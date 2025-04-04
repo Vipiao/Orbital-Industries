@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.16)
+project(OrbitalIndustries)
+
+# Set C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Specify output directory for the executable
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
+
+# Include directories for header files
+include_directories(${CMAKE_SOURCE_DIR})
+include_directories("C:/Users/user/OneDrive/cpp/libraries/glad/include")
+include_directories("C:/Users/user/OneDrive/cpp/libraries/glfw-3.3.2.bin.WIN64/include")
+include_directories("C:/Users/user/OneDrive/cpp/libraries/glm")
+
+# Link directories for libraries
+link_directories("C:/Users/user/OneDrive/cpp/libraries/glfw-3.3.2.bin.WIN64/lib-vc2019")
+
+# Add glad.c directly as a source file
+set(SOURCES
+    "${CMAKE_SOURCE_DIR}/main.cpp"
+    "C:/Users/user/OneDrive/cpp/libraries/glad/src/glad.c"
+)
+
+# Add the executable
+add_executable(OrbitalIndustries ${SOURCES})
+
+# Link with OpenGL and GLFW
+target_link_libraries(OrbitalIndustries opengl32 glfw3)
