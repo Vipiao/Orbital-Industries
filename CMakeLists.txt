@@ -13,22 +13,30 @@ include_directories(${CMAKE_SOURCE_DIR})
 include_directories("${CMAKE_SOURCE_DIR}/include")
 include_directories("C:/Users/user/OneDrive/cpp/libraries/glad/include")
 include_directories("C:/Users/user/OneDrive/cpp/libraries/glm")
+include_directories("C:/msys64/ucrt64/include")
 
-# Automatically find all source files using GLOB_RECURSE
-file(GLOB_RECURSE SOURCES
+# Add UCRT64 library path
+link_directories("C:/msys64/ucrt64/lib")
+
+# Manually list source files
+file(GLOB_RECURSE SRC_FILES
     "${CMAKE_SOURCE_DIR}/main.cpp"
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
     "C:/Users/user/OneDrive/cpp/libraries/glad/src/glad.c"
 )
 
+# Add the GLAD source file
+set(SOURCES ${SRC_FILES} "C:/Users/user/OneDrive/cpp/libraries/glad/src/glad.c")
+
 # Add the executable
 add_executable(OrbitalIndustries ${SOURCES})
 
-# Link with the static library located in your lib folder
-target_link_libraries(OrbitalIndustries 
+# Link with system libraries
+target_link_libraries(OrbitalIndustries
     "${CMAKE_SOURCE_DIR}/lib/libglfw3.a"
-    opengl32
-    gdi32
-    user32
-    shell32
+    -lassimp
+    -lopengl32
+    -lgdi32
+    -luser32
+    -lshell32
 )
