@@ -8,6 +8,7 @@
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/type_ptr.hpp>
 
 std::string ShaderProgram::loadTextFileFromPath(std::string path) {
    std::ifstream ifs(path);
@@ -53,6 +54,11 @@ void ShaderProgram::loadTessellationControlShaderFromPath(std::string tessContrC
 void ShaderProgram::loadTessellationEvaluationShaderFromPath(std::string tessEvalCodePath) {
    std::string tessCode(ShaderProgram::loadTextFileFromPath(tessEvalCodePath));
    loadTessellationEvaluationShader(tessCode);
+}
+
+void ShaderProgram::loadGeometryShaderFromPath(std::string geometryCodePath) {
+   std::string geometryCode(ShaderProgram::loadTextFileFromPath(geometryCodePath));
+   loadGeometryShader(geometryCode);
 }
 
 void ShaderProgram::loadVertexShader(std::string vertexCode) {
@@ -131,6 +137,25 @@ void ShaderProgram::loadTessellationEvaluationShader(std::string tessEvalCode) {
    m_tessellationEvaluationShaderIsLoaded = true;
 }
 
+void ShaderProgram::loadGeometryShader(std::string geometryCode) {
+   // Geometry shader.
+   m_geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
+   const char* geomCode = geometryCode.c_str();
+   glShaderSource(m_geometryShader, 1, &geomCode, NULL);
+   glCompileShader(m_geometryShader);
+   // Check for shader compile errors.
+   int success;
+   char infoLog[512];
+   glGetShaderiv(m_geometryShader, GL_COMPILE_STATUS, &success);
+   if (!success) {
+      glGetShaderInfoLog(m_geometryShader, 512, NULL, infoLog);
+      ShaderProgram::printWithLineNumbers(geomCode);
+      std::cout << std::endl << "ERROR::SHADER::GEOMETRY::COMPILATION_FAILED\n" << infoLog << std::endl;
+      throw std::runtime_error("ERROR: SHADER::GEOMETRY::COMPILATION_FAILED.");
+   }
+   m_geometryShaderIsLoaded = true;
+}
+
 void ShaderProgram::linkShaders() {
    if (!m_vertexShaderIsLoaded) {
       std::cout << "ERROR: Cannot link shader program before loading vertex shader." << std::endl;
@@ -160,6 +185,9 @@ void ShaderProgram::linkShaders() {
    if (m_tessellationEvaluationShaderIsLoaded) {
       glAttachShader(m_shaderProgram, m_tessellationEvaluationShader);
    }
+   if (m_geometryShaderIsLoaded) {
+      glAttachShader(m_shaderProgram, m_geometryShader);
+   }
    glLinkProgram(m_shaderProgram);
    // check for linking errors
    int success;
@@ -177,6 +205,9 @@ void ShaderProgram::linkShaders() {
    }
    if (m_tessellationEvaluationShaderIsLoaded) {
       glDeleteShader(m_tessellationEvaluationShader);
+   }
+   if (m_geometryShaderIsLoaded) {
+      glDeleteShader(m_geometryShader);
    }
    m_programIsLinked = true;
 }
@@ -196,6 +227,61 @@ void ShaderProgram::use() {
    }
    glUseProgram(m_shaderProgram);
 }
+
+// Uniform setters
+void ShaderProgram::setUniformMatrix4f(const std::string& name, const glm::mat4& matrix) {
+    GLint location = glGetUniformLocation(m_shaderProgram, name.c_str());
+    if (location != -1) {
+        glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(matrix));
+    }
+}
+
+void ShaderProgram::setUniformVec3(const std::string& name, const glm::dvec3& value) {
+    GLint location = glGetUniformLocation(m_shaderProgram, name.c_str());
+    if (location != -1) {
+        // Convert double precision to single precision
+        glm::vec3 floatValue(value);
+        glUniform3fv(location, 1, glm::value_ptr(floatValue));
+    }
+}
+
+void ShaderProgram::setUniformVec4(const std::string& name, const glm::dvec4& value) {
+    GLint location = glGetUniformLocation(m_shaderProgram, name.c_str());
+    if (location != -1) {
+        // Convert double precision to single precision
+        glm::vec4 floatValue(value);
+        glUniform4fv(location, 1, glm::value_ptr(floatValue));
+    }
+}
+
+void ShaderProgram::setUniformFloat(const std::string& name, float value) {
+    GLint location = glGetUniformLocation(m_shaderProgram, name.c_str());
+    if (location != -1) {
+        glUniform1f(location, value);
+    }
+}
+
+void ShaderProgram::setUniformInt(const std::string& name, int value) {
+    GLint location = glGetUniformLocation(m_shaderProgram, name.c_str());
+    if (location != -1) {
+        glUniform1i(location, value);
+    }
+}
+
+void ShaderProgram::setUniformUInt32(const std::string& name, unsigned int value) {
+    GLint location = glGetUniformLocation(m_shaderProgram, name.c_str());
+    if (location != -1) {
+        glUniform1ui(location, value);
+    }
+}
+
+void ShaderProgram::setUniformBool(const std::string& name, bool value) {
+    GLint location = glGetUniformLocation(m_shaderProgram, name.c_str());
+    if (location != -1) {
+        glUniform1i(location, static_cast<int>(value));
+    }
+}
+
 
 ShaderProgram::ShaderProgram() {
    //std::cout << std::endl << "++ Shader program" << std::endl << std::endl;
@@ -221,6 +307,10 @@ ShaderProgram::~ShaderProgram() {
       if (m_tessellationEvaluationShader != 0) {
          // 0 means it is not created yet.
          glDeleteShader(m_tessellationEvaluationShader);
+      }
+      if (m_geometryShader != 0) {
+         // 0 means it is not created yet.
+         glDeleteShader(m_geometryShader);
       }
    }
 }

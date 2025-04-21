@@ -12,6 +12,35 @@ CTestTestfile.cmake
 _deps/
 CMakeUserPresets.json
 
-# Binary files
+# Build directories
+build/
 bin/
+out/
+debug/
+release/
+
+# Cache files
+.cache/
+cache-v2-*
+codemodel-v2-*
+cmakefiles-v1-*
+index-2025-*
+target-*
+*.json.blob
+
+# Binary files
 *.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.o
+*.obj
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.vs/
