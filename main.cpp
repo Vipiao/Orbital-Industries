@@ -10,10 +10,11 @@
 
 #include "src/GraphicsEngineBase.h"
 #include "src/MeshHandler.h"
+#include "src/STBImageLoader.h"
 
 // Camera/player movement settings
-double moveSpeed = 0.1f;
-double mouseSensitivity = 0.002f;
+double moveSpeed = 0.02;
+double mouseSensitivity = 0.002;
 
 // Custom renderer class that uses MeshHandler
 class TriangleRenderer : public GraphicsEngineBase::CallBack {
@@ -75,8 +76,8 @@ public:
         // Create varying occlusion factors for demonstration
         std::vector<double> occlusionFactors = {
             1.0,  // Bottom left: fully lit
-            0.6,  // Bottom right: partially occluded
-            0.3   // Top center: more occluded
+            1.0,  // Bottom right: fully lit
+            1.0   // Top center: fully lit
         };
         
         // Add triangle to mesh
@@ -89,6 +90,14 @@ public:
         glm::dvec3 angVelAxis(0.0, 0.0, 1.0);        // Rotate around Z-axis
         double angVel = rotationSpeed;                // Rotation speed
         glm::dvec3 centerOfRotation(0.0, 0.0, 0.0);
+
+        // After creating your mesh and adding triangles, load the textures
+        MeshHandler::Texture colorTexture = meshHandler->createTexture("../media/color_512x512_occluded.png");
+        MeshHandler::Texture normalTexture = meshHandler->createTexture("../media/normal_combined_512x512.png");
+
+        // Store the texture units for later use
+        int colorTextureUnit = colorTexture.m_textureUnit;  
+        int normalTextureUnit = normalTexture.m_textureUnit;
         
         // Update mesh data - this initializes the mesh's position and rotation
         meshHandler->updateMeshData(
@@ -97,7 +106,7 @@ public:
             orientation, 
             angVelAxis, angVel, 
             centerOfRotation,
-            -1, -1,      // No textures for this demo
+            colorTextureUnit, normalTextureUnit,      // No textures for this demo
             static_cast<uint64_t>(glfwGetTime() * 1000.0)  // Current time
         );
     }

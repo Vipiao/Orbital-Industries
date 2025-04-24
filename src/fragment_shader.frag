@@ -53,7 +53,7 @@ void main() {
    // 3. Specular light - reflective highlights
    float specularStrength = 0.5;
    vec3 reflectDir = reflect(-lightDir, normal);
-   float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+   float spec = pow(max(min(dot(viewDir, reflectDir) + 0.004, 1.), 0.0), 256.0);
    vec3 specular = specularStrength * spec * vec3(1.0);
    
    // Apply occlusion factor to all lighting components
