@@ -1,0 +1,13 @@
+# Blender 4.4.1 MTL File: '00_cube.blend'
+# www.blender.org
+
+newmtl Material
+Ns 911.156982
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.450000
+d 1.000000
+illum 3
+map_Kd C:/Users/user/Documents/repositories/23_orbital_industries/Orbital-Industries/media/color_512x512_occluded.png
+map_Bump -bm 1.000000 C:/Users/user/Documents/repositories/23_orbital_industries/Orbital-Industries/media/normal_combined_512x512.png
