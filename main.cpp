@@ -36,7 +36,7 @@ public:
         loadModel();
         
         // Initialize light position
-        lightPos = glm::dvec3(2.0, 2.0, 2.0);
+        lightPos = glm::dvec3(4.0, 4.0, 4.0);
     }
     
     ~ModelRenderer() {

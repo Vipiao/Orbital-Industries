@@ -37,8 +37,12 @@ void main() {
    }
 
    // Calculate light and view directions
-   vec3 lightDir = normalize(u_lightPos - vert_pos);
+   vec3 lightVec = u_lightPos - vert_pos;
+   vec3 lightDir = normalize(lightVec);
    vec3 viewDir = normalize(u_camPos - vert_pos);
+   float sqrDist = dot(lightVec, lightVec);
+   float attenuation = 32./sqrDist;// + 1./length(lightVec);
+   attenuation = 1. - 1./(1+attenuation); // Soft max 1.
    
    // Phong lighting model components
    
@@ -53,7 +57,7 @@ void main() {
    // 3. Specular light - reflective highlights
    float specularStrength = 0.5;
    vec3 reflectDir = reflect(-lightDir, normal);
-   float spec = pow(max(min(dot(viewDir, reflectDir) + 0.004, 1.), 0.0), 256.0);
+   float spec = pow(max(min(dot(viewDir, reflectDir) + 0.001, 1.), 0.0), 128.0);
    vec3 specular = specularStrength * spec * vec3(1.0);
    
    // Apply occlusion factor to all lighting components
@@ -63,7 +67,7 @@ void main() {
    specular *= vert_occlusionFactor;
    
    // Combine all lighting components
-   vec3 result = ambient + diffuse + specular;
+   vec3 result = ambient + (diffuse + specular) * attenuation;
    
    FragColor = vec4(result, 1.0);
 }
