@@ -8,8 +8,8 @@ class MyGame : public GameBase {
 public:
     MyGame() : GameBase(800, 600, "3D Grid Demo") {
         // Set up initial camera position and orientation
-        graphicsEngine->m_camPos = glm::dvec3(0, -5, 2);
-        graphicsEngine->m_camOri = glm::angleAxis(glm::radians(20.0), glm::dvec3(1, 0, 0));
+        graphicsEngine->m_camPos = glm::dvec3(0, -3, 1);
+        graphicsEngine->m_camOri = glm::angleAxis(glm::radians(-10.0), glm::dvec3(1, 0, 0));
         graphicsEngine->m_fieldOfView = glm::radians(90.0);
         
         // Enable mouse lock for camera control
@@ -17,6 +17,8 @@ public:
         
         // Create a center grid that will be our player object
         m_playerGrid = createGrid(glm::dvec3(0, 0, 0));
+        PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->m_rigidBodyId);
+        //body->angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
         
         // Print instructions
         std::cout << "3D Grid Demo with Physics" << std::endl;
@@ -43,12 +45,12 @@ protected:
         glm::dvec3 up = graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
         
         // Handle grid force application with F key
-        if (keyboard->m_f.justPressed()) {
+        if (keyboard->m_f.isDown()) {
             // Get player rigid body
             PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->m_rigidBodyId);
             if (body) {
                 // Apply an upward force when F is pressed
-                const double forceStrength = 0.02;
+                const double forceStrength = 0.001;
                 glm::dvec3 force = forward * forceStrength;
                 
                 // Apply the force at a point slightly offset from center

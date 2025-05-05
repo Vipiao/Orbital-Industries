@@ -39,10 +39,9 @@ void GraphicsEngine::updateMeshTransform(
     double angVel,
     const glm::dvec3& centerOfRotation,
     int32_t colorTextureUnit,
-    int32_t normalTextureUnit)
+    int32_t normalTextureUnit,
+    uint64_t physicsTimeStep)
 {
-    currentTime = static_cast<uint64_t>(glfwGetTime() * 1000.0);
-    
     meshHandler->updateMeshData(
         meshId,
         &position,
@@ -53,7 +52,7 @@ void GraphicsEngine::updateMeshTransform(
         centerOfRotation,
         colorTextureUnit,
         normalTextureUnit,
-        currentTime
+        physicsTimeStep
     );
 }
 

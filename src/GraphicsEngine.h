@@ -34,7 +34,8 @@ public:
         double angVel,
         const glm::dvec3& centerOfRotation,
         int32_t colorTextureUnit = -1,
-        int32_t normalTextureUnit = -1
+        int32_t normalTextureUnit = -1,
+        uint64_t physicsTimeStep = 0
     );
     
     void removeMesh(int meshId);

@@ -30,7 +30,7 @@ Grid::Grid(GameBase* gameBase, const glm::dvec3& position, const glm::dquat& ori
     );
     
     // Set initial graphics state
-    updateGraphics(0.0);
+    updateGraphics();
 }
 
 Grid::~Grid() {
@@ -43,7 +43,7 @@ Grid::~Grid() {
     }
 }
 
-void Grid::updateGraphics(double timeRemainder) {
+void Grid::updateGraphics() {
     if (m_meshId < 0 || m_rigidBodyId < 0) {
         return;
     }
@@ -52,17 +52,28 @@ void Grid::updateGraphics(double timeRemainder) {
     if (!body) {
         return;
     }
+
+    glm::dvec3 angVelAxis = body->angularVelocity;
+    double angVelMagnitude = glm::length(angVelAxis);
+    if (angVelMagnitude > 0.00001) {
+        angVelAxis = angVelAxis / angVelMagnitude;
+    } else {
+        // If angular velocity is effectively zero, use a safe default axis
+        angVelAxis = glm::dvec3(0.0, 0.0, 1.0);
+        angVelMagnitude = 0.0;
+    }
     
     m_gameBase->graphicsEngine->updateMeshTransform(
         m_meshId,
         body->position,
         body->velocity,
         body->orientation,
-        body->angularVelocity,
-        glm::length(body->angularVelocity),
+        angVelAxis,
+        angVelMagnitude,
         glm::dvec3(0.0, 0.0, 0.0),
         m_colorTextureUnit,
-        m_normalTextureUnit
+        m_normalTextureUnit,
+        m_gameBase->physicsEngine->getCurrentPhysicsTimeStep()
     );
 }
 
@@ -78,18 +89,16 @@ GameBase::GameBase(int screenWidth, int screenHeight, const std::string& windowT
     graphicsEngine->addCallbackObject(this);
     
     m_lastFrameTime = std::chrono::high_resolution_clock::now();
-    m_lastPhysicsTime = m_lastFrameTime;
+    m_nextPhysicsTime = m_lastFrameTime + 
+        std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+            std::chrono::duration<double>(m_physicsTimeStep));
     
     int refreshRate = graphicsEngine->m_frameRate;
-    if (refreshRate <= 0) refreshRate = 60;
     
-    int physicsRate = refreshRate / 6;
-    if (physicsRate < 1) physicsRate = 1;
-    
-    m_physicsTimeStep = 1.0 / static_cast<double>(physicsRate);
+    m_physicsTimeStep = 1.0 / static_cast<double>(16);
     
     std::cout << "Display refresh rate: " << refreshRate << " Hz" << std::endl;
-    std::cout << "Physics update rate: " << physicsRate << " Hz" << std::endl;
+    std::cout << "Physics update rate: " << 16 << " Hz" << std::endl;
 }
 
 GameBase::~GameBase() {
@@ -129,20 +138,16 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     
     processInput();
     
-    m_physicsTimeAccumulator += deltaTime;
-    
-    while (m_physicsTimeAccumulator >= m_physicsTimeStep) {
+    if (currentTime >= m_nextPhysicsTime) {
         updatePhysics();
-        m_physicsTimeAccumulator -= m_physicsTimeStep;
-        m_currentPhysicsTimeStep++;
+        m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+            std::chrono::duration<double>(m_physicsTimeStep));
     }
-    
-    m_physicsTimeRemainder = m_physicsTimeAccumulator / m_physicsTimeStep;
     
     update(deltaTime);
     
     for (auto& grid : grids) {
-        grid->updateGraphics(m_physicsTimeRemainder);
+        grid->updateGraphics();
     }
 }
 
@@ -150,13 +155,22 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     // Convert double precision matrices to float precision
     glm::mat4 view = glm::mat4(viewMatrix);
     glm::mat4 projection = glm::mat4(projectionMatrix);
+
+    // Calculate time remainder directly here where it's needed
+    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto timeToNextPhysics = std::chrono::duration<double>(m_nextPhysicsTime - currentTime).count();
+    double physicsTimeRemainder = 1.0 - (timeToNextPhysics / m_physicsTimeStep);
     
+    //std::cout << "physics Time step " << physicsEngine->getCurrentPhysicsTimeStep() << std::endl;
+    //std::cout << "reminder " << physicsTimeRemainder << std::endl;
+    //std::cout << std::endl;
+
     // Render using MeshHandler's single-pass render method
     graphicsEngine->meshHandler->render(
         view, projection, 
         graphicsEngine->m_frameNum,     // frame number
-        static_cast<uint64_t>(glfwGetTime() * 1000.0),  // time in milliseconds
-        fmod(glfwGetTime() * 1000.0, 1.0),  // time remainder (fractional part)
+        physicsEngine->getCurrentPhysicsTimeStep(),  // time in milliseconds
+        physicsTimeRemainder,  // time remainder (fractional part)
         glm::dvec3(4.0, 4.0, 4.0),      // light position (fixed value or you can make this a member)
         graphicsEngine->m_camPos        // camera position
     );

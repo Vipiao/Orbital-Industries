@@ -99,6 +99,9 @@ void PhysicsEngine::run() {
     applyForces();
     updatePositions();
     handleCollisions();
+    
+    // New - increment physics time step
+    m_currentPhysicsTimeStep++;
 }
 
 void PhysicsEngine::applyForces() {
@@ -140,12 +143,20 @@ void PhysicsEngine::updatePositions() {
         
         // Update orientation: q = q + (q * ω) * 0.5
         // This is a simplified quaternion integration
-        glm::dquat angularVelocityQuat{0.0, 
-                                     body->angularVelocity.x, 
-                                     body->angularVelocity.y, 
-                                     body->angularVelocity.z};
-        body->orientation += (angularVelocityQuat * body->orientation) * 0.5;
-        body->orientation = glm::normalize(body->orientation); // Renormalize to prevent drift
+        //glm::dquat angularVelocityQuat{0.0, 
+        //                             body->angularVelocity.x, 
+        //                             body->angularVelocity.y, 
+        //                             body->angularVelocity.z};
+        //body->orientation += (angularVelocityQuat * body->orientation) * 0.5;
+        double angle{ glm::length(body->angularVelocity) };
+        glm::dquat angularVelocityQuat{};
+        if (angle > 0.) {
+            angularVelocityQuat = glm::angleAxis(angle, body->angularVelocity / angle);
+        } else {
+            angularVelocityQuat = glm::dquat{1, 0, 0, 0};
+        }
+        body->orientation = (angularVelocityQuat * body->orientation);
+         body->orientation = glm::normalize(body->orientation); // Renormalize to prevent drift
         
         // Reset forces and torques for next frame
         body->forces = glm::dvec3{0.0, 0.0, 0.0};

@@ -33,11 +33,8 @@ protected:
     virtual void update(double deltaTime);
     
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
-    std::chrono::time_point<std::chrono::high_resolution_clock> m_lastPhysicsTime;
-    double m_physicsTimeAccumulator{0.0};
-    double m_physicsTimeStep{1.0/16.0};
-    uint64_t m_currentPhysicsTimeStep{0};
-    double m_physicsTimeRemainder{0.0};
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
+    double m_physicsTimeStep{}; // Is set in constructor.
 };
 
 class Grid {
@@ -45,7 +42,7 @@ public:
     Grid(GameBase* gameBase, const glm::dvec3& position, const glm::dquat& orientation);
     ~Grid();
     
-    void updateGraphics(double timeRemainder);
+    void updateGraphics();
     
     int m_rigidBodyId{-1};
     int m_meshId{-1};

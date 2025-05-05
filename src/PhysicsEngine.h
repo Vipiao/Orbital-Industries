@@ -35,6 +35,9 @@ public:
                      double momentOfInertia = 1.0,
                      bool isStatic = false);
     
+    //
+    uint64_t getCurrentPhysicsTimeStep() const { return m_currentPhysicsTimeStep; }
+    
     // Remove a rigid body from the simulation
     void removeRigidBody(int id);
     
@@ -65,4 +68,5 @@ private:
     std::vector<std::unique_ptr<RigidBody>> m_rigidBodies;
     int m_nextBodyId;
     glm::dvec3 m_gravity{0.0, 0.0, 0.0}; // Default zero gravity
+    uint64_t m_currentPhysicsTimeStep{0};
 };
