@@ -3,6 +3,7 @@
 
 #include "GraphicsEngine.h"
 #include "PhysicsEngine.h"
+#include "TimeHandler.h"
 #include <vector>
 #include <memory>
 #include <chrono>
@@ -11,7 +12,10 @@ class Grid;
 
 class GameBase : public GraphicsEngine::CallBack {
 public:
-    GameBase(int screenWidth = 800, int screenHeight = 600, const std::string& windowTitle = "Game");
+    GameBase(int screenWidth = 800, int screenHeight = 600, 
+             const std::string& windowTitle = "Game", 
+             TimeHandler* timeHandler = nullptr,
+             GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE);
     virtual ~GameBase();
     
     Grid* createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
@@ -21,6 +25,7 @@ public:
     std::unique_ptr<GraphicsEngine> graphicsEngine;
     std::unique_ptr<PhysicsEngine> physicsEngine;
     std::vector<std::unique_ptr<Grid>> grids;
+    TimeHandler* m_timeHandler; // New
     
     virtual void preRenderCallback(uint64_t frameNum) override;
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override;

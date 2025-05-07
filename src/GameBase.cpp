@@ -77,18 +77,26 @@ void Grid::updateGraphics() {
     );
 }
 
-GameBase::GameBase(int screenWidth, int screenHeight, const std::string& windowTitle) {
+GameBase::GameBase(
+    int screenWidth, int screenHeight, const std::string& windowTitle,
+    TimeHandler* timeHandler,
+    GraphicsEngineBase::Mode controlMode)
+    : m_timeHandler(timeHandler)
+{
     graphicsEngine = std::make_unique<GraphicsEngine>(
         screenWidth, 
         screenHeight, 
-        windowTitle
+        windowTitle,
+        10000,        // maxTriangles
+        100,          // maxMeshes
+        controlMode   // Pass existing mode parameter
     );
     
     physicsEngine = std::make_unique<PhysicsEngine>();
     
     graphicsEngine->addCallbackObject(this);
     
-    m_lastFrameTime = std::chrono::high_resolution_clock::now();
+    m_lastFrameTime = m_timeHandler ? m_timeHandler->now() : std::chrono::high_resolution_clock::now();
     m_nextPhysicsTime = m_lastFrameTime + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(m_physicsTimeStep));
@@ -132,7 +140,7 @@ void GameBase::run() {
 }
 
 void GameBase::preRenderCallback(uint64_t frameNum) {
-    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = m_timeHandler ? m_timeHandler->now() : std::chrono::high_resolution_clock::now();
     auto deltaTime = std::chrono::duration<double>(currentTime - m_lastFrameTime).count();
     m_lastFrameTime = currentTime;
     
@@ -157,7 +165,7 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     glm::mat4 projection = glm::mat4(projectionMatrix);
 
     // Calculate time remainder directly here where it's needed
-    auto currentTime = std::chrono::high_resolution_clock::now();
+    auto currentTime = m_timeHandler ? m_timeHandler->now() : std::chrono::high_resolution_clock::now();
     auto timeToNextPhysics = std::chrono::duration<double>(m_nextPhysicsTime - currentTime).count();
     double physicsTimeRemainder = 1.0 - (timeToNextPhysics / m_physicsTimeStep);
     

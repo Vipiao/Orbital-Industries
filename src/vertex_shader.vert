@@ -101,7 +101,7 @@ void main() {
    
    mat3 orientation = fromQuaternion(meshData.orientation);
    orientation = rotationMatrix(
-      meshData.angVel.w * deltaTimeFloat, meshData.angVel.xyz
+      meshData.angVel.w * deltaTimeFloat * 1., meshData.angVel.xyz
    ) * orientation;
    
    vec3 rotatedPosition = orientation * (

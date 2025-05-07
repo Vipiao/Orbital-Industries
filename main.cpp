@@ -1,12 +1,15 @@
 // main.cpp
 #include "src/GameBase.h"
+#include "src/TimeHandler.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 class MyGame : public GameBase {
 public:
-    MyGame() : GameBase(800, 600, "3D Grid Demo") {
+    MyGame(TimeHandler* timeHandler, 
+           GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
+      : GameBase(800, 600, "3D Grid Demo", timeHandler, controlMode) {
         // Set up initial camera position and orientation
         graphicsEngine->m_camPos = glm::dvec3(0, -3, 1);
         graphicsEngine->m_camOri = glm::angleAxis(glm::radians(-10.0), glm::dvec3(1, 0, 0));
@@ -154,8 +157,17 @@ private:
 
 int main() {
     try {
-        MyGame game;
+        // Create the TimeHandler with appropriate mode
+        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::NONE);
+
+        // Use existing GraphicsEngineBase::Mode for controls
+        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE;
+
+        MyGame game(timeHandler, controlMode); // Updated
         game.run();
+        
+        // Clean up TimeHandler
+        delete timeHandler; // New
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
