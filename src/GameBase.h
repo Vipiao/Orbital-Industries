@@ -4,11 +4,10 @@
 #include "GraphicsEngine.h"
 #include "PhysicsEngine.h"
 #include "TimeHandler.h"
+#include "Grid.h"
 #include <vector>
 #include <memory>
 #include <chrono>
-
-class Grid;
 
 class GameBase : public GraphicsEngine::CallBack {
 public:
@@ -36,23 +35,10 @@ protected:
     virtual void processInput();
     virtual void updatePhysics();
     virtual void update(double deltaTime);
+    virtual void processGridGraphicsUpdates();
     
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
     double m_physicsTimeStep{}; // Is set in constructor.
 };
 
-class Grid {
-public:
-    Grid(GameBase* gameBase, const glm::dvec3& position, const glm::dquat& orientation);
-    ~Grid();
-    
-    void updateGraphics();
-    
-    int m_rigidBodyId{-1};
-    int m_meshId{-1};
-    
-    GameBase* m_gameBase;
-    int m_colorTextureUnit{-1};
-    int m_normalTextureUnit{-1};
-};

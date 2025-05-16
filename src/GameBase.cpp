@@ -3,80 +3,6 @@
 #include <iostream>
 #include <algorithm>
 
-Grid::Grid(GameBase* gameBase, const glm::dvec3& position, const glm::dquat& orientation)
-    : m_gameBase(gameBase)
-{
-    // Load cube mesh and store texture units
-    m_meshId = m_gameBase->graphicsEngine->loadModel(
-        "../media/blender/00_cube.obj",
-        "../media/color_512x512_occluded.png",
-        "../media/normal_combined_512x512.png",
-        false,  // ignoreTextureCoordinates
-        &m_colorTextureUnit,  // Pass the address to store color texture unit
-        &m_normalTextureUnit  // Pass the address to store normal texture unit
-    );
-    
-    if (m_meshId < 0) {
-        std::cerr << "Failed to create mesh for grid" << std::endl;
-        return;
-    }
-    
-    // Create a rigid body in the physics engine
-    m_rigidBodyId = m_gameBase->physicsEngine->addRigidBody(
-        position,
-        orientation,
-        1.0,  // Mass
-        0.4   // Moment of inertia (approximated for a cube)
-    );
-    
-    // Set initial graphics state
-    updateGraphics();
-}
-
-Grid::~Grid() {
-    if (m_meshId >= 0) {
-        m_gameBase->graphicsEngine->removeMesh(m_meshId);
-    }
-    
-    if (m_rigidBodyId >= 0) {
-        m_gameBase->physicsEngine->removeRigidBody(m_rigidBodyId);
-    }
-}
-
-void Grid::updateGraphics() {
-    if (m_meshId < 0 || m_rigidBodyId < 0) {
-        return;
-    }
-    
-    PhysicsEngine::RigidBody* body = m_gameBase->physicsEngine->getRigidBody(m_rigidBodyId);
-    if (!body) {
-        return;
-    }
-
-    glm::dvec3 angVelAxis = body->angularVelocity;
-    double angVelMagnitude = glm::length(angVelAxis);
-    if (angVelMagnitude > 0.00001) {
-        angVelAxis = angVelAxis / angVelMagnitude;
-    } else {
-        // If angular velocity is effectively zero, use a safe default axis
-        angVelAxis = glm::dvec3(0.0, 0.0, 1.0);
-        angVelMagnitude = 0.0;
-    }
-    
-    m_gameBase->graphicsEngine->updateMeshTransform(
-        m_meshId,
-        body->position,
-        body->velocity,
-        body->orientation,
-        angVelAxis,
-        angVelMagnitude,
-        glm::dvec3(0.0, 0.0, 0.0),
-        m_colorTextureUnit,
-        m_normalTextureUnit,
-        m_gameBase->physicsEngine->getCurrentPhysicsTimeStep()
-    );
-}
-
 GameBase::GameBase(
     int screenWidth, int screenHeight, const std::string& windowTitle,
     TimeHandler* timeHandler,
@@ -89,7 +15,7 @@ GameBase::GameBase(
         windowTitle,
         10000,        // maxTriangles
         100,          // maxMeshes
-        controlMode   // Pass existing mode parameter
+        controlMode
     );
     
     physicsEngine = std::make_unique<PhysicsEngine>();
@@ -118,7 +44,7 @@ GameBase::~GameBase() {
 }
 
 Grid* GameBase::createGrid(const glm::dvec3& position, const glm::dquat& orientation) {
-    auto grid = std::make_unique<Grid>(this, position, orientation);
+    auto grid = std::make_unique<Grid>(physicsEngine.get(), graphicsEngine.get(), position, orientation);
     Grid* gridPtr = grid.get();
     grids.push_back(std::move(grid));
     return gridPtr;
@@ -153,6 +79,8 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     }
     
     update(deltaTime);
+
+    processGridGraphicsUpdates();
     
     for (auto& grid : grids) {
         grid->updateGraphics();
@@ -204,4 +132,12 @@ void GameBase::updatePhysics() {
 void GameBase::update(double deltaTime) {
     // Base implementation does nothing
     // Override in derived classes for game-specific logic
+}
+
+void GameBase::processGridGraphicsUpdates() {
+    for (auto& grid : grids) {
+        if (grid->hasGraphicsUpdates()) {
+            grid->processGraphicsQueue();
+        }
+    }
 }

@@ -11,8 +11,8 @@ public:
            GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
       : GameBase(800, 600, "3D Grid Demo", timeHandler, controlMode) {
         // Set up initial camera position and orientation
-        graphicsEngine->m_camPos = glm::dvec3(0, -3, 1);
-        graphicsEngine->m_camOri = glm::angleAxis(glm::radians(-10.0), glm::dvec3(1, 0, 0));
+        graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
+        graphicsEngine->m_camOri = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
         graphicsEngine->m_fieldOfView = glm::radians(90.0);
         
         // Enable mouse lock for camera control
@@ -20,26 +20,51 @@ public:
         
         // Create a center grid that will be our player object
         m_playerGrid = createGrid(glm::dvec3(0, 0, 0));
-        PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->m_rigidBodyId);
+
+        addGridBlock(1, 0, 0);  // Block to the right
+        addGridBlock(0, 0, 0);  // Center block
+        //addGridBlock(0, 1, 0);  // Block to the front
+        //addGridBlock(0, 0, 1);  // Block above
+        
+        PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
         //body->angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
+        //body->orientation = glm::angleAxis(glm::radians(180.0), glm::dvec3{1.0, 0.,0.});
         
         // Print instructions
-        std::cout << "3D Grid Demo with Physics" << std::endl;
+        std::cout << "3D Grid Block Demo" << std::endl;
         std::cout << "Controls:" << std::endl;
         std::cout << "  WASD: Move camera" << std::endl;
         std::cout << "  Mouse: Look around" << std::endl;
         std::cout << "  Space/Shift: Move up/down" << std::endl;
         std::cout << "  M: Toggle mouse lock" << std::endl;
-        std::cout << "  F: Apply force to player grid" << std::endl;
+        std::cout << "  F: Apply force to grid" << std::endl;
+        std::cout << "  E: Add block at (1,1,1)" << std::endl;
+        std::cout << "  Q: Remove block at (1,1,1)" << std::endl;
+    }
+
+    void addGridBlock(int x, int y, int z) {
+        if (m_playerGrid) {
+            m_playerGrid->addCell(glm::ivec3(x, y, z));
+            std::cout << "Added block at (" << x << "," << y << "," << z << ")" << std::endl;
+        }
+    }
+    
+    // New - Method to remove a block from the grid
+    void removeGridBlock(int x, int y, int z) {
+        if (m_playerGrid) {
+            m_playerGrid->removeCell(glm::ivec3(x, y, z));
+            std::cout << "Removed block at (" << x << "," << y << "," << z << ")" << std::endl;
+        }
     }
     
 protected:
+    double m_moveSpeed = 0.05;
+
     virtual void processInput() override {
         MouseHandler* mouseHandler = graphicsEngine->m_mouseHandler;
         KeyboardHandler* keyboard = graphicsEngine->m_keyboardHandler;
         
         // Camera movement speed
-        const double moveSpeed = 0.05;
         const double mouseSensitivity = 0.002;
         
         // Calculate movement vectors based on camera orientation
@@ -47,10 +72,24 @@ protected:
         glm::dvec3 forward = graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 up = graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
         
+        // Add/remove blocks with E/Q keys
+        if (m_playerGrid) {
+            glm::dvec3 pos{graphicsEngine->m_camPos + forward * 2.};
+            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
+            glm::i64vec3 posI{glm::floor(glm::conjugate(body->orientation) * (pos - body->position) + m_playerGrid->m_centerOfMass)};
+            if (keyboard->m_t.justPressed()) {
+                addGridBlock(posI.x, posI.y, posI.z);
+            }
+            
+            if (keyboard->m_r.justPressed()) {
+                removeGridBlock(posI.x, posI.y, posI.z);
+            }
+        }
+
         // Handle grid force application with F key
         if (keyboard->m_f.isDown()) {
             // Get player rigid body
-            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->m_rigidBodyId);
+            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
             if (body) {
                 // Apply an upward force when F is pressed
                 const double forceStrength = 0.001;
@@ -70,6 +109,14 @@ protected:
             bool isLocked = mouseHandler->getMouseLock();
             mouseHandler->setMouseLock(!isLocked);
             std::cout << "Mouse " << (isLocked ? "unlocked" : "locked") << std::endl;
+        }
+
+        // Accelerate
+        if (keyboard->m_c.isDown()) {
+            m_moveSpeed *= 1.05;
+        }
+        if (keyboard->m_v.isDown()) {
+            m_moveSpeed /= 1.05;
         }
         
         // Mouse look (camera rotation)
@@ -120,7 +167,7 @@ protected:
         
         // Apply movement if any keys were pressed
         if (glm::length(moveDirection) > 0.0) {
-            moveDirection = glm::normalize(moveDirection) * moveSpeed;
+            moveDirection = glm::normalize(moveDirection) * m_moveSpeed;
             graphicsEngine->m_camPos += moveDirection;
         }
     }
@@ -128,7 +175,7 @@ protected:
     virtual void updatePhysics() override {
         // Apply drag to all objects before running physics
         for (const auto& grid : grids) {
-            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(grid->m_rigidBodyId);
+            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(grid->getRigidBodyId());
             if (body && !body->isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
                 const double dragCoefficient = 0.04;
