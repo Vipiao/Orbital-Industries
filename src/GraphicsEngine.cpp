@@ -19,7 +19,7 @@ GraphicsEngine::GraphicsEngine(
         glfwSetWindowTitle(m_window, windowTitle.c_str());
     }
     
-    meshHandler = std::make_unique<MeshHandler>(maxTriangles, maxMeshes);
+    m_meshHandler = std::make_unique<MeshHandler>(maxTriangles, maxMeshes);
 }
 
 GraphicsEngine::~GraphicsEngine() {
@@ -27,7 +27,7 @@ GraphicsEngine::~GraphicsEngine() {
 }
 
 int GraphicsEngine::createMesh() {
-    return meshHandler->addMesh();
+    return m_meshHandler->addMesh();
 }
 
 void GraphicsEngine::updateMeshTransform(
@@ -42,7 +42,7 @@ void GraphicsEngine::updateMeshTransform(
     int32_t normalTextureUnit,
     uint64_t physicsTimeStep)
 {
-    meshHandler->updateMeshData(
+    m_meshHandler->updateMeshData(
         meshId,
         &position,
         &velocity,
@@ -57,11 +57,11 @@ void GraphicsEngine::updateMeshTransform(
 }
 
 void GraphicsEngine::removeMesh(int meshId) {
-    meshHandler->removeMesh(meshId);
+    m_meshHandler->removeMesh(meshId);
 }
 
 MeshHandler::Texture GraphicsEngine::createTexture(const std::string& texturePath) {
-    return meshHandler->createTexture(texturePath);
+    return m_meshHandler->createTexture(texturePath);
 }
 
 int GraphicsEngine::loadModel(
@@ -191,7 +191,7 @@ std::vector<uint32_t> GraphicsEngine::loadModelIntoMesh(
             if (positions.empty()) {
                 continue;
             }
-            std::vector<uint32_t> triangleIds = meshHandler->appendTrianglesToMesh(
+            std::vector<uint32_t> triangleIds = m_meshHandler->appendTrianglesToMesh(
                 meshId,
                 &positions,
                 &normals,

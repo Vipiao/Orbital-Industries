@@ -9,25 +9,25 @@ GameBase::GameBase(
     GraphicsEngineBase::Mode controlMode)
     : m_timeHandler(timeHandler)
 {
-    graphicsEngine = std::make_unique<GraphicsEngine>(
+    m_graphicsEngine = std::make_unique<GraphicsEngine>(
         screenWidth, 
         screenHeight, 
         windowTitle,
-        10000,        // maxTriangles
+        100000,        // maxTriangles
         100,          // maxMeshes
         controlMode
     );
     
-    physicsEngine = std::make_unique<PhysicsEngine>();
+    m_physicsEngine = std::make_unique<PhysicsEngine>();
     
-    graphicsEngine->addCallbackObject(this);
+    m_graphicsEngine->addCallbackObject(this);
     
     m_lastFrameTime = m_timeHandler ? m_timeHandler->now() : std::chrono::high_resolution_clock::now();
     m_nextPhysicsTime = m_lastFrameTime + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(m_physicsTimeStep));
     
-    int refreshRate = graphicsEngine->m_frameRate;
+    int refreshRate = m_graphicsEngine->m_frameRate;
     
     m_physicsTimeStep = 1.0 / static_cast<double>(16);
     
@@ -36,33 +36,33 @@ GameBase::GameBase(
 }
 
 GameBase::~GameBase() {
-    grids.clear();
+    m_grids.clear();
     
-    if (graphicsEngine) {
-        graphicsEngine->removeCallbackObject(this);
+    if (m_graphicsEngine) {
+        m_graphicsEngine->removeCallbackObject(this);
     }
 }
 
 Grid* GameBase::createGrid(const glm::dvec3& position, const glm::dquat& orientation) {
-    auto grid = std::make_unique<Grid>(physicsEngine.get(), graphicsEngine.get(), position, orientation);
+    auto grid = std::make_unique<Grid>(m_physicsEngine.get(), m_graphicsEngine.get(), position, orientation);
     Grid* gridPtr = grid.get();
-    grids.push_back(std::move(grid));
+    m_grids.push_back(std::move(grid));
     return gridPtr;
 }
 
 void GameBase::removeGrid(Grid* grid) {
-    auto it = std::find_if(grids.begin(), grids.end(),
+    auto it = std::find_if(m_grids.begin(), m_grids.end(),
         [grid](const std::unique_ptr<Grid>& item) {
             return item.get() == grid;
         });
     
-    if (it != grids.end()) {
-        grids.erase(it);
+    if (it != m_grids.end()) {
+        m_grids.erase(it);
     }
 }
 
 void GameBase::run() {
-    graphicsEngine->startRenderLoop();
+    m_graphicsEngine->startRenderLoop();
 }
 
 void GameBase::preRenderCallback(uint64_t frameNum) {
@@ -82,7 +82,7 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
 
     processGridGraphicsUpdates();
     
-    for (auto& grid : grids) {
+    for (auto& grid : m_grids) {
         grid->updateGraphics();
     }
 }
@@ -102,13 +102,13 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     //std::cout << std::endl;
 
     // Render using MeshHandler's single-pass render method
-    graphicsEngine->meshHandler->render(
+    m_graphicsEngine->m_meshHandler->render(
         view, projection, 
-        graphicsEngine->m_frameNum,     // frame number
-        physicsEngine->getCurrentPhysicsTimeStep(),  // time in milliseconds
+        m_graphicsEngine->m_frameNum,     // frame number
+        m_physicsEngine->getCurrentPhysicsTimeStep(),  // time in milliseconds
         physicsTimeRemainder,  // time remainder (fractional part)
         glm::dvec3(4.0, 4.0, 4.0),      // light position (fixed value or you can make this a member)
-        graphicsEngine->m_camPos        // camera position
+        m_graphicsEngine->m_camPos        // camera position
     );
 }
 
@@ -126,7 +126,7 @@ void GameBase::processInput() {
 }
 
 void GameBase::updatePhysics() {
-    physicsEngine->run();
+    m_physicsEngine->run();
 }
 
 void GameBase::update(double deltaTime) {
@@ -135,7 +135,7 @@ void GameBase::update(double deltaTime) {
 }
 
 void GameBase::processGridGraphicsUpdates() {
-    for (auto& grid : grids) {
+    for (auto& grid : m_grids) {
         if (grid->hasGraphicsUpdates()) {
             grid->processGraphicsQueue();
         }

@@ -1,4 +1,4 @@
-// Grid.h - Updated
+// Grid.h
 #pragma once
 
 #include "PhysicsEngine.h"
@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <queue>
 
-// New - Custom hash function for glm::ivec3
+// Custom hash function for glm::ivec3
 struct IVec3Hash {
     size_t operator()(const glm::ivec3& coord) const {
         // XOR coordinates then apply basic hash
@@ -20,48 +20,55 @@ struct IVec3Hash {
     }
 };
 
-// New - Cell type enum
+// Cell type enum
 enum class CellType { ARMOR };
 
-// New - Cell structure to hold face triangle IDs
+// Cell structure to hold face triangle IDs
 struct GridCell {
     CellType type;
     std::vector<uint32_t> faceTriangleIds[6]; // Triangle IDs for each face direction
 };
 
-// New - Using glm::ivec3 for coordinates
+// Using glm::ivec3 for coordinates
 using CellMap = std::unordered_map<glm::ivec3, GridCell, IVec3Hash>;
 
 class Grid {
 public:
-    // Updated - Constructor now takes physics and graphics pointers
+    // Constructor now takes physics and graphics pointers
     Grid(PhysicsEngine* physics, GraphicsEngine* graphics, 
          const glm::dvec3& position, 
          const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     ~Grid();
     
-    // New - Cell management methods
+    // Cell management methods
     void addCell(const glm::ivec3& coord, CellType type = CellType::ARMOR);
     void removeCell(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;
     
-    // Updated - Split graphics update method
+    // Split graphics update method
     void updateGraphics();
     void processGraphicsQueue();
     
-    // New - Getters for GameBase
+    // Getters for GameBase
     int getRigidBodyId() const { return m_rigidBodyId; }
     bool hasGraphicsUpdates() const { return !m_graphicsUpdateQueue.empty(); }
+
+    // Convert world coordinates to grid-local coordinates
+    glm::dvec3 worldToGrid(const glm::dvec3& worldPos) const;
     
-    // New - Physics and rendering properties
+    // Convert grid-local coordinates to world coordinates
+    glm::dvec3 gridToWorld(const glm::dvec3& gridPos) const;
+
+    std::vector<glm::ivec3> gridTraversal(glm::dvec3 startPos, glm::dvec3 endPos);
+    
     glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
     
 private:
-    // New - Core data for block grid
+    // Core data for block grid
     CellMap m_cells;
     std::queue<glm::ivec3> m_graphicsUpdateQueue;
     
-    // Updated - External system references
+    // External system references
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
     int m_rigidBodyId{-1};
@@ -69,18 +76,18 @@ private:
     int m_colorTextureUnit{-1};
     int m_normalTextureUnit{-1};
     
-    // New - Face visibility and mesh management methods
+    // Face visibility and mesh management methods
     void recalculateCenterOfMass();
     void updateCellGraphics(const glm::ivec3& coord);
     bool isFaceVisible(const glm::ivec3& coord, int faceIndex) const;
     void queueNeighborsForUpdate(const glm::ivec3& coord);
     
-    // New - Static face mesh data
+    // Static face mesh data
     static std::vector<AssetMeshData> s_faceMeshData;
     static bool s_faceMeshDataLoaded;
     static void loadFaceMeshData();
     
-    // New - Face transform lookup table
+    // Face transform lookup table
     struct FaceTransform {
         glm::dvec3 axis;
         double angle;

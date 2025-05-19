@@ -57,6 +57,6 @@ public:
         bool ignoreTextureCoordinates = false
     );
     
-    std::unique_ptr<MeshHandler> meshHandler;
+    std::unique_ptr<MeshHandler> m_meshHandler;
     uint64_t currentTime{0};
 };

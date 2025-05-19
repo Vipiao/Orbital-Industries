@@ -21,9 +21,9 @@ public:
     void removeGrid(Grid* grid);
     void run();
     
-    std::unique_ptr<GraphicsEngine> graphicsEngine;
-    std::unique_ptr<PhysicsEngine> physicsEngine;
-    std::vector<std::unique_ptr<Grid>> grids;
+    std::unique_ptr<GraphicsEngine> m_graphicsEngine;
+    std::unique_ptr<PhysicsEngine> m_physicsEngine;
+    std::vector<std::unique_ptr<Grid>> m_grids;
     TimeHandler* m_timeHandler; // New
     
     virtual void preRenderCallback(uint64_t frameNum) override;

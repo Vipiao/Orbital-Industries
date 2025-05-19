@@ -119,7 +119,7 @@ void Grid::removeCell(const glm::ivec3& coord) {
         // Remove all face triangles from the mesh
         for (int face = 0; face < 6; face++) {
             if (!cellIt->second.faceTriangleIds[face].empty()) {
-                m_graphics->meshHandler->removeTrianglesFromMesh(
+                m_graphics->m_meshHandler->removeTrianglesFromMesh(
                     m_meshId, &cellIt->second.faceTriangleIds[face]);
             }
         }
@@ -160,19 +160,35 @@ void Grid::queueNeighborsForUpdate(const glm::ivec3& coord) {
     }
 }
 
-// Recalculate center of mass when cells change
 void Grid::recalculateCenterOfMass() {
     if (m_cells.empty()) return;
     
     glm::dvec3 oldCM = m_centerOfMass;
     glm::dvec3 newCM(0.0, 0.0, 0.0);
+    double totalMass = 0.0;
     
-    // Calculate average position of all cells
+    // Define mass for a steel cube made of welded panels
+    // 0.5m steel cube (hollow with 5mm thick walls) - approximately 60kg
+    const double blockMass = 60.0;
+    
+    // Calculate weighted average position of all cells (center of mass)
     for (const auto& pair : m_cells) {
         const glm::ivec3& coord = pair.first;
-        newCM += glm::dvec3(coord) + glm::dvec3{0.5, 0.5, 0.5};
+        const GridCell& cell = pair.second;
+        
+        // Get mass based on cell type (could be different for different cell types)
+        double mass = blockMass;
+        if (cell.type == CellType::ARMOR) {
+            mass = blockMass;
+        }
+        
+        // Add weighted position
+        newCM += (glm::dvec3(coord) + glm::dvec3{0.5, 0.5, 0.5}) * mass;
+        totalMass += mass;
     }
-    newCM /= static_cast<double>(m_cells.size());
+    
+    // Divide by total mass to get center of mass
+    newCM /= totalMass;
     
     // Calculate change in center of mass
     glm::dvec3 change = newCM - oldCM;
@@ -181,14 +197,54 @@ void Grid::recalculateCenterOfMass() {
         // Update center of mass
         m_centerOfMass = newCM;
         
-        // Update physics body position
+        // Update physics body position and velocity
         PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
         if (body) {
+            // Update mass of the rigid body
+            body->mass = totalMass;
+            
+            // Store old angular velocity
+            glm::dvec3 oldAngularVel = body->angularVelocity;
+            
+            // Update position
             body->position += body->orientation * change;
-
+            
+            // Calculate velocity change to conserve angular momentum
             glm::dvec3 changeInWorld = body->orientation * change;
-            glm::dvec3 addedVel = glm::cross(body->angularVelocity, changeInWorld);
+            glm::dvec3 addedVel = glm::cross(oldAngularVel, changeInWorld);
             body->velocity += addedVel;
+            
+            // Calculate new moment of inertia (scalar approximation)
+            double totalMoment = 0.0;
+            
+            // Moment of inertia of a hollow cube (approximation)
+            // For a thin-walled hollow cube, I = (2/3) * m * (a^2), where a is the side length
+            double blockBaseInertia = (2.0/3.0) * blockMass * 0.5 * 0.5;
+            // Half moment of inertia due to mass near the axis should not contribute too much. (Simplified calculation)
+            blockBaseInertia *= 0.5;
+            
+            for (const auto& pair : m_cells) {
+                const glm::ivec3& coord = pair.first;
+                const GridCell& cell = pair.second;
+                
+                // Get mass based on cell type
+                double mass = blockMass;
+                if (cell.type == CellType::ARMOR) {
+                    mass = blockMass;
+                }
+                
+                // Position of block relative to new center of mass
+                glm::dvec3 relPos = glm::dvec3(coord) + glm::dvec3{0.5, 0.5, 0.5} - newCM;
+                
+                // Distance squared from center of mass
+                double distSquared = glm::dot(relPos, relPos);
+                
+                // Apply parallel axis theorem: I = I_cm + m*d²
+                totalMoment += blockBaseInertia + mass * distSquared;
+            }
+            
+            // Update the rigid body's moment of inertia
+            body->momentOfInertia = totalMoment;
         }
     }
 }
@@ -255,6 +311,109 @@ void Grid::processGraphicsQueue() {
     }
 }
 
+// Convert world coordinates to grid-local coordinates
+glm::dvec3 Grid::worldToGrid(const glm::dvec3& worldPos) const {
+    PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
+    if (!body) {
+        throw std::runtime_error("ERROR: Failed to convert world to grid coordinates: Rigid body not found");
+    }
+    
+    // Transform: 
+    // 1. Translate relative to body position
+    // 2. Rotate by conjugate of body orientation
+    // 3. Add center of mass offset
+    return glm::conjugate(body->orientation) * (worldPos - body->position) + m_centerOfMass;
+}
+
+// Convert grid-local coordinates to world coordinates
+glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
+    PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
+    if (!body) {
+        throw std::runtime_error("ERROR: Failed to convert grid to world coordinates: Rigid body not found");
+    }
+    
+    // Transform:
+    // 1. Subtract center of mass
+    // 2. Apply body orientation
+    // 3. Add body position
+    return body->position + body->orientation * (gridPos - m_centerOfMass);
+}
+
+// Add your gridTraversal implementation to Grid.cpp
+std::vector<glm::ivec3> Grid::gridTraversal(glm::dvec3 startPos, glm::dvec3 endPos) {
+   // In case the direction is such that the end cell might be missed.
+   // For example {-0.5, 0.5, 0.5}, {0.0, 0.0, 0.5}
+   glm::ivec3 newOrigin = glm::floor(endPos);
+   glm::dvec3 startPosRel{ startPos - static_cast<glm::dvec3>(newOrigin) };
+   glm::dvec3 endPosRel{ endPos - static_cast<glm::dvec3>(newOrigin) };
+   constexpr double shift{ 1.e-6 };
+   if (endPosRel.x == 0.) {
+      endPosRel.x = shift;
+   }
+   if (endPosRel.y == 0.) {
+      endPosRel.y = shift;
+   }
+   if (endPosRel.z == 0.) {
+      endPosRel.z = shift;
+   }
+   //
+   std::vector<glm::ivec3> cells;
+   glm::dvec3 dir{ endPosRel - startPosRel };
+   glm::ivec3 step{ glm::sign(dir) };
+   glm::dvec3 nextBoundary{ glm::floor(startPosRel) + glm::dvec3{ step } };
+   glm::dvec3 tMax{};
+   glm::dvec3 tDelta{};// = glm::abs(step / dir);
+   for (int i = 0; i < 3; ++i) {
+      // Avoid division by zero for axis-aligned rays
+      if (dir[i] > 0.) {
+         tMax[i] = (nextBoundary[i] - startPosRel[i]) / dir[i];
+         tDelta[i] = glm::abs(step[i] / dir[i]);
+      } else if (dir[i] < 0.) {
+         tMax[i] = (nextBoundary[i] - startPosRel[i] + 1) / dir[i];
+         tDelta[i] = glm::abs(step[i] / dir[i]);
+      } else {
+         tMax[i] = std::numeric_limits<double>::infinity();
+         tDelta[i] = std::numeric_limits<double>::infinity();
+      }
+   }
+   glm::ivec3 cell = glm::floor(startPosRel);
+   //glm::dvec3 adjustedEndPos = endPosRel + 1e-10 * glm::normalize(dir);
+   glm::ivec3 endCell = glm::floor(endPosRel);
+#ifndef NDEBUG // Debug mode.
+   uint64_t maxIt{ static_cast<uint64_t>(glm::length(dir) + 1.) * 3 };
+   uint64_t iteration{ 0 };
+#endif
+   while (true) {
+#ifndef NDEBUG // Debug mode.
+      if (iteration++ > maxIt) {
+         throw std::runtime_error("gridTraversal too many iterations.");
+      }
+#endif
+      cells.push_back(cell + newOrigin);
+      if (cell == endCell) {
+         break;
+      }
+      if (tMax.x < tMax.y) {
+         if (tMax.x < tMax.z) {
+            cell.x += step.x;
+            tMax.x += tDelta.x;
+         } else {
+            cell.z += step.z;
+            tMax.z += tDelta.z;
+         }
+      } else {
+         if (tMax.y < tMax.z) {
+            cell.y += step.y;
+            tMax.y += tDelta.y;
+         } else {
+            cell.z += step.z;
+            tMax.z += tDelta.z;
+         }
+      }
+   }
+   return cells;
+}
+
 // Update the graphics for a specific cell
 void Grid::updateCellGraphics(const glm::ivec3& coord) {
     auto it = m_cells.find(coord);
@@ -265,7 +424,7 @@ void Grid::updateCellGraphics(const glm::ivec3& coord) {
     // First, remove any existing face meshes for this cell
     for (int face = 0; face < 6; face++) {
         if (!cell.faceTriangleIds[face].empty()) {
-            m_graphics->meshHandler->removeTrianglesFromMesh(m_meshId, &cell.faceTriangleIds[face]);
+            m_graphics->m_meshHandler->removeTrianglesFromMesh(m_meshId, &cell.faceTriangleIds[face]);
             cell.faceTriangleIds[face].clear();
         }
     }
@@ -310,7 +469,7 @@ void Grid::updateCellGraphics(const glm::ivec3& coord) {
             }
             
             // Add this face to the mesh
-            cell.faceTriangleIds[face] = m_graphics->meshHandler->appendTrianglesToMesh(
+            cell.faceTriangleIds[face] = m_graphics->m_meshHandler->appendTrianglesToMesh(
                 m_meshId, &positions, &normals, &tangents, &uvs);
         }
     }

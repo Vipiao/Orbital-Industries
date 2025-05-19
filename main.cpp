@@ -11,12 +11,12 @@ public:
            GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
       : GameBase(800, 600, "3D Grid Demo", timeHandler, controlMode) {
         // Set up initial camera position and orientation
-        graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
-        graphicsEngine->m_camOri = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
-        graphicsEngine->m_fieldOfView = glm::radians(90.0);
+        m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
+        m_graphicsEngine->m_camOri = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
+        m_graphicsEngine->m_fieldOfView = glm::radians(90.0);
         
         // Enable mouse lock for camera control
-        graphicsEngine->m_mouseHandler->setMouseLock(true);
+        m_graphicsEngine->m_mouseHandler->setMouseLock(true);
         
         // Create a center grid that will be our player object
         m_playerGrid = createGrid(glm::dvec3(0, 0, 0));
@@ -26,7 +26,7 @@ public:
         //addGridBlock(0, 1, 0);  // Block to the front
         //addGridBlock(0, 0, 1);  // Block above
         
-        PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
+        PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
         //body->angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
         //body->orientation = glm::angleAxis(glm::radians(180.0), glm::dvec3{1.0, 0.,0.});
         
@@ -45,7 +45,6 @@ public:
     void addGridBlock(int x, int y, int z) {
         if (m_playerGrid) {
             m_playerGrid->addCell(glm::ivec3(x, y, z));
-            std::cout << "Added block at (" << x << "," << y << "," << z << ")" << std::endl;
         }
     }
     
@@ -53,7 +52,6 @@ public:
     void removeGridBlock(int x, int y, int z) {
         if (m_playerGrid) {
             m_playerGrid->removeCell(glm::ivec3(x, y, z));
-            std::cout << "Removed block at (" << x << "," << y << "," << z << ")" << std::endl;
         }
     }
     
@@ -61,46 +59,86 @@ protected:
     double m_moveSpeed = 0.05;
 
     virtual void processInput() override {
-        MouseHandler* mouseHandler = graphicsEngine->m_mouseHandler;
-        KeyboardHandler* keyboard = graphicsEngine->m_keyboardHandler;
+        MouseHandler* mouseHandler = m_graphicsEngine->m_mouseHandler;
+        KeyboardHandler* keyboard = m_graphicsEngine->m_keyboardHandler;
         
         // Camera movement speed
         const double mouseSensitivity = 0.002;
         
         // Calculate movement vectors based on camera orientation
-        glm::dvec3 right = graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
-        glm::dvec3 forward = graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
-        glm::dvec3 up = graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
+        glm::dvec3 right = m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
+        glm::dvec3 forward = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 up = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
         
-        // Add/remove blocks with E/Q keys
-        if (m_playerGrid) {
-            glm::dvec3 pos{graphicsEngine->m_camPos + forward * 2.};
-            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
-            glm::i64vec3 posI{glm::floor(glm::conjugate(body->orientation) * (pos - body->position) + m_playerGrid->m_centerOfMass)};
-            if (keyboard->m_t.justPressed()) {
-                addGridBlock(posI.x, posI.y, posI.z);
+        // Add/remove blocks with T/R keys
+        bool doCreate = mouseHandler->rightClick(), doRemove = mouseHandler->leftClick();
+        if (m_playerGrid && (doCreate || doRemove)) {
+            // Start position (camera position)
+            glm::dvec3 startPos = m_graphicsEngine->m_camPos;
+            // End position (10 meters in the direction the camera is looking)
+            glm::dvec3 endPos = startPos + forward * 10.0;
+
+            glm::dvec3 startPosLocal = m_playerGrid->worldToGrid(startPos);
+            glm::dvec3 endPosLocal = m_playerGrid->worldToGrid(endPos);
+            
+            // Get all cells along the ray
+            std::vector<glm::ivec3> cellsInPath = m_playerGrid->gridTraversal(startPosLocal, endPosLocal);
+            
+            // Position where we'll place or remove a block
+            glm::ivec3 targetPos;
+            
+            // Flag to track if we found a block
+            bool blockFound = false;
+            size_t blockFoundIndex = 0;
+            
+            // Check if any cells already have blocks
+            for (size_t i = 1; i < cellsInPath.size(); i++) { // Skip first cell (where camera is)
+                if (m_playerGrid->hasCell(cellsInPath[i])) {
+                    // We found a block! Use the cell right before it
+                    targetPos = cellsInPath[i-1];
+                    blockFound = true;
+                    blockFoundIndex = i;
+                    break;
+                }
             }
             
-            if (keyboard->m_r.justPressed()) {
-                removeGridBlock(posI.x, posI.y, posI.z);
+            // If no block found, use a position 2 meters away
+            if (!blockFound) {
+                glm::dvec3 pos = startPos + forward * 2.0;
+                glm::dvec3 posLocal = m_playerGrid->worldToGrid(pos);
+                targetPos = glm::ivec3(glm::floor(posLocal));
+            }
+            
+            // Add or remove blocks based on key presses
+            if (doCreate) {
+                addGridBlock(targetPos.x, targetPos.y, targetPos.z);
+            }
+            
+            if (doRemove) {
+                // If we found a block, remove it instead of the target position
+                if (blockFound) {
+                    removeGridBlock(cellsInPath[blockFoundIndex].x, cellsInPath[blockFoundIndex].y, cellsInPath[blockFoundIndex].z);
+                } else {
+                    removeGridBlock(targetPos.x, targetPos.y, targetPos.z);
+                }
             }
         }
 
         // Handle grid force application with F key
         if (keyboard->m_f.isDown()) {
             // Get player rigid body
-            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
+            PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(m_playerGrid->getRigidBodyId());
             if (body) {
                 // Apply an upward force when F is pressed
-                const double forceStrength = 0.001;
+                const double forceStrength = 1.;
                 glm::dvec3 force = forward * forceStrength;
                 
                 // Apply the force at a point slightly offset from center
                 // This will create both linear movement and rotation
-                glm::dvec3 applicationPoint = graphicsEngine->m_camPos;
+                glm::dvec3 applicationPoint = m_graphicsEngine->m_camPos;
                 
                 // Apply force at the point
-                physicsEngine->applyForceAtPoint(body->id, force, applicationPoint);
+                m_physicsEngine->applyForceAtPoint(body->id, force, applicationPoint);
             }
         }
         
@@ -124,18 +162,25 @@ protected:
             glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
             
             // Rotate around Z-axis for yaw (left/right)
-            glm::dvec3 rotAxis = glm::dvec3(0.0, 0.0, 1.0);
             double yawAngle = -mouseMovement.x * mouseSensitivity;
-            glm::dquat yawQuat = glm::angleAxis(yawAngle, rotAxis);
+            glm::dquat yawQuat = glm::angleAxis(yawAngle, glm::dvec3(0.0, 0.0, 1.0));
             
             // Rotate around X-axis for pitch (up/down)
-            rotAxis = glm::dvec3(1.0, 0.0, 0.0);
             double pitchAngle = -mouseMovement.y * mouseSensitivity;
-            glm::dquat pitchQuat = glm::angleAxis(pitchAngle, rotAxis);
+            glm::dquat pitchQuat = glm::angleAxis(pitchAngle, glm::dvec3(1.0, 0.0, 0.0));
+
+            // Rotate around Y-axis for roll (roll right/roll left)
+            const double rollSpeed = 0.01;
+            double rollAngle = keyboard->m_q.isDown()?
+                (keyboard->m_e.isDown()?
+                    0.: -rollSpeed):
+                (keyboard->m_e.isDown()?
+                    rollSpeed: 0.);
+            glm::dquat rollQuat = glm::angleAxis(rollAngle, glm::dvec3(0.0, 1.0, 0.0));
             
             // Apply rotations to camera orientation
-            graphicsEngine->m_camOri = graphicsEngine->m_camOri * yawQuat * pitchQuat;
-            graphicsEngine->m_camOri = glm::normalize(graphicsEngine->m_camOri);
+            m_graphicsEngine->m_camOri = m_graphicsEngine->m_camOri * yawQuat * pitchQuat* rollQuat;
+            m_graphicsEngine->m_camOri = glm::normalize(m_graphicsEngine->m_camOri);
         }
         
         // Normalize the vectors
@@ -168,14 +213,14 @@ protected:
         // Apply movement if any keys were pressed
         if (glm::length(moveDirection) > 0.0) {
             moveDirection = glm::normalize(moveDirection) * m_moveSpeed;
-            graphicsEngine->m_camPos += moveDirection;
+            m_graphicsEngine->m_camPos += moveDirection;
         }
     }
     
     virtual void updatePhysics() override {
         // Apply drag to all objects before running physics
-        for (const auto& grid : grids) {
-            PhysicsEngine::RigidBody* body = physicsEngine->getRigidBody(grid->getRigidBodyId());
+        for (const auto& grid : m_grids) {
+            PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(grid->getRigidBodyId());
             if (body && !body->isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
                 const double dragCoefficient = 0.04;
@@ -183,13 +228,13 @@ protected:
                 // Apply drag to linear velocity
                 if (glm::length(body->velocity) > 0.0) {
                     glm::dvec3 dragForce = -dragCoefficient * body->velocity * body->mass;
-                    physicsEngine->applyForce(body->id, dragForce);
+                    m_physicsEngine->applyForce(body->id, dragForce);
                 }
                 
                 // Apply drag to angular velocity
                 if (glm::length(body->angularVelocity) > 0.0) {
                     glm::dvec3 angularDrag = -dragCoefficient * body->angularVelocity * body->momentOfInertia;
-                    physicsEngine->applyTorque(body->id, angularDrag);
+                    m_physicsEngine->applyTorque(body->id, angularDrag);
                 }
             }
         }

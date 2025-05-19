@@ -226,20 +226,20 @@ void MeshHandler::removeTrianglesFromMesh(int meshIndex, const std::vector<uint3
    std::sort(sortedIndices.begin(), sortedIndices.end());
 
    // Check that all indices to remove are present in the sorted indices list.
-#ifndef NDEBUG
-   for (const auto& idToRemove : idsToRemove) {
-      bool found = false;
-      for (const auto& sortedIndex : sortedIndices) {
-         if (m_vertexData[sortedIndex].triangleId == idToRemove) {
-            found = true;
-            break;
-         }
-      }
-      if (!found) {
-         throw std::invalid_argument("Triangle index to remove not found in mesh: " + std::to_string(idToRemove));
-      }
-   }
-#endif // !NDEBUG
+//#ifndef NDEBUG
+//   for (const auto& idToRemove : idsToRemove) {
+//      bool found = false;
+//      for (const auto& sortedIndex : sortedIndices) {
+//         if (m_vertexData[sortedIndex].triangleId == idToRemove) {
+//            found = true;
+//            break;
+//         }
+//      }
+//      if (!found) {
+//         throw std::invalid_argument("Triangle index to remove not found in mesh: " + std::to_string(idToRemove));
+//      }
+//   }
+//#endif // !NDEBUG
 
    // Initialize indices.
    int64_t destStart = sortedIndices[0];
