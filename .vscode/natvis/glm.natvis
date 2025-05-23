@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
   <Type Name="glm::dvec3">
     <DisplayString>({x}, {y}, {z})</DisplayString>
     <Expand>
@@ -8,6 +10,7 @@
       <Item Name="z">z</Item>
     </Expand>
   </Type>
+
   <Type Name="glm::ivec3">
     <DisplayString>({x}, {y}, {z})</DisplayString>
     <Expand>
@@ -16,4 +19,20 @@
       <Item Name="z">z</Item>
     </Expand>
   </Type>
+
+  <Type Name="glm::dmat3">
+  <DisplayString>3x3 Matrix [{value[0][0]},{value[1][0]},{value[2][0]}] [{value[0][1]},{value[1][1]},{value[2][1]}] [{value[0][2]},{value[1][2]},{value[2][2]}]</DisplayString>
+  <Expand>
+    <Item Name="row0_col0">value[0][0]</Item>
+    <Item Name="row0_col1">value[1][0]</Item>
+    <Item Name="row0_col2">value[2][0]</Item>
+    <Item Name="row1_col0">value[0][1]</Item>
+    <Item Name="row1_col1">value[1][1]</Item>
+    <Item Name="row1_col2">value[2][1]</Item>
+    <Item Name="row2_col0">value[0][2]</Item>
+    <Item Name="row2_col1">value[1][2]</Item>
+    <Item Name="row2_col2">value[2][2]</Item>
+  </Expand>
+</Type>
+
 </AutoVisualizer>

@@ -67,17 +67,20 @@ private:
     // Core data for block grid
     CellMap m_cells;
     std::queue<glm::ivec3> m_graphicsUpdateQueue;
-    
+
+    // Armor texture.
+    static int s_colorTextureUnit;
+    static int s_normalTextureUnit;
+    static bool s_texturesLoaded;
+        
     // External system references
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
     int m_rigidBodyId{-1};
     int m_meshId{-1};
-    int m_colorTextureUnit{-1};
-    int m_normalTextureUnit{-1};
     
     // Face visibility and mesh management methods
-    void recalculateCenterOfMass();
+    void recalculateMassAndInertia();
     void updateCellGraphics(const glm::ivec3& coord);
     bool isFaceVisible(const glm::ivec3& coord, int faceIndex) const;
     void queueNeighborsForUpdate(const glm::ivec3& coord);

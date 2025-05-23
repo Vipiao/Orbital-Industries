@@ -18,6 +18,10 @@ struct IVec3Comparator {
 bool Grid::s_faceMeshDataLoaded = false;
 std::vector<AssetMeshData> Grid::s_faceMeshData;
 
+int Grid::s_colorTextureUnit = -1;
+int Grid::s_normalTextureUnit = -1;
+bool Grid::s_texturesLoaded = false;
+
 // Face transform lookup table initialization
 const Grid::FaceTransform Grid::s_faceTransforms[6] = {
     // Right (+X)
@@ -55,13 +59,15 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
     m_meshId = m_graphics->createMesh();
     
     // Load textures if needed
-    if (!s_faceMeshData.empty()) {
+    if (!s_texturesLoaded && !s_faceMeshData.empty()) {
         try {
             MeshHandler::Texture colorTexture = m_graphics->createTexture("../media/color_512x512_occluded.png");
-            m_colorTextureUnit = colorTexture.m_textureUnit;
+            s_colorTextureUnit = colorTexture.m_textureUnit;
             
             MeshHandler::Texture normalTexture = m_graphics->createTexture("../media/normal_combined_512x512.png");
-            m_normalTextureUnit = normalTexture.m_textureUnit;
+            s_normalTextureUnit = normalTexture.m_textureUnit;
+            
+            s_texturesLoaded = true;
         } catch (const std::exception& e) {
             std::cerr << "Failed to load textures: " << e.what() << std::endl;
         }
@@ -105,7 +111,7 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
     queueNeighborsForUpdate(coord);
     
     // Recalculate center of mass
-    recalculateCenterOfMass();
+    recalculateMassAndInertia();
 }
 
 // Remove a cell from the grid
@@ -132,7 +138,7 @@ void Grid::removeCell(const glm::ivec3& coord) {
     m_cells.erase(coord);
     
     // Recalculate center of mass
-    recalculateCenterOfMass();
+    recalculateMassAndInertia();
 }
 
 // Check if a cell exists at the given coordinates
@@ -160,7 +166,7 @@ void Grid::queueNeighborsForUpdate(const glm::ivec3& coord) {
     }
 }
 
-void Grid::recalculateCenterOfMass() {
+void Grid::recalculateMassAndInertia() {
     if (m_cells.empty()) return;
     
     glm::dvec3 oldCM = m_centerOfMass;
@@ -504,8 +510,8 @@ void Grid::updateGraphics() {
         angVelAxis,
         angVelMagnitude,
         m_centerOfMass,                  // Updated - Set center of rotation to rigid body position
-        m_colorTextureUnit,
-        m_normalTextureUnit,
+        s_colorTextureUnit,
+        s_normalTextureUnit,
         m_physics->getCurrentPhysicsTimeStep()
     );
 }
