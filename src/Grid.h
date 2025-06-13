@@ -3,6 +3,7 @@
 
 #include "PhysicsEngine.h"
 #include "GraphicsEngine.h"
+#include "BallCollider.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
@@ -77,6 +78,7 @@ private:
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
     int m_rigidBodyId{-1};
+    std::unique_ptr<BallCollider> m_collider;
     int m_meshId{-1};
     
     // Face visibility and mesh management methods

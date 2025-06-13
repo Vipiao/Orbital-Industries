@@ -29,10 +29,10 @@ GameBase::GameBase(
     
     int refreshRate = m_graphicsEngine->m_frameRate;
     
-    m_physicsTimeStep = 1.0 / static_cast<double>(16);
+    m_physicsTimeStep = 1.0 / static_cast<double>(32);
     
     std::cout << "Display refresh rate: " << refreshRate << " Hz" << std::endl;
-    std::cout << "Physics update rate: " << 16 << " Hz" << std::endl;
+    std::cout << "Physics update rate: " << 32 << " Hz" << std::endl;
 }
 
 GameBase::~GameBase() {

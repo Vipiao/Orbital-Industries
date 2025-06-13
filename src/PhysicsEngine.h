@@ -5,6 +5,7 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include "CollisionDetector.h"
 
 class PhysicsEngine {
 public:
@@ -23,6 +24,8 @@ public:
         double momentOfInertia;     // Simplified moment of inertia (scalar)
         
         bool isStatic;              // If true, this body won't move
+
+        Collider* collider;         // Associated collider for collision detection
     };
     
     PhysicsEngine();
@@ -33,7 +36,8 @@ public:
                      const glm::dquat& orientation,
                      double mass = 1.0, 
                      double momentOfInertia = 1.0,
-                     bool isStatic = false);
+                     bool isStatic = false,
+                     Collider* collider = nullptr);
     
     //
     uint64_t getCurrentPhysicsTimeStep() const { return m_currentPhysicsTimeStep; }
@@ -64,9 +68,19 @@ private:
     void applyForces();
     void updatePositions();
     void handleCollisions();
+    void resolveCollision(CollisionResult& collision);
+    
+    // Static helper functions for collision resolution
+    static double getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
+                                  const glm::dvec3& contactPoint, const glm::dvec3& normal);
+    static double getImpulse(RigidBody* bodyA, RigidBody* bodyB, const glm::dvec3& contactPoint,
+                            const glm::dvec3& normal, double collisionMass, double restitution = 0.0);
+
     
     std::vector<std::unique_ptr<RigidBody>> m_rigidBodies;
     int m_nextBodyId;
     glm::dvec3 m_gravity{0.0, 0.0, 0.0}; // Default zero gravity
     uint64_t m_currentPhysicsTimeStep{0};
+
+    CollisionDetector m_collisionDetector;
 };

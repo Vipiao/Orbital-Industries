@@ -17,7 +17,8 @@ int PhysicsEngine::addRigidBody(const glm::dvec3& position,
                                const glm::dquat& orientation,
                                double mass, 
                                double momentOfInertia,
-                               bool isStatic) {
+                               bool isStatic,
+                               Collider* collider) {
     int id = m_nextBodyId++;
     
     auto body = std::make_unique<RigidBody>();
@@ -33,6 +34,12 @@ int PhysicsEngine::addRigidBody(const glm::dvec3& position,
     body->mass = mass;
     body->momentOfInertia = momentOfInertia;
     body->isStatic = isStatic;
+    body->collider = collider;
+     
+    // Add collider to collision detection system if provided
+    if (collider) {
+        m_collisionDetector.addCollider(collider);
+    }
     
     m_rigidBodies.push_back(std::move(body));
     
@@ -40,13 +47,30 @@ int PhysicsEngine::addRigidBody(const glm::dvec3& position,
 }
 
 void PhysicsEngine::removeRigidBody(int id) {
-    auto it = std::remove_if(m_rigidBodies.begin(), m_rigidBodies.end(),
+    // Find the body to get its collider before removal
+    Collider* colliderToRemove = nullptr;
+    auto it = std::find_if(m_rigidBodies.begin(), m_rigidBodies.end(),
         [id](const std::unique_ptr<RigidBody>& body) {
             return body->id == id;
         });
     
     if (it != m_rigidBodies.end()) {
-        m_rigidBodies.erase(it, m_rigidBodies.end());
+        colliderToRemove = (*it)->collider;
+    }
+    
+    // Remove from rigid bodies
+     auto removeIt = std::remove_if(m_rigidBodies.begin(), m_rigidBodies.end(),
+        [id](const std::unique_ptr<RigidBody>& body) {
+            return body->id == id;
+        });
+     
+     if (removeIt != m_rigidBodies.end()) {
+        m_rigidBodies.erase(removeIt, m_rigidBodies.end());
+     }
+    
+    // Remove collider from collision detection system
+    if (colliderToRemove) {
+        m_collisionDetector.removeCollider(colliderToRemove);
     }
 }
 
@@ -156,15 +180,150 @@ void PhysicsEngine::updatePositions() {
             angularVelocityQuat = glm::dquat{1, 0, 0, 0};
         }
         body->orientation = (angularVelocityQuat * body->orientation);
-         body->orientation = glm::normalize(body->orientation); // Renormalize to prevent drift
+        body->orientation = glm::normalize(body->orientation); // Renormalize to prevent drift
+
+        // Update collider position and orientation if it exists
+        if (body->collider) {
+            body->collider->position = body->position;
+            body->collider->orientation = body->orientation;
+        }
         
         // Reset forces and torques for next frame
         body->forces = glm::dvec3{0.0, 0.0, 0.0};
         body->torques = glm::dvec3{0.0, 0.0, 0.0};
+        
+        // Update collider position and orientation if it exists
+        if (body->collider) {
+            body->collider->position = body->position;
+            body->collider->orientation = body->orientation;
+        }
     }
 }
 
 void PhysicsEngine::handleCollisions() {
-    // Currently empty as per requirements
-    // This would detect and resolve collisions between bodies
+    // Collect collision results
+    std::vector<CollisionResult> collisions;
+    m_collisionDetector.run(collisions);
+    
+    // Resolve each collision
+    for (const auto& collision : collisions) {
+        resolveCollision(const_cast<CollisionResult&>(collision));
+    }
+}
+
+void PhysicsEngine::resolveCollision(CollisionResult& collision) {
+    // Find the rigid bodies associated with these colliders
+    RigidBody* bodyA = nullptr;
+    RigidBody* bodyB = nullptr;
+    
+    for (auto& body : m_rigidBodies) {
+        if (body->collider == collision.colliderA) {
+            bodyA = body.get();
+        }
+        if (body->collider == collision.colliderB) {
+            bodyB = body.get();
+        }
+    }
+    
+    if (!bodyA || !bodyB) {
+        return; // Skip if we can't find both bodies or both are static
+    }
+
+    // Calculate collision masses if not already done
+    if (!collision.collisionMassesCalculated) {
+        collision.collisionMasses.reserve(collision.normals.size());
+        for (size_t i = 0; i < collision.normals.size(); ++i) {
+            double collisionMass = getCollisionMass(bodyA, bodyB, collision.contactPoints[i], collision.normals[i]);
+            collision.collisionMasses.push_back(collisionMass);
+        }
+        collision.collisionMassesCalculated = true;
+    }
+
+    // Process each contact point
+    for (size_t i = 0; i < collision.normals.size(); ++i) {
+        glm::dvec3 normal = collision.normals[i];
+        glm::dvec3 contactPoint = collision.contactPoints[i];
+        
+        // Calculate relative position vectors from center of mass to contact point
+        glm::dvec3 rA = contactPoint - bodyA->position;
+        glm::dvec3 rB = contactPoint - bodyB->position;
+        
+        // Calculate relative velocity at contact point
+        glm::dvec3 velA = bodyA->velocity + glm::cross(bodyA->angularVelocity, rA);
+        glm::dvec3 velB = bodyB->velocity + glm::cross(bodyB->angularVelocity, rB);
+        glm::dvec3 relativeVel = velA - velB;
+        
+        // Project relative velocity onto collision normal
+        double relativeVelNormal = glm::dot(relativeVel, normal);
+        
+        // Do not resolve if velocities are separating
+        if (relativeVelNormal > 0) {
+            continue;
+        }
+        
+        // Get pre-calculated collision mass and calculate impulse
+        double collisionMass = collision.collisionMasses[i];
+        double impulseMagnitude = getImpulse(bodyA, bodyB, contactPoint, normal, collisionMass);
+
+        // Calculate inverse masses and inertias
+        double invMassA = 1.0 / bodyA->mass;
+        double invMassB = 1.0 / bodyB->mass;
+        double invInertiaA = 1.0 / bodyA->momentOfInertia;
+        double invInertiaB = 1.0 / bodyB->momentOfInertia;
+
+        // Apply impulse
+        glm::dvec3 impulse = normal * impulseMagnitude;
+        
+        bodyA->velocity += impulse * invMassA;
+        bodyA->angularVelocity += glm::cross(rA, impulse) * invInertiaA;
+        
+        bodyB->velocity -= impulse * invMassB;
+        bodyB->angularVelocity -= glm::cross(rB, impulse) * invInertiaB;
+    }
+}
+
+double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
+                                      const glm::dvec3& contactPoint, const glm::dvec3& normal) {
+    // Calculate relative position vectors from center of mass to contact point
+    glm::dvec3 rA = contactPoint - bodyA->position;
+    glm::dvec3 rB = contactPoint - bodyB->position;
+    
+    // Calculate inverse masses and inertias
+    double invMassA = 1.0 / bodyA->mass;
+    double invMassB = 1.0 / bodyB->mass;
+    double invInertiaA = 1.0 / bodyA->momentOfInertia;
+    double invInertiaB = 1.0 / bodyB->momentOfInertia;
+
+    // Cross products for rotational terms
+    glm::dvec3 rAcrossN = glm::cross(rA, normal);
+    glm::dvec3 rBcrossN = glm::cross(rB, normal);
+    
+    // Calculate collision mass using the formula: 1/(invMassA + invMassB + (rA x n)²*invInertiaA + (rB x n)²*invInertiaB)
+    double collisionMass = 1.0 / (
+        invMassA + invMassB + 
+        glm::dot(rAcrossN, rAcrossN) * invInertiaA + 
+        glm::dot(rBcrossN, rBcrossN) * invInertiaB
+    );
+    
+    return collisionMass;
+}
+
+double PhysicsEngine::getImpulse(RigidBody* bodyA, RigidBody* bodyB, const glm::dvec3& contactPoint,
+                                const glm::dvec3& normal, double collisionMass, double restitution) {
+    // Calculate relative position vectors from center of mass to contact point
+    glm::dvec3 rA = contactPoint - bodyA->position;
+    glm::dvec3 rB = contactPoint - bodyB->position;
+    
+    // Calculate relative velocity at contact point
+    glm::dvec3 velA = bodyA->velocity + glm::cross(bodyA->angularVelocity, rA);
+    glm::dvec3 velB = bodyB->velocity + glm::cross(bodyB->angularVelocity, rB);
+    glm::dvec3 relativeVel = velA - velB;
+    
+    // Project relative velocity onto collision normal
+    double relativeVelNormal = glm::dot(relativeVel, normal);
+    
+    // Calculate impulse magnitude: -(1+e)*v_rel_normal * collision_mass
+    double impulseMagnitude = -(1.0 + restitution) * relativeVelNormal * collisionMass;
+    
+    return impulseMagnitude;
 }
