@@ -37,10 +37,10 @@ public:
         
         Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         addGridBlock(gg, 0, 0, 0);  // Center block
-        PhysicsEngine::RigidBody* bb = m_physicsEngine->getRigidBody(gg->getRigidBodyId());
+        PhysicsEngine::RigidBody* bb = gg->getRigidBody();
         bb->position = {0.5, -2, 0.5};
         
-        PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(initialGrid->getRigidBodyId());
+        PhysicsEngine::RigidBody* body = initialGrid->getRigidBody();
         //body->angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
         //body->orientation = glm::angleAxis(glm::radians(180.0), glm::dvec3{1.0, 0.,0.});
         
@@ -123,7 +123,7 @@ protected:
             
             // If no block found and right-clicking, create a new grid
             if (!blockFound && doCreate) {
-                glm::dvec3 newGridPos = startPos + forward * 2.0;
+                glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
                 Grid* newGrid = createGrid(newGridPos);
                 addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
                 return;  // Early return since we created a new grid
@@ -185,7 +185,7 @@ protected:
             
             // Apply force to the grid with the closest hit
             if (targetGrid) {
-                PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(targetGrid->getRigidBodyId());
+                PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
                 if (body) {
                     // Apply force in the view direction
                     const double forceStrength = 1.0;
@@ -195,7 +195,7 @@ protected:
                     glm::dvec3 applicationPoint = m_graphicsEngine->m_camPos;
                     
                     // Apply force at the point
-                    m_physicsEngine->applyForceAtPoint(body->id, force, applicationPoint);
+                    m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
                     
                     std::cout << "Applied force to grid at hit distance: " << shortestHitDistance << std::endl;
                 }
@@ -280,7 +280,7 @@ protected:
     virtual void updatePhysics() override {
         // Apply drag to all objects before running physics
         for (const auto& grid : m_grids) {
-            PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(grid->getRigidBodyId());
+            PhysicsEngine::RigidBody* body = grid->getRigidBody();
             if (body && !body->isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
                 const double dragCoefficient = 0.04;
@@ -288,13 +288,13 @@ protected:
                 // Apply drag to linear velocity
                 if (glm::length(body->velocity) > 0.0) {
                     glm::dvec3 dragForce = -dragCoefficient * body->velocity * body->mass;
-                    m_physicsEngine->applyForce(body->id, dragForce);
+                    m_physicsEngine->applyForce(body, dragForce);
                 }
                 
                 // Apply drag to angular velocity
                 if (glm::length(body->angularVelocity) > 0.0) {
                     glm::dvec3 angularDrag = -dragCoefficient * body->angularVelocity * body->momentOfInertia;
-                    m_physicsEngine->applyTorque(body->id, angularDrag);
+                    m_physicsEngine->applyTorque(body, angularDrag);
                 }
             }
         }

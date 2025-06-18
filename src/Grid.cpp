@@ -77,7 +77,7 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
     m_collider = std::make_unique<GridCollider>(position, orientation);
     
     // Create rigid body in physics engine
-    m_rigidBodyId = m_physics->addRigidBody(
+    m_rigidBody = m_physics->addRigidBody(
         position,
         orientation,
         1.0,  // Mass
@@ -87,11 +87,10 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
     );
     
     // Set initial collider offset and update transform
-    PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
-    if (body) {
-        body->colliderOffset = m_centerOfMass;
+    if (m_rigidBody) {
+        m_rigidBody->colliderOffset = m_centerOfMass;
     }
-    m_physics->updateColliderTransform(m_rigidBodyId);
+    m_physics->updateColliderTransform(m_rigidBody);
 
     // Initial graphics update
     updateGraphics();
@@ -103,8 +102,8 @@ Grid::~Grid() {
         m_graphics->removeMesh(m_meshId);
     }
     
-    if (m_rigidBodyId >= 0) {
-        m_physics->removeRigidBody(m_rigidBodyId);
+    if (m_rigidBody) {
+        m_physics->removeRigidBody(m_rigidBody);
     }
 }
 
@@ -223,7 +222,7 @@ void Grid::recalculateMassAndInertia() {
         m_centerOfMass = newCM;
         
         // Update physics body position and velocity
-        PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
+        PhysicsEngine::RigidBody* body = m_rigidBody;
         if (body) {
             // Update mass of the rigid body
             body->mass = totalMass;
@@ -341,8 +340,7 @@ void Grid::processGraphicsQueue() {
 
 // Convert world coordinates to grid-local coordinates
 glm::dvec3 Grid::worldToGrid(const glm::dvec3& worldPos) const {
-    PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
-    if (!body) {
+    if (!m_rigidBody) {
         throw std::runtime_error("ERROR: Failed to convert world to grid coordinates: Rigid body not found");
     }
     
@@ -350,13 +348,12 @@ glm::dvec3 Grid::worldToGrid(const glm::dvec3& worldPos) const {
     // 1. Translate relative to body position
     // 2. Rotate by conjugate of body orientation
     // 3. Add center of mass offset
-    return glm::conjugate(body->orientation) * (worldPos - body->position) + m_centerOfMass;
+    return glm::conjugate(m_rigidBody->orientation) * (worldPos - m_rigidBody->position) + m_centerOfMass;
 }
 
 // Convert grid-local coordinates to world coordinates
 glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
-    PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
-    if (!body) {
+    if (!m_rigidBody) {
         throw std::runtime_error("ERROR: Failed to convert grid to world coordinates: Rigid body not found");
     }
     
@@ -364,7 +361,7 @@ glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
     // 1. Subtract center of mass
     // 2. Apply body orientation
     // 3. Add body position
-    return body->position + body->orientation * (gridPos - m_centerOfMass);
+    return m_rigidBody->position + m_rigidBody->orientation * (gridPos - m_centerOfMass);
 }
 
 // Add your gridTraversal implementation to Grid.cpp
@@ -505,11 +502,11 @@ void Grid::updateCellGraphics(const glm::ivec3& coord) {
 
 // Updated - Update mesh transform based on physics state
 void Grid::updateGraphics() {
-    if (m_meshId < 0 || m_rigidBodyId < 0) {
+    if (m_meshId < 0 || !m_rigidBody) {
         return;
     }
     
-    PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
+    PhysicsEngine::RigidBody* body = m_rigidBody;
     if (!body) {
         return;
     }

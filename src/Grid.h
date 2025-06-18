@@ -40,7 +40,7 @@ public:
     void processGraphicsQueue();
     
     // Getters for GameBase
-    int getRigidBodyId() const { return m_rigidBodyId; }
+    PhysicsEngine::RigidBody* getRigidBody() const { return m_rigidBody; }
     bool hasGraphicsUpdates() const { return !m_graphicsUpdateQueue.empty(); }
 
     // Convert world coordinates to grid-local coordinates
@@ -66,7 +66,7 @@ private:
     // External system references
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
-    int m_rigidBodyId{-1};
+    PhysicsEngine::RigidBody* m_rigidBody{nullptr};
     std::unique_ptr<GridCollider> m_collider;
     int m_meshId{-1};
     

@@ -5,7 +5,6 @@
 #include <glm/gtx/quaternion.hpp>
 
 PhysicsEngine::PhysicsEngine() 
-    : m_nextBodyId{0}
 {
 }
 
@@ -13,16 +12,14 @@ PhysicsEngine::~PhysicsEngine() {
     // Vector of unique_ptr will handle cleanup automatically
 }
 
-int PhysicsEngine::addRigidBody(const glm::dvec3& position, 
+PhysicsEngine::RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position, 
                                const glm::dquat& orientation,
                                double mass, 
                                double momentOfInertia,
                                bool isStatic,
                                Collider* collider) {
-    int id = m_nextBodyId++;
     
     auto body = std::make_unique<RigidBody>();
-    body->id = id;
     body->position = position;
     body->velocity = glm::dvec3{0.0, 0.0, 0.0};
     body->forces = glm::dvec3{0.0, 0.0, 0.0};
@@ -41,33 +38,29 @@ int PhysicsEngine::addRigidBody(const glm::dvec3& position,
     if (collider) {
         m_collisionDetector.addCollider(collider);
     }
+
+    RigidBody* bodyPtr = body.get();
     
     m_rigidBodies.push_back(std::move(body));
     
-    return id;
+    return bodyPtr;
 }
 
-void PhysicsEngine::removeRigidBody(int id) {
+void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
+    if (!bodyToRemove) return;
+
     // Find the body to get its collider before removal
-    Collider* colliderToRemove = nullptr;
-    auto it = std::find_if(m_rigidBodies.begin(), m_rigidBodies.end(),
-        [id](const std::unique_ptr<RigidBody>& body) {
-            return body->id == id;
-        });
-    
-    if (it != m_rigidBodies.end()) {
-        colliderToRemove = (*it)->collider;
-    }
+    Collider* colliderToRemove = bodyToRemove->collider;
     
     // Remove from rigid bodies
-     auto removeIt = std::remove_if(m_rigidBodies.begin(), m_rigidBodies.end(),
-        [id](const std::unique_ptr<RigidBody>& body) {
-            return body->id == id;
-        });
+    auto removeIt = std::remove_if(m_rigidBodies.begin(), m_rigidBodies.end(),
+        [bodyToRemove](const std::unique_ptr<RigidBody>& body) {
+            return body.get() == bodyToRemove;
+    });
      
-     if (removeIt != m_rigidBodies.end()) {
+    if (removeIt != m_rigidBodies.end()) {
         m_rigidBodies.erase(removeIt, m_rigidBodies.end());
-     }
+    }
     
     // Remove collider from collision detection system
     if (colliderToRemove) {
@@ -75,27 +68,13 @@ void PhysicsEngine::removeRigidBody(int id) {
     }
 }
 
-PhysicsEngine::RigidBody* PhysicsEngine::getRigidBody(int id) {
-    auto it = std::find_if(m_rigidBodies.begin(), m_rigidBodies.end(),
-        [id](const std::unique_ptr<RigidBody>& body) {
-            return body->id == id;
-        });
-    
-    if (it != m_rigidBodies.end()) {
-        return it->get();
-    }
-    return nullptr;
-}
-
-void PhysicsEngine::applyForce(int id, const glm::dvec3& force) {
-    RigidBody* body = getRigidBody(id);
+void PhysicsEngine::applyForce(RigidBody* body, const glm::dvec3& force) {
     if (body && !body->isStatic) {
         body->forces += force;
     }
 }
 
-void PhysicsEngine::applyForceAtPoint(int id, const glm::dvec3& force, const glm::dvec3& point) {
-    RigidBody* body = getRigidBody(id);
+void PhysicsEngine::applyForceAtPoint(RigidBody* body, const glm::dvec3& force, const glm::dvec3& point) {
     if (body && !body->isStatic) {
         // Add the force to overall forces
         body->forces += force;
@@ -108,8 +87,7 @@ void PhysicsEngine::applyForceAtPoint(int id, const glm::dvec3& force, const glm
     }
 }
 
-void PhysicsEngine::applyTorque(int id, const glm::dvec3& torque) {
-    RigidBody* body = getRigidBody(id);
+void PhysicsEngine::applyTorque(RigidBody* body, const glm::dvec3& torque) {
     if (body && !body->isStatic) {
         body->torques += torque;
     }
@@ -119,8 +97,7 @@ void PhysicsEngine::setGravity(const glm::dvec3& gravity) {
     m_gravity = gravity;
 }
 
-void PhysicsEngine::updateColliderTransform(int id) {
-    RigidBody* body = getRigidBody(id);
+void PhysicsEngine::updateColliderTransform(RigidBody* body) {
     if (body && body->collider) {
         body->collider->m_position = body->position - body->orientation * body->colliderOffset;
         body->collider->m_orientation = body->orientation;
@@ -196,7 +173,7 @@ void PhysicsEngine::updatePositions() {
         body->torques = glm::dvec3{0.0, 0.0, 0.0};
         
         // Update collider position and orientation if it exists
-        updateColliderTransform(body->id);
+        updateColliderTransform(body.get());
     }
 }
 
