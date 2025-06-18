@@ -3,23 +3,12 @@
 
 #include "PhysicsEngine.h"
 #include "GraphicsEngine.h"
-#include "BallCollider.h"
+#include "GridCollider.h"
+#include "HashFunctions.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
 #include <queue>
-
-// Custom hash function for glm::ivec3
-struct IVec3Hash {
-    size_t operator()(const glm::ivec3& coord) const {
-        // XOR coordinates then apply basic hash
-        size_t hash = static_cast<size_t>(coord.x) ^ 
-                      static_cast<size_t>(coord.y) ^ 
-                      static_cast<size_t>(coord.z);
-        hash = hash * 73856093;
-        return hash;
-    }
-};
 
 // Cell type enum
 enum class CellType { ARMOR };
@@ -78,7 +67,7 @@ private:
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
     int m_rigidBodyId{-1};
-    std::unique_ptr<BallCollider> m_collider;
+    std::unique_ptr<GridCollider> m_collider;
     int m_meshId{-1};
     
     // Face visibility and mesh management methods

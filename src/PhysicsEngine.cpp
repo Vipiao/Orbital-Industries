@@ -35,6 +35,7 @@ int PhysicsEngine::addRigidBody(const glm::dvec3& position,
     body->momentOfInertia = momentOfInertia;
     body->isStatic = isStatic;
     body->collider = collider;
+    body->colliderOffset = glm::dvec3{0.0, 0.0, 0.0}; // Initialize to zero offset
      
     // Add collider to collision detection system if provided
     if (collider) {
@@ -118,6 +119,14 @@ void PhysicsEngine::setGravity(const glm::dvec3& gravity) {
     m_gravity = gravity;
 }
 
+void PhysicsEngine::updateColliderTransform(int id) {
+    RigidBody* body = getRigidBody(id);
+    if (body && body->collider) {
+        body->collider->m_position = body->position - body->orientation * body->colliderOffset;
+        body->collider->m_orientation = body->orientation;
+    }
+}
+
 void PhysicsEngine::run() {
     // Run one step of physics simulation
     applyForces();
@@ -181,22 +190,13 @@ void PhysicsEngine::updatePositions() {
         }
         body->orientation = (angularVelocityQuat * body->orientation);
         body->orientation = glm::normalize(body->orientation); // Renormalize to prevent drift
-
-        // Update collider position and orientation if it exists
-        if (body->collider) {
-            body->collider->position = body->position;
-            body->collider->orientation = body->orientation;
-        }
         
         // Reset forces and torques for next frame
         body->forces = glm::dvec3{0.0, 0.0, 0.0};
         body->torques = glm::dvec3{0.0, 0.0, 0.0};
         
         // Update collider position and orientation if it exists
-        if (body->collider) {
-            body->collider->position = body->position;
-            body->collider->orientation = body->orientation;
-        }
+        updateColliderTransform(body->id);
     }
 }
 

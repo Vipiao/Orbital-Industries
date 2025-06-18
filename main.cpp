@@ -1,15 +1,23 @@
 // main.cpp
 #include "src/GameBase.h"
 #include "src/TimeHandler.h"
+#include "src/DebugVisualization.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 class MyGame : public GameBase {
+private:
+    std::unique_ptr<DebugVisualization> m_debugViz;
+
 public:
     MyGame(TimeHandler* timeHandler, 
            GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
       : GameBase(800, 600, "3D Grid Demo", timeHandler, controlMode) {
+        
+        // Create debug visualization system
+        m_debugViz = std::make_unique<DebugVisualization>(m_graphicsEngine->m_meshHandler.get());
+
         // Set up initial camera position and orientation
         m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
         m_graphicsEngine->m_camOri = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
@@ -17,11 +25,20 @@ public:
         
         // Enable mouse lock for camera control
         m_graphicsEngine->m_mouseHandler->setMouseLock(true);
+
+        // Create debug sphere at origin for testing
+        m_debugViz->createSphere(glm::dvec3(0.0, 0.0, 0.0), 1.0);
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
         addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
         addGridBlock(initialGrid, 0, 0, 0);  // Center block
+
+        
+        Grid* gg = createGrid(glm::dvec3(0, 0, 0));
+        addGridBlock(gg, 0, 0, 0);  // Center block
+        PhysicsEngine::RigidBody* bb = m_physicsEngine->getRigidBody(gg->getRigidBodyId());
+        bb->position = {0.5, -2, 0.5};
         
         PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(initialGrid->getRigidBodyId());
         //body->angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
@@ -50,29 +67,6 @@ public:
         if (grid) {
             grid->removeCell(glm::ivec3(x, y, z));
         }
-    }
-    // Find the closest grid to a given position
-    Grid* findClosestGrid(const glm::dvec3& position) {
-        if (m_grids.empty()) return nullptr;
-        
-        Grid* closest = m_grids[0].get();
-        double minDistance = glm::length(position - getGridPosition(closest));
-        
-        for (size_t i = 1; i < m_grids.size(); ++i) {
-            double distance = glm::length(position - getGridPosition(m_grids[i].get()));
-            if (distance < minDistance) {
-                minDistance = distance;
-                closest = m_grids[i].get();
-            }
-        }
-        return closest;
-    }
-    
-    // Helper to get grid position from physics body
-    glm::dvec3 getGridPosition(Grid* grid) {
-        if (!grid) return glm::dvec3(0.0);
-        PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(grid->getRigidBodyId());
-        return body ? body->position : glm::dvec3(0.0);
     }
     
 protected:
@@ -157,20 +151,54 @@ protected:
 
         // Handle grid force application with F key
         if (keyboard->m_f.isDown()) {
-            // Find closest grid to camera position
-            Grid* closestGrid = findClosestGrid(m_graphicsEngine->m_camPos);
-            PhysicsEngine::RigidBody* body = closestGrid ? m_physicsEngine->getRigidBody(closestGrid->getRigidBodyId()) : nullptr;
-            if (body) {
-                // Apply an upward force when F is pressed
-                const double forceStrength = 1.;
-                glm::dvec3 force = forward * forceStrength;
+            // Find the grid with the shortest ray hit distance
+            Grid* targetGrid = nullptr;
+            int shortestHitDistance = INT_MAX;
+            
+            // Camera position and direction
+            glm::dvec3 startPos = m_graphicsEngine->m_camPos;
+            glm::dvec3 endPos = startPos + forward * 10.0; // Cast ray 10 units forward
+            
+            // Check all grids for ray intersections
+            for (const auto& gridPtr : m_grids) {
+                Grid* grid = gridPtr.get();
                 
-                // Apply the force at a point slightly offset from center
-                // This will create both linear movement and rotation
-                glm::dvec3 applicationPoint = m_graphicsEngine->m_camPos;
+                // Convert camera ray to grid space
+                glm::dvec3 startPosLocal = grid->worldToGrid(startPos);
+                glm::dvec3 endPosLocal = grid->worldToGrid(endPos);
                 
-                // Apply force at the point
-                m_physicsEngine->applyForceAtPoint(body->id, force, applicationPoint);
+                // Perform grid traversal
+                std::vector<glm::ivec3> gridCells = grid->gridTraversal(startPosLocal, endPosLocal);
+                
+                // Check if ray hits any blocks in this grid
+                for (size_t i = 1; i < gridCells.size(); i++) { // Skip first cell (where camera is)
+                    if (grid->hasCell(gridCells[i])) {
+                        // Found a hit! Check if this is the closest hit so far
+                        if (static_cast<int>(i) < shortestHitDistance) {
+                            shortestHitDistance = static_cast<int>(i);
+                            targetGrid = grid;
+                        }
+                        break; // Only care about first hit in this grid
+                    }
+                }
+            }
+            
+            // Apply force to the grid with the closest hit
+            if (targetGrid) {
+                PhysicsEngine::RigidBody* body = m_physicsEngine->getRigidBody(targetGrid->getRigidBodyId());
+                if (body) {
+                    // Apply force in the view direction
+                    const double forceStrength = 1.0;
+                    glm::dvec3 force = forward * forceStrength;
+                    
+                    // Apply the force at the camera position
+                    glm::dvec3 applicationPoint = m_graphicsEngine->m_camPos;
+                    
+                    // Apply force at the point
+                    m_physicsEngine->applyForceAtPoint(body->id, force, applicationPoint);
+                    
+                    std::cout << "Applied force to grid at hit distance: " << shortestHitDistance << std::endl;
+                }
             }
         }
         
@@ -281,10 +309,10 @@ private:
 int main() {
     try {
         // Create the TimeHandler with appropriate mode
-        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::NONE);
+        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::PLAY);
 
         // Use existing GraphicsEngineBase::Mode for controls
-        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE;
+        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::PLAY;
 
         MyGame game(timeHandler, controlMode); // Updated
         game.run();

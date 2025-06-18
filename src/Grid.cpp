@@ -73,8 +73,8 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
         }
     }
 
-    // Create sphere collider for the grid
-    m_collider = std::make_unique<BallCollider>(position, orientation, 1.0);
+    // Create grid collider for the grid
+    m_collider = std::make_unique<GridCollider>(position, orientation);
     
     // Create rigid body in physics engine
     m_rigidBodyId = m_physics->addRigidBody(
@@ -86,6 +86,13 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
         m_collider.get() // Pass the sphere collider
     );
     
+    // Set initial collider offset and update transform
+    PhysicsEngine::RigidBody* body = m_physics->getRigidBody(m_rigidBodyId);
+    if (body) {
+        body->colliderOffset = m_centerOfMass;
+    }
+    m_physics->updateColliderTransform(m_rigidBodyId);
+
     // Initial graphics update
     updateGraphics();
 }
@@ -105,6 +112,9 @@ Grid::~Grid() {
 void Grid::addCell(const glm::ivec3& coord, CellType type) {
     // If cell already exists, return
     if (hasCell(coord)) return;
+
+    // Add cell to collider
+    m_collider->addCell(coord, 0.5);
     
     // Add cell to map immediately
     m_cells[coord] = GridCell{type};
@@ -127,6 +137,10 @@ void Grid::removeCell(const glm::ivec3& coord) {
     // Get the cell before removal
     auto cellIt = m_cells.find(coord);
     if (cellIt != m_cells.end()) {
+
+        // Remove cell from collider
+        m_collider->removeCell(coord);
+
         // Remove all face triangles from the mesh
         for (int face = 0; face < 6; face++) {
             if (!cellIt->second.faceTriangleIds[face].empty()) {
@@ -256,6 +270,9 @@ void Grid::recalculateMassAndInertia() {
             
             // Update the rigid body's moment of inertia
             body->momentOfInertia = totalMoment;
+
+            // Store the collider offset (center of mass in local coordinates)
+            body->colliderOffset = m_centerOfMass;
         }
     }
 }

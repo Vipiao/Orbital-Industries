@@ -66,6 +66,8 @@ void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
     sortAndDetectPotentialCollisions(edgesY, potentialCollisions);
     sortAndDetectPotentialCollisions(edgesZ, potentialCollisions);
 
+    static int bb = 0;bb++;
+
     // Now check potential collisions that overlap on ALL axes
     for (const auto& pair : potentialCollisions) {
         if (pair.first->checkAABBCollision(pair.second)) {
@@ -83,7 +85,7 @@ void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
 void CollisionDetector::updateAllCollisionBoxes() {
     for (Collider* collider : colliders) {
         if (collider) {
-            collider->updateCollisionBoxes();
+            collider->updateAABB();
         }
     }
 }

@@ -26,6 +26,7 @@ public:
         bool isStatic;              // If true, this body won't move
 
         Collider* collider;         // Associated collider for collision detection
+        glm::dvec3 colliderOffset;  // Offset from center of mass to collider origin (in local space)
     };
     
     PhysicsEngine();
@@ -59,6 +60,9 @@ public:
     
     // Set gravity
     void setGravity(const glm::dvec3& gravity);
+
+    // Update collider transform for a specific rigid body
+    void updateColliderTransform(int id);
     
     // Run physics simulation
     void run();
