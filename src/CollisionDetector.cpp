@@ -31,7 +31,7 @@ void CollisionDetector::removeCollider(Collider* collider) {
         edges.erase(
             std::remove_if(edges.begin(), edges.end(),
                 [collider](const std::unique_ptr<Edge>& edge) {
-                    return edge->collider == collider;
+                    return edge->m_collider == collider;
                 }),
             edges.end()
         );
@@ -112,11 +112,11 @@ void CollisionDetector::insertionSort(std::vector<std::unique_ptr<Edge>>& edges,
                                      std::set<std::pair<Collider*, Collider*>>& potentialCollisions) {
      for (size_t i = 1; i < edges.size(); ++i) {
          size_t j = i;
-         while (j > 0 && edges[j]->value < edges[j-1]->value) {
+         while (j > 0 && edges[j]->m_value < edges[j-1]->m_value) {
             // Check if we're swapping a MAX edge past a MIN edge
-            if (edges[j-1]->type == EdgeType::MAX && edges[j]->type == EdgeType::MIN) {
+            if (edges[j-1]->m_type == EdgeType::MAX && edges[j]->m_type == EdgeType::MIN) {
                 // Potential collision detected
-                auto pair = makePair(edges[j-1]->collider, edges[j]->collider);
+                auto pair = makePair(edges[j-1]->m_collider, edges[j]->m_collider);
                 potentialCollisions.insert(pair);
             }
             
@@ -137,11 +137,11 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2,
     // Perform collision detection between the two colliders
     CollisionResult result = collider1->collideWith(collider2);
     
-    if (result.hasCollision) {
+    if (result.m_hasCollision) {
         std::cout << "Collision detected between two colliders!" << std::endl;
         // Set collider references for resolution
-        result.colliderA = collider1;
-        result.colliderB = collider2;
+        result.m_colliderA = collider1;
+        result.m_colliderB = collider2;
         
         // Store collision for resolution
         collisions.push_back(result);

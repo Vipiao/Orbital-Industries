@@ -13,36 +13,36 @@ class BallCollider;
 class GridCollider;
 
 struct CollisionResult {
-    bool hasCollision = false;
-    std::vector<glm::dvec3> normals;           // Collision normals
-    std::vector<glm::dvec3> contactPoints;    // Contact points in world space
-    std::vector<double> penetrationDepths;    // How much objects are overlapping at each contact point
+    bool m_hasCollision = false;
+    std::vector<glm::dvec3> m_normals;           // Collision normals
+    std::vector<glm::dvec3> m_contactPoints;    // Contact points in world space
+    std::vector<double> m_penetrationDepths;    // How much objects are overlapping at each contact point
 
     // For collision resolution optimization
-    std::vector<double> collisionMasses;      // Collision mass for each contact point
-    bool collisionMassesCalculated = false;   // Flag to avoid recalculation
+    std::vector<double> m_collisionMasses;      // Collision mass for each contact point
+    bool m_collisionMassesCalculated = false;   // Flag to avoid recalculation
 
     // For collision resolution
-    Collider* colliderA = nullptr;
-    Collider* colliderB = nullptr;
+    Collider* m_colliderA = nullptr;
+    Collider* m_colliderB = nullptr;
     
     CollisionResult() = default;
     
     CollisionResult(bool collision, const std::vector<glm::dvec3>& norms, const std::vector<glm::dvec3>& contacts, const std::vector<double>& depths)
-        : hasCollision(collision), normals(norms), contactPoints(contacts), penetrationDepths(depths) {}
+        : m_hasCollision(collision), m_normals(norms), m_contactPoints(contacts), m_penetrationDepths(depths) {}
     
     // Constructor with collider references
     CollisionResult(bool collision, const std::vector<glm::dvec3>& norms, const std::vector<glm::dvec3>& contacts, 
                    const std::vector<double>& depths, Collider* a, Collider* b)
-        : hasCollision(collision), normals(norms), contactPoints(contacts), penetrationDepths(depths), 
-          colliderA(a), colliderB(b) {}
+        : m_hasCollision(collision), m_normals(norms), m_contactPoints(contacts), m_penetrationDepths(depths), 
+          m_colliderA(a), m_colliderB(b) {}
     
     CollisionResult(bool collision, const glm::dvec3& norm, const glm::dvec3& contact, double depth = 0.0)
-        : hasCollision(collision) {
+        : m_hasCollision(collision) {
         if (collision) {
-            normals.push_back(norm);
-            contactPoints.push_back(contact);
-            penetrationDepths.push_back(depth);
+            m_normals.push_back(norm);
+            m_contactPoints.push_back(contact);
+            m_penetrationDepths.push_back(depth);
         }
     }
 };
@@ -54,7 +54,7 @@ public:
              ColliderReference* reference = nullptr)
         : m_position(position)
         , m_orientation(orientation)
-        , reference(reference)
+        , m_reference(reference)
         , m_AABBMin(0.0)
         , m_AABBMax(0.0)
     {}
@@ -75,7 +75,7 @@ public:
     // Public member variables
     glm::dvec3 m_position;
     glm::dquat m_orientation;
-    ColliderReference* reference;
+    ColliderReference* m_reference;
 
     // AABB data
     glm::dvec3 m_AABBMin;

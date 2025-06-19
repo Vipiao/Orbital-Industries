@@ -59,11 +59,11 @@ CollisionResult GridCollider::collideWithBall(BallCollider* ball) {
         // Perform detailed collision detection
         CollisionResult result = subCollider->collideWithBall(ball);
         
-        if (result.hasCollision) {
+        if (result.m_hasCollision) {
             // Add all collision data to our result
-            allNormals.insert(allNormals.end(), result.normals.begin(), result.normals.end());
-            allContactPoints.insert(allContactPoints.end(), result.contactPoints.begin(), result.contactPoints.end());
-            allPenetrationDepths.insert(allPenetrationDepths.end(), result.penetrationDepths.begin(), result.penetrationDepths.end());
+            allNormals.insert(allNormals.end(), result.m_normals.begin(), result.m_normals.end());
+            allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
+            allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
         }
     }
     
@@ -95,11 +95,11 @@ CollisionResult GridCollider::collideWithGrid(GridCollider* other) {
             // Perform detailed collision detection
             CollisionResult result = collider1->collideWithBall(collider2);
             
-            if (result.hasCollision) {
+            if (result.m_hasCollision) {
                 // Add all collision data to our result
-                allNormals.insert(allNormals.end(), result.normals.begin(), result.normals.end());
-                allContactPoints.insert(allContactPoints.end(), result.contactPoints.begin(), result.contactPoints.end());
-                allPenetrationDepths.insert(allPenetrationDepths.end(), result.penetrationDepths.begin(), result.penetrationDepths.end());
+                allNormals.insert(allNormals.end(), result.m_normals.begin(), result.m_normals.end());
+                allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
+                allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
             }
         }
     }
@@ -125,7 +125,7 @@ bool GridCollider::checkAABBCollision(const Collider* other) const {
 void GridCollider::addCell(const glm::ivec3& coord, double radius) {
     // Create a new ball collider for this cell
     glm::dvec3 worldPos = gridToWorld(glm::dvec3(coord));
-    auto ballCollider = std::make_unique<BallCollider>(worldPos, m_orientation, radius, reference);
+    auto ballCollider = std::make_unique<BallCollider>(worldPos, m_orientation, radius, m_reference);
     
     m_cells[coord] = std::move(ballCollider);
     

@@ -88,7 +88,7 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
     
     // Set initial collider offset and update transform
     if (m_rigidBody) {
-        m_rigidBody->colliderOffset = m_centerOfMass;
+        m_rigidBody->m_colliderOffset = m_centerOfMass;
     }
     m_physics->updateColliderTransform(m_rigidBody);
 
@@ -225,18 +225,18 @@ void Grid::recalculateMassAndInertia() {
         PhysicsEngine::RigidBody* body = m_rigidBody;
         if (body) {
             // Update mass of the rigid body
-            body->mass = totalMass;
+            body->m_mass = totalMass;
             
             // Store old angular velocity
-            glm::dvec3 oldAngularVel = body->angularVelocity;
+            glm::dvec3 oldAngularVel = body->m_angularVelocity;
             
             // Update position
-            body->position += body->orientation * change;
+            body->m_position += body->m_orientation * change;
             
             // Calculate velocity change to conserve angular momentum
-            glm::dvec3 changeInWorld = body->orientation * change;
+            glm::dvec3 changeInWorld = body->m_orientation * change;
             glm::dvec3 addedVel = glm::cross(oldAngularVel, changeInWorld);
-            body->velocity += addedVel;
+            body->m_velocity += addedVel;
             
             // Calculate new moment of inertia (scalar approximation)
             double totalMoment = 0.0;
@@ -268,10 +268,10 @@ void Grid::recalculateMassAndInertia() {
             }
             
             // Update the rigid body's moment of inertia
-            body->momentOfInertia = totalMoment;
+            body->m_momentOfInertia = totalMoment;
 
             // Store the collider offset (center of mass in local coordinates)
-            body->colliderOffset = m_centerOfMass;
+            body->m_colliderOffset = m_centerOfMass;
         }
     }
 }
@@ -348,7 +348,7 @@ glm::dvec3 Grid::worldToGrid(const glm::dvec3& worldPos) const {
     // 1. Translate relative to body position
     // 2. Rotate by conjugate of body orientation
     // 3. Add center of mass offset
-    return glm::conjugate(m_rigidBody->orientation) * (worldPos - m_rigidBody->position) + m_centerOfMass;
+    return glm::conjugate(m_rigidBody->m_orientation) * (worldPos - m_rigidBody->m_position) + m_centerOfMass;
 }
 
 // Convert grid-local coordinates to world coordinates
@@ -361,7 +361,7 @@ glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
     // 1. Subtract center of mass
     // 2. Apply body orientation
     // 3. Add body position
-    return m_rigidBody->position + m_rigidBody->orientation * (gridPos - m_centerOfMass);
+    return m_rigidBody->m_position + m_rigidBody->m_orientation * (gridPos - m_centerOfMass);
 }
 
 // Add your gridTraversal implementation to Grid.cpp
@@ -511,7 +511,7 @@ void Grid::updateGraphics() {
         return;
     }
 
-    glm::dvec3 angVelAxis = body->angularVelocity;
+    glm::dvec3 angVelAxis = body->m_angularVelocity;
     double angVelMagnitude = glm::length(angVelAxis);
     if (angVelMagnitude > 0.00001) {
         angVelAxis = angVelAxis / angVelMagnitude;
@@ -523,9 +523,9 @@ void Grid::updateGraphics() {
     
     m_graphics->updateMeshTransform(
         m_meshId,
-        body->position - m_centerOfMass,                    // Updated - Use calculated mesh position
-        body->velocity,
-        body->orientation,
+        body->m_position - m_centerOfMass,                    // Updated - Use calculated mesh position
+        body->m_velocity,
+        body->m_orientation,
         angVelAxis,
         angVelMagnitude,
         m_centerOfMass,                  // Updated - Set center of rotation to rigid body position

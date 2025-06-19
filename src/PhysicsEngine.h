@@ -11,21 +11,21 @@ class PhysicsEngine {
 public:
     // Simple rigid body structure
     struct RigidBody {
-        glm::dvec3 position;        // Position in world space
-        glm::dvec3 velocity;        // Linear velocity (already includes deltaTime)
-        glm::dvec3 forces;          // Accumulated forces
+        glm::dvec3 m_position;        // Position in world space
+        glm::dvec3 m_velocity;        // Linear velocity (already includes deltaTime)
+        glm::dvec3 m_forces;          // Accumulated forces
         
-        glm::dquat orientation;     // Orientation quaternion
-        glm::dvec3 angularVelocity; // Angular velocity (already includes deltaTime)
-        glm::dvec3 torques;         // Accumulated torques
+        glm::dquat m_orientation;     // Orientation quaternion
+        glm::dvec3 m_angularVelocity; // Angular velocity (already includes deltaTime)
+        glm::dvec3 m_torques;         // Accumulated torques
         
-        double mass;                // Mass in kg
-        double momentOfInertia;     // Simplified moment of inertia (scalar)
+        double m_mass;                // Mass in kg
+        double m_momentOfInertia;     // Simplified moment of inertia (scalar)
         
-        bool isStatic;              // If true, this body won't move
+        bool m_isStatic;              // If true, this body won't move
 
-        Collider* collider;         // Associated collider for collision detection
-        glm::dvec3 colliderOffset;  // Offset from center of mass to collider origin (in local space)
+        Collider* m_collider;         // Associated collider for collision detection
+        glm::dvec3 m_colliderOffset;  // Offset from center of mass to collider origin (in local space)
     };
     
     PhysicsEngine();

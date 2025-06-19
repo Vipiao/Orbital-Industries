@@ -38,7 +38,7 @@ public:
         Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         addGridBlock(gg, 0, 0, 0);  // Center block
         PhysicsEngine::RigidBody* bb = gg->getRigidBody();
-        bb->position = {0.5, -2, 0.5};
+        bb->m_position = {0.5, -2, 0.5};
         
         PhysicsEngine::RigidBody* body = initialGrid->getRigidBody();
         //body->angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
@@ -84,75 +84,17 @@ protected:
         glm::dvec3 forward = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 up = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
         
-        // Add/remove blocks with T/R keys
-        bool doCreate = mouseHandler->rightClick(), doRemove = mouseHandler->leftClick();
-        if (!m_grids.empty() && (doCreate || doRemove)) {
-            // Start position (camera position)
-            glm::dvec3 startPos = m_graphicsEngine->m_camPos;
-            // End position (10 meters in the direction the camera is looking)
-            glm::dvec3 endPos = startPos + forward * 10.0;
-
+        // Check for input actions that require grid traversal
+        bool doCreate = mouseHandler->rightClick();
+        bool doRemove = mouseHandler->leftClick();
+        bool doForce = keyboard->m_f.isDown();
+        
+        if (doCreate || doRemove || doForce) {
+            // Perform unified grid traversal for all actions
             Grid* targetGrid = nullptr;
             glm::ivec3 targetPos;
+            glm::ivec3 hitPos;
             bool blockFound = false;
-            size_t blockFoundIndex = 0;
-            std::vector<glm::ivec3> cellsInPath;
-            
-            // Check all grids to find the first block hit by the ray
-            for (const auto& gridPtr : m_grids) {
-                Grid* grid = gridPtr.get();
-                glm::dvec3 startPosLocal = grid->worldToGrid(startPos);
-                glm::dvec3 endPosLocal = grid->worldToGrid(endPos);
-                
-                std::vector<glm::ivec3> gridCells = grid->gridTraversal(startPosLocal, endPosLocal);
-                
-                // Check if any cells already have blocks
-                for (size_t i = 1; i < gridCells.size(); i++) { // Skip first cell (where camera is)
-                    if (grid->hasCell(gridCells[i])) {
-                        // We found a block! Use the cell right before it
-                        targetGrid = grid;
-                        targetPos = gridCells[i-1];
-                        blockFound = true;
-                        blockFoundIndex = i;
-                        cellsInPath = gridCells;
-                        break;
-                    }
-                }
-                if (blockFound) break;
-            }
-            
-            // If no block found and right-clicking, create a new grid
-            if (!blockFound && doCreate) {
-                glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
-                Grid* newGrid = createGrid(newGridPos);
-                addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
-                return;  // Early return since we created a new grid
-            }
-            
-            // If no block found and left-clicking, do nothing
-            if (!blockFound) {
-                return;
-             }
-            
-            // Add or remove blocks based on key presses
-            if (doCreate && targetGrid) {
-                addGridBlock(targetGrid, targetPos.x, targetPos.y, targetPos.z);
-            }
-            
-            if (doRemove && targetGrid) {
-                // If we found a block, remove it instead of the target position
-                if (blockFound) {
-                    removeGridBlock(targetGrid, cellsInPath[blockFoundIndex].x, cellsInPath[blockFoundIndex].y, cellsInPath[blockFoundIndex].z);
-                } else {
-                    removeGridBlock(targetGrid, targetPos.x, targetPos.y, targetPos.z);
-                }
-            }
-        }
-
-        // Handle grid force application with F key
-        if (keyboard->m_f.isDown()) {
-            // Find the grid with the shortest ray hit distance
-            Grid* targetGrid = nullptr;
             int shortestHitDistance = INT_MAX;
             
             // Camera position and direction
@@ -177,31 +119,63 @@ protected:
                         if (static_cast<int>(i) < shortestHitDistance) {
                             shortestHitDistance = static_cast<int>(i);
                             targetGrid = grid;
+                            targetPos = gridCells[i-1]; // Position before the hit (for placement)
+                            hitPos = gridCells[i];      // Position of the hit block
+                            blockFound = true;
                         }
                         break; // Only care about first hit in this grid
                     }
                 }
             }
             
-            // Apply force to the grid with the closest hit
-            if (targetGrid) {
-                PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
-                if (body) {
-                    // Apply force in the view direction
-                    const double forceStrength = 1.0;
-                    glm::dvec3 force = forward * forceStrength;
-                    
-                    // Apply the force at the camera position
-                    glm::dvec3 applicationPoint = m_graphicsEngine->m_camPos;
-                    
-                    // Apply force at the point
-                    m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
-                    
-                    std::cout << "Applied force to grid at hit distance: " << shortestHitDistance << std::endl;
+            // Handle the different actions based on what was found
+            if (doForce) {
+                if (blockFound && targetGrid) {
+                    PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
+                    if (body) {
+                        // Apply force in the view direction
+                        const double forceStrength = 1.0;
+                        glm::dvec3 force = forward * forceStrength;
+                        
+                        // Apply the force at the camera position
+                        glm::dvec3 applicationPoint = m_graphicsEngine->m_camPos;
+                        
+                        // Apply force at the point
+                        m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
+                        
+                        std::cout << "Applied force to grid at hit distance: " << shortestHitDistance << std::endl;
+                    }
+                } else {
+                    std::cout << "No target found for force application" << std::endl;
+                }
+            }
+            
+            if (doCreate) {
+                if (blockFound && targetGrid) {
+                    // Place block at the position before the hit
+                    addGridBlock(targetGrid, targetPos.x, targetPos.y, targetPos.z);
+                    std::cout << "Added block at (" << targetPos.x << ", " << targetPos.y << ", " << targetPos.z << ")" << std::endl;
+                } else {
+                    // No block found, create a new grid 2 units ahead
+                    glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
+                    Grid* newGrid = createGrid(newGridPos);
+                    addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
+                    std::cout << "Created new grid with block at world position (" 
+                            << newGridPos.x << ", " << newGridPos.y << ", " << newGridPos.z << ")" << std::endl;
+                }
+            }
+            
+            if (doRemove) {
+                if (blockFound && targetGrid) {
+                    // Remove the hit block
+                    removeGridBlock(targetGrid, hitPos.x, hitPos.y, hitPos.z);
+                    std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+                } else {
+                    std::cout << "No block found to remove" << std::endl;
                 }
             }
         }
-        
+
         // Toggle mouse lock with M key
         if (keyboard->m_m.justPressed()) {
             bool isLocked = mouseHandler->getMouseLock();
@@ -281,19 +255,19 @@ protected:
         // Apply drag to all objects before running physics
         for (const auto& grid : m_grids) {
             PhysicsEngine::RigidBody* body = grid->getRigidBody();
-            if (body && !body->isStatic) {
+            if (body && !body->m_isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
                 const double dragCoefficient = 0.04;
                 
                 // Apply drag to linear velocity
-                if (glm::length(body->velocity) > 0.0) {
-                    glm::dvec3 dragForce = -dragCoefficient * body->velocity * body->mass;
+                if (glm::length(body->m_velocity) > 0.0) {
+                    glm::dvec3 dragForce = -dragCoefficient * body->m_velocity * body->m_mass;
                     m_physicsEngine->applyForce(body, dragForce);
                 }
                 
                 // Apply drag to angular velocity
-                if (glm::length(body->angularVelocity) > 0.0) {
-                    glm::dvec3 angularDrag = -dragCoefficient * body->angularVelocity * body->momentOfInertia;
+                if (glm::length(body->m_angularVelocity) > 0.0) {
+                    glm::dvec3 angularDrag = -dragCoefficient * body->m_angularVelocity * body->m_momentOfInertia;
                     m_physicsEngine->applyTorque(body, angularDrag);
                 }
             }

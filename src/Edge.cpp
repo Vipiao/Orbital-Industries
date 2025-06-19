@@ -3,25 +3,25 @@
 #include "Collider.h"
 
 Edge::Edge(Collider* collider, EdgeType type, EdgeAxis axis)
-    : collider(collider)
-    , type(type)
-    , axis(axis)
-    , value(0.0)
+    : m_collider(collider)
+    , m_type(type)
+    , m_axis(axis)
+    , m_value(0.0)
 {
 }
 
 void Edge::updateValue() {
-    if (!collider) return;
+    if (!m_collider) return;
     
-    switch (axis) {
+    switch (m_axis) {
         case EdgeAxis::X:
-            value = (type == EdgeType::MIN) ? collider->m_AABBMin.x : collider->m_AABBMax.x;
+            m_value = (m_type == EdgeType::MIN) ? m_collider->m_AABBMin.x : m_collider->m_AABBMax.x;
             break;
         case EdgeAxis::Y:
-            value = (type == EdgeType::MIN) ? collider->m_AABBMin.y : collider->m_AABBMax.y;
+            m_value = (m_type == EdgeType::MIN) ? m_collider->m_AABBMin.y : m_collider->m_AABBMax.y;
             break;
         case EdgeAxis::Z:
-            value = (type == EdgeType::MIN) ? collider->m_AABBMin.z : collider->m_AABBMax.z;
+            m_value = (m_type == EdgeType::MIN) ? m_collider->m_AABBMin.z : m_collider->m_AABBMax.z;
             break;
     }
 }
