@@ -182,9 +182,13 @@ void PhysicsEngine::handleCollisions() {
     std::vector<CollisionResult> collisions;
     m_collisionDetector.run(collisions);
     
-    // Resolve each collision
+    // Resolve each collision momentum.
     for (const auto& collision : collisions) {
         resolveCollision(const_cast<CollisionResult&>(collision));
+    }
+    // Resolve each collision overlap.
+    for (const auto& collision : collisions) {
+        separateOverlaps(const_cast<CollisionResult&>(collision));
     }
 }
 
@@ -240,7 +244,8 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         
         // Get pre-calculated collision mass and calculate impulse
         double collisionMass = collision.m_collisionMasses[i];
-        double impulseMagnitude = getImpulse(bodyA, bodyB, contactPoint, normal, collisionMass);
+        // Calculate impulse magnitude: -(1+e)*v_rel_normal * collision_mass
+        double impulseMagnitude = -(1.0 + 0.0) * relativeVelNormal * collisionMass; // restitution = 0.0
 
         // Calculate inverse masses and inertias
         double invMassA = 1.0 / bodyA->m_mass;
@@ -258,6 +263,99 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         bodyB->m_angularVelocity -= glm::cross(rB, impulse) * invInertiaB;
     }
 }
+
+void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
+    // Find the rigid bodies associated with these colliders
+    RigidBody* bodyA = nullptr;
+    RigidBody* bodyB = nullptr;
+    
+    for (auto& body : m_rigidBodies) {
+        if (body->m_collider == collision.m_colliderA) {
+            bodyA = body.get();
+        }
+        if (body->m_collider == collision.m_colliderB) {
+            bodyB = body.get();
+        }
+    }
+    
+    if (!bodyA || !bodyB) {
+        return; // Skip if we can't find both bodies
+    }
+
+    // Use pre-calculated collision masses
+    if (!collision.m_collisionMassesCalculated) {
+        // This should already be calculated in resolveCollision, but just in case
+        collision.m_collisionMasses.reserve(collision.m_normals.size());
+        for (size_t i = 0; i < collision.m_normals.size(); ++i) {
+            double collisionMass = getCollisionMass(bodyA, bodyB, collision.m_contactPoints[i], collision.m_normals[i]);
+            collision.m_collisionMasses.push_back(collisionMass);
+        }
+        collision.m_collisionMassesCalculated = true;
+    }
+
+    // Process each contact point for position correction
+    for (size_t i = 0; i < collision.m_normals.size(); ++i) {
+        glm::dvec3 normal = collision.m_normals[i];
+        glm::dvec3 contactPoint = collision.m_contactPoints[i];
+        double overlap = collision.m_penetrationDepths[i];
+        
+        // Only separate if there's positive overlap
+        if (overlap <= 0) {
+            continue;
+        }
+        
+        // Get collision mass and calculate position correction "impulse"
+        double collisionMass = collision.m_collisionMasses[i];
+        // Calculate position correction magnitude: overlap * collision_mass
+        double correctionMagnitude = overlap * collisionMass;
+
+        // Calculate relative position vectors from center of mass to contact point
+        glm::dvec3 rA = contactPoint - bodyA->m_position;
+        glm::dvec3 rB = contactPoint - bodyB->m_position;
+        
+        // Calculate inverse masses and inertias
+        double invMassA = 1.0 / bodyA->m_mass;
+        double invMassB = 1.0 / bodyB->m_mass;
+        double invInertiaA = 1.0 / bodyA->m_momentOfInertia;
+        double invInertiaB = 1.0 / bodyB->m_momentOfInertia;
+
+        // Apply position correction (similar to impulse application but to positions)
+        double scale = 0.1;
+        glm::dvec3 correction = normal * (correctionMagnitude * scale - 0.05);
+
+        // Apply linear position corrections
+        bodyA->m_position += correction * invMassA;
+        bodyB->m_position -= correction * invMassB;
+        
+        // Apply angular position corrections (to orientation)
+        glm::dvec3 angularCorrectionA = glm::cross(rA, correction) * invInertiaA;
+        glm::dvec3 angularCorrectionB = -glm::cross(rB, correction) * invInertiaB;
+        
+        // Convert angular corrections to quaternion rotations and apply
+        double angularCorrectionALengthSq = glm::dot(angularCorrectionA, angularCorrectionA);
+        if (angularCorrectionALengthSq > 1e-18) { // 1e-9 squared
+            double angleA = glm::length(angularCorrectionA);
+            glm::dvec3 axisA = angularCorrectionA / angleA;
+            glm::dquat rotationA = glm::angleAxis(angleA, axisA);
+            bodyA->m_orientation = rotationA * bodyA->m_orientation;
+            bodyA->m_orientation = glm::normalize(bodyA->m_orientation);
+        }
+        
+        double angularCorrectionBLengthSq = glm::dot(angularCorrectionB, angularCorrectionB);
+        if (angularCorrectionBLengthSq > 1e-18) { // 1e-9 squared
+            double angleB = glm::sqrt(angularCorrectionBLengthSq);
+           glm::dvec3 axisB = angularCorrectionB / angleB;
+            glm::dquat rotationB = glm::angleAxis(angleB, axisB);
+            bodyB->m_orientation = rotationB * bodyB->m_orientation;
+            bodyB->m_orientation = glm::normalize(bodyB->m_orientation);
+        }
+        
+        // Update collider transforms after position changes
+        updateColliderTransform(bodyA);
+        updateColliderTransform(bodyB);
+    }
+}
+
 
 double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
                                       const glm::dvec3& contactPoint, const glm::dvec3& normal) {
@@ -283,24 +381,4 @@ double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB,
     );
     
     return collisionMass;
-}
-
-double PhysicsEngine::getImpulse(RigidBody* bodyA, RigidBody* bodyB, const glm::dvec3& contactPoint,
-                                const glm::dvec3& normal, double collisionMass, double restitution) {
-    // Calculate relative position vectors from center of mass to contact point
-    glm::dvec3 rA = contactPoint - bodyA->m_position;
-    glm::dvec3 rB = contactPoint - bodyB->m_position;
-    
-    // Calculate relative velocity at contact point
-    glm::dvec3 velA = bodyA->m_velocity + glm::cross(bodyA->m_angularVelocity, rA);
-    glm::dvec3 velB = bodyB->m_velocity + glm::cross(bodyB->m_angularVelocity, rB);
-    glm::dvec3 relativeVel = velA - velB;
-    
-    // Project relative velocity onto collision normal
-    double relativeVelNormal = glm::dot(relativeVel, normal);
-    
-    // Calculate impulse magnitude: -(1+e)*v_rel_normal * collision_mass
-    double impulseMagnitude = -(1.0 + restitution) * relativeVelNormal * collisionMass;
-    
-    return impulseMagnitude;
 }

@@ -69,14 +69,12 @@ private:
     void updatePositions();
     void handleCollisions();
     void resolveCollision(CollisionResult& collision);
+    void separateOverlaps(CollisionResult& collision);
     
     // Static helper functions for collision resolution
     static double getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
                                   const glm::dvec3& contactPoint, const glm::dvec3& normal);
-    static double getImpulse(RigidBody* bodyA, RigidBody* bodyB, const glm::dvec3& contactPoint,
-                            const glm::dvec3& normal, double collisionMass, double restitution = 0.0);
 
-    
     std::vector<std::unique_ptr<RigidBody>> m_rigidBodies;
     glm::dvec3 m_gravity{0.0, 0.0, 0.0}; // Default zero gravity
     uint64_t m_currentPhysicsTimeStep{0};
