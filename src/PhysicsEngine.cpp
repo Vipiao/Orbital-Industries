@@ -186,6 +186,8 @@ void PhysicsEngine::updatePositions() {
     }
 }
 
+//static int ttt = 0;
+
 void PhysicsEngine::handleCollisions() {
     // Collect collision results
     std::vector<CollisionResult> collisions;
@@ -210,9 +212,11 @@ void PhysicsEngine::handleCollisions() {
     
     
     // Resolve each collision momentum.
+    //ttt = 0;
     for (const auto& collision : collisions) {
         resolveCollision(const_cast<CollisionResult&>(collision));
     }
+    //std::cout << "ttt: " << ttt << std::endl;
     // Resolve each collision overlap.
     for (const auto& collision : collisions) {
         separateOverlaps(const_cast<CollisionResult&>(collision));
@@ -231,6 +235,7 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
     if (bodyA->m_isStatic && bodyB->m_isStatic) {
         return; // Skip if both bodies are static
     }
+    //ttt += collision.m_normals.size();
 
     // Calculate collision masses if not already done
     if (!collision.m_collisionMassesCalculated) {
@@ -310,6 +315,12 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         collision.m_collisionMassesCalculated = true;
     }
 
+    // Calculate total collision mass for weighting
+    double totalCollisionMass = 0.0;
+    for (size_t i = 0; i < collision.m_collisionMasses.size(); ++i) {
+        totalCollisionMass += collision.m_collisionMasses[i];
+    }
+
     // Process each contact point for position correction
     for (size_t i = 0; i < collision.m_normals.size(); ++i) {
         glm::dvec3 normal = collision.m_normals[i];
@@ -323,6 +334,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         
         // Get collision mass and calculate position correction "impulse"
         double collisionMass = collision.m_collisionMasses[i];
+
         // Calculate position correction magnitude: overlap * collision_mass
         double margin = 0.05;
         double correctionMagnitude = (overlap - margin) * collisionMass;
@@ -338,8 +350,10 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         double invInertiaB = 1.0 / bodyB->m_momentOfInertia;
 
         // Apply position correction (similar to impulse application but to positions)
-        double scale = 0.1;
-        glm::dvec3 correction = normal * correctionMagnitude * scale;
+        // - Calculate collision mass fraction to avoid over-correction with multiple contact points
+        double collisionMassFraction = (totalCollisionMass > 0.0) ? collisionMass / totalCollisionMass : 1.0;
+        double scale = 0.2;
+        glm::dvec3 correction = normal * correctionMagnitude * scale * collisionMassFraction;
 
         // Apply linear position corrections
         bodyA->m_position += correction * invMassA;

@@ -123,3 +123,7 @@ glm::dvec3 GridCollider::gridToWorld(const glm::dvec3& gridCoord) const {
     // Apply orientation and position transform
     return m_position + m_orientation * localPos;
 }
+glm::dvec3 GridCollider::worldToGrid(const glm::dvec3& worldCoord) const {
+    // Inverse transformation: rotate by conjugate orientation, then translate
+    return glm::conjugate(m_orientation) * (worldCoord - m_position);
+}

@@ -36,11 +36,13 @@ public:
     // Allow access to cells for collision detection utils
     const std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash>& getCells() const { return m_cells; }
     
+    glm::dvec3 gridToWorld(const glm::dvec3& gridCoord) const;
+    glm::dvec3 worldToGrid(const glm::dvec3& worldCoord) const;
+    
 private:
     // Map of grid coordinates to cube colliders
     std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash> m_cells;
     
     // Helper methods
     void updateSubColliderTransformsAndAABB();
-    glm::dvec3 gridToWorld(const glm::dvec3& gridCoord) const;
 };
