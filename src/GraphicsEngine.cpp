@@ -38,6 +38,7 @@ void GraphicsEngine::updateMeshTransform(
     const glm::dvec3& angVelAxis,
     double angVel,
     const glm::dvec3& centerOfRotation,
+    const glm::dvec3& scale,
     int32_t colorTextureUnit,
     int32_t normalTextureUnit,
     uint64_t physicsTimeStep)
@@ -50,6 +51,7 @@ void GraphicsEngine::updateMeshTransform(
         angVelAxis,
         angVel,
         centerOfRotation,
+        scale,
         colorTextureUnit,
         normalTextureUnit,
         physicsTimeStep
@@ -129,6 +131,7 @@ int GraphicsEngine::loadModel(
         angVelAxis,
         angVel,
         centerOfRotation,
+        glm::dvec3(1.0, 1.0, 1.0), // Default scale
         colorTextureUnit,
         normalTextureUnit
     );

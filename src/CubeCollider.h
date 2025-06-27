@@ -1,20 +1,20 @@
-// BallCollider.h
+// CubeCollider.h
 #pragma once
 
 #include "Collider.h"
 
-// Forward declaration
+// Forward declarations
+class BallCollider;
 class GridCollider;
-class CubeCollider;
 
-class BallCollider : public Collider {
+class CubeCollider : public Collider {
 public:
-    BallCollider(const glm::dvec3& position = glm::dvec3(0.0),
+    CubeCollider(const glm::dvec3& position = glm::dvec3(0.0),
                  const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
-                 double radius = 1.0,
+                 double width = 1.0,
                  ColliderReference* reference = nullptr);
     
-    virtual ~BallCollider() = default;
+    virtual ~CubeCollider() = default;
     
     // Override base class methods
     virtual CollisionResult collideWith(Collider* other) override;
@@ -25,5 +25,9 @@ public:
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Public member variable
-    double m_radius;
+    double m_width;
+    
+private:
+    // Helper method to get cube vertices
+    std::vector<glm::dvec3> getVertices() const;
 };

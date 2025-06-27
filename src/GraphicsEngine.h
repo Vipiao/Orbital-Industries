@@ -33,6 +33,7 @@ public:
         const glm::dvec3& angVelAxis,
         double angVel,
         const glm::dvec3& centerOfRotation,
+        const glm::dvec3& scale = glm::dvec3(1.0, 1.0, 1.0),
         int32_t colorTextureUnit = -1,
         int32_t normalTextureUnit = -1,
         uint64_t physicsTimeStep = 0

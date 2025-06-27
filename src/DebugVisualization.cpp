@@ -1,6 +1,8 @@
 // DebugVisualization.cpp
 #include "DebugVisualization.h"
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 #include <algorithm>
 
 DebugVisualization::DebugVisualization(MeshHandler* meshHandler)
@@ -19,9 +21,13 @@ DebugVisualization::DebugVisualization(MeshHandler* meshHandler)
 
 DebugVisualization::~DebugVisualization() {
     // Clean up all active debug meshes
-    for (int meshId : m_activeMeshIds) {
+    for (const auto& pair : m_idToName) {
+        int meshId = pair.first;
         m_meshHandler->removeMesh(meshId);
     }
+    m_nameToId.clear();
+    m_idToName.clear();
+    m_meshProperties.clear();
 }
 
 void DebugVisualization::loadSphereMeshData() {
@@ -82,7 +88,7 @@ int DebugVisualization::createSphere(const glm::dvec3& position, double radius) 
         
         // Position - scale by radius
         const auto& pos = sphereMesh.positionsData[idx];
-        glm::dvec3 scaledPos = glm::dvec3(pos[0], pos[1], pos[2]) * radius;
+        glm::dvec3 scaledPos = glm::dvec3(pos[0], pos[1], pos[2]);
         positions.push_back(scaledPos);
         
         // Normal - don't scale
@@ -114,6 +120,7 @@ int DebugVisualization::createSphere(const glm::dvec3& position, double radius) 
     glm::dvec3 angVelAxis(0.0, 1.0, 0.0);
     double angVel = 0.0;
     glm::dvec3 centerOfRotation(0.0);
+    glm::dvec3 scale(radius, radius, radius);  // Scale the sphere by radius
     
     m_meshHandler->updateMeshData(
         meshId,
@@ -123,32 +130,190 @@ int DebugVisualization::createSphere(const glm::dvec3& position, double radius) 
         angVelAxis,
         angVel,
         centerOfRotation,
+        scale,
         m_redTextureUnit,  // Red texture
         -1,                // No normal texture
         0                  // Time
     );
     
-    // Add to active meshes list
-    m_activeMeshIds.push_back(meshId);
-    
-    std::cout << "Created debug sphere at (" << position.x << ", " << position.y << ", " << position.z 
-              << ") with radius " << radius << std::endl;
+    //std::cout << "Created debug sphere at (" << position.x << ", " << position.y << ", " << position.z 
+    //          << ") with radius " << radius << std::endl;
     
     return meshId;
 }
 
-void DebugVisualization::deleteMesh(int meshId) {
-    // Remove from mesh handler
-    m_meshHandler->removeMesh(meshId);
+int DebugVisualization::createSphere(const std::string& name, const glm::dvec3& position, double radius) {
+    // Remove existing mesh with this name if it exists
+    auto it = m_nameToId.find(name);
+    if (it != m_nameToId.end()) {
+        removeMesh(it->second);
+    }
     
-    // Remove from active meshes list
-    auto it = std::find(m_activeMeshIds.begin(), m_activeMeshIds.end(), meshId);
-    if (it != m_activeMeshIds.end()) {
-        m_activeMeshIds.erase(it);
+    // Create the sphere
+    int meshId = createSphere(position, radius);
+    
+    if (meshId >= 0) {
+        // Store name mapping
+        m_nameToId[name] = meshId;
+        m_idToName[meshId] = name;
+        
+        // Store initial properties
+        m_meshProperties[meshId] = {position, glm::dquat(1.0, 0.0, 0.0, 0.0), glm::dvec3(radius)};
+    }
+    
+    return meshId;
+}
+
+void DebugVisualization::removeMesh(const std::string& name) {
+    auto it = m_nameToId.find(name);
+    if (it != m_nameToId.end()) {
+        removeMesh(it->second);
+    }
+}
+
+void DebugVisualization::removeMesh(int id) {
+    // Remove from mesh handler
+    m_meshHandler->removeMesh(id);
+    
+    // Remove from name mappings
+    auto idToNameIt = m_idToName.find(id);
+    if (idToNameIt != m_idToName.end()) {
+        std::string name = idToNameIt->second;
+        m_nameToId.erase(name);
+        m_idToName.erase(id);
+    }
+    
+    // Remove properties
+    m_meshProperties.erase(id);
+}
+
+void DebugVisualization::setPosition(const std::string& name, const glm::dvec3& position) {
+    auto it = m_nameToId.find(name);
+    if (it != m_nameToId.end()) {
+        setPosition(it->second, position);
+    }
+}
+
+void DebugVisualization::setOrientation(const std::string& name, const glm::dquat& orientation) {
+    auto it = m_nameToId.find(name);
+    if (it != m_nameToId.end()) {
+        setOrientation(it->second, orientation);
+    }
+}
+
+void DebugVisualization::setScale(const std::string& name, const glm::dvec3& scale) {
+    auto it = m_nameToId.find(name);
+    if (it != m_nameToId.end()) {
+        setScale(it->second, scale);
+    }
+}
+
+void DebugVisualization::setPosition(int id, const glm::dvec3& position) {
+    auto it = m_meshProperties.find(id);
+    if (it != m_meshProperties.end()) {
+        it->second.position = position;
+        updateMeshTransform(id);
+    }
+}
+
+void DebugVisualization::setOrientation(int id, const glm::dquat& orientation) {
+    auto it = m_meshProperties.find(id);
+    if (it != m_meshProperties.end()) {
+        it->second.orientation = orientation;
+        updateMeshTransform(id);
+    }
+}
+
+void DebugVisualization::setScale(int id, const glm::dvec3& scale) {
+    auto it = m_meshProperties.find(id);
+    if (it != m_meshProperties.end()) {
+        it->second.scale = scale;
+        updateMeshTransform(id);
+    }
+}
+
+int DebugVisualization::getIdFromName(const std::string& name) const {
+    auto it = m_nameToId.find(name);
+    return (it != m_nameToId.end()) ? it->second : -1;
+}
+
+std::string DebugVisualization::getNameFromId(int id) const {
+    auto it = m_idToName.find(id);
+    return (it != m_idToName.end()) ? it->second : "";
+}
+
+void DebugVisualization::updateMeshTransform(int id) {
+    auto it = m_meshProperties.find(id);
+    if (it != m_meshProperties.end()) {
+        const auto& props = it->second;
+        glm::dvec3 velocity(0.0);
+        glm::dvec3 angVelAxis(0.0, 1.0, 0.0);
+        double angVel = 0.0;
+        glm::dvec3 centerOfRotation(0.0);
+        
+        m_meshHandler->updateMeshData(
+            id,
+            &props.position,
+            &velocity,
+            props.orientation,
+            angVelAxis,
+            angVel,
+            centerOfRotation,
+            props.scale,
+            m_redTextureUnit,
+            -1,
+            0
+        );
     }
 }
 
 void DebugVisualization::update() {
     // Currently no per-frame updates needed for debug shapes
     // This function is here for future extensions
+}
+
+std::string DebugVisualization::generateGeogebraCommands(const std::vector<glm::dvec2>& points, int precision) const {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(precision);
+    
+    for (size_t i = 0; i < points.size(); ++i) {
+        // Generate point name (A, B, C, ..., Z, A1, B1, C1, ...)
+        std::string pointName;
+        if (i < 26) {
+            pointName = static_cast<char>('A' + i);
+        } else {
+            size_t seriesIndex = (i - 26) / 26 + 1;
+            size_t letterIndex = (i - 26) % 26;
+            pointName = static_cast<char>('A' + letterIndex) + std::to_string(seriesIndex);
+        }
+        
+        oss << pointName << "=(" << points[i].x << "," << points[i].y << ")";
+        if (i < points.size() - 1) {
+            oss << "\n";
+        }
+    }
+    return oss.str();
+}
+
+std::string DebugVisualization::generateGeogebraCommands(const std::vector<glm::dvec3>& points, int precision) const {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(precision);
+    
+    for (size_t i = 0; i < points.size(); ++i) {
+        // Generate point name (A, B, C, ..., Z, A1, B1, C1, ...)
+        std::string pointName;
+        if (i < 26) {
+            pointName = static_cast<char>('A' + i);
+        } else {
+            size_t seriesIndex = (i - 26) / 26 + 1;
+            size_t letterIndex = (i - 26) % 26;
+            pointName = static_cast<char>('A' + letterIndex) + std::to_string(seriesIndex);
+        }
+        
+        oss << pointName << "=(" << points[i].x << "," << points[i].y << "," << points[i].z << ")";
+        if (i < points.size() - 1) {
+            oss << "\n";
+        }
+    }
+    return oss.str();
 }

@@ -602,6 +602,7 @@ int MeshHandler::getNextMeshIndex() {
 void MeshHandler::updateMeshData(
    int meshIndex, const glm::dvec3* position, const glm::dvec3* velocity, glm::dquat orientation,
    glm::dvec3 angVelAxis, double angVel, glm::dvec3 centerOfRotation,
+   glm::dvec3 scale,
    int32_t colorTextureUnit,
    int32_t normalTextureUnit,
    uint64_t time
@@ -616,6 +617,7 @@ void MeshHandler::updateMeshData(
    data.orientation = orientationVector;
    data.angVel = glm::vec4{ angVelAxis, angVel };
    data.centerOfRotation = glm::vec4{ centerOfRotation, 0 };
+   data.scale = glm::vec4{ scale, 0.0 };
    data.time = static_cast<uint32_t>(time);
    data.colorTextureUnit = colorTextureUnit;
    data.normalTextureUnit = normalTextureUnit;

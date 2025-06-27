@@ -1,5 +1,6 @@
 // GameBase.cpp
 #include "GameBase.h"
+#include "DebugRenderer.h"
 #include <iostream>
 #include <algorithm>
 
@@ -40,6 +41,15 @@ GameBase::~GameBase() {
     
     if (m_graphicsEngine) {
         m_graphicsEngine->removeCallbackObject(this);
+    }
+}
+
+void GameBase::setDebugRenderer(DebugRenderer* debugRenderer) {
+    m_debugRenderer = debugRenderer;
+    
+    // Pass debug pointer down to subsystems
+    if (m_physicsEngine) {
+        m_physicsEngine->setDebugRenderer(debugRenderer);
     }
 }
 

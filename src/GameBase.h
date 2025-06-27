@@ -9,6 +9,9 @@
 #include <memory>
 #include <chrono>
 
+// Forward declaration
+class DebugRenderer;
+
 class GameBase : public GraphicsEngine::CallBack {
 public:
     GameBase(int screenWidth = 800, int screenHeight = 600, 
@@ -24,7 +27,11 @@ public:
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
     std::vector<std::unique_ptr<Grid>> m_grids;
-    TimeHandler* m_timeHandler; // New
+    TimeHandler* m_timeHandler;
+
+    // Debug support
+    void setDebugRenderer(DebugRenderer* debugRenderer);
+    DebugRenderer* getDebugRenderer() const { return m_debugRenderer; }
     
     virtual void preRenderCallback(uint64_t frameNum) override;
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override;
@@ -40,5 +47,8 @@ protected:
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
     double m_physicsTimeStep{}; // Is set in constructor.
+
+private:
+    DebugRenderer* m_debugRenderer = nullptr;
 };
 

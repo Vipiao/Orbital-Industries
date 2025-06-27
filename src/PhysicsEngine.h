@@ -6,11 +6,15 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "CollisionDetector.h"
+#include "ColliderReference.h"
+
+// Forward declaration
+class DebugRenderer;
 
 class PhysicsEngine {
 public:
     // Simple rigid body structure
-    struct RigidBody {
+    struct RigidBody : public ColliderReference {
         glm::dvec3 m_position;        // Position in world space
         glm::dvec3 m_velocity;        // Linear velocity (already includes deltaTime)
         glm::dvec3 m_forces;          // Accumulated forces
@@ -62,6 +66,10 @@ public:
     
     // Run physics simulation
     void run();
+
+    // Debug support
+    void setDebugRenderer(DebugRenderer* debugRenderer) { m_debugRenderer = debugRenderer; }
+    DebugRenderer* getDebugRenderer() const { return m_debugRenderer; }
     
 private:
     // Physics simulation steps
@@ -80,4 +88,7 @@ private:
     uint64_t m_currentPhysicsTimeStep{0};
 
     CollisionDetector m_collisionDetector;
+
+    // Debug visualization
+    DebugRenderer* m_debugRenderer = nullptr;
 };

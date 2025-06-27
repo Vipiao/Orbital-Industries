@@ -2,21 +2,28 @@
 #include "src/GameBase.h"
 #include "src/TimeHandler.h"
 #include "src/DebugVisualization.h"
+#include "src/DebugRenderer.h"
+#include "src/DebugGlobals.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+// Define the global debug renderer (must be in exactly one .cpp file)
+DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
+
 class MyGame : public GameBase {
 private:
     std::unique_ptr<DebugVisualization> m_debugViz;
-
 public:
     MyGame(TimeHandler* timeHandler, 
            GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
       : GameBase(800, 600, "3D Grid Demo", timeHandler, controlMode) {
         
         // Create debug visualization system
-        m_debugViz = std::make_unique<DebugVisualization>(m_graphicsEngine->m_meshHandler.get());
+        setupDebugVisualization();
+
+        // Set global debug renderer
+        DebugGlobals::setDebugRenderer(m_debugViz.get());
 
         // Set up initial camera position and orientation
         m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
@@ -25,9 +32,6 @@ public:
         
         // Enable mouse lock for camera control
         m_graphicsEngine->m_mouseHandler->setMouseLock(true);
-
-        // Create debug sphere at origin for testing
-        m_debugViz->createSphere(glm::dvec3(0.0, 0.0, 0.0), 1.0);
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
@@ -54,6 +58,19 @@ public:
         std::cout << "  F: Apply force to grid" << std::endl;
         std::cout << "  E: Add block at (1,1,1)" << std::endl;
         std::cout << "  Q: Remove block at (1,1,1)" << std::endl;
+    }
+
+    // Helper method for setting up debug visualization
+    void setupDebugVisualization() {
+        // Create debug visualization system
+        m_debugViz = std::make_unique<DebugVisualization>(m_graphicsEngine->m_meshHandler.get());
+        
+        // Set debug renderer for the game and all subsystems
+        setDebugRenderer(m_debugViz.get());
+        
+        // Create some test debug spheres
+        //m_debugViz->createSphere("origin", glm::dvec3(0.0, 0.0, 0.0), 0.5);
+        //m_debugViz->createSphere("test_point", glm::dvec3(2.0, 2.0, 2.0), 0.3);
     }
 
     void addGridBlock(Grid* grid, int x, int y, int z) {
@@ -95,7 +112,7 @@ protected:
             glm::ivec3 targetPos;
             glm::ivec3 hitPos;
             bool blockFound = false;
-            int shortestHitDistance = INT_MAX;
+            double shortestSquaredDistance = DBL_MAX;
             
             // Camera position and direction
             glm::dvec3 startPos = m_graphicsEngine->m_camPos;
@@ -115,9 +132,17 @@ protected:
                 // Check if ray hits any blocks in this grid
                 for (size_t i = 1; i < gridCells.size(); i++) { // Skip first cell (where camera is)
                     if (grid->hasCell(gridCells[i])) {
-                        // Found a hit! Check if this is the closest hit so far
-                        if (static_cast<int>(i) < shortestHitDistance) {
-                            shortestHitDistance = static_cast<int>(i);
+                        // Calculate center of hit cube in world space
+                        glm::dvec3 hitCubeCenter = glm::dvec3(gridCells[i]) + glm::dvec3(0.5, 0.5, 0.5);
+                        glm::dvec3 hitCubeCenterWorld = grid->gridToWorld(hitCubeCenter);
+                        
+                        // Calculate squared distance from camera to cube center
+                        glm::dvec3 distanceVec = hitCubeCenterWorld - startPos;
+                        double squaredDistance = glm::dot(distanceVec, distanceVec);
+                        
+                        // Check if this is the closest hit so far
+                        if (squaredDistance < shortestSquaredDistance) {
+                            shortestSquaredDistance = squaredDistance;
                             targetGrid = grid;
                             targetPos = gridCells[i-1]; // Position before the hit (for placement)
                             hitPos = gridCells[i];      // Position of the hit block
@@ -134,7 +159,7 @@ protected:
                     PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
                     if (body) {
                         // Apply force in the view direction
-                        const double forceStrength = 1.0;
+                        const double forceStrength = 0.002 * body->m_mass;
                         glm::dvec3 force = forward * forceStrength;
                         
                         // Apply the force at the camera position
@@ -143,8 +168,7 @@ protected:
                         // Apply force at the point
                         m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
                         
-                        std::cout << "Applied force to grid at hit distance: " << shortestHitDistance << std::endl;
-                    }
+                        std::cout << "Applied force to grid at distance: " << std::sqrt(shortestSquaredDistance) << std::endl;                    }
                 } else {
                     std::cout << "No target found for force application" << std::endl;
                 }
@@ -283,10 +307,10 @@ private:
 int main() {
     try {
         // Create the TimeHandler with appropriate mode
-        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::PLAY);
+        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::NONE);
 
         // Use existing GraphicsEngineBase::Mode for controls
-        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::PLAY;
+        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE;
 
         MyGame game(timeHandler, controlMode); // Updated
         game.run();

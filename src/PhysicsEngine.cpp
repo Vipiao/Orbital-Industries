@@ -2,7 +2,9 @@
 #include "PhysicsEngine.h"
 #include <iostream>
 #include <algorithm>
+#include "CollisionDetectionUtils.h"
 #include <glm/gtx/quaternion.hpp>
+#include "DebugRenderer.h"
 
 PhysicsEngine::PhysicsEngine() 
 {
@@ -33,14 +35,16 @@ PhysicsEngine::RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position
     body->m_isStatic = isStatic;
     body->m_collider = collider;
     body->m_colliderOffset = glm::dvec3{0.0, 0.0, 0.0}; // Initialize to zero offset
+
+    RigidBody* bodyPtr = body.get();
      
     // Add collider to collision detection system if provided
     if (collider) {
+        // Set the rigid body as the reference for this collider
+        collider->m_reference = bodyPtr;
         m_collisionDetector.addCollider(collider);
     }
 
-    RigidBody* bodyPtr = body.get();
-    
     m_rigidBodies.push_back(std::move(body));
     
     return bodyPtr;
@@ -51,6 +55,11 @@ void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
 
     // Find the body to get its collider before removal
     Collider* colliderToRemove = bodyToRemove->m_collider;
+
+    // Clear the collider reference
+    if (colliderToRemove && colliderToRemove->m_reference) {
+        colliderToRemove->m_reference = nullptr;
+    }
     
     // Remove from rigid bodies
     auto removeIt = std::remove_if(m_rigidBodies.begin(), m_rigidBodies.end(),
@@ -181,6 +190,24 @@ void PhysicsEngine::handleCollisions() {
     // Collect collision results
     std::vector<CollisionResult> collisions;
     m_collisionDetector.run(collisions);
+
+    //for (size_t ii = 0; ii < 100; ii++) {
+    //    m_debugRenderer->removeMesh("contactPoint " + std::to_string(ii));
+    //}
+    //if (collisions.size() > 0) {
+    //    //RigidBody* bodyA = static_cast<RigidBody*>(collisions[0].m_colliderA->m_reference);
+    //    //m_debugRenderer->createSphere("test", bodyA->m_position, 1.0);
+    //    auto cc = collisions[0];
+    //    //int mm = m_debugRenderer->createSphere("body", glm::dvec3{0,0,0}, 0.1);
+    //    //m_debugRenderer->setScale(mm, glm::dvec3{1,0,0});
+    //    //m_debugRenderer->createSphere("head", glm::dvec3{0,0,0} + cc.m_normals[0], 0.1);
+    //    for (size_t ii = 0; ii < cc.m_contactPoints.size(); ii++)
+    //    {
+    //        m_debugRenderer->createSphere("contactPoint " + std::to_string(ii), cc.m_contactPoints[ii], 0.1);
+    //    }
+    //    
+    //}
+    
     
     // Resolve each collision momentum.
     for (const auto& collision : collisions) {
@@ -194,20 +221,15 @@ void PhysicsEngine::handleCollisions() {
 
 void PhysicsEngine::resolveCollision(CollisionResult& collision) {
     // Find the rigid bodies associated with these colliders
-    RigidBody* bodyA = nullptr;
-    RigidBody* bodyB = nullptr;
-    
-    for (auto& body : m_rigidBodies) {
-        if (body->m_collider == collision.m_colliderA) {
-            bodyA = body.get();
-        }
-        if (body->m_collider == collision.m_colliderB) {
-            bodyB = body.get();
-        }
+    RigidBody* bodyA = static_cast<RigidBody*>(collision.m_colliderA->m_reference);
+    RigidBody* bodyB = static_cast<RigidBody*>(collision.m_colliderB->m_reference);
+
+    if (!bodyA || !bodyB) {
+        return; // Skip if we can't find bodies
     }
     
-    if (!bodyA || !bodyB) {
-        return; // Skip if we can't find both bodies or both are static
+    if (bodyA->m_isStatic && bodyB->m_isStatic) {
+        return; // Skip if both bodies are static
     }
 
     // Calculate collision masses if not already done
@@ -266,20 +288,15 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
 
 void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
     // Find the rigid bodies associated with these colliders
-    RigidBody* bodyA = nullptr;
-    RigidBody* bodyB = nullptr;
-    
-    for (auto& body : m_rigidBodies) {
-        if (body->m_collider == collision.m_colliderA) {
-            bodyA = body.get();
-        }
-        if (body->m_collider == collision.m_colliderB) {
-            bodyB = body.get();
-        }
+    RigidBody* bodyA = static_cast<RigidBody*>(collision.m_colliderA->m_reference);
+    RigidBody* bodyB = static_cast<RigidBody*>(collision.m_colliderB->m_reference);
+     
+    if (!bodyA || !bodyB) {
+        return; // Skip if we can't find bodies
     }
     
-    if (!bodyA || !bodyB) {
-        return; // Skip if we can't find both bodies
+    if (bodyA->m_isStatic && bodyB->m_isStatic) {
+        return; // Skip if both bodies are static
     }
 
     // Use pre-calculated collision masses
@@ -307,7 +324,8 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         // Get collision mass and calculate position correction "impulse"
         double collisionMass = collision.m_collisionMasses[i];
         // Calculate position correction magnitude: overlap * collision_mass
-        double correctionMagnitude = overlap * collisionMass;
+        double margin = 0.05;
+        double correctionMagnitude = (overlap - margin) * collisionMass;
 
         // Calculate relative position vectors from center of mass to contact point
         glm::dvec3 rA = contactPoint - bodyA->m_position;
@@ -321,7 +339,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
 
         // Apply position correction (similar to impulse application but to positions)
         double scale = 0.1;
-        glm::dvec3 correction = normal * (correctionMagnitude * scale - 0.05);
+        glm::dvec3 correction = normal * correctionMagnitude * scale;
 
         // Apply linear position corrections
         bodyA->m_position += correction * invMassA;

@@ -6,10 +6,11 @@ struct MeshData {
    vec4 orientation;         // Offset=32, size=16 bytes. Quaternion
    vec4 angVel;              // Offset=48, size=16 bytes. Unit axis (xyz)
    vec4 centerOfRotation;    // Offset=64, size=16 bytes.
-   uint time;                // Offset=80, size= 4 bytes.
-   int colorTextureUnit;     // Offset=84, size= 4 bytes. (-1 means no textures)
-   int normalTextureUnit;    // Offset=88, size= 4 bytes. (-1 means no textures)
-   uint padding2;            // Offset=92, size= 4 bytes. (padding)
+   vec4 scale;               // Offset=80, size=16 bytes. (xyz = scale, w = padding)
+   uint time;                // Offset=96, size= 4 bytes.
+   int colorTextureUnit;     // Offset=100, size= 4 bytes. (-1 means no textures)
+   int normalTextureUnit;    // Offset=104, size= 4 bytes. (-1 means no textures)
+   uint padding2;            // Offset=108, size= 4 bytes. (padding)
 }; // Make sure to pad so size is divisible by 16 because you have a vec4.
 
 layout(std430, binding = 0) buffer MeshDataBuffer {
@@ -104,8 +105,11 @@ void main() {
       meshData.angVel.w * deltaTimeFloat * 1., meshData.angVel.xyz
    ) * orientation;
    
+   // Apply scale to the position before rotation
+   vec3 scaledPosition = position * meshData.scale.xyz;
+
    vec3 rotatedPosition = orientation * (
-      position - meshData.centerOfRotation.xyz
+      scaledPosition - meshData.centerOfRotation.xyz
    ) + meshData.centerOfRotation.xyz;
    
    // Transform normal and tangent

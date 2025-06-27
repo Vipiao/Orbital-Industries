@@ -2,8 +2,9 @@
 #pragma once
 
 #include "Collider.h"
-#include "BallCollider.h"
+#include "CubeCollider.h"
 #include "HashFunctions.h"
+#include "CollisionDetectionUtils.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include <memory>
@@ -20,20 +21,24 @@ public:
     virtual CollisionResult collideWith(Collider* other) override;
     virtual void updateAABB() override;
     virtual CollisionResult collideWithBall(BallCollider* ball) override;
+    virtual CollisionResult collideWithCube(CubeCollider* cube) override;
     virtual CollisionResult collideWithGrid(GridCollider* grid) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Grid-specific methods
-    void addCell(const glm::ivec3& coord, double radius = 0.5);
+    void addCell(const glm::ivec3& coord, double width = 1.0);
     void removeCell(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;
     
     // Get sub-collider for a specific cell
-    BallCollider* getCell(const glm::ivec3& coord);
+    CubeCollider* getCell(const glm::ivec3& coord);
+
+    // Allow access to cells for collision detection utils
+    const std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash>& getCells() const { return m_cells; }
     
 private:
-    // Map of grid coordinates to ball colliders
-    std::unordered_map<glm::ivec3, std::unique_ptr<BallCollider>, IVec3Hash> m_cells;
+    // Map of grid coordinates to cube colliders
+    std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash> m_cells;
     
     // Helper methods
     void updateSubColliderTransformsAndAABB();

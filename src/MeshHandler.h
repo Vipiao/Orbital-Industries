@@ -106,10 +106,11 @@ struct MeshData {
    glm::vec4 orientation{};         // Offset=32, size=16 bytes. Quaternion
    glm::vec4 angVel{};              // Offset=48, size=16 bytes. Unit axis (xyz)
    glm::vec4 centerOfRotation{};    // Offset=64, size=16 bytes.
-   uint32_t time{};                 // Offset=80, size= 4 bytes.
-   int32_t colorTextureUnit{};      // Offset=84, size= 4 bytes. (-1 means no textures)
-   int32_t normalTextureUnit{};     // Offset=88, size= 4 bytes. (-1 means no textures)
-   uint32_t padding2{};             // Offset=92, size= 4 bytes. (padding)
+   glm::vec4 scale{};               // Offset=80, size=16 bytes. (xyz = scale, w = padding)
+   uint32_t time{};                 // Offset=96, size= 4 bytes.
+   int32_t colorTextureUnit{};      // Offset=100, size= 4 bytes. (-1 means no textures)
+   int32_t normalTextureUnit{};     // Offset=104, size= 4 bytes. (-1 means no textures)
+   uint32_t padding2{};             // Offset=108, size= 4 bytes. (padding)
 }; // Make sure to pad so size is divisible by 16 because you have a vec4.
 #pragma pack(pop)
 
@@ -162,6 +163,7 @@ public:
    void updateMeshData(
       int meshIndex, const glm::dvec3* position, const glm::dvec3* velocity, glm::dquat orientation,
       glm::dvec3 angVelAxis, double angVel, glm::dvec3 centerOfRotation,
+      glm::dvec3 scale,
       int32_t colorTextureUnit,
       int32_t normalTextureUnit,
       uint64_t time);

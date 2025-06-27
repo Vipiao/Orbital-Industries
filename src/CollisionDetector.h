@@ -29,7 +29,7 @@ private:
 
     // Active collision pairs
     std::set<std::pair<Collider*, Collider*>> m_activeAABBS;
-    
+
     // Helper functions
     void updateAllCollisionBoxes();
     void updateAllEdgeValues();

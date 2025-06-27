@@ -1,5 +1,6 @@
 // CollisionDetector.cpp
 #include "CollisionDetector.h"
+#include "CollisionDetectionUtils.h"
 #include <algorithm>
 #include <iostream>
 
@@ -138,7 +139,7 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2,
     CollisionResult result = collider1->collideWith(collider2);
     
     if (result.m_hasCollision) {
-        std::cout << "Collision detected between two colliders!" << std::endl;
+        //std::cout << "Collision detected between two colliders!" << std::endl;
         // Set collider references for resolution
         result.m_colliderA = collider1;
         result.m_colliderB = collider2;

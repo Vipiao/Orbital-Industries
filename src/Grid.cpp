@@ -113,7 +113,7 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
     if (hasCell(coord)) return;
 
     // Add cell to collider
-    m_collider->addCell(coord, 0.5);
+    m_collider->addCell(coord, 1.0);  // Use 1.0 width for cube cells
     
     // Add cell to map immediately
     m_cells[coord] = GridCell{type};
@@ -529,6 +529,7 @@ void Grid::updateGraphics() {
         angVelAxis,
         angVelMagnitude,
         m_centerOfMass,                  // Updated - Set center of rotation to rigid body position
+        glm::dvec3(1.0, 1.0, 1.0),      // Default scale
         s_colorTextureUnit,
         s_normalTextureUnit,
         m_physics->getCurrentPhysicsTimeStep()
