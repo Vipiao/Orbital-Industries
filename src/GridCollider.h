@@ -19,7 +19,7 @@ public:
     
     // Override base class methods
     virtual CollisionResult collideWith(Collider* other) override;
-    virtual void updateAABB() override;
+    virtual void updateTransformAndAABB() override;
     virtual CollisionResult collideWithBall(BallCollider* ball) override;
     virtual CollisionResult collideWithCube(CubeCollider* cube) override;
     virtual CollisionResult collideWithGrid(GridCollider* grid) override;
@@ -38,7 +38,7 @@ public:
     
     glm::dvec3 gridToWorld(const glm::dvec3& gridCoord) const;
     glm::dvec3 worldToGrid(const glm::dvec3& worldCoord) const;
-    
+
 private:
     // Map of grid coordinates to cube colliders
     std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash> m_cells;

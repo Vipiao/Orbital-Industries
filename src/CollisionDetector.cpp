@@ -45,7 +45,7 @@ void CollisionDetector::removeCollider(Collider* collider) {
 
 void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
     // Update all collision boxes
-    updateAllCollisionBoxes();
+    updateAllCollidersAndAABB();
 
     std::set<std::pair<Collider*, Collider*>> potentialCollisions;
 
@@ -83,10 +83,10 @@ void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
     }
 }
 
-void CollisionDetector::updateAllCollisionBoxes() {
+void CollisionDetector::updateAllCollidersAndAABB() {
     for (Collider* collider : colliders) {
         if (collider) {
-            collider->updateAABB();
+            collider->updateTransformAndAABB();
         }
     }
 }

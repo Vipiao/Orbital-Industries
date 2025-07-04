@@ -27,9 +27,7 @@ public:
     
     // Cube-Cube collision
     static CollisionResult detectCubeCube(
-        const glm::dvec3& posA, const glm::dquat& oriA, double widthA,
-        const glm::dvec3& posB, const glm::dquat& oriB, double widthB,
-        Collider* colliderA = nullptr, Collider* colliderB = nullptr);
+        CubeCollider* cubeA, CubeCollider* cubeB);
     
     // Ball-Grid collision (delegate to individual ball-ball tests)
     static CollisionResult detectBallGrid(
@@ -81,8 +79,6 @@ private:
         const glm::dvec3& position, 
         const glm::dquat& orientation, 
         double width);
-    
-    static std::vector<glm::dvec3> getCubeAxes(const glm::dquat& orientation);
     
     static ContactInfo generateContactPoints(
         const std::vector<glm::dvec3>& verticesA,

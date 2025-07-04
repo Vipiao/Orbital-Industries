@@ -18,7 +18,7 @@ public:
     
     // Override base class methods
     virtual CollisionResult collideWith(Collider* other) override;
-    virtual void updateAABB() override;
+    virtual void updateTransformAndAABB() override;
     virtual CollisionResult collideWithBall(BallCollider* ball) override;
     virtual CollisionResult collideWithCube(CubeCollider* cube) override;
     virtual CollisionResult collideWithGrid(GridCollider* grid) override;

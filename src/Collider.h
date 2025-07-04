@@ -29,7 +29,7 @@ public:
     
     // Pure virtual methods that must be implemented by derived classes
     virtual CollisionResult collideWith(Collider* other) = 0;
-    virtual void updateAABB() = 0;
+    virtual void updateTransformAndAABB() = 0;
     
     // Double dispatch methods - can be overridden by derived classes
     virtual CollisionResult collideWithBall(BallCollider* ball) = 0;

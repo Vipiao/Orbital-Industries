@@ -106,13 +106,11 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
 }
 
 CollisionResult CollisionDetectionUtils::detectCubeCube(
-    const glm::dvec3& posA, const glm::dquat& oriA, double widthA,
-    const glm::dvec3& posB, const glm::dquat& oriB, double widthB,
-    Collider* colliderA, Collider* colliderB) {
+    CubeCollider* cubeA, CubeCollider* cubeB) {
     
-    // Get vertices for both cubes
-    std::vector<glm::dvec3> verticesA = getCubeVertices(posA, oriA, widthA);
-    std::vector<glm::dvec3> verticesB = getCubeVertices(posB, oriB, widthB);
+    // Get vertices for both cubes - will use cached vertices
+    std::vector<glm::dvec3> verticesA = cubeA->getVertices();
+    std::vector<glm::dvec3> verticesB = cubeB->getVertices();
 
     //if (DebugGlobals::getDebugRenderer()) {
     //    std::string vertA = DebugGlobals::getDebugRenderer()->generateGeogebraCommands(verticesA);
@@ -125,15 +123,15 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     //std::cout << geogebraCommands << std::endl;
     
     // Get axes for both cubes
-    std::vector<glm::dvec3> axesA = getCubeAxes(oriA);
-    std::vector<glm::dvec3> axesB = getCubeAxes(oriB);
+    auto [faceAxesA, edgeAxesA] = cubeA->getCollisionAxes();
+    auto [faceAxesB, edgeAxesB] = cubeB->getCollisionAxes();
     
     double minPenetration = std::numeric_limits<double>::max();
     glm::dvec3 separatingAxis;
     bool foundSeparatingAxis = false;
     
     // Test face normals of cube A
-    for (const glm::dvec3& axis : axesA) {
+    for (const glm::dvec3& axis : faceAxesA) {
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
@@ -145,7 +143,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     }
     
     // Test face normals of cube B
-    for (const glm::dvec3& axis : axesB) {
+    for (const glm::dvec3& axis : faceAxesB) {
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
@@ -157,8 +155,8 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     }
     
     // Test edge-edge cross products
-    for (const glm::dvec3& axisA : axesA) {
-        for (const glm::dvec3& axisB : axesB) {
+    for (const glm::dvec3& axisA : edgeAxesA) {
+        for (const glm::dvec3& axisB : edgeAxesB) {
             glm::dvec3 crossProduct = glm::cross(axisA, axisB);
             
             // Skip nearly parallel edges
@@ -180,7 +178,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     
     // If we reach here, there's a collision
     // Ensure normal points from A toward B
-    glm::dvec3 centerToCenter = posB - posA;
+    glm::dvec3 centerToCenter = cubeB->m_position - cubeA->m_position;
     if (glm::dot(separatingAxis, centerToCenter) < 0.0) {
         separatingAxis = -separatingAxis;
     }
@@ -197,7 +195,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     return CollisionResult(true, contactInfo.contactPoints.size() > 0 ? 
                           std::vector<glm::dvec3>(contactInfo.contactPoints.size(), contactInfo.normal) :
                           std::vector<glm::dvec3>{contactInfo.normal},
-                          contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints : std::vector<glm::dvec3>{posA},
+                          contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints : std::vector<glm::dvec3>{cubeA->m_position},
                           contactInfo.contactPoints.size() > 0 ? 
                           std::vector<double>(contactInfo.contactPoints.size(), contactInfo.penetration) :
                           std::vector<double>{contactInfo.penetration});
@@ -262,9 +260,7 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
         
         // Perform detailed collision detection (cube-cube)
         CollisionResult result = detectCubeCube(
-            cubePos, cubeOri, cubeWidth,
-            subCollider->m_position, subCollider->m_orientation, subCollider->m_width,
-            subCollider, cubeCollider);
+            static_cast<CubeCollider*>(cubeCollider), subCollider);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -352,8 +348,6 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             
                     // Perform detailed collision detection with correct order
                     CollisionResult result = detectCubeCube(
-                        queryCollider->m_position, queryCollider->m_orientation, queryCollider->m_width,
-                        targetCollider->m_position, targetCollider->m_orientation, targetCollider->m_width,
                         queryCollider, targetCollider);
             
                     if (result.m_hasCollision) {
@@ -418,42 +412,6 @@ CollisionDetectionUtils::ProjectionResult CollisionDetectionUtils::projectVertic
     return {minProj, maxProj};
 }
 
-std::vector<glm::dvec3> CollisionDetectionUtils::getCubeVertices(
-    const glm::dvec3& position, 
-    const glm::dquat& orientation, 
-    double width) {
-    
-    double halfWidth = width * 0.5;
-    std::vector<glm::dvec3> localVertices = {
-        {-halfWidth, -halfWidth, -halfWidth},
-        { halfWidth, -halfWidth, -halfWidth},
-        { halfWidth,  halfWidth, -halfWidth},
-        {-halfWidth,  halfWidth, -halfWidth},
-        {-halfWidth, -halfWidth,  halfWidth},
-        { halfWidth, -halfWidth,  halfWidth},
-        { halfWidth,  halfWidth,  halfWidth},
-        {-halfWidth,  halfWidth,  halfWidth}
-    };
-    
-    std::vector<glm::dvec3> worldVertices;
-    worldVertices.reserve(8);
-    
-    for (const glm::dvec3& localVertex : localVertices) {
-        glm::dvec3 worldVertex = position + orientation * localVertex;
-        worldVertices.push_back(worldVertex);
-    }
-    
-    return worldVertices;
-}
-
-std::vector<glm::dvec3> CollisionDetectionUtils::getCubeAxes(const glm::dquat& orientation) {
-    return {
-        orientation * glm::dvec3(1.0, 0.0, 0.0),  // X-axis
-        orientation * glm::dvec3(0.0, 1.0, 0.0),  // Y-axis
-        orientation * glm::dvec3(0.0, 0.0, 1.0)   // Z-axis
-    };
-}
-
 CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoints(
     const std::vector<glm::dvec3>& verticesA,
     const std::vector<glm::dvec3>& verticesB,
@@ -509,6 +467,17 @@ CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoi
         info.contactPoints.push_back((centerA + centerB) * 0.5);
         return info;
     }
+
+    // Early exit optimization: if either set has only 1 vertex, use it directly
+    if (positiveVertices.size() == 1) {
+        info.contactPoints.push_back(positiveVertices[0]);
+        return info;
+    }
+    
+    if (negativeVertices.size() == 1) {
+        info.contactPoints.push_back(negativeVertices[0]);
+        return info;
+    }
     
     // Create transformation matrix that aligns normal with Z-axis
     glm::dmat3 transformMatrix = createPlaneTransform(normal);
@@ -537,28 +506,27 @@ CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoi
     
     std::vector<glm::dvec2> clippedPoints;
     
+    // We know we have at least 2 vertices in each set due to early exits above
     if (sizeA > 2) {
         if (sizeB > 2) {
+            // Polygon vs Polygon
             clippedPoints = sutherlandHodgmanClip(points2DA, points2DB);
-        } else if (sizeB > 1) {
-            clippedPoints = clipSegmentAgainstPolygon(points2DB, points2DA);
         } else {
-            clippedPoints = points2DB; // Just return the point
+            // Polygon vs Edge (sizeB == 2)
+            clippedPoints = clipSegmentAgainstPolygon(points2DB, points2DA);
         }
-    } else if (sizeA > 1) {
+    } else {
+        // sizeA == 2 (Edge)
         if (sizeB > 2) {
+            // Edge vs Polygon
             clippedPoints = clipSegmentAgainstPolygon(points2DA, points2DB);
-        } else if (sizeB > 1) {
-            // Segment-segment intersection
+        } else {
+            // Edge vs Edge (sizeA == 2 and sizeB == 2)
             glm::dvec2 intersection;
             if (segmentIntersection(points2DA[0], points2DA[1], points2DB[0], points2DB[1], intersection)) {
                 clippedPoints = {intersection};
             }
-        } else {
-            clippedPoints = points2DB; // Just return the point
         }
-    } else {
-        clippedPoints = points2DA; // Just return the point
     }
 
     // Convert back to 3D

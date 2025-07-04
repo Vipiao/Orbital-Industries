@@ -31,7 +31,7 @@ private:
     std::set<std::pair<Collider*, Collider*>> m_activeAABBS;
 
     // Helper functions
-    void updateAllCollisionBoxes();
+    void updateAllCollidersAndAABB();
     void updateAllEdgeValues();
     void sortAndDetectPotentialCollisions(
         std::vector<std::unique_ptr<Edge>>& edges,

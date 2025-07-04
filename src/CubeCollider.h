@@ -18,7 +18,7 @@ public:
     
     // Override base class methods
     virtual CollisionResult collideWith(Collider* other) override;
-    virtual void updateAABB() override;
+    virtual void updateTransformAndAABB() override;
     virtual CollisionResult collideWithBall(BallCollider* ball) override;
     virtual CollisionResult collideWithCube(CubeCollider* cube) override;
     virtual CollisionResult collideWithGrid(GridCollider* grid) override;
@@ -27,7 +27,17 @@ public:
     // Public member variable
     double m_width;
     
+     // Get cached vertices (public so collision detection can access)
+    std::vector<glm::dvec3> getVertices() const { return m_cachedVertices; }
+
+    // Get collision axes (face axes, edge axes) for SAT collision detection
+    std::pair<std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes() const;
+    
+
 private:
-    // Helper method to get cube vertices
-    std::vector<glm::dvec3> getVertices() const;
+    
+    // Helper method to update cached vertices
+    void updateCachedVertices();
+    
+    std::vector<glm::dvec3> m_cachedVertices;
 };

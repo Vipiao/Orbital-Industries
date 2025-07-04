@@ -17,7 +17,7 @@ CollisionResult GridCollider::collideWith(Collider* other) {
     return other->collideWithGrid(this);
 }
 
-void GridCollider::updateAABB() {
+void GridCollider::updateTransformAndAABB() {
     if (m_cells.empty()) {
         // If no cells, set a minimal AABB
         m_AABBMin = m_position - glm::dvec3(0.1);
@@ -76,7 +76,7 @@ void GridCollider::addCell(const glm::ivec3& coord, double width) {
     m_cells[coord] = std::move(cubeCollider);
     
     // Update AABBs after adding
-    updateAABB();
+    updateTransformAndAABB();
 }
 
 void GridCollider::removeCell(const glm::ivec3& coord) {
@@ -84,7 +84,7 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
     if (it != m_cells.end()) {
         m_cells.erase(it);
         // Update AABBs after removing
-        updateAABB();
+        updateTransformAndAABB();
     }
 }
 
@@ -112,7 +112,7 @@ void GridCollider::updateSubColliderTransformsAndAABB() {
         subCollider->m_orientation = m_orientation;
         
         // Update the sub-collider's AABB
-        subCollider->updateAABB();
+        subCollider->updateTransformAndAABB();
     }
 }
 

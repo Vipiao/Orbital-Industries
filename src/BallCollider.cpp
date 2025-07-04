@@ -20,7 +20,7 @@ CollisionResult BallCollider::collideWith(Collider* other) {
     return other->collideWithBall(this);
 }
 
-void BallCollider::updateAABB() {
+void BallCollider::updateTransformAndAABB() {
     m_AABBMin = m_position - glm::dvec3(m_radius);
     m_AABBMax = m_position + glm::dvec3(m_radius);
 }

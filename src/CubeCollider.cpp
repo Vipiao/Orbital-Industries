@@ -20,20 +20,21 @@ CollisionResult CubeCollider::collideWith(Collider* other) {
     return other->collideWithCube(this);
 }
 
-void CubeCollider::updateAABB() {
-    // Calculate AABB by finding min/max of all vertices
-    std::vector<glm::dvec3> vertices = getVertices();
+void CubeCollider::updateTransformAndAABB() {
+    // First update cached vertices
+    updateCachedVertices();
     
-    if (vertices.empty()) {
+    // Calculate AABB by finding min/max of cached vertices
+    if (m_cachedVertices.empty()) {
         m_AABBMin = m_position - glm::dvec3(m_width * 0.5);
         m_AABBMax = m_position + glm::dvec3(m_width * 0.5);
         return;
     }
     
-    m_AABBMin = vertices[0];
-    m_AABBMax = vertices[0];
+    m_AABBMin = m_cachedVertices[0];
+    m_AABBMax = m_cachedVertices[0];
     
-    for (const glm::dvec3& vertex : vertices) {
+    for (const glm::dvec3& vertex : m_cachedVertices) {
         m_AABBMin = glm::min(m_AABBMin, vertex);
         m_AABBMax = glm::max(m_AABBMax, vertex);
     }
@@ -56,8 +57,6 @@ CollisionResult CubeCollider::collideWithBall(BallCollider* ball) {
 
 CollisionResult CubeCollider::collideWithCube(CubeCollider* other) {
     return CollisionDetectionUtils::detectCubeCube(
-        m_position, m_orientation, m_width,
-        other->m_position, other->m_orientation, other->m_width,
         this, other);
 }
 
@@ -77,7 +76,7 @@ bool CubeCollider::checkAABBCollision(const Collider* other) const {
             m_AABBMax.z >= other->m_AABBMin.z);
 }
 
-std::vector<glm::dvec3> CubeCollider::getVertices() const {
+void CubeCollider::updateCachedVertices() {
     double halfWidth = m_width * 0.5;
     std::vector<glm::dvec3> localVertices = {
         {-halfWidth, -halfWidth, -halfWidth}, { halfWidth, -halfWidth, -halfWidth},
@@ -86,12 +85,19 @@ std::vector<glm::dvec3> CubeCollider::getVertices() const {
         { halfWidth,  halfWidth,  halfWidth}, {-halfWidth,  halfWidth,  halfWidth}
     };
     
-    std::vector<glm::dvec3> worldVertices;
-    worldVertices.reserve(8);
+    m_cachedVertices.clear();
+    m_cachedVertices.reserve(8);
     
     for (const glm::dvec3& localVertex : localVertices) {
-        worldVertices.push_back(m_position + m_orientation * localVertex);
+        m_cachedVertices.push_back(m_position + m_orientation * localVertex);
     }
-    
-    return worldVertices;
+}
+
+std::pair<std::vector<glm::dvec3>, std::vector<glm::dvec3>> CubeCollider::getCollisionAxes() const {
+    std::vector<glm::dvec3> axes = {
+        m_orientation * glm::dvec3(1.0, 0.0, 0.0),  // X-axis
+        m_orientation * glm::dvec3(0.0, 1.0, 0.0),  // Y-axis
+        m_orientation * glm::dvec3(0.0, 0.0, 1.0)   // Z-axis
+    };
+    return {axes, axes}; // For cubes, face axes and edge axes are the same
 }
