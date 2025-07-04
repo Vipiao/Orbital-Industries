@@ -201,30 +201,72 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
                           std::vector<double>{contactInfo.penetration});
 }
 
+// Helper function to find grid cells within search radius
+static std::vector<CubeCollider*> performSpatialGridSearch(
+    const GridCollider* grid,
+    const glm::dvec3& objectWorldPos,
+    double searchRadius) {
+    
+    std::vector<CubeCollider*> foundColliders;
+    const auto& cells = grid->getCells();
+    
+    // Calculate spatial search bounds
+    glm::dvec3 gridSpaceCenter = grid->worldToGrid(objectWorldPos);
+    glm::ivec3 minCoord = glm::floor(gridSpaceCenter - glm::dvec3(searchRadius));
+    glm::ivec3 maxCoord = glm::floor(gridSpaceCenter + glm::dvec3(searchRadius));
+    
+    for (int x = minCoord.x; x <= maxCoord.x; ++x) {
+        for (int y = minCoord.y; y <= maxCoord.y; ++y) {
+            for (int z = minCoord.z; z <= maxCoord.z; ++z) {
+                glm::ivec3 targetCoord(x, y, z);
+                
+                auto cellIt = cells.find(targetCoord);
+                if (cellIt == cells.end()) {
+                    continue; // No cell at this coordinate
+                }
+                
+                foundColliders.push_back(cellIt->second.get());
+            }
+        }
+    }
+    
+    return foundColliders;
+}
+
+
 CollisionResult CollisionDetectionUtils::detectBallGrid(
     const glm::dvec3& ballPos, double ballRadius,
     const GridCollider* grid,
     Collider* ballCollider, Collider* gridCollider) {
+
+    // Early exit if grid is empty
+    const auto& cells = grid->getCells();
+    if (cells.empty()) {
+        return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    }
+    
+    // Calculate search radius: just ball radius
+    const double searchRadius = ballRadius;
+    
+    // Find colliders within search area
+    std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(grid, ballPos, searchRadius);
     
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
     std::vector<double> allPenetrationDepths;
     
-    // Test collision with each sub-collider in the grid
-    const auto& cells = grid->getCells();
-    for (const auto& pair : cells) {
-        CubeCollider* subCollider = pair.second.get();
-        
+    // Test collision with each found collider
+    for (CubeCollider* gridCell : nearbyColliders) {
         // Quick AABB check first
-        if (!subCollider->checkAABBCollision(ballCollider)) {
+        if (!gridCell->checkAABBCollision(ballCollider)) {
             continue;
         }
         
         // Perform detailed collision detection
         CollisionResult result = detectBallCube(
             ballPos, ballRadius,
-            subCollider->m_position, subCollider->m_orientation, subCollider->m_width,
-            ballCollider, subCollider);
+            gridCell->m_position, gridCell->m_orientation, gridCell->m_width,
+            ballCollider, gridCell);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -247,20 +289,33 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     const GridCollider* grid,
     Collider* cubeCollider, Collider* gridCollider) {
     
+    // Early exit if grid is empty
+    const auto& cells = grid->getCells();
+    if (cells.empty()) {
+        return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    }
+    
+    // Calculate search radius: cube half-diagonal + grid cell half-diagonal
+    const double cubeHalfDiagonal = cubeWidth * 0.5 * std::sqrt(3.0);
+    const double searchRadius = cubeHalfDiagonal;
+    
+    // Find colliders within search area
+    std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(grid, cubePos, searchRadius);
+    
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
     std::vector<double> allPenetrationDepths;
     
-    // Test collision with each sub-collider in the grid
-    const auto& cells = grid->getCells();
-    for (const auto& pair : cells) {
-        CubeCollider* subCollider = pair.second.get();
-        
-        // Quick AABB check first would require casting - skip for now
+    // Test collision with each found collider
+    for (CubeCollider* gridCell : nearbyColliders) {
+        // Quick AABB check first
+        if (!gridCell->checkAABBCollision(cubeCollider)) {
+            continue;
+        }
         
         // Perform detailed collision detection (cube-cube)
         CollisionResult result = detectCubeCube(
-            static_cast<CubeCollider*>(cubeCollider), subCollider);
+            static_cast<CubeCollider*>(cubeCollider), gridCell);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -305,11 +360,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         normalFlip = true; // We swapped order, so normals need to be flipped
     }
 
-    const auto& queryCells = (cellsA.size() <= cellsB.size()) ? cellsA : cellsB;
-    const auto& targetCells = (cellsA.size() <= cellsB.size()) ? cellsB : cellsA;
-    
-    // Half-diagonal of a unit cube (sqrt(3)/2), scaled by cube width
-    const double searchRadius = 0.5 * std::sqrt(3.0); // Cell is a cube width = 1.0
+    const auto& queryCells = queryGrid->getCells();
     
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
@@ -320,45 +371,33 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         const glm::ivec3& queryCoord = queryPair.first;
         CubeCollider* queryCollider = queryPair.second.get();
         
-        // Get center position of query cell and transform to target grid space
+        // Get center position of query cell
         glm::dvec3 queryCellCenter = queryGrid->gridToWorld(glm::dvec3(queryCoord) + glm::dvec3(0.5));
         glm::dvec3 targetSpaceCenter = targetGrid->worldToGrid(queryCellCenter);
+
+        const double gridCellHalfDiagonal = 0.5 * std::sqrt(3.0);
+        const double searchRadius = 2.0 * gridCellHalfDiagonal; // Two grid cell half-diagonals
         
-        // Calculate search bounds in target grid integer coordinates
-        glm::ivec3 minCoord = glm::floor(targetSpaceCenter - glm::dvec3(searchRadius));
-        glm::ivec3 maxCoord = glm::floor(targetSpaceCenter + glm::dvec3(searchRadius));
-        
-        // Check all cells in target grid within search bounds
-        for (int x = minCoord.x; x <= maxCoord.x; ++x) {
-            for (int y = minCoord.y; y <= maxCoord.y; ++y) {
-                for (int z = minCoord.z; z <= maxCoord.z; ++z) {
-                    glm::ivec3 targetCoord(x, y, z);
-                    
-                    auto targetIt = targetCells.find(targetCoord);
-                    if (targetIt == targetCells.end()) {
-                        continue; // No cell at this coordinate
-                    }
-                    
-                    CubeCollider* targetCollider = targetIt->second.get();
+        // Find colliders within search area
+        std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(targetGrid, queryCellCenter, searchRadius);
+
+        // Test collision with each found collider
+        for (CubeCollider* targetCollider : nearbyColliders) {
+            // Quick AABB check first
+            if (!queryCollider->checkAABBCollision(targetCollider)) {
+                continue;
+            }
             
-                    // Quick AABB check first
-                    if (!queryCollider->checkAABBCollision(targetCollider)) {
-                        continue;
-                    }
+            // Perform detailed collision detection with correct order
+            CollisionResult result = detectCubeCube(queryCollider, targetCollider);
             
-                    // Perform detailed collision detection with correct order
-                    CollisionResult result = detectCubeCube(
-                        queryCollider, targetCollider);
-            
-                    if (result.m_hasCollision) {
-                        // Add all collision data to our result, flipping normals if needed
-                        for (const auto& normal : result.m_normals) {
-                            allNormals.push_back(normalFlip ? -normal : normal);
-                        }
-                        allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
-                        allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
-                    }
+            if (result.m_hasCollision) {
+                // Add all collision data to our result, flipping normals if needed
+                for (const auto& normal : result.m_normals) {
+                    allNormals.push_back(normalFlip ? -normal : normal);
                 }
+                allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
+                allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
             }
         }
     }
