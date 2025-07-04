@@ -128,12 +128,24 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     
     double minPenetration = std::numeric_limits<double>::max();
     glm::dvec3 separatingAxis;
-    bool foundSeparatingAxis = false;
+
+    // Try cached axis first
+    glm::dvec3 cachedAxis;
+    if (cubeA->getCachedAxis(cubeB, cachedAxis)) {
+        SeparatingAxisResult result = testSeparatingAxis(cachedAxis, verticesA, verticesB);
+        if (result.isSeparating) {
+            // Cache this separating axis again (it worked!)
+            cubeA->setCachedAxis(cubeB, cachedAxis);
+            return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+        }
+    }
     
     // Test face normals of cube A
     for (const glm::dvec3& axis : faceAxesA) {
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
+            // Cache this separating axis
+            cubeA->setCachedAxis(cubeB, glm::normalize(axis));
             return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
         }
         if (result.penetration < minPenetration) {
@@ -146,6 +158,8 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     for (const glm::dvec3& axis : faceAxesB) {
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
+            // Cache this separating axis
+            cubeA->setCachedAxis(cubeB, glm::normalize(axis));
             return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
         }
         if (result.penetration < minPenetration) {
@@ -167,6 +181,8 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
             crossProduct = glm::normalize(crossProduct);
             SeparatingAxisResult result = testSeparatingAxis(crossProduct, verticesA, verticesB);
             if (result.isSeparating) {
+                // Cache this separating axis
+                cubeA->setCachedAxis(cubeB, crossProduct);
                 return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
             }
             if (result.penetration < minPenetration) {

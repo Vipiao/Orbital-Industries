@@ -2,12 +2,13 @@
 #pragma once
 
 #include "Collider.h"
+#include "SATCacheable.h"
 
 // Forward declarations
 class BallCollider;
 class GridCollider;
 
-class CubeCollider : public Collider {
+class CubeCollider : public Collider, public SATCacheable {
 public:
     CubeCollider(const glm::dvec3& position = glm::dvec3(0.0),
                  const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),

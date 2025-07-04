@@ -3,6 +3,8 @@
 
 #include <glm/glm.hpp>
 #include <cstddef>
+#include <utility>
+#include <functional>
 
 // Hash function for glm::ivec3 with bit shifting to prevent coordinate permutation collisions
 struct IVec3Hash {
@@ -13,5 +15,15 @@ struct IVec3Hash {
                       (static_cast<size_t>(coord.z) << 32);
         hash = hash * 73856093;
         return hash;
+    }
+};
+
+// Hash function for std::pair<uintptr_t, uintptr_t>
+struct UintPtrPairHash {
+    std::size_t operator()(const std::pair<std::uintptr_t, std::uintptr_t>& p) const noexcept {
+        std::size_t h1 = std::hash<std::uintptr_t>{}(p.first);
+        std::size_t h2 = std::hash<std::uintptr_t>{}(p.second);
+        // Combine hashes using a simple but effective method
+        return h1 ^ (h2 << 1);
     }
 };
