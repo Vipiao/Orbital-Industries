@@ -1,6 +1,7 @@
 // PhysicsEngine.cpp
 #include "PhysicsEngine.h"
 #include <iostream>
+#include <limits>
 #include <algorithm>
 #include "CollisionDetectionUtils.h"
 #include <glm/gtx/quaternion.hpp>
@@ -32,6 +33,14 @@ PhysicsEngine::RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position
     
     body->m_mass = mass;
     body->m_momentOfInertia = momentOfInertia;
+    // Handle zero mass/inertia cases
+    body->m_invMass = (mass > 1e-15) ? (1.0 / mass) : std::numeric_limits<double>::max();
+    body->m_invMomentOfInertia = (momentOfInertia > 1e-15) ? (1.0 / momentOfInertia) : std::numeric_limits<double>::max();
+    // Static bodies should have infinite mass (zero inverse mass)
+    if (isStatic) {
+        body->m_invMass = 0.0;
+        body->m_invMomentOfInertia = 0.0;
+    }
     body->m_isStatic = isStatic;
     body->m_collider = collider;
     body->m_colliderOffset = glm::dvec3{0.0, 0.0, 0.0}; // Initialize to zero offset
@@ -142,7 +151,7 @@ void PhysicsEngine::updatePositions() {
         
         // Linear motion update
         // Calculate acceleration: a = F/m
-        glm::dvec3 acceleration = body->m_forces / body->m_mass;
+        glm::dvec3 acceleration = body->m_forces * body->m_invMass;
         
         // Update velocity: v = v + a
         // (deltaTime already incorporated into velocity)
@@ -154,7 +163,7 @@ void PhysicsEngine::updatePositions() {
         
         // Angular motion update
         // Calculate angular acceleration: α = τ/I
-        glm::dvec3 angularAcceleration = body->m_torques / body->m_momentOfInertia;
+        glm::dvec3 angularAcceleration = body->m_torques * body->m_invMomentOfInertia;
         
         // Update angular velocity: ω = ω + α
         // (deltaTime already incorporated into angular velocity)
@@ -276,20 +285,14 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         // Calculate impulse magnitude: -(1+e)*v_rel_normal * collision_mass
         double impulseMagnitude = -(1.0 + 0.0) * relativeVelNormal * collisionMass; // restitution = 0.0
 
-        // Calculate inverse masses and inertias
-        double invMassA = 1.0 / bodyA->m_mass;
-        double invMassB = 1.0 / bodyB->m_mass;
-        double invInertiaA = 1.0 / bodyA->m_momentOfInertia;
-        double invInertiaB = 1.0 / bodyB->m_momentOfInertia;
-
         // Apply impulse
         glm::dvec3 impulse = normal * impulseMagnitude;
         
-        bodyA->m_velocity += impulse * invMassA;
-        bodyA->m_angularVelocity += glm::cross(rA, impulse) * invInertiaA;
+        bodyA->m_velocity += impulse * bodyA->m_invMass;
+        bodyA->m_angularVelocity += glm::cross(rA, impulse) * bodyA->m_invMomentOfInertia;
         
-        bodyB->m_velocity -= impulse * invMassB;
-        bodyB->m_angularVelocity -= glm::cross(rB, impulse) * invInertiaB;
+        bodyB->m_velocity -= impulse * bodyB->m_invMass;
+        bodyB->m_angularVelocity -= glm::cross(rB, impulse) * bodyB->m_invMomentOfInertia;
     }
 }
 
@@ -353,12 +356,6 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         // Calculate relative position vectors from center of mass to contact point
         glm::dvec3 rA = contactPoint - bodyA->m_position;
         glm::dvec3 rB = contactPoint - bodyB->m_position;
-        
-        // Calculate inverse masses and inertias
-        double invMassA = 1.0 / bodyA->m_mass;
-        double invMassB = 1.0 / bodyB->m_mass;
-        double invInertiaA = 1.0 / bodyA->m_momentOfInertia;
-        double invInertiaB = 1.0 / bodyB->m_momentOfInertia;
 
         // Apply position correction (similar to impulse application but to positions)
         // - Calculate collision mass fraction to avoid over-correction with multiple contact points
@@ -368,12 +365,12 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         glm::dvec3 correction = normal * correctionMagnitude * scale * fraction;
 
         // Apply linear position corrections
-        bodyA->m_position -= correction * invMassA;
-        bodyB->m_position += correction * invMassB;
+        bodyA->m_position -= correction * bodyA->m_invMass;
+        bodyB->m_position += correction * bodyB->m_invMass;
         
         // Apply angular position corrections (to orientation)
-        glm::dvec3 angularCorrectionA = -glm::cross(rA, correction) * invInertiaA;
-        glm::dvec3 angularCorrectionB = +glm::cross(rB, correction) * invInertiaB;
+        glm::dvec3 angularCorrectionA = -glm::cross(rA, correction) * bodyA->m_invMomentOfInertia;
+        glm::dvec3 angularCorrectionB = +glm::cross(rB, correction) * bodyB->m_invMomentOfInertia;
         
         // Convert angular corrections to quaternion rotations and apply
         double angularCorrectionALengthSq = glm::dot(angularCorrectionA, angularCorrectionA);
@@ -406,12 +403,6 @@ double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB,
     // Calculate relative position vectors from center of mass to contact point
     glm::dvec3 rA = contactPoint - bodyA->m_position;
     glm::dvec3 rB = contactPoint - bodyB->m_position;
-    
-    // Calculate inverse masses and inertias
-    double invMassA = 1.0 / bodyA->m_mass;
-    double invMassB = 1.0 / bodyB->m_mass;
-    double invInertiaA = 1.0 / bodyA->m_momentOfInertia;
-    double invInertiaB = 1.0 / bodyB->m_momentOfInertia;
 
     // Cross products for rotational terms
     glm::dvec3 rAcrossN = glm::cross(rA, normal);
@@ -419,9 +410,9 @@ double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB,
     
     // Calculate collision mass using the formula: 1/(invMassA + invMassB + (rA x n)²*invInertiaA + (rB x n)²*invInertiaB)
     double collisionMass = 1.0 / (
-        invMassA + invMassB + 
-        glm::dot(rAcrossN, rAcrossN) * invInertiaA + 
-        glm::dot(rBcrossN, rBcrossN) * invInertiaB
+        bodyA->m_invMass + bodyB->m_invMass + 
+        glm::dot(rAcrossN, rAcrossN) * bodyA->m_invMomentOfInertia + 
+        glm::dot(rBcrossN, rBcrossN) * bodyB->m_invMomentOfInertia
     );
     
     return collisionMass;

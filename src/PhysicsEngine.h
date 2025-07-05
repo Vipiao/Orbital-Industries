@@ -26,6 +26,8 @@ public:
         
         double m_mass;                // Mass in kg
         double m_momentOfInertia;     // Simplified moment of inertia (scalar)
+        double m_invMass;             // Cached inverse mass (1/mass)
+        double m_invMomentOfInertia;  // Cached inverse moment of inertia (1/momentOfInertia)
         
         bool m_isStatic;              // If true, this body won't move
 
