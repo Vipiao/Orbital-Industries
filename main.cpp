@@ -35,8 +35,16 @@ public:
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
-        addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
-        addGridBlock(initialGrid, 0, 0, 0);  // Center block
+        //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
+        //addGridBlock(initialGrid, 0, 0, 0);  // Center block
+        for (size_t ii = 0; ii < 20; ii++)
+        {
+            for (size_t jj = 0; jj < 20; jj++)
+            {
+                addGridBlock(initialGrid, ii, jj, 0);
+            }
+        }
+        
 
         
         Grid* gg = createGrid(glm::dvec3(0, 0, 0));

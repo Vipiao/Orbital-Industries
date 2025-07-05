@@ -227,7 +227,7 @@ void PhysicsEngine::handleCollisions() {
     }
     //std::cout << "ttt: " << ttt << std::endl;
     // Resolve each collision overlap.
-    for (int ii=0; ii < 1; ii++) {
+    for (int ii=0; ii < 4; ii++) {
         for (const auto& collision : collisions) {
             separateOverlaps(const_cast<CollisionResult&>(collision));
         }
@@ -320,23 +320,22 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         collision.m_collisionMassesCalculated = true;
     }
 
-    // Calculate total collision mass for weighting
-    double totalCollisionMass = 0.0;
-    for (size_t ii = 0; ii < collision.m_collisionMasses.size(); ++ii) {
-        totalCollisionMass += collision.m_collisionMasses[ii];
-    }
-
-    // Calculate total overlap weighting
-    double totalOverlap = 0.0;
-    for (size_t ii = 0; ii < collision.m_penetrationDepths.size(); ++ii) {
-        totalOverlap += collision.m_penetrationDepths[ii];
-    }
-
-    // Process each contact point for position correction
+    // Process each contact point for position correction with dynamic overlap calculation
     for (size_t ii = 0; ii < collision.m_normals.size(); ++ii) {
         glm::dvec3 normal = collision.m_normals[ii];
         glm::dvec3 contactPoint = collision.m_contactPoints[ii];
-        double overlap = collision.m_penetrationDepths[ii];
+
+        // Calculate current overlap using dynamic contact point positions
+        // Transform local contact points back to current world space using collider methods
+        glm::dvec3 currentContactA = collision.m_colliderA->localToWorld(collision.m_contactPointsLocalA[ii]);
+        glm::dvec3 currentContactB = collision.m_colliderB->localToWorld(collision.m_contactPointsLocalB[ii]);
+        
+        // Calculate how much the contact points have separated since collision detection
+        glm::dvec3 separation = currentContactA - currentContactB;
+        double separationAlongNormal = glm::dot(separation, normal);
+        
+        // Adjust the overlap: positive separation means objects moved apart, so reduce overlap
+        double overlap = collision.m_penetrationDepths[ii] + separationAlongNormal;
         
         // Only separate if there's positive overlap
         if (overlap <= 0) {
@@ -357,12 +356,9 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         glm::dvec3 rA = contactPoint - bodyA->m_position;
         glm::dvec3 rB = contactPoint - bodyB->m_position;
 
-        // Apply position correction (similar to impulse application but to positions)
-        // - Calculate collision mass fraction to avoid over-correction with multiple contact points
-        //double fraction = (totalCollisionMass > 0.0) ? collisionMass / totalCollisionMass : 1.0;
-        double fraction = (totalOverlap > 0.0) ? overlap / totalOverlap : 1.0;
-        double scale = 0.8;
-        glm::dvec3 correction = normal * correctionMagnitude * scale * fraction;
+        // Apply position correction
+        double scale = 0.3;
+        glm::dvec3 correction = normal * correctionMagnitude * scale;
 
         // Apply linear position corrections
         bodyA->m_position -= correction * bodyA->m_invMass;

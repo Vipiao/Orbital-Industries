@@ -30,6 +30,16 @@ public:
 
     // Axis-aligned bounding box collision detection
     virtual bool checkAABBCollision(const Collider* other) const = 0;
+
+    // Transform local point to world coordinates
+    glm::dvec3 localToWorld(const glm::dvec3& localPoint) const {
+        return m_position + m_orientation * localPoint;
+    }
+    
+    // Transform world point to local coordinates
+    glm::dvec3 worldToLocal(const glm::dvec3& worldPoint) const {
+        return glm::conjugate(m_orientation) * (worldPoint - m_position);
+    }
     
     // Public member variables
     glm::dvec3 m_position;

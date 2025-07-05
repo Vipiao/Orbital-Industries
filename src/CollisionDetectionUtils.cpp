@@ -68,7 +68,7 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
     }
     
     // Default case - no collision
-    return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    return CollisionResult();
 }
 
 CollisionResult CollisionDetectionUtils::detectBallBall(
@@ -107,11 +107,11 @@ CollisionResult CollisionDetectionUtils::detectBallBall(
         // Calculate penetration depth
         double penetrationDepth = radiusSum - distance;
         
-        return CollisionResult(true, normal, contactPoint, penetrationDepth);
+        return CollisionResult(true, normal, contactPoint, penetrationDepth, ballA, ballB);
     }
     
     // No collision
-    return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    return CollisionResult();
 }
 
 CollisionResult CollisionDetectionUtils::detectBallCube(
@@ -168,10 +168,10 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
         // Penetration depth
         double penetration = ballRadius - distance;
         
-        return CollisionResult(true, worldNormal, contactPoint, penetration);
+        return CollisionResult(true, worldNormal, contactPoint, penetration, ball, cube);
     }
     
-    return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    return CollisionResult();
 }
 
 CollisionResult CollisionDetectionUtils::detectCubeCube(
@@ -205,7 +205,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         if (result.isSeparating) {
             // Cache this separating axis again (it worked!)
             cubeA->setCachedAxis(cubeB, cachedAxis);
-            return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+            return CollisionResult();
         }
     }
     
@@ -215,7 +215,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         if (result.isSeparating) {
             // Cache this separating axis
             cubeA->setCachedAxis(cubeB, glm::normalize(axis));
-            return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+            return CollisionResult();
         }
         if (result.penetration < minPenetration) {
             minPenetration = result.penetration;
@@ -229,7 +229,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         if (result.isSeparating) {
             // Cache this separating axis
             cubeA->setCachedAxis(cubeB, glm::normalize(axis));
-            return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+            return CollisionResult();
         }
         if (result.penetration < minPenetration) {
             minPenetration = result.penetration;
@@ -252,7 +252,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
             if (result.isSeparating) {
                 // Cache this separating axis
                 cubeA->setCachedAxis(cubeB, crossProduct);
-                return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+                return CollisionResult();
             }
             if (result.penetration < minPenetration) {
                 minPenetration = result.penetration;
@@ -283,7 +283,8 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
                           contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints : std::vector<glm::dvec3>{cubeA->m_position},
                           contactInfo.contactPoints.size() > 0 ? 
                           std::vector<double>(contactInfo.contactPoints.size(), contactInfo.penetration) :
-                          std::vector<double>{contactInfo.penetration});
+                          std::vector<double>{contactInfo.penetration},
+                          cubeA, cubeB);
 }
 
 // Helper function to find grid cells within search radius
@@ -328,7 +329,7 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     // Early exit if grid is empty
     const auto& cells = grid->getCells();
     if (cells.empty()) {
-        return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+        return CollisionResult();
     }
     
     // Calculate search radius: just ball radius
@@ -364,7 +365,7 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
         return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, ball, grid);
     }
     
-    return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    return CollisionResult();
 }
 
 CollisionResult CollisionDetectionUtils::detectCubeGrid(
@@ -377,7 +378,7 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     // Early exit if grid is empty
     const auto& cells = grid->getCells();
     if (cells.empty()) {
-        return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+        return CollisionResult();
     }
     
     // Calculate search radius: cube half-diagonal + grid cell half-diagonal
@@ -414,7 +415,7 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
         return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, cube, grid);
     }
     
-    return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    return CollisionResult();
 }
 
 CollisionResult CollisionDetectionUtils::detectGridGrid(
@@ -425,7 +426,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     
     // Early exit if either grid is empty
     if (cellsA.empty() || cellsB.empty()) {
-        return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+        return CollisionResult();
     }
     
     // Choose the smaller grid as the query grid for optimization
@@ -491,7 +492,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
                                gridA, gridB);
     }
     
-    return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+    return CollisionResult();
 }
 
 CollisionResult CollisionDetectionUtils::detectCubeBall(
