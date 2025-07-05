@@ -136,7 +136,7 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2,
     if (!collider1 || !collider2 || collider1 == collider2) return;
     
     // Perform collision detection between the two colliders
-    CollisionResult result = collider1->collideWith(collider2);
+    CollisionResult result = CollisionDetectionUtils::collideWith(collider1, collider2);
     
     if (result.m_hasCollision) {
         //std::cout << "Collision detected between two colliders!" << std::endl;

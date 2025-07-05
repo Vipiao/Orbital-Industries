@@ -267,7 +267,7 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         double relativeVelNormal = glm::dot(relativeVel, normal);
         
         // Do not resolve if velocities are separating
-        if (relativeVelNormal > 0) {
+        if (relativeVelNormal < 0) {
             continue;
         }
         
@@ -368,12 +368,12 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         glm::dvec3 correction = normal * correctionMagnitude * scale * fraction;
 
         // Apply linear position corrections
-        bodyA->m_position += correction * invMassA;
-        bodyB->m_position -= correction * invMassB;
+        bodyA->m_position -= correction * invMassA;
+        bodyB->m_position += correction * invMassB;
         
         // Apply angular position corrections (to orientation)
-        glm::dvec3 angularCorrectionA = glm::cross(rA, correction) * invInertiaA;
-        glm::dvec3 angularCorrectionB = -glm::cross(rB, correction) * invInertiaB;
+        glm::dvec3 angularCorrectionA = -glm::cross(rA, correction) * invInertiaA;
+        glm::dvec3 angularCorrectionB = +glm::cross(rB, correction) * invInertiaB;
         
         // Convert angular corrections to quaternion rotations and apply
         double angularCorrectionALengthSq = glm::dot(angularCorrectionA, angularCorrectionA);

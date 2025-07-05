@@ -1,8 +1,5 @@
 // CubeCollider.cpp
 #include "CubeCollider.h"
-#include "BallCollider.h"
-#include "GridCollider.h"
-#include "CollisionDetectionUtils.h"
 #include <glm/gtx/transform.hpp>
 
 CubeCollider::CubeCollider(const glm::dvec3& position,
@@ -13,11 +10,6 @@ CubeCollider::CubeCollider(const glm::dvec3& position,
     , m_width(width)
 {
     
-}
-
-CollisionResult CubeCollider::collideWith(Collider* other) {
-    // Double dispatch: call collideWithCube on other
-    return other->collideWithCube(this);
 }
 
 void CubeCollider::updateTransformAndAABB() {
@@ -38,32 +30,6 @@ void CubeCollider::updateTransformAndAABB() {
         m_AABBMin = glm::min(m_AABBMin, vertex);
         m_AABBMax = glm::max(m_AABBMax, vertex);
     }
-}
-
-CollisionResult CubeCollider::collideWithBall(BallCollider* ball) {
-    // Use utility function for ball-cube collision (swap order for cube-ball)
-    CollisionResult result = CollisionDetectionUtils::detectBallCube(
-        ball->m_position, ball->m_radius,
-        m_position, m_orientation, m_width,
-        ball, this);
-    
-    // Flip normal direction since we called ball-cube instead of cube-ball
-    for (glm::dvec3& normal : result.m_normals) {
-        normal = -normal;
-    }
-    
-    return result;
-}
-
-CollisionResult CubeCollider::collideWithCube(CubeCollider* other) {
-    return CollisionDetectionUtils::detectCubeCube(
-        this, other);
-}
-
-CollisionResult CubeCollider::collideWithGrid(GridCollider* grid) {
-    return CollisionDetectionUtils::detectCubeGrid(
-        m_position, m_orientation, m_width,
-        grid, this, grid);
 }
 
 bool CubeCollider::checkAABBCollision(const Collider* other) const {

@@ -3,6 +3,7 @@
 
 #include "Collider.h"
 #include "Edge.h"
+#include "CollisionResult.h"
 #include <vector>
 #include <set>
 #include <memory>

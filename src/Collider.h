@@ -2,16 +2,10 @@
 #pragma once
 
 #include "ColliderReference.h"
-#include "CollisionResult.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <utility>
 #include <vector>
-
-// Forward declaration
-class BallCollider;
-class CubeCollider;
-class GridCollider;
 
 class Collider {
 public:
@@ -26,15 +20,13 @@ public:
     {}
     
     virtual ~Collider() = default;
+
+    // Type identification system
+    static const int TYPE_ID;
+    virtual int getTypeId() const = 0;
     
     // Pure virtual methods that must be implemented by derived classes
-    virtual CollisionResult collideWith(Collider* other) = 0;
     virtual void updateTransformAndAABB() = 0;
-    
-    // Double dispatch methods - can be overridden by derived classes
-    virtual CollisionResult collideWithBall(BallCollider* ball) = 0;
-    virtual CollisionResult collideWithCube(CubeCollider* cube) = 0;
-    virtual CollisionResult collideWithGrid(GridCollider* grid) = 0;
 
     // Axis-aligned bounding box collision detection
     virtual bool checkAABBCollision(const Collider* other) const = 0;

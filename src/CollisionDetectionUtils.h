@@ -13,38 +13,40 @@ class GridCollider;
 
 class CollisionDetectionUtils {
 public:
+    // Main collision entry point - replaces double dispatch
+    static CollisionResult collideWith(Collider* colliderA, Collider* colliderB);
+
     // Ball-Ball collision
     static CollisionResult detectBallBall(
-        const glm::dvec3& posA, double radiusA,
-        const glm::dvec3& posB, double radiusB,
-        Collider* colliderA = nullptr, Collider* colliderB = nullptr);
+        BallCollider* ballA, BallCollider* ballB);
     
     // Ball-Cube collision
     static CollisionResult detectBallCube(
-        const glm::dvec3& ballPos, double ballRadius,
-        const glm::dvec3& cubePos, const glm::dquat& cubeOri, double cubeWidth,
-        Collider* ballCollider = nullptr, Collider* cubeCollider = nullptr);
+        BallCollider* ball, CubeCollider* cube);
     
     // Cube-Cube collision
     static CollisionResult detectCubeCube(
         CubeCollider* cubeA, CubeCollider* cubeB);
     
-    // Ball-Grid collision (delegate to individual ball-ball tests)
+    // Ball-Grid collision
     static CollisionResult detectBallGrid(
-        const glm::dvec3& ballPos, double ballRadius,
-        const GridCollider* grid,
-        Collider* ballCollider = nullptr, Collider* gridCollider = nullptr);
+        BallCollider* ball, GridCollider* grid);
     
-    // Cube-Grid collision (delegate to individual cube-ball tests)
+    // Cube-Grid collision
     static CollisionResult detectCubeGrid(
-        const glm::dvec3& cubePos, const glm::dquat& cubeOri, double cubeWidth,
-        const GridCollider* grid,
-        Collider* cubeCollider = nullptr, Collider* gridCollider = nullptr);
+        CubeCollider* cube, GridCollider* grid);
     
-    // Grid-Grid collision (delegate to individual ball-ball tests)
+    // Grid-Grid collision
     static CollisionResult detectGridGrid(
-        const GridCollider* gridA, const GridCollider* gridB,
-        Collider* colliderA = nullptr, Collider* colliderB = nullptr);
+        GridCollider* gridA, GridCollider* gridB);
+
+    // Reverse-order functions with normal flipping
+    static CollisionResult detectCubeBall(
+        CubeCollider* cube, BallCollider* ball);
+    static CollisionResult detectGridBall(
+        GridCollider* grid, BallCollider* ball);
+    static CollisionResult detectGridCube(
+        GridCollider* grid, CubeCollider* cube);
 
 private:
     // Helper structures for cube collision detection

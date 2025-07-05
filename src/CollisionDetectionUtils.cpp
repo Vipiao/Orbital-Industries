@@ -1,5 +1,7 @@
 // CollisionDetectionUtils.cpp
 #include "CollisionDetectionUtils.h"
+#include "BallCollider.h"
+#include "CubeCollider.h"
 #include "GridCollider.h"
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/transform.hpp>
@@ -9,10 +11,73 @@
 #include "DebugGlobals.h"
 #include "DebugRenderer.h"
 
+CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collider* colliderB) {
+    int typeA = colliderA->getTypeId();
+    int typeB = colliderB->getTypeId();
+    
+    // Switch table for collision detection
+    switch (typeA) {
+        case BallCollider::TYPE_ID:
+            switch (typeB) {
+                case BallCollider::TYPE_ID:
+                    return detectBallBall(
+                        static_cast<BallCollider*>(colliderA),
+                        static_cast<BallCollider*>(colliderB));
+                case CubeCollider::TYPE_ID:
+                    return detectBallCube(
+                        static_cast<BallCollider*>(colliderA),
+                        static_cast<CubeCollider*>(colliderB));
+                case GridCollider::TYPE_ID:
+                    return detectBallGrid(
+                        static_cast<BallCollider*>(colliderA),
+                        static_cast<GridCollider*>(colliderB));
+            }
+            break;
+        case CubeCollider::TYPE_ID:
+            switch (typeB) {
+                case BallCollider::TYPE_ID:
+                    return detectCubeBall(
+                        static_cast<CubeCollider*>(colliderA),
+                        static_cast<BallCollider*>(colliderB));
+                case CubeCollider::TYPE_ID:
+                    return detectCubeCube(
+                        static_cast<CubeCollider*>(colliderA),
+                        static_cast<CubeCollider*>(colliderB));
+                case GridCollider::TYPE_ID:
+                    return detectCubeGrid(
+                        static_cast<CubeCollider*>(colliderA),
+                        static_cast<GridCollider*>(colliderB));
+            }
+            break;
+        case GridCollider::TYPE_ID:
+            switch (typeB) {
+                case BallCollider::TYPE_ID:
+                    return detectGridBall(
+                        static_cast<GridCollider*>(colliderA),
+                        static_cast<BallCollider*>(colliderB));
+                case CubeCollider::TYPE_ID:
+                    return detectGridCube(
+                        static_cast<GridCollider*>(colliderA),
+                        static_cast<CubeCollider*>(colliderB));
+                case GridCollider::TYPE_ID:
+                    return detectGridGrid(
+                        static_cast<GridCollider*>(colliderA),
+                        static_cast<GridCollider*>(colliderB));
+            }
+            break;
+    }
+    
+    // Default case - no collision
+    return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+}
+
 CollisionResult CollisionDetectionUtils::detectBallBall(
-    const glm::dvec3& posA, double radiusA,
-    const glm::dvec3& posB, double radiusB,
-    Collider* colliderA, Collider* colliderB) {
+    BallCollider* ballA, BallCollider* ballB) {
+
+    const glm::dvec3& posA = ballA->m_position;
+    const glm::dvec3& posB = ballB->m_position;
+    double radiusA = ballA->m_radius;
+    double radiusB = ballB->m_radius;
     
     // Calculate distance between centers
     glm::dvec3 direction = posB - posA;
@@ -50,9 +115,13 @@ CollisionResult CollisionDetectionUtils::detectBallBall(
 }
 
 CollisionResult CollisionDetectionUtils::detectBallCube(
-    const glm::dvec3& ballPos, double ballRadius,
-    const glm::dvec3& cubePos, const glm::dquat& cubeOri, double cubeWidth,
-    Collider* ballCollider, Collider* cubeCollider) {
+    BallCollider* ball, CubeCollider* cube) {
+
+    const glm::dvec3& ballPos = ball->m_position;
+    double ballRadius = ball->m_radius;
+    const glm::dvec3& cubePos = cube->m_position;
+    const glm::dquat& cubeOri = cube->m_orientation;
+    double cubeWidth = cube->m_width;
     
     // Transform ball position to cube's local space
     glm::dvec3 localBallPos = glm::conjugate(cubeOri) * (ballPos - cubePos);
@@ -251,9 +320,10 @@ static std::vector<CubeCollider*> performSpatialGridSearch(
 
 
 CollisionResult CollisionDetectionUtils::detectBallGrid(
-    const glm::dvec3& ballPos, double ballRadius,
-    const GridCollider* grid,
-    Collider* ballCollider, Collider* gridCollider) {
+    BallCollider* ball, GridCollider* grid) {
+    
+    const glm::dvec3& ballPos = ball->m_position;
+    double ballRadius = ball->m_radius;
 
     // Early exit if grid is empty
     const auto& cells = grid->getCells();
@@ -274,15 +344,12 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     // Test collision with each found collider
     for (CubeCollider* gridCell : nearbyColliders) {
         // Quick AABB check first
-        if (!gridCell->checkAABBCollision(ballCollider)) {
+        if (!gridCell->checkAABBCollision(ball)) {
             continue;
         }
         
         // Perform detailed collision detection
-        CollisionResult result = detectBallCube(
-            ballPos, ballRadius,
-            gridCell->m_position, gridCell->m_orientation, gridCell->m_width,
-            ballCollider, gridCell);
+        CollisionResult result = detectBallCube(ball, gridCell);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -294,16 +361,18 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
-        return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, ballCollider, gridCollider);
+        return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, ball, grid);
     }
     
     return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
 }
 
 CollisionResult CollisionDetectionUtils::detectCubeGrid(
-    const glm::dvec3& cubePos, const glm::dquat& cubeOri, double cubeWidth,
-    const GridCollider* grid,
-    Collider* cubeCollider, Collider* gridCollider) {
+    CubeCollider* cube, GridCollider* grid) {
+    
+    const glm::dvec3& cubePos = cube->m_position;
+    const glm::dquat& cubeOri = cube->m_orientation;
+    double cubeWidth = cube->m_width;
     
     // Early exit if grid is empty
     const auto& cells = grid->getCells();
@@ -325,13 +394,12 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     // Test collision with each found collider
     for (CubeCollider* gridCell : nearbyColliders) {
         // Quick AABB check first
-        if (!gridCell->checkAABBCollision(cubeCollider)) {
+        if (!gridCell->checkAABBCollision(cube)) {
             continue;
         }
         
         // Perform detailed collision detection (cube-cube)
-        CollisionResult result = detectCubeCube(
-            static_cast<CubeCollider*>(cubeCollider), gridCell);
+        CollisionResult result = detectCubeCube(cube, gridCell);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -343,15 +411,14 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
-        return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, cubeCollider, gridCollider);
+        return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, cube, grid);
     }
     
     return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
 }
 
 CollisionResult CollisionDetectionUtils::detectGridGrid(
-    const GridCollider* gridA, const GridCollider* gridB,
-    Collider* colliderA, Collider* colliderB) {
+    GridCollider* gridA, GridCollider* gridB) {
 
     const auto& cellsA = gridA->getCells();
     const auto& cellsB = gridB->getCells();
@@ -421,10 +488,49 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     // Return combined result
     if (!allNormals.empty()) {
         return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, 
-                               colliderA, colliderB);
+                               gridA, gridB);
     }
     
     return CollisionResult(false, std::vector<glm::dvec3>(), std::vector<glm::dvec3>(), std::vector<double>());
+}
+
+CollisionResult CollisionDetectionUtils::detectCubeBall(
+    CubeCollider* cube, BallCollider* ball) {
+    // Use ball-cube detection and flip normals
+    CollisionResult result = detectBallCube(ball, cube);
+    
+    // Flip normal direction since we called ball-cube instead of cube-ball
+    for (glm::dvec3& normal : result.m_normals) {
+        normal = -normal;
+    }
+    
+    return result;
+}
+
+CollisionResult CollisionDetectionUtils::detectGridBall(
+    GridCollider* grid, BallCollider* ball) {
+    // Use ball-grid detection and flip normals
+    CollisionResult result = detectBallGrid(ball, grid);
+    
+    // Flip normal direction since we called ball-grid instead of grid-ball
+    for (glm::dvec3& normal : result.m_normals) {
+        normal = -normal;
+    }
+    
+    return result;
+}
+
+CollisionResult CollisionDetectionUtils::detectGridCube(
+    GridCollider* grid, CubeCollider* cube) {
+    // Use cube-grid detection and flip normals
+    CollisionResult result = detectCubeGrid(cube, grid);
+    
+    // Flip normal direction since we called cube-grid instead of grid-cube
+    for (glm::dvec3& normal : result.m_normals) {
+        normal = -normal;
+    }
+    
+    return result;
 }
 
 // Helper function implementations

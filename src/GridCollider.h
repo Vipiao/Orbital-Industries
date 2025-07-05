@@ -4,7 +4,6 @@
 #include "Collider.h"
 #include "CubeCollider.h"
 #include "HashFunctions.h"
-#include "CollisionDetectionUtils.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include <memory>
@@ -18,11 +17,8 @@ public:
     virtual ~GridCollider() = default;
     
     // Override base class methods
-    virtual CollisionResult collideWith(Collider* other) override;
+    virtual int getTypeId() const override { return TYPE_ID; }
     virtual void updateTransformAndAABB() override;
-    virtual CollisionResult collideWithBall(BallCollider* ball) override;
-    virtual CollisionResult collideWithCube(CubeCollider* cube) override;
-    virtual CollisionResult collideWithGrid(GridCollider* grid) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Grid-specific methods
@@ -38,6 +34,9 @@ public:
     
     glm::dvec3 gridToWorld(const glm::dvec3& gridCoord) const;
     glm::dvec3 worldToGrid(const glm::dvec3& worldCoord) const;
+
+    // Type identification  
+    static constexpr int TYPE_ID = hashColliderName("GridCollider");
 
 private:
     // Map of grid coordinates to cube colliders

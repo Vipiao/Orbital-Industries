@@ -105,6 +105,7 @@ protected:
         bool doCreate = mouseHandler->rightClick();
         bool doRemove = mouseHandler->leftClick();
         bool doForce = keyboard->m_f.isDown();
+        double forceMultiplier = (keyboard->m_f.timeDown() * 0.01 + 1.);
         
         if (doCreate || doRemove || doForce) {
             // Perform unified grid traversal for all actions
@@ -159,7 +160,7 @@ protected:
                     PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
                     if (body) {
                         // Apply force in the view direction
-                        const double forceStrength = 0.002 * body->m_mass;
+                        const double forceStrength = 0.002 * body->m_mass * forceMultiplier;
                         glm::dvec3 force = forward * forceStrength;
                         
                         // Apply the force at the camera position

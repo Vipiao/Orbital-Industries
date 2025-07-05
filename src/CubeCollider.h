@@ -3,10 +3,7 @@
 
 #include "Collider.h"
 #include "SATCacheable.h"
-
-// Forward declarations
-class BallCollider;
-class GridCollider;
+#include "HashFunctions.h"
 
 class CubeCollider : public Collider, public SATCacheable {
 public:
@@ -18,11 +15,8 @@ public:
     virtual ~CubeCollider() = default;
     
     // Override base class methods
-    virtual CollisionResult collideWith(Collider* other) override;
+    virtual int getTypeId() const override { return TYPE_ID; }
     virtual void updateTransformAndAABB() override;
-    virtual CollisionResult collideWithBall(BallCollider* ball) override;
-    virtual CollisionResult collideWithCube(CubeCollider* cube) override;
-    virtual CollisionResult collideWithGrid(GridCollider* grid) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Public member variable
@@ -33,7 +27,9 @@ public:
 
     // Get collision axes (face axes, edge axes) for SAT collision detection
     std::pair<std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes() const;
-    
+
+    // Type identification
+    static constexpr int TYPE_ID = hashColliderName("CubeCollider");
 
 private:
     

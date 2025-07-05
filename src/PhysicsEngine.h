@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "CollisionDetector.h"
+#include "CollisionResult.h"
 #include "ColliderReference.h"
 
 // Forward declaration

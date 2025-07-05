@@ -1,7 +1,5 @@
 // GridCollider.cpp
 #include "GridCollider.h"
-#include "BallCollider.h"
-#include "CollisionDetectionUtils.h"
 #include <glm/gtx/transform.hpp>
 
 GridCollider::GridCollider(const glm::dvec3& position,
@@ -10,11 +8,6 @@ GridCollider::GridCollider(const glm::dvec3& position,
     : Collider(position, orientation, reference)
 {
     
-}
-
-CollisionResult GridCollider::collideWith(Collider* other) {
-    // Double dispatch: call collideWithGrid on other
-    return other->collideWithGrid(this);
 }
 
 void GridCollider::updateTransformAndAABB() {
@@ -42,20 +35,6 @@ void GridCollider::updateTransformAndAABB() {
     
     m_AABBMin = minBounds;
     m_AABBMax = maxBounds;
-}
-
-CollisionResult GridCollider::collideWithBall(BallCollider* ball) {
-    return CollisionDetectionUtils::detectBallGrid(
-        ball->m_position, ball->m_radius, this, ball, this);
-}
-
-CollisionResult GridCollider::collideWithCube(CubeCollider* cube) {
-    return CollisionDetectionUtils::detectCubeGrid(
-        cube->m_position, cube->m_orientation, cube->m_width, this, cube, this);
-}
-
-CollisionResult GridCollider::collideWithGrid(GridCollider* other) {
-    return CollisionDetectionUtils::detectGridGrid(this, other, this, other);
 }
 
 bool GridCollider::checkAABBCollision(const Collider* other) const {

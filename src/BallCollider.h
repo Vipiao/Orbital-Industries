@@ -2,10 +2,7 @@
 #pragma once
 
 #include "Collider.h"
-
-// Forward declaration
-class GridCollider;
-class CubeCollider;
+#include "HashFunctions.h"
 
 class BallCollider : public Collider {
 public:
@@ -17,13 +14,13 @@ public:
     virtual ~BallCollider() = default;
     
     // Override base class methods
-    virtual CollisionResult collideWith(Collider* other) override;
+    virtual int getTypeId() const override { return TYPE_ID; }
     virtual void updateTransformAndAABB() override;
-    virtual CollisionResult collideWithBall(BallCollider* ball) override;
-    virtual CollisionResult collideWithCube(CubeCollider* cube) override;
-    virtual CollisionResult collideWithGrid(GridCollider* grid) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Public member variable
     double m_radius;
+
+    // Type identification
+    static constexpr int TYPE_ID = hashColliderName("BallCollider");
 };

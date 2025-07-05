@@ -6,6 +6,16 @@
 #include <utility>
 #include <functional>
 
+// Compile-time string hash using FNV-1a algorithm
+constexpr int hashColliderName(const char* name) {
+    unsigned int hash = 2166136261u;
+    while (*name) {
+        hash ^= *name++;
+        hash *= 16777619;
+    }
+    return static_cast<int>(hash);
+}
+
 // Hash function for glm::ivec3 with bit shifting to prevent coordinate permutation collisions
 struct IVec3Hash {
     size_t operator()(const glm::ivec3& coord) const {
