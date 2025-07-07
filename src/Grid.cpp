@@ -58,7 +58,11 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
     
     // Create mesh in graphics engine
     m_meshId = m_graphics->createMesh();
-    
+
+    // Initialize next update time to 0 to force initial update
+    m_nextUpdatePhysicsTimeStep = 0;
+    m_lastCheckedPhysicsTimeStep = 0;
+
     // Load textures if needed
     if (!s_texturesLoaded && !s_faceMeshData.empty()) {
         try {
@@ -554,6 +558,78 @@ std::vector<glm::ivec3> Grid::gridTraversal(glm::dvec3 startPos, glm::dvec3 endP
    return cells;
 }
 
+double Grid::getApproximateRadius() const {
+    if (m_collider && !m_collider->getCells().empty()) {
+        // Use the collider's bounding box to estimate radius
+        // Force an AABB update to get current bounds
+        m_collider->updateTransformAndAABB();
+        
+        glm::dvec3 bboxSize = m_collider->m_AABBMax - m_collider->m_AABBMin;
+        // Use half the maximum dimension as approximate radius
+        double maxDimension = glm::max(glm::max(bboxSize.x, bboxSize.y), bboxSize.z);
+        return maxDimension * 0.5;
+    }
+    
+    // Fallback to radius = 1.0
+    return 1.0;
+}
+
+bool Grid::shouldUpdateGPU() const {
+    uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
+    
+    // Check if physics time step has incremented since last check
+    if (currentPhysicsTimeStep > m_lastCheckedPhysicsTimeStep) {
+        // Advance our cached state by the number of physics steps that have passed
+        uint64_t stepsDelta = currentPhysicsTimeStep - m_lastCheckedPhysicsTimeStep;
+        
+        // Update cached position with velocity
+        m_lastSentRigidBodyPosition += m_lastSentRigidBodyVelocity * static_cast<double>(stepsDelta);
+        
+        // Update cached orientation with angular velocity quaternion
+        for (uint64_t i = 0; i < stepsDelta; ++i) {
+            m_lastSentRigidBodyOrientation = m_lastSentRigidBodyAngularVelocityQuat * m_lastSentRigidBodyOrientation;
+        }
+        m_lastSentRigidBodyOrientation = glm::normalize(m_lastSentRigidBodyOrientation);
+        
+        m_lastCheckedPhysicsTimeStep = currentPhysicsTimeStep;
+    }
+    
+    if (!m_rigidBody) {
+        return false;
+    }
+    
+    PhysicsEngine::RigidBody* body = m_rigidBody;
+    
+    // Check if it's time for a scheduled update
+    if (currentPhysicsTimeStep >= m_nextUpdatePhysicsTimeStep) {
+        return true;
+    }
+    
+    // Check position difference (now using interpolated cached position)
+    double positionDiff = glm::length(body->m_position - m_lastSentRigidBodyPosition);
+    if (positionDiff > POSITION_THRESHOLD) {
+        return true;
+    }
+    
+    // Check orientation difference using radius-based threshold (now using interpolated cached orientation)
+    double orientationDot = glm::abs(glm::dot(body->m_orientation, m_lastSentRigidBodyOrientation));
+    // Clamp to handle numerical precision issues
+    orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
+    double halfAngleDiff = glm::acos(orientationDot);
+    double angleDiff = 2.0 * halfAngleDiff;
+    
+    // Calculate radius-based orientation threshold
+    double radius = getApproximateRadius();
+    double orientationThreshold = ORIENTATION_THRESHOLD_BASE / radius;
+    
+    if (angleDiff > orientationThreshold) {
+        return true;
+    }
+    
+    // No significant change detected
+    return false;
+}
+
 // Update the graphics for a specific cell
 void Grid::updateCellGraphics(const glm::ivec3& coord) {
     auto it = m_cells.find(coord);
@@ -620,11 +696,15 @@ void Grid::updateGraphics() {
     if (m_meshId < 0 || !m_rigidBody) {
         return;
     }
+
+    // Only update GPU if there's a significant change
+    if (!shouldUpdateGPU()) {
+        return;
+    } else {
+        std::cout << "Updated graphics for " << this->m_cells.size() << std::endl;
+    }
     
     PhysicsEngine::RigidBody* body = m_rigidBody;
-    if (!body) {
-        return;
-    }
 
     glm::dvec3 angVelAxis = body->m_angularVelocity;
     double angVelMagnitude = glm::length(angVelAxis);
@@ -635,10 +715,12 @@ void Grid::updateGraphics() {
         angVelAxis = glm::dvec3(0.0, 0.0, 1.0);
         angVelMagnitude = 0.0;
     }
+
+    uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
     
     m_graphics->updateMeshTransform(
         m_meshId,
-        body->m_position - m_centerOfMass,                    // Updated - Use calculated mesh position
+        body->m_position - m_centerOfMass,
         body->m_velocity,
         body->m_orientation,
         angVelAxis,
@@ -647,6 +729,24 @@ void Grid::updateGraphics() {
         glm::dvec3(1.0, 1.0, 1.0),      // Default scale
         s_colorTextureUnit,
         s_normalTextureUnit,
-        m_physics->getCurrentPhysicsTimeStep()
+        currentPhysicsTimeStep
     );
+
+    // Update tracking variables with current rigid body state
+    m_lastSentRigidBodyPosition = body->m_position;
+    m_lastSentRigidBodyOrientation = body->m_orientation;
+    m_lastSentRigidBodyVelocity = body->m_velocity;
+    
+    // Convert angular velocity to quaternion for one physics step
+    if (angVelMagnitude > 0.00001) {
+        m_lastSentRigidBodyAngularVelocityQuat = glm::angleAxis(angVelMagnitude, angVelAxis);
+    } else {
+        m_lastSentRigidBodyAngularVelocityQuat = glm::dquat(1.0, 0.0, 0.0, 0.0); // Identity quaternion (no rotation)
+    }
+    
+    // Update the last checked time step to current
+    m_lastCheckedPhysicsTimeStep = currentPhysicsTimeStep;
+    
+    // Schedule next mandatory update
+    m_nextUpdatePhysicsTimeStep = currentPhysicsTimeStep + TIME_THRESHOLD;
 }

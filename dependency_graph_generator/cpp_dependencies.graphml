@@ -377,7 +377,7 @@
       </data>
     </edge>
     
-    <edge id="edge1004" source="CollisionDetectionUtils" target="CubeCollider">
+    <edge id="edge1004" source="CollisionDetectionUtils" target="BallCollider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -397,7 +397,7 @@
       </data>
     </edge>
     
-    <edge id="edge1006" source="CollisionDetectionUtils" target="DebugGlobals">
+    <edge id="edge1006" source="CollisionDetectionUtils" target="CollisionResult">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -407,7 +407,7 @@
       </data>
     </edge>
     
-    <edge id="edge1007" source="CollisionDetectionUtils" target="BallCollider">
+    <edge id="edge1007" source="CollisionDetectionUtils" target="CubeCollider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -417,7 +417,7 @@
       </data>
     </edge>
     
-    <edge id="edge1008" source="CollisionDetectionUtils" target="CollisionResult">
+    <edge id="edge1008" source="CollisionDetectionUtils" target="DebugGlobals">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -427,7 +427,7 @@
       </data>
     </edge>
     
-    <edge id="edge1009" source="CollisionDetector" target="CollisionResult">
+    <edge id="edge1009" source="CollisionDetector" target="CollisionDetectionUtils">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -437,7 +437,7 @@
       </data>
     </edge>
     
-    <edge id="edge1010" source="CollisionDetector" target="Collider">
+    <edge id="edge1010" source="CollisionDetector" target="CollisionResult">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -447,7 +447,7 @@
       </data>
     </edge>
     
-    <edge id="edge1011" source="CollisionDetector" target="CollisionDetectionUtils">
+    <edge id="edge1011" source="CollisionDetector" target="Collider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -517,7 +517,7 @@
       </data>
     </edge>
     
-    <edge id="edge1018" source="DebugVisualization" target="MeshHandler">
+    <edge id="edge1018" source="DebugVisualization" target="AssimpLoader">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -527,7 +527,7 @@
       </data>
     </edge>
     
-    <edge id="edge1019" source="DebugVisualization" target="AssimpLoader">
+    <edge id="edge1019" source="DebugVisualization" target="MeshHandler">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -567,7 +567,7 @@
       </data>
     </edge>
     
-    <edge id="edge1023" source="GameBase" target="GraphicsEngine">
+    <edge id="edge1023" source="GameBase" target="Grid">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -577,7 +577,7 @@
       </data>
     </edge>
     
-    <edge id="edge1024" source="GameBase" target="Grid">
+    <edge id="edge1024" source="GameBase" target="GraphicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -587,7 +587,7 @@
       </data>
     </edge>
     
-    <edge id="edge1025" source="GameBase" target="PhysicsEngine">
+    <edge id="edge1025" source="GameBase" target="TimeHandler">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -597,7 +597,7 @@
       </data>
     </edge>
     
-    <edge id="edge1026" source="GameBase" target="TimeHandler">
+    <edge id="edge1026" source="GameBase" target="PhysicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -607,7 +607,7 @@
       </data>
     </edge>
     
-    <edge id="edge1027" source="GraphicsEngine" target="MeshHandler">
+    <edge id="edge1027" source="GraphicsEngine" target="GraphicsEngineBase">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -617,7 +617,7 @@
       </data>
     </edge>
     
-    <edge id="edge1028" source="GraphicsEngine" target="GraphicsEngineBase">
+    <edge id="edge1028" source="GraphicsEngine" target="AssimpLoader">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -627,7 +627,7 @@
       </data>
     </edge>
     
-    <edge id="edge1029" source="GraphicsEngine" target="AssimpLoader">
+    <edge id="edge1029" source="GraphicsEngine" target="MeshHandler">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -657,7 +657,7 @@
       </data>
     </edge>
     
-    <edge id="edge1032" source="Grid" target="GraphicsEngine">
+    <edge id="edge1032" source="Grid" target="PhysicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -667,7 +667,7 @@
       </data>
     </edge>
     
-    <edge id="edge1033" source="Grid" target="HashFunctions">
+    <edge id="edge1033" source="Grid" target="GraphicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -677,7 +677,7 @@
       </data>
     </edge>
     
-    <edge id="edge1034" source="Grid" target="PhysicsEngine">
+    <edge id="edge1034" source="Grid" target="GridCollider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -687,7 +687,7 @@
       </data>
     </edge>
     
-    <edge id="edge1035" source="Grid" target="GridCollider">
+    <edge id="edge1035" source="Grid" target="HashFunctions">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -747,7 +747,7 @@
       </data>
     </edge>
     
-    <edge id="edge1041" source="PhysicsEngine" target="DebugRenderer">
+    <edge id="edge1041" source="PhysicsEngine" target="CollisionDetectionUtils">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -757,7 +757,7 @@
       </data>
     </edge>
     
-    <edge id="edge1042" source="PhysicsEngine" target="CollisionDetectionUtils">
+    <edge id="edge1042" source="PhysicsEngine" target="DebugRenderer">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -767,7 +767,7 @@
       </data>
     </edge>
     
-    <edge id="edge1043" source="PhysicsEngine" target="ColliderReference">
+    <edge id="edge1043" source="PhysicsEngine" target="CollisionDetector">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -777,7 +777,7 @@
       </data>
     </edge>
     
-    <edge id="edge1044" source="PhysicsEngine" target="CollisionResult">
+    <edge id="edge1044" source="PhysicsEngine" target="ColliderReference">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -787,7 +787,7 @@
       </data>
     </edge>
     
-    <edge id="edge1045" source="PhysicsEngine" target="CollisionDetector">
+    <edge id="edge1045" source="PhysicsEngine" target="CollisionResult">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>

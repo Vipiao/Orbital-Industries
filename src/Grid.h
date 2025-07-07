@@ -69,6 +69,19 @@ private:
     PhysicsEngine::RigidBody* m_rigidBody{nullptr};
     std::unique_ptr<GridCollider> m_collider;
     int m_meshId{-1};
+
+    // GPU state tracking for optimization (mutable for const function caching)
+    mutable glm::dvec3 m_lastSentRigidBodyPosition{0.0};
+    mutable glm::dquat m_lastSentRigidBodyOrientation{1.0, 0.0, 0.0, 0.0};
+    glm::dvec3 m_lastSentRigidBodyVelocity{0.0};
+    glm::dquat m_lastSentRigidBodyAngularVelocityQuat{1.0, 0.0, 0.0, 0.0}; // Quaternion for one physics step
+    uint64_t m_nextUpdatePhysicsTimeStep{0}; // When the next update should happen
+    mutable uint64_t m_lastCheckedPhysicsTimeStep{0}; // Last time step we checked in shouldUpdateGPU
+    
+    // Update thresholds
+    static constexpr double POSITION_THRESHOLD = 0.002; // 5mm
+    static constexpr double ORIENTATION_THRESHOLD_BASE = 0.002; // Base threshold for radius = 1.0
+    static constexpr uint64_t TIME_THRESHOLD = 256; // Update at least every 256 physics steps (~8 seconds)
     
     // Face visibility and mesh management methods
     void recalculateMassAndInertia();
@@ -77,6 +90,8 @@ private:
     void updateCellGraphics(const glm::ivec3& coord);
     bool isFaceVisible(const glm::ivec3& coord, int faceIndex) const;
     void queueNeighborsForUpdate(const glm::ivec3& coord);
+    bool shouldUpdateGPU() const;
+    double getApproximateRadius() const;
     
     // Static face mesh data
     static std::vector<AssetMeshData> s_faceMeshData;

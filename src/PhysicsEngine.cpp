@@ -227,7 +227,7 @@ void PhysicsEngine::handleCollisions() {
     }
     //std::cout << "ttt: " << ttt << std::endl;
     // Resolve each collision overlap.
-    for (int ii=0; ii < 4; ii++) {
+    for (int ii=0; ii < 8; ii++) {
         for (const auto& collision : collisions) {
             separateOverlaps(const_cast<CollisionResult&>(collision));
         }
@@ -349,7 +349,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         double margin = 0.03;
         double correctionMagnitude = (overlap - margin) * collisionMass;
         if (correctionMagnitude < 0.) {
-            correctionMagnitude *= 0.1;
+            correctionMagnitude *= 0.04;
         }
 
         // Calculate relative position vectors from center of mass to contact point

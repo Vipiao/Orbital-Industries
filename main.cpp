@@ -14,6 +14,7 @@ DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 class MyGame : public GameBase {
 private:
     std::unique_ptr<DebugVisualization> m_debugViz;
+    glm::dvec3 m_cameraVelocity{0.0, 0.0, 0.0}; // Camera tracking velocity
 public:
     MyGame(TimeHandler* timeHandler, 
            GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
@@ -45,16 +46,15 @@ public:
             }
         }
         
-
-        
         Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         addGridBlock(gg, 0, 0, 0);  // Center block
         PhysicsEngine::RigidBody* bb = gg->getRigidBody();
         bb->m_position = {0.5, -2, 0.5};
         
         PhysicsEngine::RigidBody* body = initialGrid->getRigidBody();
-        //body->angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
-        //body->orientation = glm::angleAxis(glm::radians(180.0), glm::dvec3{1.0, 0.,0.});
+        //body->m_angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
+        //body->m_velocity = {0,0,-1};
+        //body->m_orientation = glm::angleAxis(glm::radians(180.0), glm::dvec3{1.0, 0.,0.});
         
         // Print instructions
         std::cout << "3D Grid Block Demo" << std::endl;
@@ -108,14 +108,20 @@ protected:
         glm::dvec3 right = m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
         glm::dvec3 forward = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 up = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
+
+        // Integrate camera position using tracked velocity
+        if (glm::length(m_cameraVelocity) > 0.0) {
+            m_graphicsEngine->m_camPos += m_cameraVelocity * (32.0 / (double)m_graphicsEngine->m_frameRate);
+        }
         
         // Check for input actions that require grid traversal
         bool doCreate = mouseHandler->rightClick();
         bool doRemove = mouseHandler->leftClick();
         bool doForce = keyboard->m_f.isDown();
+        bool doTrackSpeed = keyboard->m_z.justPressed();
         double forceMultiplier = (keyboard->m_f.timeDown() * 0.01 + 1.);
         
-        if (doCreate || doRemove || doForce) {
+        if (doCreate || doRemove || doForce || doTrackSpeed) {
             // Perform unified grid traversal for all actions
             Grid* targetGrid = nullptr;
             glm::ivec3 targetPos;
@@ -163,6 +169,23 @@ protected:
             }
             
             // Handle the different actions based on what was found
+            if (doTrackSpeed) {
+                if (blockFound && targetGrid) {
+                    PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
+                    if (body) {
+                        // Set camera velocity to match the rigid body's velocity
+                        m_cameraVelocity = body->m_velocity;
+                        std::cout << "Tracking speed of rigid body: (" 
+                                  << m_cameraVelocity.x << ", " 
+                                  << m_cameraVelocity.y << ", " 
+                                  << m_cameraVelocity.z << ")" << std::endl;
+                    }
+                } else {
+                    // No target found, stop tracking
+                    m_cameraVelocity = glm::dvec3(0.0, 0.0, 0.0);
+                    std::cout << "No target found for speed tracking - camera velocity reset" << std::endl;
+                }
+            }
             if (doForce) {
                 if (blockFound && targetGrid) {
                     PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
