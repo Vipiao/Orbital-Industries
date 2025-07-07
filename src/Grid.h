@@ -4,6 +4,7 @@
 #include "PhysicsEngine.h"
 #include "GraphicsEngine.h"
 #include "GridCollider.h"
+#include "MassInertiaCalculator.h"
 #include "HashFunctions.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -86,7 +87,7 @@ private:
     // Face visibility and mesh management methods
     void recalculateMassAndInertia();
     void recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& newCellCoords);
-    void updateRigidBodyMassProperties(double totalMass, double totalMoment);
+    void updateRigidBodyInverses();
     void updateCellGraphics(const glm::ivec3& coord);
     bool isFaceVisible(const glm::ivec3& coord, int faceIndex) const;
     void queueNeighborsForUpdate(const glm::ivec3& coord);

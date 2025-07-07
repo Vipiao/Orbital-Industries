@@ -3,6 +3,7 @@
 #include <set>
 #include "Grid.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include "MassInertiaCalculator.h"
 #include <limits>
 #include <iostream>
 
@@ -198,201 +199,59 @@ void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& n
         return;
     }
     
-    // Define mass for a steel cube made of welded panels
+    if (newCellCoords.empty()) return;
+
+    // Constants for block properties
     const double blockMass = 60.0;
+    const double blockBaseInertia = (2.0/3.0) * blockMass * 0.5 * 0.5 * 0.5;
     
-    // Store old values
     glm::dvec3 oldCM = m_centerOfMass;
-    double oldTotalMass = m_rigidBody->m_mass;
-    double oldMomentOfInertia = m_rigidBody->m_momentOfInertia;
     
-    // Calculate contribution of new cells
-    double newCellsTotalMass = 0.0;
-    glm::dvec3 newCellsWeightedPosition(0.0);
-    
-    for (const glm::ivec3& coord : newCellCoords) {
-        auto it = m_cells.find(coord);
-        if (it == m_cells.end()) continue; // Cell doesn't exist
-        
-        const GridCell& cell = it->second;
-        double mass = blockMass;
-        if (cell.type == CellType::ARMOR) {
-            mass = blockMass;
-        }
-        
-        glm::dvec3 cellPos = glm::dvec3(coord) + glm::dvec3{0.5, 0.5, 0.5};
-        newCellsTotalMass += mass;
-        newCellsWeightedPosition += cellPos * mass;
-    }
-    
-    if (newCellsTotalMass <= 0.0) return; // No valid new cells
-    
-    // Calculate new total mass and center of mass
-    double newTotalMass = oldTotalMass + newCellsTotalMass;
-    glm::dvec3 newCM = (oldCM * oldTotalMass + newCellsWeightedPosition) / newTotalMass;
-    
-    // Calculate change in center of mass
-    glm::dvec3 cmShift = newCM - oldCM;
-    
-    // Update center of mass
-    m_centerOfMass = newCM;
-    
-    // Update physics body
-    PhysicsEngine::RigidBody* body = m_rigidBody;
-    if (body) {
-        // Store old angular velocity for momentum conservation
-        glm::dvec3 oldAngularVel = body->m_angularVelocity;
-        
-        // Update position due to center of mass shift
-        body->m_position += body->m_orientation * cmShift;
-        
-        // Calculate velocity change to conserve angular momentum
-        glm::dvec3 changeInWorld = body->m_orientation * cmShift;
-        glm::dvec3 addedVel = glm::cross(oldAngularVel, changeInWorld);
-        body->m_velocity += addedVel;
-        
-        // Update mass
-        body->m_mass = newTotalMass;
-        
-        // Calculate new moment of inertia using parallel axis theorem
-        // First, adjust old moment of inertia for the center of mass shift
-        double cmShiftSquared = glm::dot(cmShift, cmShift);
-        double adjustedOldInertia = oldMomentOfInertia + oldTotalMass * cmShiftSquared;
-        
-        // Add contribution of new blocks
-        double blockBaseInertia = (2.0/3.0) * blockMass * 0.5 * 0.5 * 0.5; // Hollow cube approximation
-        double newBlocksInertia = 0.0;
-        
-        for (const glm::ivec3& coord : newCellCoords) {
-            auto it = m_cells.find(coord);
-            if (it == m_cells.end()) continue;
-            
-            const GridCell& cell = it->second;
-            double mass = blockMass;
-            if (cell.type == CellType::ARMOR) {
-                mass = blockMass;
-            }
-            
-            // Position of block relative to new center of mass
-            glm::dvec3 relPos = glm::dvec3(coord) + glm::dvec3{0.5, 0.5, 0.5} - newCM;
-            double distSquared = glm::dot(relPos, relPos);
-            
-            // Apply parallel axis theorem: I = I_cm + m*d²
-            newBlocksInertia += blockBaseInertia + mass * distSquared;
-        }
-        
-        // Total new moment of inertia
-        double totalMoment = adjustedOldInertia + newBlocksInertia;
-        
-        // Update rigid body using helper function
-        updateRigidBodyMassProperties(newTotalMass, totalMoment);
-    }
+    // Calculate incremental update directly on rigid body properties
+    MassInertiaCalculator::calculateScalarInertiaIncremental(
+        newCellCoords, 
+        [this, blockMass, blockBaseInertia](const glm::ivec3& coord) { 
+            bool exists = m_cells.find(coord) != m_cells.end();
+            return MassInertiaCalculator::ObjectData{glm::dvec3(coord) + glm::dvec3{0.5}, 
+                                                    exists ? blockMass : 0.0, 
+                                                    exists ? blockBaseInertia : 0.0};
+        },
+        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_momentOfInertia);
+
+    // Update physics body with momentum conservation
+    glm::dvec3 cmShift = m_centerOfMass - oldCM;
+    m_rigidBody->m_position += m_rigidBody->m_orientation * cmShift;
+    m_rigidBody->m_velocity += glm::cross(m_rigidBody->m_angularVelocity, m_rigidBody->m_orientation * cmShift);
+    updateRigidBodyInverses();
 }
 
 void Grid::recalculateMassAndInertia() {
     if (m_cells.empty()) return;
-    
+
     glm::dvec3 oldCM = m_centerOfMass;
-    glm::dvec3 newCM(0.0, 0.0, 0.0);
-    double totalMass = 0.0;
-    
-    // Define mass for a steel cube made of welded panels
-    // 0.5m steel cube (hollow with 5mm thick walls) - approximately 60kg
     const double blockMass = 60.0;
+    const double blockBaseInertia = (2.0/3.0) * blockMass * 0.5 * 0.5 * 0.5;
     
-    // Calculate weighted average position of all cells (center of mass)
-    for (const auto& pair : m_cells) {
-        const glm::ivec3& coord = pair.first;
-        const GridCell& cell = pair.second;
-        
-        // Get mass based on cell type (could be different for different cell types)
-        double mass = blockMass;
-        if (cell.type == CellType::ARMOR) {
-            mass = blockMass;
-        }
-        
-        // Add weighted position
-        newCM += (glm::dvec3(coord) + glm::dvec3{0.5, 0.5, 0.5}) * mass;
-        totalMass += mass;
-    }
-    
-    // Divide by total mass to get center of mass
-    newCM /= totalMass;
-    
-    // Calculate change in center of mass
-    glm::dvec3 change = newCM - oldCM;
-    
+    MassInertiaCalculator::calculateScalarInertia(
+        m_cells, 
+        [=](const auto& pair) { return MassInertiaCalculator::ObjectData{glm::dvec3(pair.first) + glm::dvec3{0.5}, blockMass, blockBaseInertia}; },
+        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_momentOfInertia);
+    glm::dvec3 change = m_centerOfMass - oldCM;
     if (glm::length(change) > 0.00001) {
-        // Update center of mass
-        m_centerOfMass = newCM;
-        
-        // Update physics body position and velocity
-        PhysicsEngine::RigidBody* body = m_rigidBody;
-        if (body) {
-            // Update mass of the rigid body
-            body->m_mass = totalMass;
-            
-            // Store old angular velocity
-            glm::dvec3 oldAngularVel = body->m_angularVelocity;
-            
-            // Update position
-            body->m_position += body->m_orientation * change;
-            
-            // Calculate velocity change to conserve angular momentum
-            glm::dvec3 changeInWorld = body->m_orientation * change;
-            glm::dvec3 addedVel = glm::cross(oldAngularVel, changeInWorld);
-            body->m_velocity += addedVel;
-            
-            // Calculate new moment of inertia (scalar approximation)
-            double totalMoment = 0.0;
-            
-            // Moment of inertia of a hollow cube (approximation)
-            // For a thin-walled hollow cube, I = (2/3) * m * (a^2), where a is the side length
-            double blockBaseInertia = (2.0/3.0) * blockMass * 0.5 * 0.5;
-            // Half moment of inertia due to mass near the axis should not contribute too much. (Simplified calculation)
-            blockBaseInertia *= 0.5;
-            
-            for (const auto& pair : m_cells) {
-                const glm::ivec3& coord = pair.first;
-                const GridCell& cell = pair.second;
-                
-                // Get mass based on cell type
-                double mass = blockMass;
-                if (cell.type == CellType::ARMOR) {
-                    mass = blockMass;
-                }
-                
-                // Position of block relative to new center of mass
-                glm::dvec3 relPos = glm::dvec3(coord) + glm::dvec3{0.5, 0.5, 0.5} - newCM;
-                
-                // Distance squared from center of mass
-                double distSquared = glm::dot(relPos, relPos);
-                
-                // Apply parallel axis theorem: I = I_cm + m*d²
-                totalMoment += blockBaseInertia + mass * distSquared;
-            }
-            
-            // Update rigid body using helper function
-            updateRigidBodyMassProperties(totalMass, totalMoment);
-        }
+        m_rigidBody->m_position += m_rigidBody->m_orientation * change;
+        m_rigidBody->m_velocity += glm::cross(m_rigidBody->m_angularVelocity, m_rigidBody->m_orientation * change);
     }
+    updateRigidBodyInverses();
 }
 
-void Grid::updateRigidBodyMassProperties(double totalMass, double totalMoment) {
+void Grid::updateRigidBodyInverses() {
     if (!m_rigidBody) return;
-    
-    PhysicsEngine::RigidBody* body = m_rigidBody;
-    
-    // Update mass and moment of inertia
-    body->m_mass = totalMass;
-    body->m_momentOfInertia = totalMoment;
-    
+
     // Update inverse values with safety checks
-    body->m_invMass = (totalMass > 1e-15) ? (1.0 / totalMass) : std::numeric_limits<double>::max();
-    body->m_invMomentOfInertia = (totalMoment > 1e-15) ? (1.0 / totalMoment) : std::numeric_limits<double>::max();
-    
-    // Store the collider offset (center of mass in local coordinates)
-    body->m_colliderOffset = m_centerOfMass;
+    m_rigidBody->m_invMass = (m_rigidBody->m_mass > 1e-15) ? (1.0 / m_rigidBody->m_mass) : std::numeric_limits<double>::max();
+    m_rigidBody->m_invMomentOfInertia = (m_rigidBody->m_momentOfInertia > 1e-15) ? (1.0 / m_rigidBody->m_momentOfInertia) : std::numeric_limits<double>::max();
+
+    m_rigidBody->m_colliderOffset = m_centerOfMass;
 }
 
 // Check if a face is visible (not covered by another cell)
