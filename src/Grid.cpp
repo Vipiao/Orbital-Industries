@@ -138,6 +138,9 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
 void Grid::removeCell(const glm::ivec3& coord) {
     // If cell doesn't exist, return
     if (!hasCell(coord)) return;
+
+    // Recalculate mass and inertia incrementally before removing the cell
+    recalculateMassAndInertiaIncremental({coord}, true);
     
     // Get the cell before removal
     auto cellIt = m_cells.find(coord);
@@ -160,9 +163,6 @@ void Grid::removeCell(const glm::ivec3& coord) {
     
     // Remove cell from map
     m_cells.erase(coord);
-    
-    // Recalculate center of mass
-    recalculateMassAndInertia();
 }
 
 // Check if a cell exists at the given coordinates
@@ -190,16 +190,16 @@ void Grid::queueNeighborsForUpdate(const glm::ivec3& coord) {
     }
 }
 
-void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& newCellCoords) {
+void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& cellCoords, bool isRemoval) {
     if (!m_rigidBody) return;
     
-    // If we have no existing mass or no new cells, do full recalculation
-    if (newCellCoords.empty() || m_rigidBody->m_mass < 1e-15) {
+    // If we have no existing mass or no cells to process, do full recalculation
+    if (cellCoords.empty() || m_rigidBody->m_mass < 1e-15) {
         recalculateMassAndInertia();
         return;
     }
     
-    if (newCellCoords.empty()) return;
+    if (cellCoords.empty()) return;
 
     // Constants for block properties
     const double blockMass = 60.0;
@@ -209,12 +209,14 @@ void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& n
     
     // Calculate incremental update directly on rigid body properties
     MassInertiaCalculator::calculateScalarInertiaIncremental(
-        newCellCoords, 
-        [this, blockMass, blockBaseInertia](const glm::ivec3& coord) { 
+        cellCoords,
+        [this, blockMass, blockBaseInertia, isRemoval](const glm::ivec3& coord) { 
             bool exists = m_cells.find(coord) != m_cells.end();
+            double massSign = isRemoval ? -1.0 : 1.0;
+            double inertiaSign = isRemoval ? -1.0 : 1.0;
             return MassInertiaCalculator::ObjectData{glm::dvec3(coord) + glm::dvec3{0.5}, 
-                                                    exists ? blockMass : 0.0, 
-                                                    exists ? blockBaseInertia : 0.0};
+                                                    exists ? blockMass * massSign : 0.0, 
+                                                    exists ? blockBaseInertia * inertiaSign : 0.0};
         },
         &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_momentOfInertia);
 
