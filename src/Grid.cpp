@@ -4,8 +4,34 @@
 #include "Grid.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "MassInertiaCalculator.h"
+#include "DebugGlobals.h"
 #include <limits>
 #include <iostream>
+#include "DebugGlobals.h"
+#include "DebugRenderer.h"
+
+std::vector<glm::ivec3> GridCell::getConnectedNeighbors() const {
+    std::vector<glm::ivec3> neighbors;
+    
+    // Check all 6 directions
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0},   // Right
+        {-1, 0, 0},  // Left
+        {0, 1, 0},   // Front
+        {0, -1, 0},  // Back
+        {0, 0, 1},   // Top
+        {0, 0, -1}   // Bottom
+    };
+    
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = coordinates + directions[i];
+        if (parentGrid && parentGrid->hasCell(neighborCoord)) {
+            neighbors.push_back(neighborCoord);
+        }
+    }
+    
+    return neighbors;
+}
 
 // Comparator for std::set to work with glm::ivec3
 struct IVec3Comparator {
@@ -122,7 +148,7 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
     m_collider->addCell(coord, 1.0);  // Use 1.0 width for cube cells
     
     // Add cell to map immediately
-    m_cells[coord] = GridCell{type};
+    m_cells.emplace(coord, GridCell{coord, this, type});
     
     // Queue this cell for graphics update
     m_graphicsUpdateQueue.push(coord);
@@ -165,9 +191,38 @@ void Grid::removeCell(const glm::ivec3& coord) {
     m_cells.erase(coord);
 }
 
+void Grid::analyzeStructuralIntegrity() {
+    // Clear existing weak cell debug spheres
+    if (DebugGlobals::getDebugRenderer()) {
+        DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("weak_cell_");
+    }
+    
+    // Analyze each cell
+    for (auto& pair : m_cells) {
+        const glm::ivec3& coord = pair.first;
+        GridCell& cell = pair.second;
+        
+        bool isStrong = m_structuralAnalyzer.analyzeSingleNode(coord, m_cells);
+        cell.setWeak(!isStrong);
+        
+        // If weak, add debug sphere
+        if (!isStrong && DebugGlobals::getDebugRenderer()) {
+            glm::dvec3 cellWorldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
+            std::string sphereName = "weak_cell_" + std::to_string(coord.x) + "_" + 
+                                   std::to_string(coord.y) + "_" + std::to_string(coord.z);
+            DebugGlobals::getDebugRenderer()->createSphere(sphereName, cellWorldPos, 0.6);
+        }
+    }
+}
+
 // Check if a cell exists at the given coordinates
 bool Grid::hasCell(const glm::ivec3& coord) const {
     return m_cells.find(coord) != m_cells.end();
+}
+
+// Check if the grid is empty (has no cells)
+bool Grid::isEmpty() const {
+    return m_cells.empty();
 }
 
 // Queue neighboring cells for graphics update

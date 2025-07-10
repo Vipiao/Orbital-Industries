@@ -6,6 +6,7 @@
 #include "GridCollider.h"
 #include "MassInertiaCalculator.h"
 #include "HashFunctions.h"
+#include "StructuralAnalyzer.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
@@ -14,10 +15,21 @@
 // Cell type enum
 enum class CellType { ARMOR };
 
+// Forward declaration
+class Grid;
+
 // Cell structure to hold face triangle IDs
-struct GridCell {
+struct GridCell : public StructuralNode {
     CellType type;
     std::vector<uint32_t> faceTriangleIds[6]; // Triangle IDs for each face direction
+    glm::ivec3 coordinates; // Store coordinates for this cell
+    Grid* parentGrid; // Reference to parent grid for neighbor lookup
+    
+    GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType = CellType::ARMOR) 
+        : coordinates(coords), parentGrid(parent), type(cellType) {}
+    
+    // Implement StructuralNode interface
+    virtual std::vector<glm::ivec3> getConnectedNeighbors() const override;
 };
 
 // Using glm::ivec3 for coordinates
@@ -35,6 +47,10 @@ public:
     void addCell(const glm::ivec3& coord, CellType type = CellType::ARMOR);
     void removeCell(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;
+    bool isEmpty() const;
+
+    // Structural analysis
+    void analyzeStructuralIntegrity();
     
     // Split graphics update method
     void updateGraphics();
@@ -58,6 +74,9 @@ private:
     // Core data for block grid
     CellMap m_cells;
     std::queue<glm::ivec3> m_graphicsUpdateQueue;
+
+    // Structural analysis
+    StructuralAnalyzer m_structuralAnalyzer{{2, 4}};
 
     // Armor texture.
     static int s_colorTextureUnit;

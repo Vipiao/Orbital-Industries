@@ -14,7 +14,7 @@
  * 
  * Template parameter Node must be:
  * - Copyable
- * - Hashable (std::hash<Node> must be defined)
+ * - Hashable (Hash functor must be provided)
  * - Equality comparable (operator== must be defined)
  * 
  * Uses callback-based interface for maximum performance - all lambdas are fully inlined.
@@ -32,7 +32,7 @@
  *     [&](const glm::ivec3& node) { return heuristic(node, target); }
  * );
  */
-template<typename Node>
+template<typename Node, typename Hash = std::hash<Node>>
 class AStar {
 public:
     struct Result {
@@ -79,22 +79,22 @@ private:
     };
     
     static std::vector<Node> reconstructPath(
-        const std::unordered_map<Node, NodeInfo>& nodeInfo,
+        const std::unordered_map<Node, NodeInfo, Hash>& nodeInfo,
         const Node& target
     );
 };
 
 // Template implementation
-template<typename Node>
+template<typename Node, typename Hash>
 template<typename IsTargetF, typename GetNeighborsF, typename HeuristicF>
-typename AStar<Node>::Result AStar<Node>::search(
+typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
     const Node& start,
     IsTargetF isTarget,
     GetNeighborsF getNeighbors,
     HeuristicF heuristic
 ) {
-    std::unordered_map<Node, NodeInfo> nodeInfo;
-    std::unordered_set<Node> closedSet;
+    std::unordered_map<Node, NodeInfo, Hash> nodeInfo;
+    std::unordered_set<Node, Hash> closedSet;
     std::priority_queue<OpenSetItem> openSet;
     
     // Initialize start node
@@ -157,9 +157,9 @@ typename AStar<Node>::Result AStar<Node>::search(
     return Result{};
 }
 
-template<typename Node>
-std::vector<Node> AStar<Node>::reconstructPath(
-    const std::unordered_map<Node, NodeInfo>& nodeInfo,
+template<typename Node, typename Hash>
+std::vector<Node> AStar<Node, Hash>::reconstructPath(
+    const std::unordered_map<Node, NodeInfo, Hash>& nodeInfo,
     const Node& target
 ) {
     std::vector<Node> path;

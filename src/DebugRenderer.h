@@ -30,6 +30,10 @@ public:
     virtual int getIdFromName(const std::string& name) const = 0;
     virtual std::string getNameFromId(int id) const = 0;
 
+    // Prefix-based operations
+    virtual std::vector<int> getIdsByPrefix(const std::string& prefix) const = 0;
+    virtual void removeMeshesByPrefix(const std::string& prefix) = 0;
+
     // Generate GeoGebra commands for visualization
     virtual std::string generateGeogebraCommands(const std::vector<glm::dvec2>& points, int precision = 4) const = 0;
     virtual std::string generateGeogebraCommands(const std::vector<glm::dvec3>& points, int precision = 4) const = 0;

@@ -36,13 +36,59 @@ public:
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
-        //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
+        addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
         //addGridBlock(initialGrid, 0, 0, 0);  // Center block
-        for (size_t ii = 0; ii < 20; ii++)
-        {
-            for (size_t jj = 0; jj < 20; jj++)
+        //for (size_t ii = 0; ii < 20; ii++)
+        //{
+        //    for (size_t jj = 0; jj < 20; jj++)
+        //    {
+        //        addGridBlock(initialGrid, ii, jj, 0);
+        //    }
+        //}
+        for (int ll = 0; ll < 2; ll++) {
+            for (int ii = -2; ii < 3; ii++)
             {
-                addGridBlock(initialGrid, ii, jj, 0);
+                for (int jj = -2; jj < 3; jj++)
+                {
+                    
+                    for (int kk = -2; kk < 3; kk++)
+                    {
+                        addGridBlock(initialGrid, ii + ll*8, jj, kk);
+                    }
+                }
+            }
+            for (int ii = -1; ii < 2; ii++)
+            {
+                for (int jj = -1; jj < 2; jj++)
+                {
+                    
+                    for (int kk = -1; kk < 2; kk++)
+                    {
+                        removeGridBlock(initialGrid, ii + ll*8, jj, kk);
+                    }
+                }
+            }
+        }
+        for (int ii = 3; ii < 6; ii++)
+        {
+            for (int jj = -1; jj < 2; jj++)
+            {
+                
+                for (int kk = -2; kk < 2; kk++)
+                {
+                    addGridBlock(initialGrid, ii, jj, kk);
+                }
+            }
+        }
+        for (int ii = 3-1; ii < 6+1; ii++)
+        {
+            for (int jj = -1+1; jj < 2-1; jj++)
+            {
+                
+                for (int kk = -2+1; kk < 2-1; kk++)
+                {
+                    removeGridBlock(initialGrid, ii, jj, kk);
+                }
             }
         }
         
@@ -112,6 +158,22 @@ protected:
         // Integrate camera position using tracked velocity
         if (glm::length(m_cameraVelocity) > 0.0) {
             m_graphicsEngine->m_camPos += m_cameraVelocity * (32.0 / (double)m_graphicsEngine->m_frameRate);
+        }
+        // Structural analysis with G key
+        if (keyboard->m_g.justPressed()) {
+            std::cout << "Running structural analysis on " << m_grids.size() << " grids..." << std::endl;
+            
+            // Clear existing weak cell debug spheres (now handled in analyzeStructuralIntegrity)
+            
+            // Analyze all grids
+            int totalWeakCells = 0;
+            for (const auto& grid : m_grids) {
+                grid->analyzeStructuralIntegrity();
+                // Count weak cells for logging
+                // (Note: This is just for demonstration - you could collect this info from the analysis)
+            }
+            
+            std::cout << "Structural analysis complete!" << std::endl;
         }
         
         // Check for input actions that require grid traversal
@@ -226,6 +288,13 @@ protected:
                     // Remove the hit block
                     removeGridBlock(targetGrid, hitPos.x, hitPos.y, hitPos.z);
                     std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+
+                    // Check if the grid is now empty and remove it if so
+                    if (targetGrid->isEmpty()) {
+                        std::cout << "Grid is now empty, removing grid" << std::endl;
+                        removeGrid(targetGrid);
+                        targetGrid = nullptr; // Prevent accidental reuse
+                    }
                 } else {
                     std::cout << "No block found to remove" << std::endl;
                 }

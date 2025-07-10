@@ -242,6 +242,29 @@ std::string DebugVisualization::getNameFromId(int id) const {
     return (it != m_idToName.end()) ? it->second : "";
 }
 
+std::vector<int> DebugVisualization::getIdsByPrefix(const std::string& prefix) const {
+    std::vector<int> matchingIds;
+    
+    for (const auto& pair : m_nameToId) {
+        const std::string& name = pair.first;
+        int id = pair.second;
+        
+        if (name.substr(0, prefix.length()) == prefix) {
+            matchingIds.push_back(id);
+        }
+    }
+    
+    return matchingIds;
+}
+
+void DebugVisualization::removeMeshesByPrefix(const std::string& prefix) {
+    std::vector<int> idsToRemove = getIdsByPrefix(prefix);
+    
+    for (int id : idsToRemove) {
+        removeMesh(id);
+    }
+}
+
 void DebugVisualization::updateMeshTransform(int id) {
     auto it = m_meshProperties.find(id);
     if (it != m_meshProperties.end()) {

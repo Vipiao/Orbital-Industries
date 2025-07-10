@@ -13,10 +13,22 @@
   <graph edgedefault="directed" id="G">
     <data key="d0"/>
     
+    <node id="AStar">
+      <data key="d6">
+        <y:ShapeNode>
+          <y:Geometry height="30.0" width="60.0" x="710.0" y="400.0"/>
+          <y:Fill color="#FFCC00" transparent="false"/>
+          <y:BorderStyle color="#000000" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">AStar<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    
     <node id="AssimpLoader">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="116.0" x="710.0" y="400.0"/>
+          <y:Geometry height="30.0" width="116.0" x="708.8" y="412.1"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">AssimpLoader<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -28,7 +40,7 @@
     <node id="BallCollider">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="116.0" x="708.4" y="413.8"/>
+          <y:Geometry height="30.0" width="116.0" x="705.1" y="423.7"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">BallCollider<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -40,7 +52,7 @@
     <node id="Collider">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="84.0" x="703.6" y="426.9"/>
+          <y:Geometry height="30.0" width="84.0" x="699.2" y="434.3"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">Collider<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -52,7 +64,7 @@
     <node id="ColliderReference">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="156.0" x="696.0" y="438.6"/>
+          <y:Geometry height="30.0" width="156.0" x="691.3" y="443.5"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">ColliderReference<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -64,7 +76,7 @@
     <node id="CollisionDetectionUtils">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="204.0" x="685.8" y="448.1"/>
+          <y:Geometry height="30.0" width="204.0" x="681.7" y="450.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">CollisionDetectionUtils<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -76,7 +88,7 @@
     <node id="CollisionDetector">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="156.0" x="673.8" y="455.1"/>
+          <y:Geometry height="30.0" width="156.0" x="670.8" y="456.3"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">CollisionDetector<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -88,7 +100,7 @@
     <node id="CollisionResult">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="140.0" x="660.4" y="459.1"/>
+          <y:Geometry height="30.0" width="140.0" x="659.1" y="459.3"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">CollisionResult<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -100,7 +112,7 @@
     <node id="CubeCollider">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="116.0" x="646.5" y="459.9"/>
+          <y:Geometry height="30.0" width="116.0" x="647.0" y="459.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">CubeCollider<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -112,7 +124,7 @@
     <node id="DebugGlobals">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="116.0" x="632.8" y="457.5"/>
+          <y:Geometry height="30.0" width="116.0" x="635.0" y="458.1"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">DebugGlobals<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -124,7 +136,7 @@
     <node id="DebugRenderer">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="124.0" x="620.0" y="452.0"/>
+          <y:Geometry height="30.0" width="124.0" x="623.6" y="453.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">DebugRenderer<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -136,7 +148,7 @@
     <node id="DebugVisualization">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="164.0" x="608.8" y="443.6"/>
+          <y:Geometry height="30.0" width="164.0" x="613.3" y="447.4"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">DebugVisualization<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -148,7 +160,7 @@
     <node id="Edge">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="60.0" x="599.9" y="433.0"/>
+          <y:Geometry height="30.0" width="60.0" x="604.5" y="439.1"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">Edge<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -160,7 +172,7 @@
     <node id="GameBase">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="84.0" x="593.6" y="420.5"/>
+          <y:Geometry height="30.0" width="84.0" x="597.5" y="429.1"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">GameBase<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -169,10 +181,22 @@
       </data>
     </node>
     
+    <node id="Generator">
+      <data key="d6">
+        <y:ShapeNode>
+          <y:Geometry height="30.0" width="92.0" x="592.8" y="418.0"/>
+          <y:Fill color="#FFCC00" transparent="false"/>
+          <y:BorderStyle color="#000000" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">Generator<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    
     <node id="GraphicsEngine">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="132.0" x="590.4" y="407.0"/>
+          <y:Geometry height="30.0" width="132.0" x="590.3" y="406.1"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">GraphicsEngine<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -184,7 +208,7 @@
     <node id="GraphicsEngineBase">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="164.0" x="590.4" y="393.0"/>
+          <y:Geometry height="30.0" width="164.0" x="590.3" y="393.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">GraphicsEngineBase<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -196,7 +220,7 @@
     <node id="Grid">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="60.0" x="593.6" y="379.5"/>
+          <y:Geometry height="30.0" width="60.0" x="592.8" y="382.0"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">Grid<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -208,7 +232,7 @@
     <node id="GridCollider">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="116.0" x="599.9" y="367.0"/>
+          <y:Geometry height="30.0" width="116.0" x="597.5" y="370.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">GridCollider<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -220,7 +244,7 @@
     <node id="HashFunctions">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="124.0" x="608.8" y="356.4"/>
+          <y:Geometry height="30.0" width="124.0" x="604.5" y="360.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">HashFunctions<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -232,7 +256,7 @@
     <node id="KeyboardHandler">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="140.0" x="620.0" y="348.0"/>
+          <y:Geometry height="30.0" width="140.0" x="613.3" y="352.6"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">KeyboardHandler<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -241,10 +265,22 @@
       </data>
     </node>
     
+    <node id="MassInertiaCalculator">
+      <data key="d6">
+        <y:ShapeNode>
+          <y:Geometry height="30.0" width="188.0" x="623.6" y="346.1"/>
+          <y:Fill color="#FFCC00" transparent="false"/>
+          <y:BorderStyle color="#000000" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">MassInertiaCalculator<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    
     <node id="MeshHandler">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="108.0" x="632.8" y="342.5"/>
+          <y:Geometry height="30.0" width="108.0" x="635.0" y="341.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">MeshHandler<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -256,7 +292,7 @@
     <node id="MouseHandler">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="116.0" x="646.5" y="340.1"/>
+          <y:Geometry height="30.0" width="116.0" x="647.0" y="340.1"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">MouseHandler<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -268,7 +304,7 @@
     <node id="PhysicsEngine">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="124.0" x="660.4" y="340.9"/>
+          <y:Geometry height="30.0" width="124.0" x="659.1" y="340.7"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">PhysicsEngine<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -280,7 +316,7 @@
     <node id="SATCacheable">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="116.0" x="673.8" y="344.9"/>
+          <y:Geometry height="30.0" width="116.0" x="670.8" y="343.7"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">SATCacheable<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -292,7 +328,7 @@
     <node id="STBImageLoader">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="132.0" x="685.8" y="351.9"/>
+          <y:Geometry height="30.0" width="132.0" x="681.7" y="349.1"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">STBImageLoader<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -304,7 +340,7 @@
     <node id="ShaderProgram">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="124.0" x="696.0" y="361.4"/>
+          <y:Geometry height="30.0" width="124.0" x="691.3" y="356.5"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">ShaderProgram<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -313,10 +349,22 @@
       </data>
     </node>
     
+    <node id="StructuralAnalyzer">
+      <data key="d6">
+        <y:ShapeNode>
+          <y:Geometry height="30.0" width="164.0" x="699.2" y="365.7"/>
+          <y:Fill color="#FFCC00" transparent="false"/>
+          <y:BorderStyle color="#000000" type="line" width="1.0"/>
+          <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">StructuralAnalyzer<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
+          <y:Shape type="rectangle"/>
+        </y:ShapeNode>
+      </data>
+    </node>
+    
     <node id="TimeHandler">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="108.0" x="703.6" y="373.1"/>
+          <y:Geometry height="30.0" width="108.0" x="705.1" y="376.3"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">TimeHandler<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -328,7 +376,7 @@
     <node id="stb_image">
       <data key="d6">
         <y:ShapeNode>
-          <y:Geometry height="30.0" width="92.0" x="708.4" y="386.2"/>
+          <y:Geometry height="30.0" width="92.0" x="708.8" y="387.9"/>
           <y:Fill color="#FFCC00" transparent="false"/>
           <y:BorderStyle color="#000000" type="line" width="1.0"/>
           <y:NodeLabel alignment="center" autoSizePolicy="content" fontFamily="Dialog" fontSize="12" fontStyle="plain" hasBackgroundColor="false" hasLineColor="false" modelName="custom" textColor="#000000" visible="true">stb_image<y:LabelModel><y:SmartNodeLabelModel distance="4.0"/></y:LabelModel><y:ModelParameter><y:SmartNodeLabelModelParameter labelRatioX="0.0" labelRatioY="0.0" nodeRatioX="0.0" nodeRatioY="0.0" offsetX="0.0" offsetY="0.0" upX="0.0" upY="-1.0"/></y:ModelParameter></y:NodeLabel>
@@ -337,7 +385,7 @@
       </data>
     </node>
     
-    <edge id="edge1000" source="BallCollider" target="Collider">
+    <edge id="edge1000" source="BallCollider" target="HashFunctions">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -347,7 +395,7 @@
       </data>
     </edge>
     
-    <edge id="edge1001" source="BallCollider" target="HashFunctions">
+    <edge id="edge1001" source="BallCollider" target="Collider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -367,7 +415,7 @@
       </data>
     </edge>
     
-    <edge id="edge1003" source="CollisionDetectionUtils" target="DebugRenderer">
+    <edge id="edge1003" source="CollisionDetectionUtils" target="GridCollider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -377,7 +425,7 @@
       </data>
     </edge>
     
-    <edge id="edge1004" source="CollisionDetectionUtils" target="BallCollider">
+    <edge id="edge1004" source="CollisionDetectionUtils" target="CollisionResult">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -387,7 +435,7 @@
       </data>
     </edge>
     
-    <edge id="edge1005" source="CollisionDetectionUtils" target="GridCollider">
+    <edge id="edge1005" source="CollisionDetectionUtils" target="DebugRenderer">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -397,7 +445,7 @@
       </data>
     </edge>
     
-    <edge id="edge1006" source="CollisionDetectionUtils" target="CollisionResult">
+    <edge id="edge1006" source="CollisionDetectionUtils" target="BallCollider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -427,7 +475,7 @@
       </data>
     </edge>
     
-    <edge id="edge1009" source="CollisionDetector" target="CollisionDetectionUtils">
+    <edge id="edge1009" source="CollisionDetector" target="CollisionResult">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -437,7 +485,7 @@
       </data>
     </edge>
     
-    <edge id="edge1010" source="CollisionDetector" target="CollisionResult">
+    <edge id="edge1010" source="CollisionDetector" target="CollisionDetectionUtils">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -477,7 +525,7 @@
       </data>
     </edge>
     
-    <edge id="edge1014" source="CubeCollider" target="SATCacheable">
+    <edge id="edge1014" source="CubeCollider" target="HashFunctions">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -487,7 +535,7 @@
       </data>
     </edge>
     
-    <edge id="edge1015" source="CubeCollider" target="Collider">
+    <edge id="edge1015" source="CubeCollider" target="SATCacheable">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -497,7 +545,7 @@
       </data>
     </edge>
     
-    <edge id="edge1016" source="CubeCollider" target="HashFunctions">
+    <edge id="edge1016" source="CubeCollider" target="Collider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -517,7 +565,7 @@
       </data>
     </edge>
     
-    <edge id="edge1018" source="DebugVisualization" target="AssimpLoader">
+    <edge id="edge1018" source="DebugVisualization" target="DebugRenderer">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -527,7 +575,7 @@
       </data>
     </edge>
     
-    <edge id="edge1019" source="DebugVisualization" target="MeshHandler">
+    <edge id="edge1019" source="DebugVisualization" target="AssimpLoader">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -537,7 +585,7 @@
       </data>
     </edge>
     
-    <edge id="edge1020" source="DebugVisualization" target="DebugRenderer">
+    <edge id="edge1020" source="DebugVisualization" target="MeshHandler">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -567,7 +615,7 @@
       </data>
     </edge>
     
-    <edge id="edge1023" source="GameBase" target="Grid">
+    <edge id="edge1023" source="GameBase" target="GraphicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -577,7 +625,7 @@
       </data>
     </edge>
     
-    <edge id="edge1024" source="GameBase" target="GraphicsEngine">
+    <edge id="edge1024" source="GameBase" target="TimeHandler">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -587,7 +635,7 @@
       </data>
     </edge>
     
-    <edge id="edge1025" source="GameBase" target="TimeHandler">
+    <edge id="edge1025" source="GameBase" target="PhysicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -597,7 +645,7 @@
       </data>
     </edge>
     
-    <edge id="edge1026" source="GameBase" target="PhysicsEngine">
+    <edge id="edge1026" source="GameBase" target="Grid">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -607,7 +655,7 @@
       </data>
     </edge>
     
-    <edge id="edge1027" source="GraphicsEngine" target="GraphicsEngineBase">
+    <edge id="edge1027" source="GraphicsEngine" target="AssimpLoader">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -617,7 +665,7 @@
       </data>
     </edge>
     
-    <edge id="edge1028" source="GraphicsEngine" target="AssimpLoader">
+    <edge id="edge1028" source="GraphicsEngine" target="GraphicsEngineBase">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -637,7 +685,7 @@
       </data>
     </edge>
     
-    <edge id="edge1030" source="GraphicsEngineBase" target="KeyboardHandler">
+    <edge id="edge1030" source="GraphicsEngineBase" target="MouseHandler">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -647,7 +695,7 @@
       </data>
     </edge>
     
-    <edge id="edge1031" source="GraphicsEngineBase" target="MouseHandler">
+    <edge id="edge1031" source="GraphicsEngineBase" target="KeyboardHandler">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -657,7 +705,7 @@
       </data>
     </edge>
     
-    <edge id="edge1032" source="Grid" target="PhysicsEngine">
+    <edge id="edge1032" source="Grid" target="GridCollider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -667,7 +715,7 @@
       </data>
     </edge>
     
-    <edge id="edge1033" source="Grid" target="GraphicsEngine">
+    <edge id="edge1033" source="Grid" target="DebugRenderer">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -677,7 +725,7 @@
       </data>
     </edge>
     
-    <edge id="edge1034" source="Grid" target="GridCollider">
+    <edge id="edge1034" source="Grid" target="HashFunctions">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -687,7 +735,7 @@
       </data>
     </edge>
     
-    <edge id="edge1035" source="Grid" target="HashFunctions">
+    <edge id="edge1035" source="Grid" target="MassInertiaCalculator">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -697,7 +745,7 @@
       </data>
     </edge>
     
-    <edge id="edge1036" source="GridCollider" target="CubeCollider">
+    <edge id="edge1036" source="Grid" target="GraphicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -707,7 +755,7 @@
       </data>
     </edge>
     
-    <edge id="edge1037" source="GridCollider" target="Collider">
+    <edge id="edge1037" source="Grid" target="PhysicsEngine">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -717,7 +765,7 @@
       </data>
     </edge>
     
-    <edge id="edge1038" source="GridCollider" target="HashFunctions">
+    <edge id="edge1038" source="Grid" target="StructuralAnalyzer">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -727,7 +775,7 @@
       </data>
     </edge>
     
-    <edge id="edge1039" source="MeshHandler" target="STBImageLoader">
+    <edge id="edge1039" source="Grid" target="DebugGlobals">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -737,7 +785,7 @@
       </data>
     </edge>
     
-    <edge id="edge1040" source="MeshHandler" target="ShaderProgram">
+    <edge id="edge1040" source="GridCollider" target="HashFunctions">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -747,7 +795,7 @@
       </data>
     </edge>
     
-    <edge id="edge1041" source="PhysicsEngine" target="CollisionDetectionUtils">
+    <edge id="edge1041" source="GridCollider" target="CubeCollider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -757,7 +805,7 @@
       </data>
     </edge>
     
-    <edge id="edge1042" source="PhysicsEngine" target="DebugRenderer">
+    <edge id="edge1042" source="GridCollider" target="Collider">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -767,7 +815,7 @@
       </data>
     </edge>
     
-    <edge id="edge1043" source="PhysicsEngine" target="CollisionDetector">
+    <edge id="edge1043" source="MeshHandler" target="ShaderProgram">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -777,7 +825,7 @@
       </data>
     </edge>
     
-    <edge id="edge1044" source="PhysicsEngine" target="ColliderReference">
+    <edge id="edge1044" source="MeshHandler" target="STBImageLoader">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -797,7 +845,7 @@
       </data>
     </edge>
     
-    <edge id="edge1046" source="SATCacheable" target="HashFunctions">
+    <edge id="edge1046" source="PhysicsEngine" target="ColliderReference">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
@@ -807,7 +855,67 @@
       </data>
     </edge>
     
-    <edge id="edge1047" source="STBImageLoader" target="stb_image">
+    <edge id="edge1047" source="PhysicsEngine" target="DebugRenderer">
+      <data key="d10">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    
+    <edge id="edge1048" source="PhysicsEngine" target="CollisionDetector">
+      <data key="d10">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    
+    <edge id="edge1049" source="PhysicsEngine" target="CollisionDetectionUtils">
+      <data key="d10">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    
+    <edge id="edge1050" source="SATCacheable" target="HashFunctions">
+      <data key="d10">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    
+    <edge id="edge1051" source="STBImageLoader" target="stb_image">
+      <data key="d10">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    
+    <edge id="edge1052" source="StructuralAnalyzer" target="AStar">
+      <data key="d10">
+        <y:PolyLineEdge>
+          <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>
+          <y:LineStyle color="#000000" type="line" width="1.0"/>
+          <y:Arrows source="none" target="standard"/>
+        </y:PolyLineEdge>
+      </data>
+    </edge>
+    
+    <edge id="edge1053" source="StructuralAnalyzer" target="HashFunctions">
       <data key="d10">
         <y:PolyLineEdge>
           <y:Path sx="0.0" sy="0.0" tx="0.0" ty="0.0"/>

@@ -41,6 +41,17 @@ void CollisionDetector::removeCollider(Collider* collider) {
     removeEdges(edgesX);
     removeEdges(edgesY);
     removeEdges(edgesZ);
+
+    
+    // Remove any active collision pairs involving this collider
+    auto it = m_activeAABBS.begin();
+    while (it != m_activeAABBS.end()) {
+        if (it->first == collider || it->second == collider) {
+            it = m_activeAABBS.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
