@@ -93,7 +93,7 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     processGridGraphicsUpdates();
     
     for (auto& grid : m_grids) {
-        grid->updateGraphics();
+        grid->updateGraphics(m_graphicsEngine->m_camPos);
     }
 }
 

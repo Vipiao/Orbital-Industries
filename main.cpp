@@ -406,10 +406,10 @@ private:
 int main() {
     try {
         // Create the TimeHandler with appropriate mode
-        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::NONE);
+        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::PLAY);
 
         // Use existing GraphicsEngineBase::Mode for controls
-        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE;
+        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::PLAY;
 
         MyGame game(timeHandler, controlMode); // Updated
         game.run();

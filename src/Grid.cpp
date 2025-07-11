@@ -126,7 +126,8 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
     m_physics->updateColliderTransform(m_rigidBody);
 
     // Initial graphics update
-    updateGraphics();
+    // Use a default distant camera position for initial update
+    updateGraphics(glm::dvec3(0.0, 0.0, 100.0));
 }
 
 Grid::~Grid() {
@@ -533,7 +534,7 @@ double Grid::getApproximateRadius() const {
     return 1.0;
 }
 
-bool Grid::shouldUpdateGPU() const {
+bool Grid::shouldUpdateGPU(const glm::dvec3& cameraPos) const {
     uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
     
     // Check if physics time step has incremented since last check
@@ -563,10 +564,17 @@ bool Grid::shouldUpdateGPU() const {
     if (currentPhysicsTimeStep >= m_nextUpdatePhysicsTimeStep) {
         return true;
     }
+
+    // Calculate distance-based scaling factor
+    double distanceToCamera = glm::length(cameraPos - body->m_position);
+    double meshRadius = getApproximateRadius();
+    double effectiveDistance = std::max(distanceToCamera - meshRadius, 0.1); // Prevent division by very small numbers
+    double scalingFactor = std::max(effectiveDistance, 1.0); // Cap scaling factor at 1.0
     
     // Check position difference (now using interpolated cached position)
     double positionDiff = glm::length(body->m_position - m_lastSentRigidBodyPosition);
-    if (positionDiff > POSITION_THRESHOLD) {
+    double adaptivePositionThreshold = POSITION_THRESHOLD * scalingFactor;
+    if (positionDiff > adaptivePositionThreshold) {
         return true;
     }
     
@@ -579,7 +587,7 @@ bool Grid::shouldUpdateGPU() const {
     
     // Calculate radius-based orientation threshold
     double radius = getApproximateRadius();
-    double orientationThreshold = ORIENTATION_THRESHOLD_BASE / radius;
+    double orientationThreshold = ORIENTATION_THRESHOLD_BASE / radius * scalingFactor;
     
     if (angleDiff > orientationThreshold) {
         return true;
@@ -651,13 +659,13 @@ void Grid::updateCellGraphics(const glm::ivec3& coord) {
 }
 
 // Updated - Update mesh transform based on physics state
-void Grid::updateGraphics() {
+void Grid::updateGraphics(const glm::dvec3& cameraPos) {
     if (m_meshId < 0 || !m_rigidBody) {
         return;
     }
 
     // Only update GPU if there's a significant change
-    if (!shouldUpdateGPU()) {
+    if (!shouldUpdateGPU(cameraPos)) {
         return;
     } else {
         std::cout << "Updated graphics for " << this->m_cells.size() << std::endl;

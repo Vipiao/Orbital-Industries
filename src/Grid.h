@@ -56,7 +56,7 @@ public:
     void analyzeStructuralIntegrity(TimeHandler* timeHandler);
     
     // Split graphics update method
-    void updateGraphics();
+    void updateGraphics(const glm::dvec3& cameraPos);
     void processGraphicsQueue();
     
     // Getters for GameBase
@@ -102,8 +102,8 @@ private:
     mutable uint64_t m_lastCheckedPhysicsTimeStep{0}; // Last time step we checked in shouldUpdateGPU
     
     // Update thresholds
-    static constexpr double POSITION_THRESHOLD = 0.002; // 5mm
-    static constexpr double ORIENTATION_THRESHOLD_BASE = 0.002; // Base threshold for radius = 1.0
+    static constexpr double POSITION_THRESHOLD = 0.0008; //
+    static constexpr double ORIENTATION_THRESHOLD_BASE = 0.0004; // Base threshold for radius = 1.0
     static constexpr uint64_t TIME_THRESHOLD = 256; // Update at least every 256 physics steps (~8 seconds)
     
     // Face visibility and mesh management methods
@@ -113,7 +113,7 @@ private:
     void updateCellGraphics(const glm::ivec3& coord);
     bool isFaceVisible(const glm::ivec3& coord, int faceIndex) const;
     void queueNeighborsForUpdate(const glm::ivec3& coord);
-    bool shouldUpdateGPU() const;
+    bool shouldUpdateGPU(const glm::dvec3& cameraPos) const;
     double getApproximateRadius() const;
 
     // Static face mesh data
