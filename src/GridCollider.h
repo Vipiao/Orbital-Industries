@@ -44,4 +44,8 @@ private:
     
     // Helper methods
     void updateSubColliderTransformsAndAABB();
+
+    // Filter normal management
+    void updateFilterNormalsForCell(const glm::ivec3& coord);
+    void updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoord);
 };

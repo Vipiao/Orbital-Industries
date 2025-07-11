@@ -26,7 +26,13 @@ public:
     std::vector<glm::dvec3> getVertices() const { return m_cachedVertices; }
 
     // Get collision axes (face axes, edge axes) for SAT collision detection
-    std::pair<std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes() const;
+    std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes() const;
+    
+    // Filter normal management
+    void addFilterNormal(const glm::dvec3& normal);
+    void removeFilterNormal(const glm::dvec3& normal);
+    void clearFilterNormals();
+    const std::vector<glm::dvec3>& getFilterNormals() const;
 
     // Type identification
     static constexpr int TYPE_ID = hashColliderName("CubeCollider");
@@ -37,4 +43,7 @@ private:
     void updateCachedVertices();
     
     std::vector<glm::dvec3> m_cachedVertices;
+
+    // Filter normals in local space for collision filtering
+    std::vector<glm::dvec3> m_filterNormals;
 };

@@ -53,6 +53,8 @@ void GridCollider::addCell(const glm::ivec3& coord, double width) {
     auto cubeCollider = std::make_unique<CubeCollider>(worldPos, m_orientation, width, m_reference);
     
     m_cells[coord] = std::move(cubeCollider);
+
+    updateFilterNormalsForCell(coord);
     
     // Update AABBs after adding
     updateTransformAndAABB();
@@ -62,6 +64,8 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
     auto it = m_cells.find(coord);
     if (it != m_cells.end()) {
         m_cells.erase(it);
+        updateFilterNormalsAfterRemoval(coord);
+
         // Update AABBs after removing
         updateTransformAndAABB();
     }
@@ -105,4 +109,59 @@ glm::dvec3 GridCollider::gridToWorld(const glm::dvec3& gridCoord) const {
 glm::dvec3 GridCollider::worldToGrid(const glm::dvec3& worldCoord) const {
     // Inverse transformation: rotate by conjugate orientation, then translate
     return glm::conjugate(m_orientation) * (worldCoord - m_position);
+}
+
+void GridCollider::updateFilterNormalsForCell(const glm::ivec3& coord) {
+    // Standard grid directions (6-connectivity)
+    static const glm::dvec3 directions[6] = {
+        { 1.0,  0.0,  0.0},  // +X
+        {-1.0,  0.0,  0.0},  // -X
+        { 0.0,  1.0,  0.0},  // +Y
+        { 0.0, -1.0,  0.0},  // -Y
+        { 0.0,  0.0,  1.0},  // +Z
+        { 0.0,  0.0, -1.0}   // -Z
+    };
+    
+    CubeCollider* currentCube = getCell(coord);
+    if (!currentCube) return;
+    
+    // Clear existing filter normals for this cube
+    currentCube->clearFilterNormals();
+    
+    // Check each direction for neighbors
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = coord + glm::ivec3(directions[i]);
+        CubeCollider* neighborCube = getCell(neighborCoord);
+        
+        if (neighborCube) {
+            // Add filter normal pointing toward neighbor
+            currentCube->addFilterNormal(directions[i]);
+            
+            // Add filter normal to neighbor pointing back toward current cube
+            neighborCube->addFilterNormal(-directions[i]);
+        }
+    }
+}
+
+void GridCollider::updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoord) {
+    // Standard grid directions (6-connectivity)
+    static const glm::dvec3 directions[6] = {
+        { 1.0,  0.0,  0.0},  // +X
+        {-1.0,  0.0,  0.0},  // -X
+        { 0.0,  1.0,  0.0},  // +Y
+        { 0.0, -1.0,  0.0},  // -Y
+        { 0.0,  0.0,  1.0},  // +Z
+        { 0.0,  0.0, -1.0}   // -Z
+    };
+    
+    // Update neighbors of the removed cell
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = removedCoord + glm::ivec3(directions[i]);
+        CubeCollider* neighborCube = getCell(neighborCoord);
+        
+        if (neighborCube) {
+            // Remove filter normal pointing toward the removed cube
+            neighborCube->removeFilterNormal(-directions[i]);
+        }
+    }
 }

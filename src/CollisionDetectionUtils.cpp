@@ -192,8 +192,8 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     //std::cout << geogebraCommands << std::endl;
     
     // Get axes for both cubes
-    auto [faceAxesA, edgeAxesA] = cubeA->getCollisionAxes();
-    auto [faceAxesB, edgeAxesB] = cubeB->getCollisionAxes();
+    auto [faceAxesA, edgeAxesA, filterNormalsA] = cubeA->getCollisionAxes();
+    auto [faceAxesB, edgeAxesB, filterNormalsB] = cubeB->getCollisionAxes();
     
     double minPenetration = std::numeric_limits<double>::max();
     glm::dvec3 separatingAxis;
@@ -271,6 +271,22 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     // Now separatingAxis is our collision normal pointing from A toward B
     glm::dvec3 collisionNormal = glm::normalize(separatingAxis);
     
+    // Check if this collision should be filtered based on filter normals
+    const double filterTolerance = 0.8; // arccos(0.8) = 36.87 deg tolerance
+    
+    // Check filter normals from both cubes
+    for (const glm::dvec3& filterNormal : filterNormalsA) {
+        if (glm::dot(collisionNormal, filterNormal) > filterTolerance) {
+            return CollisionResult(true, {}, {}, {}, cubeA, cubeB); // Collision detected but filtered
+        }
+    }
+    
+    for (const glm::dvec3& filterNormal : filterNormalsB) {
+        if (glm::dot(-collisionNormal, filterNormal) > filterTolerance) {
+            return CollisionResult(true, {}, {}, {}, cubeA, cubeB); // Collision detected but filtered  
+        }
+    }
+
     // Generate contact points
     ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration);
     
