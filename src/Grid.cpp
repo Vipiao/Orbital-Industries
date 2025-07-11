@@ -163,7 +163,7 @@ void Grid::analyzeStructuralIntegrity(TimeHandler* timeHandler) {
                 glm::dvec3 cellWorldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
                 std::string sphereName = "cost_cell_" + std::to_string(coord.x) + "_" + 
                                        std::to_string(coord.y) + "_" + std::to_string(coord.z);
-                double radius = 0.0 + glm::pow((averageWeakness - 1.0) * 0.01, 1./3.);
+                double radius = 0.0 + glm::pow((averageWeakness - 1.0) * 0.02, 1./3.);
                 DebugGlobals::getDebugRenderer()->createSphere(sphereName, cellWorldPos, radius);
             }
         }
