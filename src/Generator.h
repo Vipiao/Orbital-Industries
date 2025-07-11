@@ -83,6 +83,7 @@ public:
 
    struct Handle : std::coroutine_handle<promise_type> {
       Handle(std::coroutine_handle<promise_type> h) : std::coroutine_handle<promise_type>(h) {}
+      Handle() : std::coroutine_handle<promise_type>() {}
       T& operator()() {
          if (this->promise().exception) {
             std::rethrow_exception(this->promise().exception);
@@ -101,13 +102,13 @@ public:
    Generator(const Generator&) = delete;
    Generator& operator=(const Generator&) = delete;
    Generator(Generator&& other) noexcept : handle(std::move(other.handle)) {
-      other.handle = nullptr;
+      other.handle = Handle();
    }
    Generator& operator=(Generator&& other) noexcept {
       if (this != &other) {
          if (handle) handle.destroy();
          handle = std::move(other.handle);
-         other.handle = nullptr;
+         other.handle = Handle();
       }
       return *this;
    }

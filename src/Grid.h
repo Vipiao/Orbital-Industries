@@ -6,7 +6,8 @@
 #include "GridCollider.h"
 #include "MassInertiaCalculator.h"
 #include "HashFunctions.h"
-#include "StructuralAnalyzer.h"
+#include "StochasticAnalyzer.h"
+#include "TimeHandler.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
@@ -19,21 +20,23 @@ enum class CellType { ARMOR };
 class Grid;
 
 // Cell structure to hold face triangle IDs
-struct GridCell : public StructuralNode {
+struct GridCell : public IStochasticCell {
     CellType type;
     std::vector<uint32_t> faceTriangleIds[6]; // Triangle IDs for each face direction
     glm::ivec3 coordinates; // Store coordinates for this cell
     Grid* parentGrid; // Reference to parent grid for neighbor lookup
+    double structuralWeakness = 0.0; // Accumulated structural weakness across multiple analysis iterations
     
     GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType = CellType::ARMOR) 
         : coordinates(coords), parentGrid(parent), type(cellType) {}
     
-    // Implement StructuralNode interface
+    // Implement IStochasticCell interface
     virtual std::vector<glm::ivec3> getConnectedNeighbors() const override;
+    virtual bool isValidForPath() const override { return true; } // All grid cells are valid for pathfinding
 };
 
-// Using glm::ivec3 for coordinates
-using CellMap = std::unordered_map<glm::ivec3, GridCell, IVec3Hash>;
+// Forward declaration
+class TimeHandler;
 
 class Grid {
 public:
@@ -50,7 +53,7 @@ public:
     bool isEmpty() const;
 
     // Structural analysis
-    void analyzeStructuralIntegrity();
+    void analyzeStructuralIntegrity(TimeHandler* timeHandler);
     
     // Split graphics update method
     void updateGraphics();
@@ -72,11 +75,11 @@ public:
     
 private:
     // Core data for block grid
-    CellMap m_cells;
+    std::unordered_map<glm::ivec3, GridCell, IVec3Hash> m_cells;
     std::queue<glm::ivec3> m_graphicsUpdateQueue;
 
-    // Structural analysis
-    StructuralAnalyzer m_structuralAnalyzer{{2, 4}};
+    // Stochastic analysis
+    std::unique_ptr<StochasticAnalyzer<GridCell>> m_stochasticAnalyzer;
 
     // Armor texture.
     static int s_colorTextureUnit;
@@ -112,7 +115,7 @@ private:
     void queueNeighborsForUpdate(const glm::ivec3& coord);
     bool shouldUpdateGPU() const;
     double getApproximateRadius() const;
-    
+
     // Static face mesh data
     static std::vector<AssetMeshData> s_faceMeshData;
     static bool s_faceMeshDataLoaded;

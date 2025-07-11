@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+//static int hit_count = 0; ++hit_count; std::cout << "Hit: " << hit_count << std::endl;
+
 // Define the global debug renderer (must be in exactly one .cpp file)
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 
@@ -46,6 +48,17 @@ public:
         //    }
         //}
         for (int ll = 0; ll < 2; ll++) {
+            for (int ii = -3; ii < 4; ii++)
+            {
+                for (int jj = -3; jj < 4; jj++)
+                {
+                    
+                    for (int kk = -3; kk < 4; kk++)
+                    {
+                        addGridBlock(initialGrid, ii + ll*10, jj, kk);
+                    }
+                }
+            }
             for (int ii = -2; ii < 3; ii++)
             {
                 for (int jj = -2; jj < 3; jj++)
@@ -53,23 +66,12 @@ public:
                     
                     for (int kk = -2; kk < 3; kk++)
                     {
-                        addGridBlock(initialGrid, ii + ll*8, jj, kk);
-                    }
-                }
-            }
-            for (int ii = -1; ii < 2; ii++)
-            {
-                for (int jj = -1; jj < 2; jj++)
-                {
-                    
-                    for (int kk = -1; kk < 2; kk++)
-                    {
-                        removeGridBlock(initialGrid, ii + ll*8, jj, kk);
+                        removeGridBlock(initialGrid, ii + ll*10, jj, kk);
                     }
                 }
             }
         }
-        for (int ii = 3; ii < 6; ii++)
+        for (int ii = 4; ii < 7; ii++)
         {
             for (int jj = -1; jj < 2; jj++)
             {
@@ -80,7 +82,7 @@ public:
                 }
             }
         }
-        for (int ii = 3-1; ii < 6+1; ii++)
+        for (int ii = 4-1; ii < 7+1; ii++)
         {
             for (int jj = -1+1; jj < 2-1; jj++)
             {
@@ -92,10 +94,10 @@ public:
             }
         }
         
-        Grid* gg = createGrid(glm::dvec3(0, 0, 0));
-        addGridBlock(gg, 0, 0, 0);  // Center block
-        PhysicsEngine::RigidBody* bb = gg->getRigidBody();
-        bb->m_position = {0.5, -2, 0.5};
+        //Grid* gg = createGrid(glm::dvec3(0, 0, 0));
+        //addGridBlock(gg, 0, 0, 0);  // Center block
+        //PhysicsEngine::RigidBody* bb = gg->getRigidBody();
+        //bb->m_position = {0.5, -2, 0.5};
         
         PhysicsEngine::RigidBody* body = initialGrid->getRigidBody();
         //body->m_angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
@@ -161,19 +163,15 @@ protected:
         }
         // Structural analysis with G key
         if (keyboard->m_g.justPressed()) {
-            std::cout << "Running structural analysis on " << m_grids.size() << " grids..." << std::endl;
+            std::cout << "Starting stochastic structural analysis on " << m_grids.size() << " grids..." << std::endl;
             
-            // Clear existing weak cell debug spheres (now handled in analyzeStructuralIntegrity)
+            // Clear existing cost cell debug spheres (now handled in analyzeStructuralIntegrity)
             
             // Analyze all grids
-            int totalWeakCells = 0;
             for (const auto& grid : m_grids) {
-                grid->analyzeStructuralIntegrity();
-                // Count weak cells for logging
-                // (Note: This is just for demonstration - you could collect this info from the analysis)
+                grid->analyzeStructuralIntegrity(m_timeHandler);
             }
             
-            std::cout << "Structural analysis complete!" << std::endl;
         }
         
         // Check for input actions that require grid traversal

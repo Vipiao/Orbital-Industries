@@ -5,6 +5,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "MassInertiaCalculator.h"
 #include "DebugGlobals.h"
+#include "StochasticAnalyzer.h"
 #include <limits>
 #include <iostream>
 #include "DebugGlobals.h"
@@ -191,28 +192,70 @@ void Grid::removeCell(const glm::ivec3& coord) {
     m_cells.erase(coord);
 }
 
-void Grid::analyzeStructuralIntegrity() {
-    // Clear existing weak cell debug spheres
-    if (DebugGlobals::getDebugRenderer()) {
-        DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("weak_cell_");
+void Grid::analyzeStructuralIntegrity(TimeHandler* timeHandler) {
+    if (!timeHandler) {
+        std::cerr << "Error: TimeHandler is required for structural analysis" << std::endl;
+        return;
     }
     
-    // Analyze each cell
+    // Clear existing cost-based debug spheres
+    if (DebugGlobals::getDebugRenderer()) {
+        DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("cost_cell_");
+    }
+    
+    // Clear structural weakness from previous analysis
     for (auto& pair : m_cells) {
-        const glm::ivec3& coord = pair.first;
-        GridCell& cell = pair.second;
+        pair.second.structuralWeakness = 0.0;
+    }
+    
+    const int numIterations = 8; // Run analysis 5 times to reduce randomness
+    
+    std::cout << "Starting stochastic structural analysis with " << numIterations 
+              << " iterations on " << m_cells.size() << " cells..." << std::endl;
+    
+    for (int iteration = 0; iteration < numIterations; ++iteration) {
+        // Create new stochastic analyzer for this iteration
+        m_stochasticAnalyzer = std::make_unique<StochasticAnalyzer<GridCell>>(m_cells);
         
-        bool isStrong = m_structuralAnalyzer.analyzeSingleNode(coord, m_cells);
-        cell.setWeak(!isStrong);
+        // Set time limit for analysis (e.g., 16ms per iteration)
+        auto timeLimit = timeHandler->now() + std::chrono::milliseconds(160000);
+        m_stochasticAnalyzer->setTimeLimit(timeLimit);
         
-        // If weak, add debug sphere
-        if (!isStrong && DebugGlobals::getDebugRenderer()) {
-            glm::dvec3 cellWorldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
-            std::string sphereName = "weak_cell_" + std::to_string(coord.x) + "_" + 
-                                   std::to_string(coord.y) + "_" + std::to_string(coord.z);
-            DebugGlobals::getDebugRenderer()->createSphere(sphereName, cellWorldPos, 0.6);
+        // Run analysis to completion for this iteration
+        auto analysisGenerator = m_stochasticAnalyzer->performAnalysis(*timeHandler);
+        
+        while (analysisGenerator) {
+            analysisGenerator();
+            ++analysisGenerator;
+        }
+        
+        // Accumulate structural weakness from this iteration
+        for (auto& pair : m_cells) {
+            pair.second.structuralWeakness += pair.second.getCost();
+        }
+        
+        std::cout << "Completed iteration " << (iteration + 1) << "/" << numIterations << std::endl;
+    }
+    
+    // Update debug visualization
+    if (DebugGlobals::getDebugRenderer()) {
+        for (const auto& pair : m_cells) {
+            const glm::ivec3& coord = pair.first;
+            const GridCell& cell = pair.second;
+            
+            double averageWeakness = numIterations > 0 ? cell.structuralWeakness / numIterations : 0.0;
+            if (averageWeakness > 1.0) {
+                glm::dvec3 cellWorldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
+                std::string sphereName = "cost_cell_" + std::to_string(coord.x) + "_" + 
+                                       std::to_string(coord.y) + "_" + std::to_string(coord.z);
+                double radius = 0.1 + (averageWeakness - 1.0) * 0.1;
+                DebugGlobals::getDebugRenderer()->createSphere(sphereName, cellWorldPos, radius);
+            }
         }
     }
+    
+    std::cout << "Stochastic structural analysis complete! Averaged results from " 
+              << numIterations << " iterations on " << m_cells.size() << " cells." << std::endl;
 }
 
 // Check if a cell exists at the given coordinates
