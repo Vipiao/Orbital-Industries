@@ -14,7 +14,7 @@ GameBase::GameBase(
         screenWidth, 
         screenHeight, 
         windowTitle,
-        1000000,        // maxTriangles
+        10000000,        // maxTriangles
         10000,          // maxMeshes
         controlMode
     );

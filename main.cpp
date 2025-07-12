@@ -93,6 +93,19 @@ public:
                 }
             }
         }
+        // Ground.
+        //int size{ 20 };
+        //for (int ii = -size; ii < size; ii++)
+        //{
+        //    for (int jj = -size; jj < size; jj++)
+        //    {
+        //        for (int kk = -3; kk < -2; kk++)
+        //        {
+        //            addGridBlock(initialGrid, ii, jj, kk);
+        //            std::cout << ii << std::endl;
+        //        }
+        //    }
+        //}
         
         //Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         //addGridBlock(gg, 0, 0, 0);  // Center block

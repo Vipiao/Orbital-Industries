@@ -65,7 +65,7 @@ private:
     std::vector<glm::ivec3> m_costOneCellsCache;
     
     // Deterministic random counter
-    static size_t s_randomCounter;
+    inline static size_t s_randomCounter = 0;
 };
 
 // Template implementations (must be in header)
