@@ -290,10 +290,8 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     // Generate contact points
     ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration);
     
-    // Update contactInfo normal to ensure consistency
-    contactInfo.normal = collisionNormal;
-
-    return CollisionResult(true, contactInfo.contactPoints.size() > 0 ? 
+    // Create collision result
+    CollisionResult result(true, contactInfo.contactPoints.size() > 0 ? 
                           std::vector<glm::dvec3>(contactInfo.contactPoints.size(), contactInfo.normal) :
                           std::vector<glm::dvec3>{contactInfo.normal},
                           contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints : std::vector<glm::dvec3>{cubeA->m_position},
@@ -301,6 +299,13 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
                           std::vector<double>(contactInfo.contactPoints.size(), contactInfo.penetration) :
                           std::vector<double>{contactInfo.penetration},
                           cubeA, cubeB);
+    
+    // Reduce contact points if there are too many
+    if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
+        reduceContactPoints(result);
+    }
+
+    return result;
 }
 
 // Helper function to find grid cells within search radius
@@ -378,7 +383,14 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
-        return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, ball, grid);
+        CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, ball, grid);
+        
+        // Reduce contact points if there are too many
+        if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
+            reduceContactPoints(result);
+        }
+        
+        return result;
     }
     
     return CollisionResult();
@@ -428,7 +440,14 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
-        return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, cube, grid);
+        CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, cube, grid);
+        
+        // Reduce contact points if there are too many
+        if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
+            reduceContactPoints(result);
+        }
+        
+        return result;
     }
     
     return CollisionResult();
@@ -504,8 +523,15 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
-        return CollisionResult(true, allNormals, allContactPoints, allPenetrationDepths, 
+        CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, 
                                gridA, gridB);
+        
+        // Reduce contact points if there are too many
+        if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
+            reduceContactPoints(result);
+        }
+        
+        return result;
     }
     
     return CollisionResult();
@@ -974,4 +1000,116 @@ std::vector<glm::dvec3> CollisionDetectionUtils::projectToWorld(
     }
     
     return points3D;
+}
+
+void CollisionDetectionUtils::reduceContactPoints(CollisionResult& collision, int maxPoints) {
+    if (collision.m_contactPoints.size() <= static_cast<size_t>(maxPoints)) {
+        return; // No reduction needed
+    }
+    
+    size_t numPoints = collision.m_contactPoints.size();
+    
+    // Step 1: Generate 6D coordinates
+    std::vector<std::array<double, 6>> coords6D(numPoints);
+    
+    // Find min/max for x, y, z coordinates
+    double minX = collision.m_contactPoints[0].x, maxX = collision.m_contactPoints[0].x;
+    double minY = collision.m_contactPoints[0].y, maxY = collision.m_contactPoints[0].y;
+    double minZ = collision.m_contactPoints[0].z, maxZ = collision.m_contactPoints[0].z;
+    
+    for (const auto& point : collision.m_contactPoints) {
+        minX = std::min(minX, point.x);
+        maxX = std::max(maxX, point.x);
+        minY = std::min(minY, point.y);
+        maxY = std::max(maxY, point.y);
+        minZ = std::min(minZ, point.z);
+        maxZ = std::max(maxZ, point.z);
+    }
+    
+    // Generate normalized 6D coordinates
+    for (size_t i = 0; i < numPoints; ++i) {
+        const auto& point = collision.m_contactPoints[i];
+        const auto& normal = collision.m_normals[i];
+        
+        // Normalize position coordinates (handle edge case where max == min)
+        double normX = (maxX > minX) ? 2.0 * (point.x - minX) / (maxX - minX) - 1.0 : 0.0;
+        double normY = (maxY > minY) ? 2.0 * (point.y - minY) / (maxY - minY) - 1.0 : 0.0;
+        double normZ = (maxZ > minZ) ? 2.0 * (point.z - minZ) / (maxZ - minZ) - 1.0 : 0.0;
+        
+        coords6D[i] = {normX, normY, normZ, normal.x, normal.y, normal.z};
+    }
+    
+    // Step 2: Support point selection algorithm
+    std::vector<double> costs(numPoints, 0.0);
+    std::vector<bool> selected(numPoints, false);
+    std::vector<size_t> selectedIndices;
+    
+    // Find point with largest x-coordinate as first support point
+    size_t firstIndex = 0;
+    for (size_t i = 1; i < numPoints; ++i) {
+        if (collision.m_contactPoints[i].x > collision.m_contactPoints[firstIndex].x) {
+            firstIndex = i;
+        }
+    }
+    
+    selectedIndices.push_back(firstIndex);
+    selected[firstIndex] = true;
+    
+    // Select remaining points
+    while (selectedIndices.size() < static_cast<size_t>(maxPoints) && selectedIndices.size() < numPoints) {
+        size_t currentIndex = selectedIndices.back();
+        
+        // Update costs from current selected point
+        for (size_t i = 0; i < numPoints; ++i) {
+            if (selected[i]) continue;
+            
+            // Calculate 6D distance squared
+            double distSq = 0.0;
+            for (int dim = 0; dim < 6; ++dim) {
+                double diff = coords6D[i][dim] - coords6D[currentIndex][dim];
+                distSq += diff * diff;
+            }
+            
+            // Add 1/(distance²) to cost (with small epsilon to avoid division by zero)
+            costs[i] += 1.0 / (distSq + 1e-12);
+        }
+        
+        // Find point with minimum cost
+        size_t nextIndex = 0;
+        double minCost = std::numeric_limits<double>::infinity();
+        for (size_t i = 0; i < numPoints; ++i) {
+            if (!selected[i] && costs[i] < minCost) {
+                minCost = costs[i];
+                nextIndex = i;
+            }
+        }
+        
+        selectedIndices.push_back(nextIndex);
+        selected[nextIndex] = true;
+    }
+    
+    // Step 3: Reconstruct collision result with selected points only
+    std::vector<glm::dvec3> newNormals;
+    std::vector<glm::dvec3> newContactPoints;
+    std::vector<double> newPenetrationDepths;
+    std::vector<glm::dvec3> newContactPointsLocalA;
+    std::vector<glm::dvec3> newContactPointsLocalB;
+    
+    for (size_t index : selectedIndices) {
+        newNormals.push_back(collision.m_normals[index]);
+        newContactPoints.push_back(collision.m_contactPoints[index]);
+        newPenetrationDepths.push_back(collision.m_penetrationDepths[index]);
+        newContactPointsLocalA.push_back(collision.m_contactPointsLocalA[index]);
+        newContactPointsLocalB.push_back(collision.m_contactPointsLocalB[index]);
+    }
+    
+    collision.m_normals = std::move(newNormals);
+    collision.m_contactPoints = std::move(newContactPoints);
+    collision.m_penetrationDepths = std::move(newPenetrationDepths);
+    collision.m_contactPointsLocalA = std::move(newContactPointsLocalA);
+    collision.m_contactPointsLocalB = std::move(newContactPointsLocalB);
+    
+    // Reset collision masses calculation flag since we changed the contacts
+    collision.m_collisionMassesCalculated = false;
+    collision.m_collisionMasses.clear();
 }

@@ -11,6 +11,10 @@ class BallCollider;
 class CubeCollider;
 class GridCollider;
 
+// Contact point reduction thresholds
+static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 12;
+static constexpr int MAX_CONTACT_POINTS = 12;
+
 class CollisionDetectionUtils {
 public:
     // Main collision entry point - replaces double dispatch
@@ -104,6 +108,9 @@ private:
         const std::vector<glm::dvec2>& points2D,
         const glm::dmat3& inverseMatrix,
         double averageZ = 0.0);
+
+    // Contact point reduction for performance optimization
+    static void reduceContactPoints(CollisionResult& collision, int maxPoints = MAX_CONTACT_POINTS);
 
     static glm::dmat3 createPlaneTransform(const glm::dvec3& normal);
 
