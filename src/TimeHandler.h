@@ -45,15 +45,13 @@ public:
     std::chrono::time_point<std::chrono::high_resolution_clock> now() {
         if (m_mode == Mode::RECORD) {
             auto currentTime = std::chrono::high_resolution_clock::now();
-            // Record the time as a duration since start (more reliable for playback)
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(currentTime - m_startTime);
-            record(duration);
+            // Record the actual time point directly
+            record(currentTime);
             return currentTime;
         } 
         else if (m_mode == Mode::PLAY) {
-            // Playback the recorded duration and convert back to a time point
-            auto duration = playback<std::chrono::nanoseconds>();
-            return m_startTime + duration;
+            // Playback the recorded time point directly
+            return playback<std::chrono::time_point<std::chrono::high_resolution_clock>>();
         } 
         else {
             return std::chrono::high_resolution_clock::now();
@@ -79,11 +77,11 @@ private:
         if (m_file.eof() || !m_file.good()) {
             m_file.close();
             m_mode = Mode::NONE;
-            // Fall back to real time if we run out of recorded data
+            // Fall back to real time if we run out of recorded data  
             std::cout << "Warning: End of recorded time data reached, switching to real-time." << std::endl;
-            return std::chrono::duration_cast<T>(
-                std::chrono::high_resolution_clock::now() - m_startTime);
+            return std::chrono::high_resolution_clock::now();
         }
+        //static int gkgkgkg = 0; ++gkgkgkg; std::cout << "Hit: " << gkgkgkg << std::endl;
         return data;
     }
 

@@ -77,9 +77,9 @@ GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& f
 
    // Clobal configuration.
 #ifdef V_SYNC_OFF
-   glfwSwapInterval(0);
+   setSwapInterval(0);
 #else
-   glfwSwapInterval(1);
+   setSwapInterval(1);
 #endif
    glEnable(GL_DEPTH_TEST);
    glEnable(GL_CULL_FACE);

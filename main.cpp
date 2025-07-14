@@ -38,15 +38,8 @@ public:
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
-        addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
+        //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
         //addGridBlock(initialGrid, 0, 0, 0);  // Center block
-        //for (size_t ii = 0; ii < 20; ii++)
-        //{
-        //    for (size_t jj = 0; jj < 20; jj++)
-        //    {
-        //        addGridBlock(initialGrid, ii, jj, 0);
-        //    }
-        //}
         for (int ll = 0; ll < 2; ll++) {
             for (int ii = -3; ii < 4; ii++)
             {
@@ -176,13 +169,10 @@ protected:
         }
         // Structural analysis with G key
         if (keyboard->m_g.justPressed()) {
-            std::cout << "Starting stochastic structural analysis on " << m_grids.size() << " grids..." << std::endl;
+            std::cout << "Visualizing structural analysis on " << m_grids.size() << " grids..." << std::endl;
             
-            // Clear existing cost cell debug spheres (now handled in analyzeStructuralIntegrity)
-            
-            // Analyze all grids
             for (const auto& grid : m_grids) {
-                grid->analyzeStructuralIntegrity(m_timeHandler);
+                grid->visualizeStructuralIntegrity();
             }
             
         }
@@ -387,7 +377,7 @@ protected:
         }
     }
     
-    virtual void updatePhysics() override {
+    virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) override {
         // Apply drag to all objects before running physics
         for (const auto& grid : m_grids) {
             PhysicsEngine::RigidBody* body = grid->getRigidBody();
@@ -409,8 +399,8 @@ protected:
             }
         }
         
-        // Call the base class implementation to run the physics simulation
-        GameBase::updatePhysics();
+        // Call the base class implementation to run the physics simulation  
+        return GameBase::updatePhysics(endTime);
     }
     
 private:

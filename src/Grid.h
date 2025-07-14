@@ -11,6 +11,8 @@
 #include "CellType.h"
 #include "TimeHandler.h"
 #include <glm/glm.hpp>
+#include "JobManager.h"
+#include <memory>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
 #include <queue>
@@ -23,7 +25,7 @@ struct GridCell : public IStochasticCell {
     CellType type;
     glm::ivec3 coordinates; // Store coordinates for this cell
     Grid* parentGrid; // Reference to parent grid for neighbor lookup
-    double structuralWeakness = 0.0; // Accumulated structural weakness across multiple analysis iterations
+    double structuralWeakness = -1.0; // Running average structural weakness (-1 = no data yet)
     
     GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType = CellType::ARMOR) 
         : coordinates(coords), parentGrid(parent), type(cellType) {}
@@ -33,14 +35,11 @@ struct GridCell : public IStochasticCell {
     virtual bool isValidForPath() const override { return true; } // All grid cells are valid for pathfinding
 };
 
-// Forward declaration
-class TimeHandler;
-
 class Grid {
 public:
     // Constructor now takes physics and graphics pointers
-    Grid(PhysicsEngine* physics, GraphicsEngine* graphics,
-         const glm::dvec3& position, 
+    Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
+         TimeHandler* timeHandler, const glm::dvec3& position,
          const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     ~Grid();
     
@@ -50,8 +49,8 @@ public:
     bool hasCell(const glm::ivec3& coord) const;
     bool isEmpty() const;
 
-    // Structural analysis
-    void analyzeStructuralIntegrity(TimeHandler* timeHandler);
+    // Structural analysis visualization (analysis runs automatically as background job)
+    void visualizeStructuralIntegrity();
     
     // Split graphics update method
     void updateGraphics(const glm::dvec3& cameraPos);
@@ -72,6 +71,16 @@ public:
     glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
     
 private:
+    // Job management
+    JobManager* m_jobManager;
+    TimeHandler* m_timeHandler;
+    std::weak_ptr<Job> m_analysisJob;
+    
+    // Analysis state
+    int m_currentAnalysisIteration = 0;
+    static constexpr int MAX_ANALYSIS_ITERATIONS = 8;
+    static constexpr double WEAKNESS_BLEND_FACTOR = 0.2; // New result weight in running average
+    
     // Core data for block grid
     std::unordered_map<glm::ivec3, GridCell, IVec3Hash> m_cells;
 
@@ -85,6 +94,11 @@ private:
 
     // Graphics subsystem
     std::unique_ptr<GridGraphics> m_gridGraphics;
+
+    // Structural analysis methods
+    bool performStructuralAnalysisUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
+    void scheduleStructuralAnalysis();
+    void cancelStructuralAnalysis();
     
     // Face visibility and mesh management methods
     void recalculateMassAndInertia();

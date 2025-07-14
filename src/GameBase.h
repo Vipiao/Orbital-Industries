@@ -2,6 +2,7 @@
 #pragma once
 
 #include "GraphicsEngine.h"
+#include "JobManager.h"
 #include "PhysicsEngine.h"
 #include "TimeHandler.h"
 #include "Grid.h"
@@ -26,6 +27,7 @@ public:
     
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
+    std::unique_ptr<JobManager> m_jobManager;
     std::vector<std::unique_ptr<Grid>> m_grids;
     TimeHandler* m_timeHandler;
 
@@ -40,7 +42,7 @@ public:
     
 protected:
     virtual void processInput();
-    virtual void updatePhysics();
+    virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     virtual void update(double deltaTime);
     virtual void processGridGraphicsUpdates();
     

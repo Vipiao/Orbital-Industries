@@ -18,12 +18,19 @@ GameBase::GameBase(
         10000,          // maxMeshes
         controlMode
     );
-    
-    m_physicsEngine = std::make_unique<PhysicsEngine>();
+
+    m_physicsEngine = std::make_unique<PhysicsEngine>(m_timeHandler);
+
+    // Create job manager
+    m_jobManager = std::make_unique<JobManager>(m_timeHandler);
+
+    if (!m_timeHandler) {
+        throw std::runtime_error("TimeHandler cannot be null");
+    }
     
     m_graphicsEngine->addCallbackObject(this);
     
-    m_lastFrameTime = m_timeHandler ? m_timeHandler->now() : std::chrono::high_resolution_clock::now();
+    m_lastFrameTime = m_timeHandler->now();
     m_nextPhysicsTime = m_lastFrameTime + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(m_physicsTimeStep));
@@ -54,7 +61,7 @@ void GameBase::setDebugRenderer(DebugRenderer* debugRenderer) {
 }
 
 Grid* GameBase::createGrid(const glm::dvec3& position, const glm::dquat& orientation) {
-    auto grid = std::make_unique<Grid>(m_physicsEngine.get(), m_graphicsEngine.get(), position, orientation);
+    auto grid = std::make_unique<Grid>(m_physicsEngine.get(), m_graphicsEngine.get(), m_jobManager.get(), m_timeHandler, position, orientation);
     Grid* gridPtr = grid.get();
     m_grids.push_back(std::move(grid));
     return gridPtr;
@@ -76,14 +83,24 @@ void GameBase::run() {
 }
 
 void GameBase::preRenderCallback(uint64_t frameNum) {
-    auto currentTime = m_timeHandler ? m_timeHandler->now() : std::chrono::high_resolution_clock::now();
+    if (!m_timeHandler) {
+        throw std::runtime_error("TimeHandler cannot be null");
+    }
+    auto currentTime = m_timeHandler->now();
     auto deltaTime = std::chrono::duration<double>(currentTime - m_lastFrameTime).count();
     m_lastFrameTime = currentTime;
     
     processInput();
     
+    // Schedule physics job if needed
     if (currentTime >= m_nextPhysicsTime) {
-        updatePhysics();
+        // Schedule physics as a high-priority job
+        m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
+            return updatePhysics(endTime);
+        }, 0); // Priority 0 (high priority)
+        //updatePhysics(currentTime + std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+        //    std::chrono::duration<double>(9999.9)));
+        
         m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(m_physicsTimeStep));
     }
@@ -95,6 +112,16 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     for (auto& grid : m_grids) {
         grid->updateGraphics(m_graphicsEngine->m_camPos);
     }
+
+    // Process jobs with remaining frame time
+    double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->m_frameRate);
+    auto targetFrameEnd = currentTime  + 
+        std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+            std::chrono::duration<double>(targetFrameDuration));
+    
+    // Calculate end time with 1ms safety margin
+    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
+    m_jobManager->work(jobEndTime);
 }
 
 void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
@@ -103,7 +130,10 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     glm::mat4 projection = glm::mat4(projectionMatrix);
 
     // Calculate time remainder directly here where it's needed
-    auto currentTime = m_timeHandler ? m_timeHandler->now() : std::chrono::high_resolution_clock::now();
+    if (!m_timeHandler) {
+        throw std::runtime_error("TimeHandler cannot be null");
+    }
+    auto currentTime = m_timeHandler->now();
     auto timeToNextPhysics = std::chrono::duration<double>(m_nextPhysicsTime - currentTime).count();
     double physicsTimeRemainder = 1.0 - (timeToNextPhysics / m_physicsTimeStep);
     
@@ -135,8 +165,12 @@ void GameBase::processInput() {
     // Override in derived classes for game-specific input handling
 }
 
-void GameBase::updatePhysics() {
-    m_physicsEngine->run();
+bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    // Apply drag to all objects before running physics
+    // (move existing drag code from MyGame here if you want)
+    
+    // Run physics engine
+    return m_physicsEngine->runUntil(endTime);
 }
 
 void GameBase::update(double deltaTime) {

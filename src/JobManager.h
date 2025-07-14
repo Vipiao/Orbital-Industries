@@ -17,19 +17,24 @@ public:
     Job(std::function<bool(std::chrono::time_point<std::chrono::high_resolution_clock>)> callback, 
         int prio, uint64_t seqId)
         : execute(callback), priority(prio), sequenceId(seqId) {}
-    
-    // For priority queue - higher priority comes first
-    bool operator<(const Job& other) const {
-        if (priority != other.priority) {
-            return priority < other.priority; // Higher priority first
+};
+
+// Custom comparator for the priority queue
+struct JobComparator {
+    bool operator()(const std::shared_ptr<Job>& a, const std::shared_ptr<Job>& b) const {
+        // Higher priority comes first
+        if (a->priority != b->priority) {
+            return a->priority < b->priority; // Higher priority first
         }
-        return sequenceId > other.sequenceId; // Earlier sequence first (FIFO within priority)
+        return a->sequenceId > b->sequenceId; // Earlier sequence first (FIFO within priority)
     }
 };
 
 class JobManager {
 private:
-    std::priority_queue<std::shared_ptr<Job>> m_jobQueue;
+    std::priority_queue<std::shared_ptr<Job>, 
+                       std::vector<std::shared_ptr<Job>>, 
+                       JobComparator> m_jobQueue;
     uint64_t m_nextSequenceId = 0;
     TimeHandler* m_timeHandler;
     

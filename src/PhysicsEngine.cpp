@@ -6,9 +6,14 @@
 #include "CollisionDetectionUtils.h"
 #include <glm/gtx/quaternion.hpp>
 #include "DebugRenderer.h"
+#include "TimeHandler.h"
 
-PhysicsEngine::PhysicsEngine() 
+PhysicsEngine::PhysicsEngine(TimeHandler* timeHandler)
+    : m_timeHandler(timeHandler)
 {
+    if (!m_timeHandler) {
+        throw std::invalid_argument("TimeHandler cannot be null");
+    }
 }
 
 PhysicsEngine::~PhysicsEngine() {
@@ -122,14 +127,102 @@ void PhysicsEngine::updateColliderTransform(RigidBody* body) {
     }
 }
 
-void PhysicsEngine::run() {
-    // Run one step of physics simulation
-    applyForces();
-    updatePositions();
-    handleCollisions();
+bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    while (m_timeHandler->now() < endTime) {
+        switch (m_runState) {
+            case RunState::APPLY_FORCES:
+                applyForces();
+                m_runState = RunState::UPDATE_POSITIONS;
+                
+                // Check time after forces
+                if (m_timeHandler->now() >= endTime) {
+                    return true; // More work needed
+                }
+                break;
+                
+            case RunState::UPDATE_POSITIONS:
+                updatePositions();
+                m_runState = RunState::HANDLE_COLLISIONS;
+                m_collisionProcessState = CollisionProcessState::DETECT; // Reset collision state
+                
+                // Check time after positions
+                if (m_timeHandler->now() >= endTime) {
+                    return true; // More work needed
+                }
+                break;
+                
+            case RunState::HANDLE_COLLISIONS:
+                if (handleCollisionsUntil(endTime)) {
+                    return true; // Collision processing needs more time
+                }
+                m_runState = RunState::DONE;
+                break;
+                
+            case RunState::DONE:
+                // Physics step complete - reset state and increment counter
+                m_currentPhysicsTimeStep++;
+                m_runState = RunState::APPLY_FORCES;
+                m_collisionProcessState = CollisionProcessState::DETECT;
+                m_currentCollisionIndex = 0;
+                m_separationIteration = 0;
+                m_activeCollisions.clear();
+                return false; // No more work needed
+        }
+    }
+
+    return true; // Time ran out, more work needed
+}
+
+bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    const size_t COLLISION_BATCH_SIZE = 5; // Process this many collisions before checking time
     
-    // New - increment physics time step
-    m_currentPhysicsTimeStep++;
+    while (m_timeHandler->now() < endTime) {
+        switch (m_collisionProcessState) {
+            case CollisionProcessState::DETECT:
+                // Collect collision results
+                m_activeCollisions.clear();
+                m_collisionDetector.run(m_activeCollisions);
+                m_currentCollisionIndex = 0;
+                m_collisionProcessState = CollisionProcessState::RESOLVE;
+                break;
+                
+            case CollisionProcessState::RESOLVE:
+                // Process collision resolution in batches
+                for (size_t i = 0; i < COLLISION_BATCH_SIZE && m_currentCollisionIndex < m_activeCollisions.size(); i++) {
+                    resolveCollision(m_activeCollisions[m_currentCollisionIndex]);
+                    m_currentCollisionIndex++;
+                }
+                
+                if (m_currentCollisionIndex >= m_activeCollisions.size()) {
+                    // All collisions resolved, move to separation
+                    m_collisionProcessState = CollisionProcessState::SEPARATE;
+                    m_separationIteration = 0;
+                }
+                break;
+                
+            case CollisionProcessState::SEPARATE:
+                // Process separation iterations (originally 8 iterations)
+                for (const auto& collision : m_activeCollisions) {
+                    separateOverlaps(const_cast<CollisionResult&>(collision));
+                }
+                m_separationIteration++;
+                
+                if (m_separationIteration >= 8) {
+                    m_collisionProcessState = CollisionProcessState::DONE;
+                }
+                break;
+                
+            case CollisionProcessState::DONE:
+                return false; // Collision processing complete
+        }
+        
+        // Check time periodically
+        if (m_timeHandler->now() >= endTime) {
+            return true; // More work needed
+        }
+    }
+    
+    return true; // Time ran out, more work needed
 }
 
 void PhysicsEngine::applyForces() {
@@ -196,43 +289,6 @@ void PhysicsEngine::updatePositions() {
 }
 
 //static int ttt = 0;
-
-void PhysicsEngine::handleCollisions() {
-    // Collect collision results
-    std::vector<CollisionResult> collisions;
-    m_collisionDetector.run(collisions);
-
-    //for (size_t ii = 0; ii < 100; ii++) {
-    //    m_debugRenderer->removeMesh("contactPoint " + std::to_string(ii));
-    //}
-    //if (collisions.size() > 0) {
-    //    //RigidBody* bodyA = static_cast<RigidBody*>(collisions[0].m_colliderA->m_reference);
-    //    //m_debugRenderer->createSphere("test", bodyA->m_position, 1.0);
-    //    auto cc = collisions[0];
-    //    //int mm = m_debugRenderer->createSphere("body", glm::dvec3{0,0,0}, 0.1);
-    //    //m_debugRenderer->setScale(mm, glm::dvec3{1,0,0});
-    //    //m_debugRenderer->createSphere("head", glm::dvec3{0,0,0} + cc.m_normals[0], 0.1);
-    //    for (size_t ii = 0; ii < cc.m_contactPoints.size(); ii++)
-    //    {
-    //        m_debugRenderer->createSphere("contactPoint " + std::to_string(ii), cc.m_contactPoints[ii], 0.1);
-    //    }
-    //    
-    //}
-    
-    
-    // Resolve each collision momentum.
-    //ttt = 0;
-    for (const auto& collision : collisions) {
-        resolveCollision(const_cast<CollisionResult&>(collision));
-    }
-    //std::cout << "ttt: " << ttt << std::endl;
-    // Resolve each collision overlap.
-    for (int ii=0; ii < 8; ii++) {
-        for (const auto& collision : collisions) {
-            separateOverlaps(const_cast<CollisionResult&>(collision));
-        }
-    }
-}
 
 void PhysicsEngine::resolveCollision(CollisionResult& collision) {
     // Find the rigid bodies associated with these colliders

@@ -8,8 +8,10 @@
 #include "CollisionDetector.h"
 #include "CollisionResult.h"
 #include "ColliderReference.h"
+#include <chrono>
 
 // Forward declaration
+class TimeHandler;
 class DebugRenderer;
 
 class PhysicsEngine {
@@ -34,8 +36,18 @@ public:
         Collider* m_collider;         // Associated collider for collision detection
         glm::dvec3 m_colliderOffset;  // Offset from center of mass to collider origin (in local space)
     };
+
+    // State machine enums
+    enum class RunState {
+        APPLY_FORCES,
+        UPDATE_POSITIONS, 
+        HANDLE_COLLISIONS,
+        DONE
+    };
     
-    PhysicsEngine();
+    enum class CollisionProcessState { DETECT, RESOLVE, SEPARATE, DONE };
+    
+    PhysicsEngine(TimeHandler* timeHandler);
     ~PhysicsEngine();
     
     // Add a rigid body to the simulation
@@ -68,7 +80,7 @@ public:
     void updateColliderTransform(RigidBody* body);
     
     // Run physics simulation
-    void run();
+    bool runUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 
     // Debug support
     void setDebugRenderer(DebugRenderer* debugRenderer) { m_debugRenderer = debugRenderer; }
@@ -78,13 +90,22 @@ private:
     // Physics simulation steps
     void applyForces();
     void updatePositions();
-    void handleCollisions();
+    bool handleCollisionsUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     void resolveCollision(CollisionResult& collision);
     void separateOverlaps(CollisionResult& collision);
     
     // Static helper functions for collision resolution
     static double getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
                                   const glm::dvec3& contactPoint, const glm::dvec3& normal);
+
+    // State machine variables
+    RunState m_runState = RunState::APPLY_FORCES;
+    CollisionProcessState m_collisionProcessState = CollisionProcessState::DETECT;
+    size_t m_currentCollisionIndex = 0;
+    int m_separationIteration = 0;
+    std::vector<CollisionResult> m_activeCollisions;
+    
+    TimeHandler* m_timeHandler;
 
     std::vector<std::unique_ptr<RigidBody>> m_rigidBodies;
     glm::dvec3 m_gravity{0.0, 0.0, 0.0}; // Default zero gravity

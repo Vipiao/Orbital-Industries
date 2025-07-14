@@ -5,7 +5,6 @@
 #include <vector>
 #include <chrono>
 #include "HashFunctions.h"
-#include "Generator.h"
 #include "TimeHandler.h"
 #include "AStar.h"
 
@@ -30,14 +29,21 @@ public:
 template<typename CellType>
 class StochasticAnalyzer {
 public:
+    enum class AnalysisState {
+        SELECTING_RANDOM_CELLS,
+        PATHFINDING_ASTAR, 
+        UPDATING_PATH_COSTS,
+        ANALYSIS_COMPLETE
+    };
+
     StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, IVec3Hash>& cells);
     ~StochasticAnalyzer();
     
-    // Create generator for full analysis
-    Generator<bool> performAnalysis(TimeHandler& timeHandler);
-    
-    // Update time limit for current analysis
-    void setTimeLimit(std::chrono::high_resolution_clock::time_point newTimeLimit);
+    // Perform analysis until endTime, return true if more work needed
+    bool performAnalysisUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime, TimeHandler& timeHandler);
+
+    // Reset analysis state (call when starting new analysis)
+    void resetAnalysis();
     
 private:
     // Initialize all cell costs to 1 and populate cache
@@ -57,9 +63,13 @@ private:
     
 private:
     const std::unordered_map<glm::ivec3, CellType, IVec3Hash>& m_cells;
-    
-    // Current time limit for analysis
-    std::chrono::high_resolution_clock::time_point m_timeLimit;
+
+    // State machine variables
+    AnalysisState m_analysisState = AnalysisState::SELECTING_RANDOM_CELLS;
+    glm::ivec3 m_selectedStart;
+    glm::ivec3 m_selectedEnd;
+    std::vector<glm::ivec3> m_foundPath;
+    bool m_pathExists = false;
     
     // Cache of cell positions that may have cost 1 (shrinks over time)
     std::vector<glm::ivec3> m_costOneCellsCache;
@@ -71,13 +81,19 @@ private:
 // Template implementations (must be in header)
 template<typename CellType>
 StochasticAnalyzer<CellType>::StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, IVec3Hash>& cells) 
-    : m_cells(cells), m_timeLimit(std::chrono::high_resolution_clock::time_point::max())
+    : m_cells(cells)
 {
     initializeCostsAndCache();
 }
 
 template<typename CellType>
 StochasticAnalyzer<CellType>::~StochasticAnalyzer() = default;
+
+template<typename CellType>
+void StochasticAnalyzer<CellType>::resetAnalysis() {
+    m_analysisState = AnalysisState::SELECTING_RANDOM_CELLS;
+    initializeCostsAndCache(); // Reset all costs to 1 and rebuild cache
+}
 
 template<typename CellType>
 void StochasticAnalyzer<CellType>::initializeCostsAndCache() {
@@ -89,11 +105,6 @@ void StochasticAnalyzer<CellType>::initializeCostsAndCache() {
             m_costOneCellsCache.push_back(pos);
         }
     }
-}
-
-template<typename CellType>
-void StochasticAnalyzer<CellType>::setTimeLimit(std::chrono::high_resolution_clock::time_point newTimeLimit) {
-    m_timeLimit = newTimeLimit;
 }
 
 template<typename CellType>
@@ -110,72 +121,107 @@ size_t StochasticAnalyzer<CellType>::getRandomIndex(size_t maxValue) {
 }
 
 template<typename CellType>
-Generator<bool> StochasticAnalyzer<CellType>::performAnalysis(TimeHandler& timeHandler) {
-    while (m_costOneCellsCache.size() >= 2) {
-        // Check if time limit reached
-        if (timeHandler.now() >= m_timeLimit) {
-            co_yield true; // Yield control, will continue later
-            continue;
-        }
-        
-        // Select two random cells with cost 1
-        auto [success, cellPair] = selectRandomCellsWithCostOne();
-        
-        // If we couldn't find two cells, analysis is complete
-        if (!success) {
-            break;
-        }
-        
-        auto [start, end] = cellPair;
-        
-        // Test connectivity using existing A* implementation
-        bool pathExists = false;
-        
-        auto pathResult = AStar<glm::ivec3, IVec3Hash>::search(
-            start,
-            [&](const glm::ivec3& node) {
-                // Goal test - return true when we reach the end
-                if (node == end) {
-                    pathExists = true;
-                    return true;
-                }
-                return false;
-            },
-            [&](const glm::ivec3& node, auto callback) {
-                // Neighbor expansion - call callback for each valid neighbor
-                auto cell = getCell(node);
-                if (!cell || !cell->isValidForPath()) {
-                    return;
+bool StochasticAnalyzer<CellType>::performAnalysisUntil(
+    std::chrono::time_point<std::chrono::high_resolution_clock> endTime, 
+    TimeHandler& timeHandler) {
+    
+    while (timeHandler.now() < endTime) {
+    //while (true) {
+        switch (m_analysisState) {
+            case AnalysisState::SELECTING_RANDOM_CELLS:
+                // Check if we have enough cells to continue
+                if (m_costOneCellsCache.size() < 2) {
+                    m_analysisState = AnalysisState::ANALYSIS_COMPLETE;
+                    break;
                 }
                 
-                auto neighbors = cell->getConnectedNeighbors();
-                for (const auto& neighbor : neighbors) {
-                    auto neighborCell = getCell(neighbor);
-                    if (neighborCell && neighborCell->isValidForPath()) {
-                        double cost = static_cast<double>(neighborCell->getCost());
-                        callback(neighbor, cost);
+                // Select two random cells with cost 1
+                {
+                    auto [success, cellPair] = selectRandomCellsWithCostOne();
+                    if (!success) {
+                        m_analysisState = AnalysisState::ANALYSIS_COMPLETE;
+                        break;
+                    }
+                    m_selectedStart = cellPair.first;
+                    m_selectedEnd = cellPair.second;
+                }
+                
+                m_analysisState = AnalysisState::PATHFINDING_ASTAR;
+                break;
+                
+            case AnalysisState::PATHFINDING_ASTAR:
+                // Test connectivity using existing A* implementation
+                m_pathExists = false;
+                m_foundPath.clear();
+                
+                {
+                    auto pathResult = AStar<glm::ivec3, IVec3Hash>::search(
+                        m_selectedStart,
+                        [&](const glm::ivec3& node) {
+                            // Goal test - return true when we reach the end
+                            if (node == m_selectedEnd) {
+                                m_pathExists = true;
+                                return true;
+                            }
+                            return false;
+                        },
+                        [&](const glm::ivec3& node, auto callback) {
+                            // Neighbor expansion - call callback for each valid neighbor
+                            auto cell = getCell(node);
+                            if (!cell || !cell->isValidForPath()) {
+                                return;
+                            }
+                            
+                            auto neighbors = cell->getConnectedNeighbors();
+                            for (const auto& neighbor : neighbors) {
+                                auto neighborCell = getCell(neighbor);
+                                if (neighborCell && neighborCell->isValidForPath()) {
+                                    double cost = static_cast<double>(neighborCell->getCost());
+                                    callback(neighbor, cost);
+                                }
+                            }
+                        },
+                        [&](const glm::ivec3& node) {
+                            // Heuristic function - Manhattan distance
+                            return static_cast<double>(
+                                std::abs(node.x - m_selectedEnd.x) + 
+                                std::abs(node.y - m_selectedEnd.y) + 
+                                std::abs(node.z - m_selectedEnd.z)
+                            );
+                        }
+                    );
+                    
+                    if (m_pathExists) {
+                        m_foundPath = pathResult.path;
                     }
                 }
-            },
-            [&](const glm::ivec3& node) {
-                // Heuristic function - Manhattan distance
-                return static_cast<double>(
-                    std::abs(node.x - end.x) + 
-                    std::abs(node.y - end.y) + 
-                    std::abs(node.z - end.z)
-                );
-            }
-        );
+                
+                m_analysisState = AnalysisState::UPDATING_PATH_COSTS;
+                break;
+                
+            case AnalysisState::UPDATING_PATH_COSTS:
+                if (m_pathExists) {
+                    incrementPathCosts(m_foundPath);
+                } else {
+                    incrementPathCosts({m_selectedStart, m_selectedEnd});
+                }
+                
+                m_analysisState = AnalysisState::SELECTING_RANDOM_CELLS;
+                break;
+                
+            case AnalysisState::ANALYSIS_COMPLETE:
+                return false; // Analysis complete
+        }
         
-        if (pathExists) {
-            // Use the actual path found by A*
-            std::vector<glm::ivec3> path = pathResult.path;
-            incrementPathCosts(path);
-        } else {
-            incrementPathCosts({start, end});
+        // Check time periodically
+        
+        if (timeHandler.now() >= endTime) {
+            return true; // More work needed
         }
     }
-}
+    
+    return true; // Time ran out, more work needed
+ }
 
 template<typename CellType>
 void StochasticAnalyzer<CellType>::incrementPathCosts(const std::vector<glm::ivec3>& path) {

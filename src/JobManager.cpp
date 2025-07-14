@@ -34,7 +34,9 @@ void JobManager::work(std::chrono::time_point<std::chrono::high_resolution_clock
         auto job = m_jobQueue.top();
         
         // Skip if job was cancelled
+        //static int xxxxxx = 0;
         if (job->cancelled) {
+            //++xxxxxx; std::cout << "Hit: " << xxxxxx << std::endl;
             m_jobQueue.pop();
             continue;
         }

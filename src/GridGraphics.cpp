@@ -184,27 +184,6 @@ void GridGraphics::processGraphicsQueue() {
     }
 }
 
-bool GridGraphics::isFaceVisible(const glm::ivec3& coord) const {
-    // Define the 6 neighbor directions (±X, ±Y, ±Z)
-    static const glm::ivec3 neighbors[6] = {
-        {1, 0, 0}, {-1, 0, 0},  // Right, Left (X)
-        {0, 1, 0}, {0, -1, 0},  // Front, Back (Y)
-        {0, 0, 1}, {0, 0, -1}   // Up, Down (Z)
-    };
-    
-    // Check each face direction
-    for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
-        glm::ivec3 neighborCoord = coord + neighbors[faceIndex];
-        
-        // Face is visible if neighbor is empty
-        if (!hasGraphicsCell(neighborCoord)) {
-            return true;
-        }
-    }
-    
-    return false; // All faces are covered
-}
-
 glm::dmat4 GridGraphics::getFaceTransform(int faceIndex, const glm::ivec3& coord) {
     glm::dmat4 transform = glm::dmat4(1.0);
     

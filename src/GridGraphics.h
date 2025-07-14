@@ -109,7 +109,6 @@ private:
     static glm::dmat4 getFaceTransform(int faceIndex, const glm::ivec3& coord);
     
     void updateCellGraphics(const glm::ivec3& coord);
-    bool isFaceVisible(const glm::ivec3& coord) const;
     
     bool shouldUpdateGPU(
         const glm::dvec3& cameraPos,
