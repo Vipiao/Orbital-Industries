@@ -8,8 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include "DebugGlobals.h"
-#include "DebugRenderer.h"
+#include "../debug/DebugGlobals.h"
+#include "../debug/DebugRenderer.h"
 
 CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collider* colliderB) {
     int typeA = colliderA->getTypeId();

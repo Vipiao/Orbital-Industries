@@ -3,7 +3,7 @@
 
 #include "Collider.h"
 #include "CubeCollider.h"
-#include "HashFunctions.h"
+#include "../utils/HashFunctions.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include <memory>

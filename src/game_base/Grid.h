@@ -1,17 +1,17 @@
 // Grid.h
 #pragma once
 
-#include "PhysicsEngine.h"
-#include "GridCollider.h"
+#include "../physics/PhysicsEngine.h"
+#include "../physics/GridCollider.h"
 #include "MassInertiaCalculator.h"
-#include "HashFunctions.h"
-#include "StochasticAnalyzer.h"
+#include "../utils/HashFunctions.h"
+#include "../utils/StochasticAnalyzer.h"
 #include "GridGraphics.h"
 #include "GridGeometry.h"
 #include "CellType.h"
-#include "TimeHandler.h"
+#include "../utils/TimeHandler.h"
 #include <glm/glm.hpp>
-#include "JobManager.h"
+#include "../utils/JobManager.h"
 #include <memory>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>

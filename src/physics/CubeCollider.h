@@ -3,7 +3,7 @@
 
 #include "Collider.h"
 #include "SATCacheable.h"
-#include "HashFunctions.h"
+#include "../utils/HashFunctions.h"
 
 class CubeCollider : public Collider, public SATCacheable {
 public:

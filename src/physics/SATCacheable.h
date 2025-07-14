@@ -2,7 +2,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include "HashFunctions.h"
+#include "../utils/HashFunctions.h"
 #include <unordered_map>
 #include <utility>
 #include <cstdint>

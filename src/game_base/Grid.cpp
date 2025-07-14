@@ -4,10 +4,10 @@
 #include "Grid.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "MassInertiaCalculator.h"
-#include "DebugGlobals.h"
+#include "../debug/DebugGlobals.h"
 #include <limits>
 #include <iostream>
-#include "DebugRenderer.h"
+#include "../debug/DebugRenderer.h"
 
 std::vector<glm::ivec3> GridCell::getConnectedNeighbors() const {
     std::vector<glm::ivec3> neighbors;

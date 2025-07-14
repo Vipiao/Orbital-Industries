@@ -1,9 +1,9 @@
 // main.cpp
-#include "src/GameBase.h"
-#include "src/TimeHandler.h"
-#include "src/DebugVisualization.h"
-#include "src/DebugRenderer.h"
-#include "src/DebugGlobals.h"
+#include "src/game_base/GameBase.h"
+#include "src/utils/TimeHandler.h"
+#include "src/debug/DebugVisualization.h"
+#include "src/debug/DebugRenderer.h"
+#include "src/debug/DebugGlobals.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>

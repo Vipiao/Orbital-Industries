@@ -1,10 +1,10 @@
 // GameBase.h
 #pragma once
 
-#include "GraphicsEngine.h"
-#include "JobManager.h"
-#include "PhysicsEngine.h"
-#include "TimeHandler.h"
+#include "../graphics/GraphicsEngine.h"
+#include "../utils/JobManager.h"
+#include "../physics/PhysicsEngine.h"
+#include "../utils/TimeHandler.h"
 #include "Grid.h"
 #include <vector>
 #include <memory>

@@ -1,6 +1,6 @@
 // GameBase.cpp
 #include "GameBase.h"
-#include "DebugRenderer.h"
+#include "../debug/DebugRenderer.h"
 #include <iostream>
 #include <algorithm>
 

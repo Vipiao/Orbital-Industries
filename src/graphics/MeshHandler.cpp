@@ -14,8 +14,8 @@
 MeshHandler::MeshHandler(size_t maxTriangles, size_t maxMeshes)
    : m_maxTriangles(maxTriangles), m_maxMeshes(maxMeshes) {
 
-   m_shaderProgram.loadVertexShaderFromPath("../src/vertex_shader.vert");
-   m_shaderProgram.loadFragmentShaderFromPath("../src/fragment_shader.frag");
+   m_shaderProgram.loadVertexShaderFromPath("../src/graphics/vertex_shader.vert");
+   m_shaderProgram.loadFragmentShaderFromPath("../src/graphics/fragment_shader.frag");
    m_shaderProgram.linkShaders();
 
    // Vertex buffer object.
