@@ -12,8 +12,8 @@ class CubeCollider;
 class GridCollider;
 
 // Contact point reduction thresholds
-static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 12;
-static constexpr int MAX_CONTACT_POINTS = 12;
+static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 10;
+static constexpr int MAX_CONTACT_POINTS = 10;
 
 class CollisionDetectionUtils {
 public:
