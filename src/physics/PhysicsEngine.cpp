@@ -405,7 +405,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         double margin = 0.03;
         double correctionMagnitude = (overlap - margin) * collisionMass;
         if (correctionMagnitude < 0.) {
-            correctionMagnitude *= 0.04;
+            correctionMagnitude *= 0.2 / collision.m_normals.size();
         }
 
         // Calculate relative position vectors from center of mass to contact point
