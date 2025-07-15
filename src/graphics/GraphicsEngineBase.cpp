@@ -174,7 +174,7 @@ void GraphicsEngineBase::startRenderLoop() {
       else aspectRatio = (double)m_screen_width / (double)m_screen_height;
       //if (m_frameNum % 60 == 0) std::cout << aspectRatio << std::endl;
       projectionMatrix =
-         glm::perspective(m_fieldOfView / aspectRatio, aspectRatio, 0.01, 100.);
+         glm::perspective(m_fieldOfView / aspectRatio, aspectRatio, 0.01, 1000.);
 
       for (auto& callback : m_graphicsEngineCallbacks) {
          callback->renderCallback(viewMatrix, projectionMatrix);

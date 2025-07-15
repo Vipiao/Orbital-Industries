@@ -38,8 +38,9 @@ public:
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
-        //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
         //addGridBlock(initialGrid, 0, 0, 0);  // Center block
+        //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
+        //addGridBlock(initialGrid, 2, 0, 0);  // Block to the right right
         for (int ll = 0; ll < 2; ll++) {
             for (int ii = -3; ii < 4; ii++)
             {
@@ -290,6 +291,25 @@ protected:
                     removeGridBlock(targetGrid, hitPos.x, hitPos.y, hitPos.z);
                     std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
 
+                // Check for grid splits by testing connectivity of neighboring blocks
+                std::vector<glm::ivec3> edgeCoords = {
+                    glm::ivec3(hitPos.x + 1, hitPos.y, hitPos.z),  // +X
+                    glm::ivec3(hitPos.x - 1, hitPos.y, hitPos.z),  // -X
+                    glm::ivec3(hitPos.x, hitPos.y + 1, hitPos.z),  // +Y
+                    glm::ivec3(hitPos.x, hitPos.y - 1, hitPos.z),  // -Y
+                    glm::ivec3(hitPos.x, hitPos.y, hitPos.z + 1),  // +Z
+                    glm::ivec3(hitPos.x, hitPos.y, hitPos.z - 1)   // -Z
+                };
+                
+                std::vector<Grid*> newGrids = checkAndSplitGrid(targetGrid, edgeCoords);
+                if (!newGrids.empty()) {
+                    std::cout << "Grid split into " << (newGrids.size() + 1) << " pieces!" << std::endl;
+                    // Optional: Apply some separation forces to the fragments
+                    for (Grid* fragment : newGrids) {
+                        // Could add small random forces here to separate fragments visually
+                    }
+                }
+
                     // Check if the grid is now empty and remove it if so
                     if (targetGrid->isEmpty()) {
                         std::cout << "Grid is now empty, removing grid" << std::endl;
@@ -383,7 +403,7 @@ protected:
             PhysicsEngine::RigidBody* body = grid->getRigidBody();
             if (body && !body->m_isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
-                const double dragCoefficient = 0.04;
+                const double dragCoefficient = 0.04 * 0.;
                 
                 // Apply drag to linear velocity
                 if (glm::length(body->m_velocity) > 0.0) {

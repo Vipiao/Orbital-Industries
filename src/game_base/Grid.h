@@ -68,7 +68,11 @@ public:
 
     std::vector<glm::ivec3> gridTraversal(glm::dvec3 startPos, glm::dvec3 endPos);
     
+    // Center of mass in local space. Get m_rigidBody->m_position to get the world center of mass.
     glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
+
+    // Access to cells for partitioning
+    const std::unordered_map<glm::ivec3, GridCell, IVec3Hash>& getCells() const { return m_cells; }
     
 private:
     // Job management
