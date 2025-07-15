@@ -24,6 +24,9 @@ public:
     Grid* createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     void removeGrid(Grid* grid);
     void run();
+
+    // Grid partitioning/splitting
+    std::vector<Grid*> splitGrid(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;

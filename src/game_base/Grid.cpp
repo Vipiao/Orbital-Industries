@@ -51,8 +51,8 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
     m_rigidBody = m_physics->addRigidBody(
         position,
         orientation,
-        1.0,  // Mass
-        0.4,  // Moment of inertia
+        0.0,  // Mass
+        0.0,  // Moment of inertia
         false, // Not static
         m_collider.get() // Pass the sphere collider
     );
