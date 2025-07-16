@@ -3,7 +3,6 @@
 #include <iostream>
 #include <limits>
 #include <algorithm>
-#include "CollisionDetectionUtils.h"
 #include <glm/gtx/quaternion.hpp>
 #include "../debug/DebugRenderer.h"
 #include "../utils/TimeHandler.h"
