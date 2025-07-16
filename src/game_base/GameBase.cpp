@@ -102,27 +102,57 @@ void GameBase::scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::i
     pendingEdges.insert(edgeCoords.begin(), edgeCoords.end());
 }
 
-void GameBase::handlePendingSplits() {
-    if (m_pendingGridSplits.empty()) {
-        return;
+bool GameBase::handlePendingSplits(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    if (!m_pendingSplitsGenerator) {
+        if (m_pendingGridSplits.empty()) {
+            return false; // No work to do
+        }
+        m_pendingSplitsGenerator = std::make_unique<Generator<bool>>(handlePendingSplitsAsync());
+        ++(*m_pendingSplitsGenerator); // Start the generator
     }
     
-    // Process all pending splits
-    for (const auto& pair : m_pendingGridSplits) {
+    while (*m_pendingSplitsGenerator && m_timeHandler->now() < endTime) {
+        ++(*m_pendingSplitsGenerator);
+    }
+    
+    if (!*m_pendingSplitsGenerator) {
+        // Generator finished
+        m_pendingSplitsGenerator.reset();
+        return false; // Work complete
+    }
+    
+    return true; // More work needed
+}
+
+Generator<bool> GameBase::handlePendingSplitsAsync() {
+    if (m_pendingGridSplits.empty()) {
+        co_return;
+    }
+    
+    // Snapshot pending splits to avoid race conditions
+    auto pendingSplitsSnapshot = std::move(m_pendingGridSplits);
+    // m_pendingGridSplits is now empty and ready for new entries
+
+    // Process snapshotted splits
+    for (const auto& pair : pendingSplitsSnapshot) {
         Grid* sourceGrid = pair.first;
         const auto& edgeCoords = pair.second;
         
         // Convert unordered_set back to vector for the analysis function
         std::vector<glm::ivec3> edgeVector(edgeCoords.begin(), edgeCoords.end());
         
-        performGridSplit(sourceGrid, edgeVector);
+        // Use async grid split generator
+        auto splitGenerator = performGridSplitAsync(sourceGrid, edgeVector);
+        ++splitGenerator; // Start the generator
+        
+        while (splitGenerator) {
+            co_yield true; // Yield control for time checking
+            ++splitGenerator;
+        }
     }
-    
-    // Clear all pending splits
-    m_pendingGridSplits.clear();
 }
 
-void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
+Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
     std::vector<Grid*> newGrids;
 
     struct PartitionPhysics {
@@ -132,8 +162,10 @@ void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>&
     };
     
     if (!sourceGrid || edgeCoords.empty()) {
-        return;
+        co_return;
     }
+
+    co_yield true; // Allow time check before expensive operation
     
     // Step 1: Analyze partitions using PartitionCalculator
     auto result = PartitionCalculator<GridCell>::analyzePartitions(
@@ -143,10 +175,12 @@ void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>&
             return cell.getConnectedNeighbors();
         }
     );
+
+    co_yield true; // Allow time check after expensive analysis
     
     // Step 2: If no split detected, return empty vector
     if (!result.hasSplit || result.partitions.size() <= 1) {
-        return;
+        co_return;
     }
     
     std::cout << "Grid split detected! " << result.partitions.size() << " partitions found." << std::endl;
@@ -160,6 +194,8 @@ void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>&
     
     std::vector<PartitionPhysics> partitionPhysics(result.partitions.size());
     const double blockMass = 60.0; // Match Grid.cpp value
+
+    co_yield true; // Allow time check before physics calculations
     
     for (size_t i = 0; i < result.partitions.size(); ++i) {
         const std::vector<glm::ivec3>& partition = result.partitions[i];
@@ -186,6 +222,8 @@ void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>&
                   << ", CM=(" << partitionCenterOfMass.x << "," << partitionCenterOfMass.y << "," << partitionCenterOfMass.z << ")"
                   << ", vel=(" << partitionVelocity.x << "," << partitionVelocity.y << "," << partitionVelocity.z << ")" << std::endl;
     }
+
+    co_yield true; // Allow time check before grid operations
     
     // Step 4: Find the largest partition (this stays with the original grid)
     size_t largestPartitionIndex = 0;
@@ -201,6 +239,8 @@ void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>&
     std::cout << "Largest partition (index " << largestPartitionIndex << ") has " << largestSize << " cells" << std::endl;
     
     // Step 5: Create new grids for all partitions except the largest
+
+    co_yield true; // Allow time check before creating new grids
     
     for (size_t i = 0; i < result.partitions.size(); ++i) {
         if (i == largestPartitionIndex) {
@@ -214,7 +254,10 @@ void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>&
         
         std::cout << "Moving " << partition.size() << " cells to new grid" << std::endl;
         
+        co_yield true; // Allow time check before moving cells
+
         // Move cells from source grid to new grid
+        size_t cellsProcessed = 0;
         for (const glm::ivec3& cellCoord : partition) {
             // Get cell type before removing (assume ARMOR for now, could be extended)
             CellType cellType = CellType::ARMOR;
@@ -222,6 +265,11 @@ void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>&
             // Remove from source grid and add to new grid
             sourceGrid->removeCell(cellCoord);
             newGrid->addCell(cellCoord, cellType);
+
+            // Yield every 5 cells to avoid blocking too long
+            if (++cellsProcessed % 5 == 0) {
+                co_yield true;
+            }
         }
 
         // Set physics properties using pre-calculated values
@@ -329,7 +377,9 @@ void GameBase::processInput() {
 
 bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
     // Handle any pending grid splits before running physics
-    handlePendingSplits();
+    if (handlePendingSplits(endTime)) {
+        return true; // Grid splitting needs more time
+    }
 
     // Apply drag to all objects before running physics
     // (move existing drag code from MyGame here if you want)

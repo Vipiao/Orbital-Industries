@@ -7,6 +7,7 @@
 #include "../utils/TimeHandler.h"
 #include "../utils/HashFunctions.h"
 #include "Grid.h"
+#include "../utils/Generator.h"
 #include <vector>
 #include <memory>
 #include <chrono>
@@ -58,8 +59,12 @@ protected:
 private:
     // Deferred grid splitting
     std::unordered_map<Grid*, std::unordered_set<glm::ivec3, IVec3Hash>> m_pendingGridSplits;
-    void handlePendingSplits();
-    void performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
+    bool handlePendingSplits(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
+    Generator<bool> handlePendingSplitsAsync();
+    Generator<bool> performGridSplitAsync(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
+
+    // Async state management
+    std::unique_ptr<Generator<bool>> m_pendingSplitsGenerator;
     
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
