@@ -15,7 +15,6 @@
 #include <memory>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
-#include <queue>
 
 // Forward declaration
 class Grid;
