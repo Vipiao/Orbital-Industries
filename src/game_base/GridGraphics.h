@@ -9,8 +9,9 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <unordered_map>
-#include <queue>
 #include <vector>
+#include <memory>
+#include "../utils/JobManager.h"
 
 /**
  * @brief Graphics data for grid cells (not a base class)
@@ -32,7 +33,7 @@ public:
      * @brief Constructor
      * @param graphics Pointer to the graphics engine
      */
-    explicit GridGraphics(GraphicsEngine* graphics);
+    explicit GridGraphics(GraphicsEngine* graphics, JobManager* jobManager);
     
     /**
      * @brief Destructor - cleans up mesh and resources
@@ -54,13 +55,6 @@ public:
         uint64_t currentTimeStep,
         double approximateRadius);
     
-    void processGraphicsQueue();
-    bool hasGraphicsUpdates() const { return !m_graphicsUpdateQueue.empty(); }
-    
-    // Update queue management
-    void queueCellForUpdate(const glm::ivec3& coord);
-    void queueNeighborsForUpdate(const glm::ivec3& coord);
-    
     // Cell access for other systems
     bool hasGraphicsCell(const glm::ivec3& coord) const;
     GraphicsCell* getGraphicsCell(const glm::ivec3& coord);
@@ -74,7 +68,6 @@ private:
     
     // Graphics cell storage
     std::unordered_map<glm::ivec3, GraphicsCell, IVec3Hash> m_graphicsCells;
-    std::queue<glm::ivec3> m_graphicsUpdateQueue;
     
     // Graphics engine reference
     GraphicsEngine* m_graphics;
@@ -89,6 +82,12 @@ private:
     static std::vector<AssetMeshData> s_faceMeshData;
     static bool s_faceMeshDataLoaded;
     static const FaceTransform s_faceTransforms[6];
+
+    // Job system
+    JobManager* m_jobManager;
+
+    // Track pending jobs for cleanup
+    std::vector<std::weak_ptr<Job>> m_pendingJobs;
     
     // GPU state tracking for optimization
     mutable glm::dvec3 m_lastSentPosition{0.0};
@@ -108,7 +107,13 @@ private:
     static void loadFaceMeshData();
     static glm::dmat4 getFaceTransform(int faceIndex, const glm::ivec3& coord);
     
+    // Job-based graphics operations
+    void removeCellGraphics(const std::vector<std::vector<uint32_t>>& faceTriangleIds);
     void updateCellGraphics(const glm::ivec3& coord);
+    void scheduleNeighborUpdateJobs(const glm::ivec3& coord);
+
+    // Helper to track job handles
+    void trackJob(std::weak_ptr<Job> jobHandle);
     
     bool shouldUpdateGPU(
         const glm::dvec3& cameraPos,

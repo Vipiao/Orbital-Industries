@@ -52,13 +52,10 @@ public:
     // Structural analysis visualization (analysis runs automatically as background job)
     void visualizeStructuralIntegrity();
     
-    // Split graphics update method
+    // Graphics updates
     void updateGraphics(const glm::dvec3& cameraPos);
-    void processGraphicsQueue();
     
-    // Getters for GameBase
     PhysicsEngine::RigidBody* getRigidBody() const { return m_rigidBody; }
-    bool hasGraphicsUpdates() const;
 
     // Convert world coordinates to grid-local coordinates
     glm::dvec3 worldToGrid(const glm::dvec3& worldPos) const;

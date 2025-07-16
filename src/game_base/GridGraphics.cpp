@@ -3,6 +3,7 @@
 #include <iostream>
 #include <set>
 #include <algorithm>
+#include "../game_base/JobPriorities.h"
 
 // Static member initialization
 int GridGraphics::s_colorTextureUnit = -1;
@@ -28,13 +29,17 @@ const GridGraphics::FaceTransform GridGraphics::s_faceTransforms[6] = {
     {glm::dvec3(1, 0, 0), glm::radians(180.0)}
 };
 
-GridGraphics::GridGraphics(GraphicsEngine* graphics) 
-    : m_graphics(graphics), m_meshId(-1) {
+GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager) 
+    : m_graphics(graphics), m_jobManager(jobManager), m_meshId(-1) {
     
     if (!graphics) {
         throw std::runtime_error("GraphicsEngine pointer cannot be null");
     }
     
+    if (!jobManager) {
+        throw std::runtime_error("JobManager pointer cannot be null");
+    }
+
     // Create mesh in graphics engine
     m_meshId = m_graphics->createMesh();
     if (m_meshId < 0) {
@@ -53,6 +58,13 @@ GridGraphics::GridGraphics(GraphicsEngine* graphics)
 }
 
 GridGraphics::~GridGraphics() {
+    // Cancel all pending jobs
+    for (auto& jobHandle : m_pendingJobs) {
+        if (!jobHandle.expired()) {
+            m_jobManager->cancel(jobHandle);
+        }
+    }
+
     // Clean up mesh
     if (m_meshId >= 0) {
         m_graphics->removeMesh(m_meshId);
@@ -94,11 +106,15 @@ void GridGraphics::addCell(const glm::ivec3& coord, CellType type) {
     // Add graphics cell to map
     m_graphicsCells.emplace(coord, GraphicsCell{});
     
-    // Queue this cell for graphics update
-    queueCellForUpdate(coord);
+    // Schedule update job for this cell
+    auto jobHandle = m_jobManager->schedule([this, coord](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        updateCellGraphics(coord);
+        return false; // Job complete
+    }, JobPriorities::GRAPHICS_UPDATE);
+    trackJob(jobHandle);
     
-    // Queue neighbors for potential graphics updates
-    queueNeighborsForUpdate(coord);
+    // Schedule update jobs for neighbors
+    scheduleNeighborUpdateJobs(coord);
 }
 
 void GridGraphics::removeCell(const glm::ivec3& coord) {
@@ -107,42 +123,24 @@ void GridGraphics::removeCell(const glm::ivec3& coord) {
         return; // Cell doesn't exist
     }
     
-    // Remove all face triangles from the mesh
+    // Capture the triangle IDs before removing the cell
+    std::vector<std::vector<uint32_t>> triangleIds(6);
     for (int face = 0; face < 6; face++) {
-        if (!cellIt->second.faceTriangleIds[face].empty()) {
-            m_graphics->m_meshHandler->removeTrianglesFromMesh(
-                m_meshId, &cellIt->second.faceTriangleIds[face]);
-        }
+        triangleIds[face] = cellIt->second.faceTriangleIds[face];
     }
+
+    // Schedule remove job with captured triangle IDs
+    auto jobHandle = m_jobManager->schedule([this, triangleIds](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        removeCellGraphics(triangleIds);
+        return false; // Job complete
+    }, JobPriorities::GRAPHICS_REMOVE);
+    trackJob(jobHandle);
     
-    // Queue neighbors for potential graphics updates before removing the cell
-    queueNeighborsForUpdate(coord);
-    
-    // Remove graphics cell from map
+    // Schedule update jobs for neighbors
+    scheduleNeighborUpdateJobs(coord);
+
+    // Remove graphics cell from map immediately
     m_graphicsCells.erase(coord);
-}
-
-void GridGraphics::queueCellForUpdate(const glm::ivec3& coord) {
-    m_graphicsUpdateQueue.push(coord);
-}
-
-void GridGraphics::queueNeighborsForUpdate(const glm::ivec3& coord) {
-    // Define the 6 neighbor directions (±X, ±Y, ±Z)
-    static const glm::ivec3 neighbors[6] = {
-        {1, 0, 0}, {-1, 0, 0}, 
-        {0, 1, 0}, {0, -1, 0}, 
-        {0, 0, 1}, {0, 0, -1}
-    };
-    
-    // Add each neighbor to the update queue
-    for (int i = 0; i < 6; i++) {
-        glm::ivec3 neighborCoord = coord + neighbors[i];
-        
-        // If the neighbor exists, queue it for update
-        if (hasGraphicsCell(neighborCoord)) {
-            queueCellForUpdate(neighborCoord);
-        }
-    }
 }
 
 bool GridGraphics::hasGraphicsCell(const glm::ivec3& coord) const {
@@ -152,36 +150,6 @@ bool GridGraphics::hasGraphicsCell(const glm::ivec3& coord) const {
 GraphicsCell* GridGraphics::getGraphicsCell(const glm::ivec3& coord) {
     auto it = m_graphicsCells.find(coord);
     return (it != m_graphicsCells.end()) ? &it->second : nullptr;
-}
-
-void GridGraphics::processGraphicsQueue() {
-    // Comparator for std::set to work with glm::ivec3
-    struct IVec3Comparator {
-        bool operator()(const glm::ivec3& a, const glm::ivec3& b) const {
-            if (a.x != b.x) return a.x < b.x;
-            if (a.y != b.y) return a.y < b.y;
-            return a.z < b.z;
-        }
-    };
-    
-    // Process the graphics update queue
-    std::set<glm::ivec3, IVec3Comparator> processed; // To avoid processing the same cell multiple times
-    
-    while (!m_graphicsUpdateQueue.empty()) {
-        glm::ivec3 coord = m_graphicsUpdateQueue.front();
-        m_graphicsUpdateQueue.pop();
-        
-        // Skip if already processed
-        if (processed.find(coord) != processed.end()) {
-            continue;
-        }
-        processed.insert(coord);
-        
-        // Only update if the cell exists
-        if (hasGraphicsCell(coord)) {
-            updateCellGraphics(coord);
-        }
-    }
 }
 
 glm::dmat4 GridGraphics::getFaceTransform(int faceIndex, const glm::ivec3& coord) {
@@ -201,13 +169,43 @@ glm::dmat4 GridGraphics::getFaceTransform(int faceIndex, const glm::ivec3& coord
     return transform;
 }
 
+void GridGraphics::removeCellGraphics(const std::vector<std::vector<uint32_t>>& faceTriangleIds) {
+    // Remove all face triangles from the mesh
+    for (int face = 0; face < 6; face++) {
+        if (!faceTriangleIds[face].empty()) {
+            m_graphics->m_meshHandler->removeTrianglesFromMesh(
+                m_meshId, &faceTriangleIds[face]);
+        }
+    }
+}
+
+void GridGraphics::scheduleNeighborUpdateJobs(const glm::ivec3& coord) {
+    // Define the 6 neighbor directions (±X, ±Y, ±Z)
+    static const glm::ivec3 neighbors[6] = {
+        {1, 0, 0}, {-1, 0, 0}, 
+        {0, 1, 0}, {0, -1, 0}, 
+        {0, 0, 1}, {0, 0, -1}
+    };
+    
+    // Schedule update jobs for each neighbor (job will validate existence before executing)
+    for (int i = 0; i < 6; i++) {
+        glm::ivec3 neighborCoord = coord + neighbors[i];
+        
+        auto jobHandle = m_jobManager->schedule([this, neighborCoord](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+            updateCellGraphics(neighborCoord);
+            return false; // Job complete
+        }, JobPriorities::GRAPHICS_UPDATE);
+        trackJob(jobHandle);
+    }
+}
+
 void GridGraphics::updateCellGraphics(const glm::ivec3& coord) {
     auto it = m_graphicsCells.find(coord);
-    if (it == m_graphicsCells.end()) return;
+    if (it == m_graphicsCells.end()) return; // Cell doesn't exist, job is no-op
     
     GraphicsCell& cell = it->second;
     
-    // First, remove any existing face meshes for this cell
+    // Always remove all existing face meshes for this cell first
     for (int face = 0; face < 6; face++) {
         if (!cell.faceTriangleIds[face].empty()) {
             m_graphics->m_meshHandler->removeTrianglesFromMesh(m_meshId, &cell.faceTriangleIds[face]);
@@ -274,6 +272,16 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord) {
                 m_meshId, &positions, &normals, &tangents, &uvs);
         }
     }
+}
+
+void GridGraphics::trackJob(std::weak_ptr<Job> jobHandle) {
+    // Clean up expired handles periodically to prevent unbounded growth
+    if (m_pendingJobs.size() % 50 == 0) {
+        m_pendingJobs.erase(std::remove_if(m_pendingJobs.begin(), m_pendingJobs.end(),
+            [](const std::weak_ptr<Job>& handle) { return handle.expired(); }), m_pendingJobs.end());
+    }
+    
+    m_pendingJobs.push_back(jobHandle);
 }
 
 bool GridGraphics::shouldUpdateGPU(

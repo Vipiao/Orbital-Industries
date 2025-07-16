@@ -8,6 +8,7 @@
 #include <limits>
 #include <iostream>
 #include "../debug/DebugRenderer.h"
+#include "../game_base/JobPriorities.h"
 
 std::vector<glm::ivec3> GridCell::getConnectedNeighbors() const {
     std::vector<glm::ivec3> neighbors;
@@ -42,7 +43,7 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
     }
 
     // Create graphics subsystem
-    m_gridGraphics = std::make_unique<GridGraphics>(graphics);
+    m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager);
 
     // Create grid collider for the grid
     m_collider = std::make_unique<GridCollider>(position, orientation);
@@ -155,7 +156,7 @@ void Grid::scheduleStructuralAnalysis() {
     // Schedule new analysis job with low priority (don't cancel existing or reset state)
     m_analysisJob = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
         return performStructuralAnalysisUntil(endTime);
-    }, -1); // Priority -1 (background job)
+    }, JobPriorities::STRUCTURAL_ANALYSIS);
 }
 
 void Grid::cancelStructuralAnalysis() {
@@ -293,11 +294,6 @@ void Grid::updateRigidBodyInverses() {
     m_rigidBody->m_colliderOffset = m_centerOfMass;
 }
 
-// Process all queued graphics updates.
-void Grid::processGraphicsQueue() {
-    m_gridGraphics->processGraphicsQueue();
-}
-
 // Convert world coordinates to grid-local coordinates
 glm::dvec3 Grid::worldToGrid(const glm::dvec3& worldPos) const {
     if (!m_rigidBody) {
@@ -367,8 +363,4 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
         currentPhysicsTimeStep,
         getApproximateRadius()
     );
-}
-
-bool Grid::hasGraphicsUpdates() const {
-    return m_gridGraphics->hasGraphicsUpdates();
 }

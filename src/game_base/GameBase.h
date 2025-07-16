@@ -34,6 +34,9 @@ public:
     std::vector<std::unique_ptr<Grid>> m_grids;
     TimeHandler* m_timeHandler;
 
+    // Track pending jobs for cleanup
+    std::vector<std::weak_ptr<Job>> m_pendingJobs;
+
     // Debug support
     void setDebugRenderer(DebugRenderer* debugRenderer);
     DebugRenderer* getDebugRenderer() const { return m_debugRenderer; }
@@ -47,7 +50,9 @@ protected:
     virtual void processInput();
     virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     virtual void update(double deltaTime);
-    virtual void processGridGraphicsUpdates();
+
+    // Helper to track job handles
+    void trackJob(std::weak_ptr<Job> jobHandle);
     
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;

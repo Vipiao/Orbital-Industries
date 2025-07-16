@@ -17,6 +17,8 @@ class MyGame : public GameBase {
 private:
     std::unique_ptr<DebugVisualization> m_debugViz;
     glm::dvec3 m_cameraVelocity{0.0, 0.0, 0.0}; // Camera tracking velocity
+    // Keep debug guard alive for the lifetime of the game
+    DebugRendererGuard m_debugGuard;
 public:
     MyGame(TimeHandler* timeHandler, 
            GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
@@ -25,8 +27,8 @@ public:
         // Create debug visualization system
         setupDebugVisualization();
 
-        // Set global debug renderer
-        DebugGlobals::setDebugRenderer(m_debugViz.get());
+        // Set global debug renderer with RAII guard  
+        m_debugGuard = DebugGlobals::setDebugRenderer(m_debugViz.get());
 
         // Set up initial camera position and orientation
         m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
@@ -38,6 +40,8 @@ public:
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
+        PhysicsEngine::RigidBody* bb = initialGrid->getRigidBody();
+        //bb->m_angularVelocity = {0.01,0,0};
         //addGridBlock(initialGrid, 0, 0, 0);  // Center block
         //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
         //addGridBlock(initialGrid, 2, 0, 0);  // Block to the right right
@@ -195,7 +199,7 @@ protected:
             
             // Camera position and direction
             glm::dvec3 startPos = m_graphicsEngine->m_camPos;
-            glm::dvec3 endPos = startPos + forward * 10.0; // Cast ray 10 units forward
+            glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 10 units forward
             
             // Check all grids for ray intersections
             for (const auto& gridPtr : m_grids) {

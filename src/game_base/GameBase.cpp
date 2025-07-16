@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include "../utils/PartitionCalculator.h"
+#include "../game_base/JobPriorities.h"
 
 GameBase::GameBase(
     int screenWidth, int screenHeight, const std::string& windowTitle,
@@ -45,6 +46,13 @@ GameBase::GameBase(
 }
 
 GameBase::~GameBase() {
+    // Cancel all pending jobs
+    for (auto& jobHandle : m_pendingJobs) {
+        if (!jobHandle.expired()) {
+            m_jobManager->cancel(jobHandle);
+        }
+    }
+
     m_grids.clear();
     
     if (m_graphicsEngine) {
@@ -217,9 +225,10 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     // Schedule physics job if needed
     if (currentTime >= m_nextPhysicsTime) {
         // Schedule physics as a high-priority job
-        m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
+        auto jobHandle = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
             return updatePhysics(endTime);
-        }, 0); // Priority 0 (high priority)
+        }, JobPriorities::PHYSICS_UPDATE);
+        trackJob(jobHandle);
         //updatePhysics(currentTime + std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
         //    std::chrono::duration<double>(9999.9)));
         
@@ -228,8 +237,6 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     }
     
     update(deltaTime);
-
-    processGridGraphicsUpdates();
     
     for (auto& grid : m_grids) {
         grid->updateGraphics(m_graphicsEngine->m_camPos);
@@ -300,10 +307,12 @@ void GameBase::update(double deltaTime) {
     // Override in derived classes for game-specific logic
 }
 
-void GameBase::processGridGraphicsUpdates() {
-    for (auto& grid : m_grids) {
-        if (grid->hasGraphicsUpdates()) {
-            grid->processGraphicsQueue();
-        }
+void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
+    // Clean up expired handles periodically to prevent unbounded growth
+    if (m_pendingJobs.size() % 20 == 0) {
+        m_pendingJobs.erase(std::remove_if(m_pendingJobs.begin(), m_pendingJobs.end(),
+            [](const std::weak_ptr<Job>& handle) { return handle.expired(); }), m_pendingJobs.end());
     }
+    
+    m_pendingJobs.push_back(jobHandle);
 }
