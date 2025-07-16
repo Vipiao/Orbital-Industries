@@ -5,6 +5,7 @@
 #include "../utils/JobManager.h"
 #include "../physics/PhysicsEngine.h"
 #include "../utils/TimeHandler.h"
+#include "../utils/HashFunctions.h"
 #include "Grid.h"
 #include <vector>
 #include <memory>
@@ -25,8 +26,8 @@ public:
     void removeGrid(Grid* grid);
     void run();
 
-    // Grid partitioning/splitting
-    std::vector<Grid*> checkAndSplitGrid(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
+    // Grid partitioning/splitting - now deferred
+    void scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
@@ -53,12 +54,17 @@ protected:
 
     // Helper to track job handles
     void trackJob(std::weak_ptr<Job> jobHandle);
+
+private:
+    // Deferred grid splitting
+    std::unordered_map<Grid*, std::unordered_set<glm::ivec3, IVec3Hash>> m_pendingGridSplits;
+    void handlePendingSplits();
+    void performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
     double m_physicsTimeStep{}; // Is set in constructor.
 
-private:
     DebugRenderer* m_debugRenderer = nullptr;
 };
 

@@ -83,11 +83,46 @@ void GameBase::removeGrid(Grid* grid) {
         });
     
     if (it != m_grids.end()) {
+        // Remove any pending split operations for this grid
+        auto pendingIt = m_pendingGridSplits.find(grid);
+        if (pendingIt != m_pendingGridSplits.end()) {
+            m_pendingGridSplits.erase(pendingIt);
+        }
         m_grids.erase(it);
     }
 }
 
-std::vector<Grid*> GameBase::checkAndSplitGrid(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
+void GameBase::scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
+    if (!sourceGrid || edgeCoords.empty()) {
+        return;
+    }
+    
+    // Add edge coordinates to pending splits, automatically deduplicating
+    auto& pendingEdges = m_pendingGridSplits[sourceGrid];
+    pendingEdges.insert(edgeCoords.begin(), edgeCoords.end());
+}
+
+void GameBase::handlePendingSplits() {
+    if (m_pendingGridSplits.empty()) {
+        return;
+    }
+    
+    // Process all pending splits
+    for (const auto& pair : m_pendingGridSplits) {
+        Grid* sourceGrid = pair.first;
+        const auto& edgeCoords = pair.second;
+        
+        // Convert unordered_set back to vector for the analysis function
+        std::vector<glm::ivec3> edgeVector(edgeCoords.begin(), edgeCoords.end());
+        
+        performGridSplit(sourceGrid, edgeVector);
+    }
+    
+    // Clear all pending splits
+    m_pendingGridSplits.clear();
+}
+
+void GameBase::performGridSplit(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
     std::vector<Grid*> newGrids;
 
     struct PartitionPhysics {
@@ -97,7 +132,7 @@ std::vector<Grid*> GameBase::checkAndSplitGrid(Grid* sourceGrid, const std::vect
     };
     
     if (!sourceGrid || edgeCoords.empty()) {
-        return newGrids;
+        return;
     }
     
     // Step 1: Analyze partitions using PartitionCalculator
@@ -111,7 +146,7 @@ std::vector<Grid*> GameBase::checkAndSplitGrid(Grid* sourceGrid, const std::vect
     
     // Step 2: If no split detected, return empty vector
     if (!result.hasSplit || result.partitions.size() <= 1) {
-        return newGrids;
+        return;
     }
     
     std::cout << "Grid split detected! " << result.partitions.size() << " partitions found." << std::endl;
@@ -204,8 +239,6 @@ std::vector<Grid*> GameBase::checkAndSplitGrid(Grid* sourceGrid, const std::vect
     }
     
     std::cout << "Created " << newGrids.size() << " new grids from split" << std::endl;
-    
-    return newGrids;
 }
 
 void GameBase::run() {
@@ -295,6 +328,9 @@ void GameBase::processInput() {
 }
 
 bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    // Handle any pending grid splits before running physics
+    handlePendingSplits();
+
     // Apply drag to all objects before running physics
     // (move existing drag code from MyGame here if you want)
     

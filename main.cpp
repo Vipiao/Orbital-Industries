@@ -305,14 +305,10 @@ protected:
                     glm::ivec3(hitPos.x, hitPos.y, hitPos.z - 1)   // -Z
                 };
                 
-                std::vector<Grid*> newGrids = checkAndSplitGrid(targetGrid, edgeCoords);
-                if (!newGrids.empty()) {
-                    std::cout << "Grid split into " << (newGrids.size() + 1) << " pieces!" << std::endl;
-                    // Optional: Apply some separation forces to the fragments
-                    for (Grid* fragment : newGrids) {
-                        // Could add small random forces here to separate fragments visually
-                    }
-                }
+                // Schedule the grid split check for later processing
+                scheduleGridSplitCheck(targetGrid, edgeCoords);
+                std::cout << "Scheduled grid split check for removed block at (" 
+                          << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
 
                     // Check if the grid is now empty and remove it if so
                     if (targetGrid->isEmpty()) {
@@ -407,7 +403,7 @@ protected:
             PhysicsEngine::RigidBody* body = grid->getRigidBody();
             if (body && !body->m_isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
-                const double dragCoefficient = 0.04 * 0.;
+                const double dragCoefficient = 0.04 * 0.2;
                 
                 // Apply drag to linear velocity
                 if (glm::length(body->m_velocity) > 0.0) {
