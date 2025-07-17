@@ -318,10 +318,6 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     }
     
     update(deltaTime);
-    
-    for (auto& grid : m_grids) {
-        grid->updateGraphics(m_graphicsEngine->m_camPos);
-    }
 
     // Process jobs with remaining frame time
     double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->m_frameRate);
@@ -385,7 +381,18 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
     // (move existing drag code from MyGame here if you want)
     
     // Run physics engine
-    return m_physicsEngine->runUntil(endTime);
+    bool needsMoreTime = m_physicsEngine->runUntil(endTime);
+    if (needsMoreTime)
+    {
+        return true;
+    }
+    
+    // Update graphics only when physics step is complete
+    for (auto& grid : m_grids) {
+        grid->updateGraphics(m_graphicsEngine->m_camPos);
+    }
+    
+    return false;
 }
 
 void GameBase::update(double deltaTime) {
