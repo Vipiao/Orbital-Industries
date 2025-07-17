@@ -319,9 +319,7 @@ std::vector<glm::ivec3> Grid::gridTraversal(glm::dvec3 startPos, glm::dvec3 endP
 
 double Grid::getApproximateRadius() const {
     if (m_collider && !m_collider->getCells().empty()) {
-        // Use the collider's bounding box to estimate radius
-        // Force an AABB update to get current bounds
-        m_collider->updateTransformAndAABB();
+        // Use the collider's bounding box to estimate radius (AABB already updated by collision detector)
         
         glm::dvec3 bboxSize = m_collider->m_AABBMax - m_collider->m_AABBMin;
         // Use half the maximum dimension as approximate radius

@@ -326,8 +326,12 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
             std::chrono::duration<double>(targetFrameDuration));
     
     // Calculate end time with 1ms safety margin
-    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
+    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(3);
     m_jobManager->work(jobEndTime);
+
+    if(m_timeHandler->now() >= targetFrameEnd) {
+        std::cout << "Frame drop" << std::endl;
+    }
 }
 
 void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
