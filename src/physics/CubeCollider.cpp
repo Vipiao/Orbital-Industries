@@ -45,18 +45,21 @@ bool CubeCollider::checkAABBCollision(const Collider* other) const {
 
 void CubeCollider::updateCachedVertices() {
     double halfWidth = m_width * 0.5;
-    std::vector<glm::dvec3> localVertices = {
+
+    // Pre-allocate vertices array to avoid repeated allocations
+    if (m_cachedVertices.size() != 8) {
+        m_cachedVertices.resize(8);
+    }
+    
+    static const glm::dvec3 localVertices[8] = {
         {-halfWidth, -halfWidth, -halfWidth}, { halfWidth, -halfWidth, -halfWidth},
         { halfWidth,  halfWidth, -halfWidth}, {-halfWidth,  halfWidth, -halfWidth},
         {-halfWidth, -halfWidth,  halfWidth}, { halfWidth, -halfWidth,  halfWidth},
         { halfWidth,  halfWidth,  halfWidth}, {-halfWidth,  halfWidth,  halfWidth}
     };
     
-    m_cachedVertices.clear();
-    m_cachedVertices.reserve(8);
-    
-    for (const glm::dvec3& localVertex : localVertices) {
-        m_cachedVertices.push_back(m_position + m_orientation * localVertex);
+    for (int i = 0; i < 8; ++i) {
+        m_cachedVertices[i] = m_position + m_orientation * localVertices[i];
     }
 }
 

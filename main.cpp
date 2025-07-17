@@ -16,7 +16,6 @@ DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 class MyGame : public GameBase {
 private:
     std::unique_ptr<DebugVisualization> m_debugViz;
-    glm::dvec3 m_cameraVelocity{0.0, 0.0, 0.0}; // Camera tracking velocity
     // Keep debug guard alive for the lifetime of the game
     DebugRendererGuard m_debugGuard;
 public:
@@ -168,10 +167,6 @@ protected:
         glm::dvec3 forward = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 up = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
 
-        // Integrate camera position using tracked velocity
-        if (glm::length(m_cameraVelocity) > 0.0) {
-            m_graphicsEngine->m_camPos += m_cameraVelocity * (32.0 / (double)m_graphicsEngine->m_frameRate);
-        }
         // Structural analysis with G key
         if (keyboard->m_g.justPressed()) {
             std::cout << "Visualizing structural analysis on " << m_grids.size() << " grids..." << std::endl;
@@ -242,16 +237,12 @@ protected:
                     PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
                     if (body) {
                         // Set camera velocity to match the rigid body's velocity
-                        m_cameraVelocity = body->m_velocity;
-                        std::cout << "Tracking speed of rigid body: (" 
-                                  << m_cameraVelocity.x << ", " 
-                                  << m_cameraVelocity.y << ", " 
-                                  << m_cameraVelocity.z << ")" << std::endl;
+                        //m_cameraVelocity = body->m_velocity;
                     }
                 } else {
                     // No target found, stop tracking
-                    m_cameraVelocity = glm::dvec3(0.0, 0.0, 0.0);
-                    std::cout << "No target found for speed tracking - camera velocity reset" << std::endl;
+                    //m_cameraVelocity = glm::dvec3(0.0, 0.0, 0.0);
+                    //std::cout << "No target found for speed tracking - camera velocity reset" << std::endl;
                 }
             }
             if (doForce) {
