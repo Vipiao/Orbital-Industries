@@ -10,6 +10,7 @@
 #include <iostream>
 #include "../debug/DebugGlobals.h"
 #include "../debug/DebugRenderer.h"
+#include "../utils/PairCache.h"
 
 CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collider* colliderB) {
     int typeA = colliderA->getTypeId();
@@ -175,7 +176,8 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
 }
 
 CollisionResult CollisionDetectionUtils::detectCubeCube(
-    CubeCollider* cubeA, CubeCollider* cubeB) {
+    CubeCollider* cubeA, CubeCollider* cubeB,
+    bool useSimplifiedContactGeneration) {
 
     // Update accurate AABBs for precise collision detection
     cubeA->updateAdvancedAABB();
@@ -208,11 +210,11 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
 
     // Try cached axis first
     glm::dvec3 cachedAxis;
-    if (cubeA->getCachedAxis(cubeB, cachedAxis)) {
+    if (PairCache<glm::dvec3>::getCachedData(cubeA, cubeB, cachedAxis)) {
         SeparatingAxisResult result = testSeparatingAxis(cachedAxis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis again (it worked!)
-            cubeA->setCachedAxis(cubeB, cachedAxis);
+            PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, cachedAxis);
             return CollisionResult();
         }
     }
@@ -222,7 +224,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            cubeA->setCachedAxis(cubeB, glm::normalize(axis));
+            PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, glm::normalize(axis));
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -236,7 +238,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            cubeA->setCachedAxis(cubeB, glm::normalize(axis));
+            PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, glm::normalize(axis));
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -259,7 +261,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
             SeparatingAxisResult result = testSeparatingAxis(crossProduct, verticesA, verticesB);
             if (result.isSeparating) {
                 // Cache this separating axis
-                cubeA->setCachedAxis(cubeB, crossProduct);
+                PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, crossProduct);
                 return CollisionResult();
             }
             if (result.penetration < minPenetration) {
@@ -295,7 +297,13 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         }
     }
 
-    // Generate contact points
+    // Early return for simplified contact generation
+    if (useSimplifiedContactGeneration) {
+        glm::dvec3 contactPoint = (cubeA->m_position + cubeB->m_position) * 0.5;
+        return CollisionResult(true, collisionNormal, contactPoint, minPenetration, cubeA, cubeB);
+    }
+
+    // Generate contact points (full complexity)
     ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration);
     
     // Create collision result
@@ -471,6 +479,15 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     if (cellsA.empty() || cellsB.empty()) {
         return CollisionResult();
     }
+
+    // Check cached contact point count from previous iteration
+    int cachedContactCount = 0;
+    bool hasCachedData = PairCache<int>::getCachedData(gridA, gridB, cachedContactCount);
+    //hasCachedData = false;
+
+    // Use simplified contact generation if previous iteration had too many contact points
+    const int CONTACT_COMPLEXITY_THRESHOLD = 16;
+    bool useSimplifiedContactGeneration = hasCachedData && cachedContactCount > CONTACT_COMPLEXITY_THRESHOLD;
     
     // Choose the smaller grid as the query grid for optimization
     const GridCollider* queryGrid;
@@ -516,7 +533,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             }
             
             // Perform detailed collision detection with correct order
-            CollisionResult result = detectCubeCube(queryCollider, targetCollider);
+            CollisionResult result = detectCubeCube(queryCollider, targetCollider, 
+                                                   useSimplifiedContactGeneration);
             
             if (result.m_hasCollision) {
                 // Add all collision data to our result, flipping normals if needed
@@ -531,6 +549,9 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
+        // Cache the contact point count before reduction for next iteration
+        int contactCountBeforeReduction = static_cast<int>(allContactPoints.size());
+        PairCache<int>::setCachedData(gridA, gridB, contactCountBeforeReduction);
         CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, 
                                gridA, gridB);
         
@@ -538,10 +559,22 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
             reduceContactPoints(result);
         }
+
+        // Debug visualization of contact points
+        //if (DebugGlobals::getDebugRenderer()) {
+        //    DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("contact_point_");
+        //    for (size_t i = 0; i < result.m_contactPoints.size(); ++i) {
+        //        std::string sphereName = "contact_point_" + std::to_string(i);
+        //        DebugGlobals::getDebugRenderer()->createSphere(sphereName, result.m_contactPoints[i], 0.1);
+        //    }
+        //}
         
         return result;
     }
     
+    // No collision detected - cache 0 contact points
+    PairCache<int>::setCachedData(gridA, gridB, 0);
+
     return CollisionResult();
 }
 

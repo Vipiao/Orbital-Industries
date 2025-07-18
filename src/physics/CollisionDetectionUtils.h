@@ -30,7 +30,8 @@ public:
     
     // Cube-Cube collision
     static CollisionResult detectCubeCube(
-        CubeCollider* cubeA, CubeCollider* cubeB);
+        CubeCollider* cubeA, CubeCollider* cubeB,
+        bool useSimplifiedContactGeneration = false);
     
     // Ball-Grid collision
     static CollisionResult detectBallGrid(

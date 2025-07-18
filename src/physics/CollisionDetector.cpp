@@ -2,6 +2,7 @@
 #include "CollisionDetector.h"
 #include "CollisionDetectionUtils.h"
 #include <algorithm>
+#include "../utils/PairCache.h"
 #include <iostream>
 
 void CollisionDetector::addCollider(Collider* collider) {
@@ -64,6 +65,11 @@ void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
     auto it = m_activeAABBS.begin();
     while (it != m_activeAABBS.end()) {
         if (!it->first->checkAABBCollision(it->second)) {
+            // Clear cached data for this collider pair since they're no longer colliding
+            PairCache<glm::dvec3>::clearCachedData(it->first, it->second);  // SAT axes
+            PairCache<int>::clearCachedData(it->first, it->second);         // Contact counts
+            
+            // Remove from active collisions
             it = m_activeAABBS.erase(it);
         } else {
             ++it;

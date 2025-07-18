@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <vector>
+#include <iostream>
 #include "HashFunctions.h"
 
 /**
@@ -66,6 +67,16 @@ public:
         s_globalCache[cacheKey] = info;
     }
 
+    /**
+     * @brief Clear cached data for a specific pair of objects
+     * @param objA First object pointer (used as cache key)
+     * @param objB Second object pointer (used as cache key)
+     */
+    static void clearCachedData(const void* objA, const void* objB) {
+        auto cacheKey = makeCacheKey(objA, objB);
+        s_globalCache.erase(cacheKey);
+    }
+
 private:
     struct CachedInfo {
         DataType data;           // The cached data
@@ -81,6 +92,8 @@ private:
     }
     
     static void evictOldestCacheEntries() {
+        std::cout << "Warning: PairCache eviction triggered for cache size " 
+                  << s_globalCache.size() << " (max: " << MAX_CACHE_SIZE << ")" << std::endl;
         if (s_globalCache.size() < EVICT_COUNT) {
             s_globalCache.clear();
             return;
@@ -105,8 +118,8 @@ private:
     // Static access counter per template instantiation
     static uint64_t s_accessCounter;
     static std::unordered_map<std::pair<uintptr_t, uintptr_t>, CachedInfo, UintPtrPairHash> s_globalCache;
-    static constexpr size_t MAX_CACHE_SIZE = 40;
-    static constexpr size_t EVICT_COUNT = 26; // 3x3x3-1 Completely surrounded by cubes
+    static constexpr size_t MAX_CACHE_SIZE = 1000;
+    static constexpr size_t EVICT_COUNT = 100;
 };
 
 // Static member definitions

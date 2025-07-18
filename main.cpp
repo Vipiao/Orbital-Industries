@@ -40,7 +40,7 @@ public:
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
         PhysicsEngine::RigidBody* bb = initialGrid->getRigidBody();
-        //bb->m_angularVelocity = {0.01,0,0};
+        //bb->m_velocity = {0.0,0.0,-0.01};
         //addGridBlock(initialGrid, 0, 0, 0);  // Center block
         //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
         //addGridBlock(initialGrid, 2, 0, 0);  // Block to the right right
@@ -52,65 +52,65 @@ public:
         //addGridBlock(initialGrid, 0, -2, -2);
         //addGridBlock(initialGrid, 0, -2, -1);
         //addGridBlock(initialGrid, -1, 0, -2);
-        for (int ll = 0; ll < 2; ll++) {
-            for (int ii = -3; ii < 4; ii++)
-            {
-                for (int jj = -3; jj < 4; jj++)
-                {
-                    
-                    for (int kk = -3; kk < 4; kk++)
-                    {
-                        addGridBlock(initialGrid, ii + ll*10, jj, kk);
-                    }
-                }
-            }
-            for (int ii = -2; ii < 3; ii++)
-            {
-                for (int jj = -2; jj < 3; jj++)
-                {
-                    
-                    for (int kk = -2; kk < 3; kk++)
-                    {
-                        removeGridBlock(initialGrid, ii + ll*10, jj, kk);
-                    }
-                }
-            }
-        }
-        for (int ii = 4; ii < 7; ii++)
-        {
-            for (int jj = -1; jj < 2; jj++)
-            {
-                
-                for (int kk = -2; kk < 2; kk++)
-                {
-                    addGridBlock(initialGrid, ii, jj, kk);
-                }
-            }
-        }
-        for (int ii = 4-1; ii < 7+1; ii++)
-        {
-            for (int jj = -1+1; jj < 2-1; jj++)
-            {
-                
-                for (int kk = -2+1; kk < 2-1; kk++)
-                {
-                    removeGridBlock(initialGrid, ii, jj, kk);
-                }
-            }
-        }
-        // Ground.
-        //int size{ 2 };
-        //for (int ii = -size; ii < size; ii++)
-        //{
-        //    for (int jj = -size; jj < size; jj++)
+        //for (int ll = 0; ll < 2; ll++) {
+        //    for (int ii = -3; ii < 4; ii++)
         //    {
-        //        for (int kk = -3; kk < -2; kk++)
+        //        for (int jj = -3; jj < 4; jj++)
         //        {
-        //            addGridBlock(initialGrid, ii, jj, kk);
-        //            std::cout << ii << std::endl;
+        //            
+        //            for (int kk = -3; kk < 4; kk++)
+        //            {
+        //                addGridBlock(initialGrid, ii + ll*10, jj, kk);
+        //            }
+        //        }
+        //    }
+        //    for (int ii = -2; ii < 3; ii++)
+        //    {
+        //        for (int jj = -2; jj < 3; jj++)
+        //        {
+        //            
+        //            for (int kk = -2; kk < 3; kk++)
+        //            {
+        //                removeGridBlock(initialGrid, ii + ll*10, jj, kk);
+        //            }
         //        }
         //    }
         //}
+        //for (int ii = 4; ii < 7; ii++)
+        //{
+        //    for (int jj = -1; jj < 2; jj++)
+        //    {
+        //        
+        //        for (int kk = -2; kk < 2; kk++)
+        //        {
+        //            addGridBlock(initialGrid, ii, jj, kk);
+        //        }
+        //    }
+        //}
+        //for (int ii = 4-1; ii < 7+1; ii++)
+        //{
+        //    for (int jj = -1+1; jj < 2-1; jj++)
+        //    {
+        //        
+        //        for (int kk = -2+1; kk < 2-1; kk++)
+        //        {
+        //            removeGridBlock(initialGrid, ii, jj, kk);
+        //        }
+        //    }
+        //}
+        // Ground.
+        int size{ 50 };
+        for (int ii = -size; ii < size; ii++)
+        {
+            for (int jj = -size; jj < size; jj++)
+            {
+                for (int kk = -3; kk < -2; kk++)
+                {
+                    addGridBlock(initialGrid, ii, jj, kk);
+                    std::cout << ii << std::endl;
+                }
+            }
+        }
         
         //Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         //addGridBlock(gg, 0, 0, 0);  // Center block
@@ -402,7 +402,7 @@ protected:
             PhysicsEngine::RigidBody* body = grid->getRigidBody();
             if (body && !body->m_isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
-                const double dragCoefficient = 0.04 * 0.2;
+                const double dragCoefficient = 0.04 * 0.4;
                 
                 // Apply drag to linear velocity
                 if (glm::length(body->m_velocity) > 0.0) {
