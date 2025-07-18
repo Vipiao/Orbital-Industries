@@ -495,7 +495,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         glm::dvec3 targetSpaceCenter = targetGrid->worldToGrid(queryCellCenter);
 
         const double gridCellHalfDiagonal = 0.5 * std::sqrt(3.0);
-        const double searchRadius = 2.0 * gridCellHalfDiagonal; // Two grid cell half-diagonals
+        const double searchRadius = gridCellHalfDiagonal;
         
         // Find colliders within search area
         std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(targetGrid, queryCellCenter, searchRadius);
