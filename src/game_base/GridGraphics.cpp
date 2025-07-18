@@ -363,7 +363,7 @@ void GridGraphics::updateGraphics(
     if (!shouldUpdateGPU(cameraPos, gridPosition, gridOrientation, currentTimeStep, approximateRadius)) {
         return;
     } else {
-        std::cout << "Updated graphics for " << m_graphicsCells.size() << " cells" << std::endl;
+        //std::cout << "Updated graphics for " << m_graphicsCells.size() << " cells" << std::endl;
     }
     
     glm::dvec3 angVelAxis = gridAngularVelocity;
