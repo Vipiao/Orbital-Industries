@@ -52,6 +52,7 @@ private:
     // Cached local AABB corners (only recalculated when local AABB changes)
     glm::dvec3 m_localCorners[8];
     bool m_cornersDirty = true;
+    bool m_advancedAABBDirty = true;
 
     // Map of grid coordinates to cube colliders
     std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash> m_cells;

@@ -36,9 +36,21 @@ void GridCollider::updateSimpleAABB() {
         m_AABBMin = glm::min(m_AABBMin, worldCorner);
         m_AABBMax = glm::max(m_AABBMax, worldCorner);
     }
+
+    // Mark advanced AABB as dirty since position/orientation may have changed
+    // This happens when the grid collider's transform is updated by the physics system
+    m_advancedAABBDirty = true;
 }
 
 void GridCollider::updateAdvancedAABB() {
+    // Only recalculate if dirty
+    if (!m_advancedAABBDirty) {
+        return;
+    }
+
+    // Mark as clean
+    m_advancedAABBDirty = false;
+
     if (m_cells.empty()) {
         // If no cells, set a minimal AABB
         m_AABBMin = m_position - glm::dvec3(0.1);
