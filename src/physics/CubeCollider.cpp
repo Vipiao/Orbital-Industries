@@ -2,6 +2,7 @@
 #include "CubeCollider.h"
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
+#include <stdexcept>
 
 CubeCollider::CubeCollider(const glm::dvec3& position,
                            const glm::dquat& orientation,
@@ -21,6 +22,36 @@ void CubeCollider::updateSimpleAABB() {
 
     // Mark cached vertices as dirty since position/orientation may have changed
     m_verticesDirty = true;
+    // Mark advanced AABB as dirty since position/orientation may have changed
+    m_advancedAABBDirty = true;
+    // Mark collision axes as dirty since orientation may have changed
+    m_collisionAxesDirty = true;
+}
+
+void CubeCollider::updateAdvancedAABB() {
+    // Only recalculate if dirty
+    if (!m_advancedAABBDirty) {
+        return;
+    }
+
+    std::vector<glm::dvec3> vertices = getVertices();
+    
+    if (vertices.empty()) {
+        throw std::runtime_error("CubeCollider::updateAdvancedAABB: No vertices available for AABB calculation");
+    }
+    
+    // Initialize with first vertex
+    m_AABBMin = vertices[0];
+    m_AABBMax = vertices[0];
+    
+    // Expand to include all vertices
+    for (size_t i = 1; i < vertices.size(); ++i) {
+        m_AABBMin = glm::min(m_AABBMin, vertices[i]);
+        m_AABBMax = glm::max(m_AABBMax, vertices[i]);
+    }
+
+    // Mark as clean
+    m_advancedAABBDirty = false;
 }
 
 bool CubeCollider::checkAABBCollision(const Collider* other) const {
@@ -63,6 +94,15 @@ void CubeCollider::updateCachedVertices() const {
 }
 
 std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> CubeCollider::getCollisionAxes() const {
+    // Lazy calculation - only recalculate if dirty
+    if (m_collisionAxesDirty) {
+        updateCachedCollisionAxes();
+        m_collisionAxesDirty = false;
+    }
+    return m_cachedCollisionAxes;
+}
+
+void CubeCollider::updateCachedCollisionAxes() const {
     std::vector<glm::dvec3> axes = {
         m_orientation * glm::dvec3(1.0, 0.0, 0.0),  // X-axis
         m_orientation * glm::dvec3(0.0, 1.0, 0.0),  // Y-axis
@@ -76,7 +116,7 @@ std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dv
         worldFilterNormals.push_back(m_orientation * filterNormal);
     }
     
-    return {axes, axes, worldFilterNormals}; // For cubes, face axes and edge axes are the same
+    m_cachedCollisionAxes = {axes, axes, worldFilterNormals}; // For cubes, face axes and edge axes are the same
 }
 
 void CubeCollider::addFilterNormal(const glm::dvec3& normal) {
@@ -91,6 +131,9 @@ void CubeCollider::addFilterNormal(const glm::dvec3& normal) {
     // Add normalized filter normal
     glm::dvec3 normalizedNormal = glm::normalize(normal);
     m_filterNormals.push_back(normalizedNormal);
+
+    // Mark collision axes as dirty since filter normals changed
+    m_collisionAxesDirty = true;
 }
 
 void CubeCollider::removeFilterNormal(const glm::dvec3& normal) {
@@ -103,10 +146,16 @@ void CubeCollider::removeFilterNormal(const glm::dvec3& normal) {
         });
     
     m_filterNormals.erase(it, m_filterNormals.end());
+
+    // Mark collision axes as dirty since filter normals changed
+    m_collisionAxesDirty = true;
 }
 
 void CubeCollider::clearFilterNormals() {
     m_filterNormals.clear();
+
+    // Mark collision axes as dirty since filter normals changed
+    m_collisionAxesDirty = true;
 }
 
 const std::vector<glm::dvec3>& CubeCollider::getFilterNormals() const {

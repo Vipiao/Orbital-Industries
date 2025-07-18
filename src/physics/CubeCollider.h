@@ -17,6 +17,7 @@ public:
     // Override base class methods
     virtual int getTypeId() const override { return TYPE_ID; }
     virtual void updateSimpleAABB() override;
+    virtual void updateAdvancedAABB() override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Public member variable
@@ -42,8 +43,12 @@ private:
     // Cached vertices with dirty flag for lazy calculation
     mutable std::vector<glm::dvec3> m_cachedVertices;
     mutable bool m_verticesDirty = true;
+    mutable bool m_advancedAABBDirty = true;
+    mutable std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> m_cachedCollisionAxes;
+    mutable bool m_collisionAxesDirty = true;
     
     void updateCachedVertices() const;
+    void updateCachedCollisionAxes() const;
 
     // Filter normals in local space for collision filtering
     std::vector<glm::dvec3> m_filterNormals;

@@ -176,6 +176,14 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
 
 CollisionResult CollisionDetectionUtils::detectCubeCube(
     CubeCollider* cubeA, CubeCollider* cubeB) {
+
+    // Update accurate AABBs for precise collision detection
+    cubeA->updateAdvancedAABB();
+    cubeB->updateAdvancedAABB();
+    
+    if (!cubeA->checkAABBCollision(cubeB)) {
+        return CollisionResult(); // No collision after precise AABB check
+    }
     
     // Get vertices for both cubes - will use cached vertices
     std::vector<glm::dvec3> verticesA = cubeA->getVertices();
