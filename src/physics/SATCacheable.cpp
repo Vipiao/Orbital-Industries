@@ -6,10 +6,13 @@
 uint64_t SATCacheable::s_accessCounter = 0;
 
 bool SATCacheable::getCachedAxis(const SATCacheable* other, glm::dvec3& axis) const {
+    // Determine canonical cache owner (object with smaller address)
+    const SATCacheable* canonicalOwner = (this < other) ? this : other;
+
     auto cacheKey = makeCacheKey(this, other);
-    auto it = m_separatingAxisCache.find(cacheKey);
+    auto it = canonicalOwner->m_separatingAxisCache.find(cacheKey);
     
-    if (it == m_separatingAxisCache.end()) {
+    if (it == canonicalOwner->m_separatingAxisCache.end()) {
         return false; // No cached entry
     }
     
@@ -23,9 +26,15 @@ bool SATCacheable::getCachedAxis(const SATCacheable* other, glm::dvec3& axis) co
 }
 
 void SATCacheable::setCachedAxis(const SATCacheable* other, const glm::dvec3& axis) {
+    // Determine canonical cache owner (object with smaller address)
+    const SATCacheable* canonicalOwner = (this < other) ? this : other;
+
+    // Get non-const reference to canonical owner's cache
+    auto& canonicalCache = const_cast<SATCacheable*>(canonicalOwner)->m_separatingAxisCache;
+
     // Check if we need to evict old entries
-    if (m_separatingAxisCache.size() >= MAX_CACHE_SIZE) {
-        evictOldestCacheEntries();
+    if (canonicalCache.size() >= MAX_CACHE_SIZE) {
+        const_cast<SATCacheable*>(canonicalOwner)->evictOldestCacheEntries();
     }
     
     auto cacheKey = makeCacheKey(this, other);
@@ -34,7 +43,7 @@ void SATCacheable::setCachedAxis(const SATCacheable* other, const glm::dvec3& ax
     info.axis = axis;
     info.accessOrder = ++s_accessCounter;
     
-    m_separatingAxisCache[cacheKey] = info;
+    canonicalCache[cacheKey] = info;
 }
 
 std::pair<uintptr_t, uintptr_t> SATCacheable::makeCacheKey(const SATCacheable* a, const SATCacheable* b) {

@@ -28,7 +28,7 @@ private:
     // Static access counter (global "time")
     static uint64_t s_accessCounter;
     static constexpr size_t MAX_CACHE_SIZE = 40;
-    static constexpr size_t EVICT_COUNT = 10;
+    static constexpr size_t EVICT_COUNT = 26; // 3x3x3-1 Completely surrounded by cubes
     
     mutable std::unordered_map<std::pair<uintptr_t, uintptr_t>, CachedAxisInfo, UintPtrPairHash> m_separatingAxisCache;
 };
