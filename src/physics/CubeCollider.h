@@ -2,10 +2,10 @@
 #pragma once
 
 #include "Collider.h"
-#include "SATCacheable.h"
+#include "../utils/PairCache.h"
 #include "../utils/HashFunctions.h"
 
-class CubeCollider : public Collider, public SATCacheable {
+class CubeCollider : public Collider {
 public:
     CubeCollider(const glm::dvec3& position = glm::dvec3(0.0),
                  const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
@@ -34,6 +34,14 @@ public:
     void removeFilterNormal(const glm::dvec3& normal);
     void clearFilterNormals();
     const std::vector<glm::dvec3>& getFilterNormals() const;
+
+    // SAT axis caching convenience methods
+    bool getCachedAxis(const CubeCollider* other, glm::dvec3& axis) const {
+        return PairCache<glm::dvec3>::getCachedData(this, other, axis);
+    }
+    void setCachedAxis(const CubeCollider* other, const glm::dvec3& axis) {
+        PairCache<glm::dvec3>::setCachedData(this, other, axis);
+    }
 
     // Type identification
     static constexpr int TYPE_ID = hashColliderName("CubeCollider");
