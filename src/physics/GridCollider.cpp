@@ -252,7 +252,7 @@ void GridCollider::updateLocalCorners() {
     // Expand local AABB by half diagonal of cube to encompass entire cubes
     const double halfDiagonal = std::sqrt(3.0) * 0.5;
     glm::dvec3 expandedMin = glm::dvec3(m_localAABBMin) - glm::dvec3(halfDiagonal);
-    glm::dvec3 expandedMax = glm::dvec3(m_localAABBMax) + glm::dvec3(halfDiagonal);
+    glm::dvec3 expandedMax = glm::dvec3(m_localAABBMax) + glm::dvec3(halfDiagonal) + glm::dvec3(1.0);
     
     m_localCorners[0] = glm::dvec3(expandedMin.x, expandedMin.y, expandedMin.z);
     m_localCorners[1] = glm::dvec3(expandedMax.x, expandedMin.y, expandedMin.z);
