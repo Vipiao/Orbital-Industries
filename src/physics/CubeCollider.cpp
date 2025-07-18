@@ -13,24 +13,14 @@ CubeCollider::CubeCollider(const glm::dvec3& position,
     
 }
 
-void CubeCollider::updateTransformAndAABB() {
-    // First update cached vertices
-    updateCachedVertices();
-    
-    // Calculate AABB by finding min/max of cached vertices
-    if (m_cachedVertices.empty()) {
-        m_AABBMin = m_position - glm::dvec3(m_width * 0.5);
-        m_AABBMax = m_position + glm::dvec3(m_width * 0.5);
-        return;
-    }
-    
-    m_AABBMin = m_cachedVertices[0];
-    m_AABBMax = m_cachedVertices[0];
-    
-    for (const glm::dvec3& vertex : m_cachedVertices) {
-        m_AABBMin = glm::min(m_AABBMin, vertex);
-        m_AABBMax = glm::max(m_AABBMax, vertex);
-    }
+void CubeCollider::updateSimpleAABB() {
+    // Simple AABB using half diagonal of cube
+    double halfDiagonal = m_width * std::sqrt(3.0) * 0.5;
+    m_AABBMin = m_position - glm::dvec3(halfDiagonal);
+    m_AABBMax = m_position + glm::dvec3(halfDiagonal);
+
+    // Mark cached vertices as dirty since position/orientation may have changed
+    m_verticesDirty = true;
 }
 
 bool CubeCollider::checkAABBCollision(const Collider* other) const {
@@ -43,7 +33,16 @@ bool CubeCollider::checkAABBCollision(const Collider* other) const {
             m_AABBMax.z >= other->m_AABBMin.z);
 }
 
-void CubeCollider::updateCachedVertices() {
+std::vector<glm::dvec3> CubeCollider::getVertices() const {
+    // Lazy calculation - only recalculate if dirty
+    if (m_verticesDirty) {
+        updateCachedVertices();
+        m_verticesDirty = false;
+    }
+    return m_cachedVertices;
+}
+
+void CubeCollider::updateCachedVertices() const {
     double halfWidth = m_width * 0.5;
 
     // Pre-allocate vertices array to avoid repeated allocations

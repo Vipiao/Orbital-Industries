@@ -44,6 +44,14 @@ public:
         //addGridBlock(initialGrid, 0, 0, 0);  // Center block
         //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
         //addGridBlock(initialGrid, 2, 0, 0);  // Block to the right right
+        //addGridBlock(initialGrid, 0, -1, -2);
+        //addGridBlock(initialGrid, 0, -1, -1);
+        //addGridBlock(initialGrid, -1, -1, -1);
+        //addGridBlock(initialGrid, -2, -1, -1);
+        //addGridBlock(initialGrid, -2, -1, -2);
+        //addGridBlock(initialGrid, 0, -2, -2);
+        //addGridBlock(initialGrid, 0, -2, -1);
+        //addGridBlock(initialGrid, -1, 0, -2);
         for (int ll = 0; ll < 2; ll++) {
             for (int ii = -3; ii < 4; ii++)
             {
@@ -91,7 +99,7 @@ public:
             }
         }
         // Ground.
-        //int size{ 20 };
+        //int size{ 2 };
         //for (int ii = -size; ii < size; ii++)
         //{
         //    for (int jj = -size; jj < size; jj++)

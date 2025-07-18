@@ -26,7 +26,10 @@ public:
     virtual int getTypeId() const = 0;
     
     // Pure virtual methods that must be implemented by derived classes
-    virtual void updateTransformAndAABB() = 0;
+    virtual void updateSimpleAABB() = 0;
+
+    // Advanced AABB update for precise collision detection (default calls updateSimpleAABB)
+    virtual void updateAdvancedAABB() { updateSimpleAABB(); }
 
     // Axis-aligned bounding box collision detection
     virtual bool checkAABBCollision(const Collider* other) const = 0;

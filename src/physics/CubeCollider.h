@@ -16,14 +16,14 @@ public:
     
     // Override base class methods
     virtual int getTypeId() const override { return TYPE_ID; }
-    virtual void updateTransformAndAABB() override;
+    virtual void updateSimpleAABB() override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Public member variable
     double m_width;
     
-     // Get cached vertices (public so collision detection can access)
-    std::vector<glm::dvec3> getVertices() const { return m_cachedVertices; }
+    // Get cached vertices (public so collision detection can access)
+    std::vector<glm::dvec3> getVertices() const;
 
     // Get collision axes (face axes, edge axes) for SAT collision detection
     std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes() const;
@@ -39,10 +39,11 @@ public:
 
 private:
     
-    // Helper method to update cached vertices
-    void updateCachedVertices();
+    // Cached vertices with dirty flag for lazy calculation
+    mutable std::vector<glm::dvec3> m_cachedVertices;
+    mutable bool m_verticesDirty = true;
     
-    std::vector<glm::dvec3> m_cachedVertices;
+    void updateCachedVertices() const;
 
     // Filter normals in local space for collision filtering
     std::vector<glm::dvec3> m_filterNormals;

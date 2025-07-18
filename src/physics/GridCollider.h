@@ -18,7 +18,8 @@ public:
     
     // Override base class methods
     virtual int getTypeId() const override { return TYPE_ID; }
-    virtual void updateTransformAndAABB() override;
+    virtual void updateSimpleAABB() override;
+    virtual void updateAdvancedAABB() override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Grid-specific methods
@@ -39,6 +40,19 @@ public:
     static constexpr int TYPE_ID = hashColliderName("GridCollider");
 
 private:
+    // Axis counts for efficient AABB calculation
+    std::unordered_map<int, int> m_xAxisCounts;
+    std::unordered_map<int, int> m_yAxisCounts;
+    std::unordered_map<int, int> m_zAxisCounts;
+    
+    // Local integer AABB
+    glm::ivec3 m_localAABBMin{0};
+    glm::ivec3 m_localAABBMax{0};
+
+    // Cached local AABB corners (only recalculated when local AABB changes)
+    glm::dvec3 m_localCorners[8];
+    bool m_cornersDirty = true;
+
     // Map of grid coordinates to cube colliders
     std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash> m_cells;
     
@@ -48,4 +62,7 @@ private:
     // Filter normal management
     void updateFilterNormalsForCell(const glm::ivec3& coord);
     void updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoord);
+
+    // Helper to update cached corners when local AABB changes
+    void updateLocalCorners();
 };

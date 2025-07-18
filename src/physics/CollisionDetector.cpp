@@ -97,7 +97,7 @@ void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
 void CollisionDetector::updateAllCollidersAndAABB() {
     for (Collider* collider : colliders) {
         if (collider) {
-            collider->updateTransformAndAABB();
+            collider->updateSimpleAABB();
         }
     }
 }
@@ -145,6 +145,15 @@ std::pair<Collider*, Collider*> CollisionDetector::makePair(Collider* a, Collide
 
 void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2, std::vector<CollisionResult>& collisions) {
     if (!collider1 || !collider2 || collider1 == collider2) return;
+
+    // Update advanced AABBs for precise collision detection
+    collider1->updateAdvancedAABB();
+    collider2->updateAdvancedAABB();
+    
+    // Do precise AABB test with updated bounds
+    if (!collider1->checkAABBCollision(collider2)) {
+        return; // No collision even with precise AABBs
+    }
     
     // Perform collision detection between the two colliders
     CollisionResult result = CollisionDetectionUtils::collideWith(collider1, collider2);

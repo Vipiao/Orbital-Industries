@@ -12,7 +12,7 @@ BallCollider::BallCollider(const glm::dvec3& position,
     
 }
 
-void BallCollider::updateTransformAndAABB() {
+void BallCollider::updateSimpleAABB() {
     m_AABBMin = m_position - glm::dvec3(m_radius);
     m_AABBMax = m_position + glm::dvec3(m_radius);
 }
