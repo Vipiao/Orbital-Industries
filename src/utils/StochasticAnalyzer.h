@@ -212,12 +212,6 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
             case AnalysisState::ANALYSIS_COMPLETE:
                 return false; // Analysis complete
         }
-        
-        // Check time periodically
-        
-        if (timeHandler.now() >= endTime) {
-            return true; // More work needed
-        }
     }
     
     return true; // Time ran out, more work needed
