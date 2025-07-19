@@ -7,6 +7,7 @@
 #include "HashFunctions.h"
 #include "TimeHandler.h"
 #include "AStar.h"
+#include "Generator.h"
 
 // Cell interface for stochastic analysis
 class IStochasticCell {
@@ -28,7 +29,8 @@ class StochasticAnalyzer {
 public:
     enum class AnalysisState {
         SELECTING_RANDOM_CELLS,
-        PATHFINDING_ASTAR, 
+        PATHFINDING_INIT,
+        PATHFINDING_STEPPING,
         UPDATING_PATH_COSTS,
         ANALYSIS_COMPLETE
     };
@@ -65,6 +67,9 @@ private:
     AnalysisState m_analysisState = AnalysisState::SELECTING_RANDOM_CELLS;
     glm::ivec3 m_selectedStart;
     glm::ivec3 m_selectedEnd;
+
+    // A* generator state
+    std::unique_ptr<Generator<typename AStar<glm::ivec3, IVec3Hash>::Result>> m_astarGenerator;
     std::vector<glm::ivec3> m_foundPath;
     bool m_pathExists = false;
     
@@ -89,6 +94,7 @@ StochasticAnalyzer<CellType>::~StochasticAnalyzer() = default;
 template<typename CellType>
 void StochasticAnalyzer<CellType>::resetAnalysis() {
     m_analysisState = AnalysisState::SELECTING_RANDOM_CELLS;
+    m_astarGenerator.reset(); // Clean up any existing generator
     initializeCostsAndCache(); // Reset all costs to 1 and rebuild cache
 }
 
@@ -141,27 +147,21 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
                     m_selectedEnd = cellPair.second;
                 }
                 
-                m_analysisState = AnalysisState::PATHFINDING_ASTAR;
+                m_analysisState = AnalysisState::PATHFINDING_INIT;
                 break;
                 
-            case AnalysisState::PATHFINDING_ASTAR:
-                // Test connectivity using existing A* implementation
+            case AnalysisState::PATHFINDING_INIT:
+                // Initialize A* generator
                 m_pathExists = false;
                 m_foundPath.clear();
-                extern int hit_count;
-                
-                {
-                    auto pathResult = AStar<glm::ivec3, IVec3Hash>::search(
+                m_astarGenerator = std::make_unique<Generator<typename AStar<glm::ivec3, IVec3Hash>::Result>>(
+                    AStar<glm::ivec3, IVec3Hash>::searchGenerator(
                         m_selectedStart,
-                        [&](const glm::ivec3& node) {
+                        [this](const glm::ivec3& node) {
                             // Goal test - return true when we reach the end
-                            if (node == m_selectedEnd) {
-                                m_pathExists = true;
-                                return true;
-                            }
-                            return false;
+                            return node == m_selectedEnd;
                         },
-                        [&](const glm::ivec3& node, auto callback) {
+                        [this](const glm::ivec3& node, auto callback) {
                             // Neighbor expansion - call callback for each valid neighbor
                             auto cell = getCell(node);
                             if (!cell) {
@@ -176,7 +176,7 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
                                 }
                             });
                         },
-                        [&](const glm::ivec3& node) {
+                        [this](const glm::ivec3& node) {
                             // Heuristic function - Manhattan distance
                             return static_cast<double>(
                                 std::abs(node.x - m_selectedEnd.x) + 
@@ -184,14 +184,32 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
                                 std::abs(node.z - m_selectedEnd.z)
                             );
                         }
-                    );
-                    
-                    if (m_pathExists) {
-                        m_foundPath = pathResult.path;
-                    }
-                }
+                    )
+                );
                 
-                m_analysisState = AnalysisState::UPDATING_PATH_COSTS;
+                // Start the generator
+                ++(*m_astarGenerator);
+                m_analysisState = AnalysisState::PATHFINDING_STEPPING;
+                break;
+                
+            case AnalysisState::PATHFINDING_STEPPING:
+                // Step through A* generator until complete
+                if (*m_astarGenerator) {
+                    ++(*m_astarGenerator);
+                    // Generator is still running, yield control
+                    break;
+                } else {
+                    // Generator finished, get result
+                    auto result = (*m_astarGenerator)();
+                    m_pathExists = result.found;
+                    if (m_pathExists) {
+                        m_foundPath = result.path;
+                    }
+
+                    // Clean up generator
+                    m_astarGenerator.reset();
+                    m_analysisState = AnalysisState::UPDATING_PATH_COSTS;
+                }
                 break;
                 
             case AnalysisState::UPDATING_PATH_COSTS:
@@ -210,7 +228,7 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
     }
     
     return true; // Time ran out, more work needed
- }
+}
 
 template<typename CellType>
 void StochasticAnalyzer<CellType>::incrementPathCosts(const std::vector<glm::ivec3>& path) {

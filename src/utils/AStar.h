@@ -7,6 +7,7 @@
 #include <limits>
 #include <algorithm>
 #include <functional>
+#include "Generator.h"
 
 template<typename Node, typename Hash = std::hash<Node>>
 class AStar {
@@ -19,6 +20,14 @@ public:
     
     template<typename IsTargetF, typename GetNeighborsF, typename HeuristicF>
     static Result search(
+        const Node& start,
+        IsTargetF isTarget,
+        GetNeighborsF getNeighbors,
+        HeuristicF heuristic
+    );
+
+    template<typename IsTargetF, typename GetNeighborsF, typename HeuristicF>
+    static Generator<Result> searchGenerator(
         const Node& start,
         IsTargetF isTarget,
         GetNeighborsF getNeighbors,
@@ -118,6 +127,89 @@ typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
     
     // No path found
     return Result{};
+}
+
+template<typename Node, typename Hash>
+template<typename IsTargetF, typename GetNeighborsF, typename HeuristicF>
+Generator<typename AStar<Node, Hash>::Result> AStar<Node, Hash>::searchGenerator(
+    const Node& start,
+    IsTargetF isTarget,
+    GetNeighborsF getNeighbors,
+    HeuristicF heuristic
+) {
+    std::unordered_map<Node, NodeInfo, Hash> nodeInfo;
+    std::priority_queue<NodeInfo> openQueue;
+    
+    // Step 1: Initialize start node
+    NodeInfo& startInfo = nodeInfo[start];
+    startInfo.node = start;
+    startInfo.gCost = 0.0;
+    startInfo.hCost = heuristic(start);
+    
+    openQueue.push(startInfo);
+    
+    int nodesProcessed = 0;
+    constexpr int YIELD_INTERVAL = 20; // Yield every 20 nodes processed
+    
+    while (!openQueue.empty()) {
+        // Step 2: Get best node from queue
+        NodeInfo current = openQueue.top();
+        openQueue.pop();
+        
+        auto& currentInfo = nodeInfo[current.node];
+        
+        // Skip stale entries (outdated f-cost due to better path found later)
+        if (currentInfo.inClosed || currentInfo.fCost() < current.fCost()) {
+            continue;
+        }
+        
+        // Move to closed set
+        currentInfo.inClosed = true;
+        nodesProcessed++;
+        
+        // Check if target reached
+        if (isTarget(current.node)) {
+            Result result;
+            result.found = true;
+            result.path = reconstructPath(nodeInfo, current.node);
+            result.totalCost = currentInfo.gCost;
+            co_yield result;
+            co_return;
+        }
+        
+        // Step 3: Process neighbors
+        getNeighbors(current.node, [&](const Node& neighbor, double edgeCost) {
+            NodeInfo& neighborInfo = nodeInfo[neighbor];
+            
+            // Skip if already in closed set
+            if (neighborInfo.inClosed) {
+                return;
+            }
+            
+            double tentativeGCost = currentInfo.gCost + edgeCost;
+            
+            // If this is a better path to neighbor
+            if (tentativeGCost < neighborInfo.gCost) {
+                neighborInfo.node = neighbor;
+                neighborInfo.gCost = tentativeGCost;
+                neighborInfo.hCost = heuristic(neighbor);
+                neighborInfo.parent = current.node;
+                neighborInfo.hasParent = true;
+                
+                // Add to queue (old entries will be detected as stale)
+                openQueue.push(neighborInfo);
+            }
+        });
+        
+        // Yield periodically to allow time checking
+        if (nodesProcessed % YIELD_INTERVAL == 0) {
+            co_yield Result{}; // Empty result indicates more work needed
+        }
+    }
+    
+    // No path found
+    co_yield Result{};
+    co_yield Result{};
 }
 
 template<typename Node, typename Hash>
