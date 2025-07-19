@@ -297,14 +297,8 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         }
     }
 
-    // Early return for simplified contact generation
-    if (useSimplifiedContactGeneration) {
-        glm::dvec3 contactPoint = (cubeA->m_position + cubeB->m_position) * 0.5;
-        return CollisionResult(true, collisionNormal, contactPoint, minPenetration, cubeA, cubeB);
-    }
-
     // Generate contact points (full complexity)
-    ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration);
+    ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration, useSimplifiedContactGeneration);
     
     // Create collision result
     CollisionResult result(true, contactInfo.contactPoints.size() > 0 ? 
@@ -657,7 +651,8 @@ CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoi
     const std::vector<glm::dvec3>& verticesA,
     const std::vector<glm::dvec3>& verticesB,
     const glm::dvec3& normal,
-    double penetration) {
+    double penetration,
+    bool useSimplifiedContactGeneration) {
     
     ContactInfo info;
     info.normal = normal;
@@ -717,6 +712,52 @@ CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoi
     
     if (negativeVertices.size() == 1) {
         info.contactPoints.push_back(negativeVertices[0]);
+        return info;
+    }
+
+    // Handle simplified contact generation
+    if (useSimplifiedContactGeneration) {
+        // Calculate average position of collision vertices
+        glm::dvec3 avgPositive(0.0);
+        glm::dvec3 avgNegative(0.0);
+        
+        for (const glm::dvec3& vertex : positiveVertices) {
+            avgPositive += vertex;
+        }
+        avgPositive /= static_cast<double>(positiveVertices.size());
+        
+        for (const glm::dvec3& vertex : negativeVertices) {
+            avgNegative += vertex;
+        }
+        avgNegative /= static_cast<double>(negativeVertices.size());
+        
+        glm::dvec3 center = (avgPositive + avgNegative) * 0.5;
+        const double radius = 0.3;
+        
+        // Choose plane perpendicular to collision normal's largest component
+        if (std::abs(normal.x) > std::abs(normal.y) && std::abs(normal.x) > std::abs(normal.z)) {
+            // Use YZ plane
+            info.contactPoints = {
+                center + glm::dvec3(0.0, radius, 0.0),
+                center + glm::dvec3(0.0, -radius * 0.5, radius * 0.866),
+                center + glm::dvec3(0.0, -radius * 0.5, -radius * 0.866)
+            };
+        } else if (std::abs(normal.y) > std::abs(normal.z)) {
+            // Use XZ plane
+            info.contactPoints = {
+                center + glm::dvec3(radius, 0.0, 0.0),
+                center + glm::dvec3(-radius * 0.5, 0.0, radius * 0.866),
+                center + glm::dvec3(-radius * 0.5, 0.0, -radius * 0.866)
+            };
+        } else {
+            // Use XY plane
+            info.contactPoints = {
+                center + glm::dvec3(radius, 0.0, 0.0),
+                center + glm::dvec3(-radius * 0.5, radius * 0.866, 0.0),
+                center + glm::dvec3(-radius * 0.5, -radius * 0.866, 0.0)
+            };
+        }
+        
         return info;
     }
     

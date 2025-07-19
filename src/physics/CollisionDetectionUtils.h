@@ -90,7 +90,8 @@ private:
         const std::vector<glm::dvec3>& verticesA,
         const std::vector<glm::dvec3>& verticesB,
         const glm::dvec3& normal,
-        double penetration);
+        double penetration,
+        bool useSimplifiedContactGeneration = false);
     
     // Polygon clipping helpers
     static std::vector<glm::dvec2> projectToPlane(
