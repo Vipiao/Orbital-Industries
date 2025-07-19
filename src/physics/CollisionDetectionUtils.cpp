@@ -254,7 +254,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
             
             // Skip nearly parallel edges
             double ll{ glm::length2(crossProduct) };
-            if (ll < 0.01) {
+            if (ll < 0.01) { // Angle ~0.1 radians
                 continue;
             }
             
