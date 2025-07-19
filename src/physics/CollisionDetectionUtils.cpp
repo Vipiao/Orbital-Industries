@@ -253,7 +253,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
             glm::dvec3 crossProduct = glm::cross(axisA, axisB);
             
             // Skip nearly parallel edges
-            if (glm::length2(crossProduct) < 1e-8) {
+            if (glm::length2(crossProduct) < 0.1) {
                 continue;
             }
             
