@@ -44,10 +44,12 @@ private:
         bool inClosed = false;
         
         double fCost() const { return gCost + hCost; }
-        
-        // For priority queue (min-heap)
-        bool operator<(const NodeInfo& other) const {
-            return fCost() > other.fCost();
+    };
+    
+    // Comparator for priority queue with NodeInfo pointers
+    struct NodeInfoComparator {
+        bool operator()(const NodeInfo* a, const NodeInfo* b) const {
+            return a->fCost() > b->fCost(); // Min-heap
         }
     };
     
@@ -66,7 +68,7 @@ typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
     HeuristicF heuristic
 ) {
     std::unordered_map<Node, NodeInfo, Hash> nodeInfo;
-    std::priority_queue<NodeInfo> openQueue;
+    std::priority_queue<NodeInfo*, std::vector<NodeInfo*>, NodeInfoComparator> openQueue;
     
     // Step 1: Initialize start node
     NodeInfo& startInfo = nodeInfo[start];
@@ -74,17 +76,17 @@ typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
     startInfo.gCost = 0.0;
     startInfo.hCost = heuristic(start);
     
-    openQueue.push(startInfo);
+    openQueue.push(&startInfo);
     
     while (!openQueue.empty()) {
         // Step 2: Get best node from queue
-        NodeInfo current = openQueue.top();
+        NodeInfo* current = openQueue.top();
         openQueue.pop();
         
-        auto& currentInfo = nodeInfo[current.node];
+        auto& currentInfo = nodeInfo[current->node];
         
         // Skip stale entries (outdated f-cost due to better path found later)
-        if (currentInfo.inClosed || currentInfo.fCost() < current.fCost()) {
+        if (currentInfo.inClosed || currentInfo.fCost() < current->fCost()) {
             continue;
         }
         
@@ -92,16 +94,16 @@ typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
         currentInfo.inClosed = true;
         
         // Check if target reached
-        if (isTarget(current.node)) {
+        if (isTarget(current->node)) {
             Result result;
             result.found = true;
-            result.path = reconstructPath(nodeInfo, current.node);
+            result.path = reconstructPath(nodeInfo, current->node);
             result.totalCost = currentInfo.gCost;
             return result;
         }
         
         // Step 3: Process neighbors
-        getNeighbors(current.node, [&](const Node& neighbor, double edgeCost) {
+        getNeighbors(current->node, [&](const Node& neighbor, double edgeCost) {
             NodeInfo& neighborInfo = nodeInfo[neighbor];
             
             // Skip if already in closed set
@@ -116,11 +118,11 @@ typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
                 neighborInfo.node = neighbor;
                 neighborInfo.gCost = tentativeGCost;
                 neighborInfo.hCost = heuristic(neighbor);
-                neighborInfo.parent = current.node;
+                neighborInfo.parent = current->node;
                 neighborInfo.hasParent = true;
                 
                 // Add to queue (old entries will be detected as stale)
-                openQueue.push(neighborInfo);
+                openQueue.push(&neighborInfo);
             }
         });
     }
@@ -138,7 +140,7 @@ Generator<typename AStar<Node, Hash>::Result> AStar<Node, Hash>::searchGenerator
     HeuristicF heuristic
 ) {
     std::unordered_map<Node, NodeInfo, Hash> nodeInfo;
-    std::priority_queue<NodeInfo> openQueue;
+    std::priority_queue<NodeInfo*, std::vector<NodeInfo*>, NodeInfoComparator> openQueue;
     
     // Step 1: Initialize start node
     NodeInfo& startInfo = nodeInfo[start];
@@ -146,20 +148,20 @@ Generator<typename AStar<Node, Hash>::Result> AStar<Node, Hash>::searchGenerator
     startInfo.gCost = 0.0;
     startInfo.hCost = heuristic(start);
     
-    openQueue.push(startInfo);
+    openQueue.push(&startInfo);
     
     int nodesProcessed = 0;
     constexpr int YIELD_INTERVAL = 20; // Yield every 20 nodes processed
     
     while (!openQueue.empty()) {
         // Step 2: Get best node from queue
-        NodeInfo current = openQueue.top();
+        NodeInfo* current = openQueue.top();
         openQueue.pop();
         
-        auto& currentInfo = nodeInfo[current.node];
+        auto& currentInfo = nodeInfo[current->node];
         
         // Skip stale entries (outdated f-cost due to better path found later)
-        if (currentInfo.inClosed || currentInfo.fCost() < current.fCost()) {
+        if (currentInfo.inClosed || currentInfo.fCost() < current->fCost()) {
             continue;
         }
         
@@ -168,17 +170,17 @@ Generator<typename AStar<Node, Hash>::Result> AStar<Node, Hash>::searchGenerator
         nodesProcessed++;
         
         // Check if target reached
-        if (isTarget(current.node)) {
+        if (isTarget(current->node)) {
             Result result;
             result.found = true;
-            result.path = reconstructPath(nodeInfo, current.node);
+            result.path = reconstructPath(nodeInfo, current->node);
             result.totalCost = currentInfo.gCost;
             co_yield result;
             co_return;
         }
         
         // Step 3: Process neighbors
-        getNeighbors(current.node, [&](const Node& neighbor, double edgeCost) {
+        getNeighbors(current->node, [&](const Node& neighbor, double edgeCost) {
             NodeInfo& neighborInfo = nodeInfo[neighbor];
             
             // Skip if already in closed set
@@ -193,11 +195,11 @@ Generator<typename AStar<Node, Hash>::Result> AStar<Node, Hash>::searchGenerator
                 neighborInfo.node = neighbor;
                 neighborInfo.gCost = tentativeGCost;
                 neighborInfo.hCost = heuristic(neighbor);
-                neighborInfo.parent = current.node;
+                neighborInfo.parent = current->node;
                 neighborInfo.hasParent = true;
                 
                 // Add to queue (old entries will be detected as stale)
-                openQueue.push(neighborInfo);
+                openQueue.push(&neighborInfo);
             }
         });
         
@@ -209,7 +211,7 @@ Generator<typename AStar<Node, Hash>::Result> AStar<Node, Hash>::searchGenerator
     
     // No path found
     co_yield Result{};
-    co_yield Result{};
+    co_return;
 }
 
 template<typename Node, typename Hash>
