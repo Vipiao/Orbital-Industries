@@ -118,7 +118,7 @@ private:
     // Static access counter per template instantiation
     static uint64_t s_accessCounter;
     static std::unordered_map<std::pair<uintptr_t, uintptr_t>, CachedInfo, UintPtrPairHash> s_globalCache;
-    static constexpr size_t MAX_CACHE_SIZE = 1000;
+    static constexpr size_t MAX_CACHE_SIZE = 4000;
     static constexpr size_t EVICT_COUNT = 100;
 };
 
