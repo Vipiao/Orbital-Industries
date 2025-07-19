@@ -1,4 +1,3 @@
-// AStar.h
 #pragma once
 
 #include <vector>
@@ -9,29 +8,6 @@
 #include <algorithm>
 #include <functional>
 
-/**
- * @brief High-performance A* pathfinding algorithm using callbacks for zero-allocation neighbor processing
- * 
- * Template parameter Node must be:
- * - Copyable
- * - Hashable (Hash functor must be provided)
- * - Equality comparable (operator== must be defined)
- * 
- * Uses callback-based interface for maximum performance - all lambdas are fully inlined.
- * 
- * Example usage:
- * auto result = AStar<glm::ivec3>::search(
- *     start,
- *     [&](const glm::ivec3& node) { return node == target; },
- *     [&](const glm::ivec3& node, auto callback) {
- *         // Call callback(neighbor, cost) for each valid neighbor
- *         for (auto neighbor : getValidNeighbors(node)) {
- *             callback(neighbor, getCost(node, neighbor));
- *         }
- *     },
- *     [&](const glm::ivec3& node) { return heuristic(node, target); }
- * );
- */
 template<typename Node, typename Hash = std::hash<Node>>
 class AStar {
 public:
@@ -41,16 +17,6 @@ public:
         double totalCost = 0.0;
     };
     
-    /**
-     * @brief High-performance A* search with callback-based neighbor processing
-     * 
-     * @param start Starting node
-     * @param isTarget Function that returns true if node is the target: bool(const Node&)
-     * @param getNeighbors Function that calls callback for each neighbor: void(const Node&, auto callback)
-     *                     The callback signature is: void(const Node& neighbor, double cost)
-     * @param heuristic Function that returns estimated cost to target: double(const Node&)
-     * @return Result containing path if found, total cost, and success flag
-     */
     template<typename IsTargetF, typename GetNeighborsF, typename HeuristicF>
     static Result search(
         const Node& start,
@@ -61,20 +27,18 @@ public:
 
 private:
     struct NodeInfo {
+        Node node;
         double gCost = std::numeric_limits<double>::infinity();
         double hCost = 0.0;
-        double fCost() const { return gCost + hCost; }
         Node parent;
         bool hasParent = false;
-    };
-    
-    struct OpenSetItem {
-        Node node;
-        double fCost;
+        bool inClosed = false;
         
-        // For priority queue (max heap), we want smallest fCost first
-        bool operator<(const OpenSetItem& other) const {
-            return fCost > other.fCost;
+        double fCost() const { return gCost + hCost; }
+        
+        // For priority queue (min-heap)
+        bool operator<(const NodeInfo& other) const {
+            return fCost() > other.fCost();
         }
     };
     
@@ -84,7 +48,6 @@ private:
     );
 };
 
-// Template implementation
 template<typename Node, typename Hash>
 template<typename IsTargetF, typename GetNeighborsF, typename HeuristicF>
 typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
@@ -94,61 +57,61 @@ typename AStar<Node, Hash>::Result AStar<Node, Hash>::search(
     HeuristicF heuristic
 ) {
     std::unordered_map<Node, NodeInfo, Hash> nodeInfo;
-    std::unordered_set<Node, Hash> closedSet;
-    std::priority_queue<OpenSetItem> openSet;
+    std::priority_queue<NodeInfo> openQueue;
     
-    // Initialize start node
+    // Step 1: Initialize start node
     NodeInfo& startInfo = nodeInfo[start];
+    startInfo.node = start;
     startInfo.gCost = 0.0;
     startInfo.hCost = heuristic(start);
     
-    openSet.push({start, startInfo.fCost()});
+    openQueue.push(startInfo);
     
-    while (!openSet.empty()) {
-        OpenSetItem current = openSet.top();
-        openSet.pop();
+    while (!openQueue.empty()) {
+        // Step 2: Get best node from queue
+        NodeInfo current = openQueue.top();
+        openQueue.pop();
         
-        // Skip if we've already processed this node
-        if (closedSet.find(current.node) != closedSet.end()) {
+        auto& currentInfo = nodeInfo[current.node];
+        
+        // Skip stale entries (outdated f-cost due to better path found later)
+        if (currentInfo.inClosed || currentInfo.fCost() < current.fCost()) {
             continue;
         }
         
-        // Skip if we found a better path to this node already
-        auto nodeIt = nodeInfo.find(current.node);
-        if (nodeIt != nodeInfo.end() && nodeIt->second.fCost() < current.fCost) {
-            continue;
-        }
+        // Move to closed set
+        currentInfo.inClosed = true;
         
-        // Move current node to closed set
-        closedSet.insert(current.node);
-        
-        // Check if we reached the target
+        // Check if target reached
         if (isTarget(current.node)) {
             Result result;
             result.found = true;
             result.path = reconstructPath(nodeInfo, current.node);
-            result.totalCost = nodeInfo[current.node].gCost;
+            result.totalCost = currentInfo.gCost;
             return result;
         }
         
-        // Process neighbors via callback - zero allocations!
+        // Step 3: Process neighbors
         getNeighbors(current.node, [&](const Node& neighbor, double edgeCost) {
-            // Skip if neighbor is already processed
-            if (closedSet.find(neighbor) != closedSet.end()) {
+            NodeInfo& neighborInfo = nodeInfo[neighbor];
+            
+            // Skip if already in closed set
+            if (neighborInfo.inClosed) {
                 return;
             }
             
-            double tentativeGCost = nodeInfo[current.node].gCost + edgeCost;
-            NodeInfo& neighborInfo = nodeInfo[neighbor];
+            double tentativeGCost = currentInfo.gCost + edgeCost;
             
             // If this is a better path to neighbor
             if (tentativeGCost < neighborInfo.gCost) {
+                neighborInfo.node = neighbor;
                 neighborInfo.gCost = tentativeGCost;
                 neighborInfo.hCost = heuristic(neighbor);
                 neighborInfo.parent = current.node;
                 neighborInfo.hasParent = true;
                 
-                openSet.push({neighbor, neighborInfo.fCost()});
+                // Add to queue (old entries will be detected as stale)
+                openQueue.push(neighborInfo);
             }
         });
     }

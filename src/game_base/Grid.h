@@ -26,12 +26,14 @@ struct GridCell : public IStochasticCell {
     Grid* parentGrid; // Reference to parent grid for neighbor lookup
     double structuralWeakness = -1.0; // Running average structural weakness (-1 = no data yet)
     
+    // Direct neighbor pointers for fast access (Right, Left, Front, Back, Top, Bottom)
+    std::array<GridCell*, 6> neighbors{nullptr};
+    
     GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType = CellType::ARMOR) 
         : coordinates(coords), parentGrid(parent), type(cellType) {}
     
     // Implement IStochasticCell interface
-    virtual std::vector<glm::ivec3> getConnectedNeighbors() const override;
-    virtual bool isValidForPath() const override { return true; } // All grid cells are valid for pathfinding
+    virtual void forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> callback) const override;
 };
 
 class Grid {
@@ -99,6 +101,13 @@ private:
     bool performStructuralAnalysisUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     void scheduleStructuralAnalysis();
     void cancelStructuralAnalysis();
+
+    // Neighbor connection management
+    void updateNeighborConnections(const glm::ivec3& coord);
+    void removeNeighborConnections(const glm::ivec3& coord);
+    
+    // Internal cell access
+    GridCell* getCell(const glm::ivec3& coord);
     
     // Face visibility and mesh management methods
     void recalculateMassAndInertia();

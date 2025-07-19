@@ -10,27 +10,12 @@
 #include "../debug/DebugRenderer.h"
 #include "../game_base/JobPriorities.h"
 
-std::vector<glm::ivec3> GridCell::getConnectedNeighbors() const {
-    std::vector<glm::ivec3> neighbors;
-    
-    // Check all 6 directions
-    static const glm::ivec3 directions[6] = {
-        {1, 0, 0},   // Right
-        {-1, 0, 0},  // Left
-        {0, 1, 0},   // Front
-        {0, -1, 0},  // Back
-        {0, 0, 1},   // Top
-        {0, 0, -1}   // Bottom
-    };
-    
+void GridCell::forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> callback) const {
     for (int i = 0; i < 6; ++i) {
-        glm::ivec3 neighborCoord = coordinates + directions[i];
-        if (parentGrid && parentGrid->hasCell(neighborCoord)) {
-            neighbors.push_back(neighborCoord);
+        if (neighbors[i]) {
+            callback(neighbors[i]->coordinates);
         }
     }
-    
-    return neighbors;
 }
 
 // Updated - Constructor now initializes with physics and graphics references
@@ -98,6 +83,9 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
 
     // Add to graphics subsystem
     m_gridGraphics->addCell(coord, type);
+
+    // Update neighbor connections after all other setup
+    updateNeighborConnections(coord);
     
     // Recalculate center of mass (will automatically choose incremental vs full)
     recalculateMassAndInertiaIncremental({coord});
@@ -111,6 +99,7 @@ void Grid::removeCell(const glm::ivec3& coord) {
     // Cancel existing analysis to prevent accessing deleted cells
     cancelStructuralAnalysis();
 
+    removeNeighborConnections(coord);
     // Recalculate mass and inertia incrementally before removing the cell
     recalculateMassAndInertiaIncremental({coord}, true);
     
@@ -119,12 +108,69 @@ void Grid::removeCell(const glm::ivec3& coord) {
     
     // Remove from graphics subsystem
     m_gridGraphics->removeCell(coord);
+
+    // Remove neighbor connections before removing from map
+    removeNeighborConnections(coord);
     
     // Remove cell from map
     m_cells.erase(coord);
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();
+}
+
+GridCell* Grid::getCell(const glm::ivec3& coord) {
+    auto it = m_cells.find(coord);
+    return (it != m_cells.end()) ? &it->second : nullptr;
+}
+
+void Grid::updateNeighborConnections(const glm::ivec3& coord) {
+    // Direction mapping: Right, Left, Front, Back, Top, Bottom
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0},   // Right  (index 0)
+        {-1, 0, 0},  // Left   (index 1)
+        {0, 1, 0},   // Front  (index 2)
+        {0, -1, 0},  // Back   (index 3)
+        {0, 0, 1},   // Top    (index 4)
+        {0, 0, -1}   // Bottom (index 5)
+    };
+    
+    // Opposite direction mapping
+    static const int oppositeDir[6] = {1, 0, 3, 2, 5, 4};
+    
+    GridCell* cell = getCell(coord);
+    if (!cell) return;
+    
+    // Update this cell's neighbor pointers and update neighbors to point back
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = coord + directions[i];
+        GridCell* neighbor = getCell(neighborCoord);
+        
+        cell->neighbors[i] = neighbor;
+        
+        // If neighbor exists, make it point back to this cell
+        if (neighbor) {
+            neighbor->neighbors[oppositeDir[i]] = cell;
+        }
+    }
+}
+
+void Grid::removeNeighborConnections(const glm::ivec3& coord) {
+    GridCell* cell = getCell(coord);
+    if (!cell) return;
+    
+    // Remove this cell from all its neighbors' pointer arrays
+    for (int i = 0; i < 6; ++i) {
+        GridCell* neighbor = cell->neighbors[i];
+        if (neighbor) {
+            // Find this cell in neighbor's array and set to nullptr
+            for (int j = 0; j < 6; ++j) {
+                if (neighbor->neighbors[j] == cell) {
+                    neighbor->neighbors[j] = nullptr;
+                }
+            }
+        }
+    }
 }
 
 void Grid::visualizeStructuralIntegrity() {
@@ -167,6 +213,10 @@ void Grid::cancelStructuralAnalysis() {
 }
 
 bool Grid::performStructuralAnalysisUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    
+    extern int hit_count;
+    int hh = hit_count;
+    
     // Check if analysis is complete
     if (m_currentAnalysisIteration >= MAX_ANALYSIS_ITERATIONS) {
         return false; // Analysis complete

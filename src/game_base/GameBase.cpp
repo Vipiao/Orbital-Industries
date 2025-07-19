@@ -171,8 +171,12 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     auto result = PartitionCalculator<GridCell>::analyzePartitions(
         &sourceGrid->getCells(),
         edgeCoords,
-        [](const GridCell& cell) {
-            return cell.getConnectedNeighbors();
+        [](const GridCell& cell) -> std::vector<glm::ivec3> {
+            std::vector<glm::ivec3> neighbors;
+            cell.forEachConnectedNeighbor([&](const glm::ivec3& neighbor) {
+                neighbors.push_back(neighbor);
+            });
+            return neighbors;
         }
     );
 
@@ -293,6 +297,8 @@ void GameBase::run() {
     m_graphicsEngine->startRenderLoop();
 }
 
+int hit_count = 0;
+
 void GameBase::preRenderCallback(uint64_t frameNum) {
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
@@ -324,9 +330,11 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     auto targetFrameEnd = currentTime  + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(targetFrameDuration));
+
+    int hh = hit_count++;
     
     // Calculate end time with 1ms safety margin
-    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(3);
+    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
     m_jobManager->work(jobEndTime);
 
     if(m_timeHandler->now() >= targetFrameEnd) {

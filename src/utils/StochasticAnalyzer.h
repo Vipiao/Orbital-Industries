@@ -15,11 +15,8 @@ public:
 
     virtual ~IStochasticCell() = default;
     
-    // Get connected neighbors as positions
-    virtual std::vector<glm::ivec3> getConnectedNeighbors() const = 0;
-    
-    // Check if this cell is valid for pathfinding
-    virtual bool isValidForPath() const = 0;
+    // Call callback for each connected neighbor position
+    virtual void forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> callback) const = 0;
 
     // Default implementations for cost management
     int getCost() const { return cost; }
@@ -100,10 +97,8 @@ void StochasticAnalyzer<CellType>::initializeCostsAndCache() {
     m_costOneCellsCache.clear();
     
     for (auto& [pos, cell] : m_cells) {
-        if (cell.isValidForPath()) {
-            const_cast<CellType&>(cell).setCost(1);
-            m_costOneCellsCache.push_back(pos);
-        }
+        const_cast<CellType&>(cell).setCost(1);
+        m_costOneCellsCache.push_back(pos);
     }
 }
 
@@ -153,6 +148,7 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
                 // Test connectivity using existing A* implementation
                 m_pathExists = false;
                 m_foundPath.clear();
+                extern int hit_count;
                 
                 {
                     auto pathResult = AStar<glm::ivec3, IVec3Hash>::search(
@@ -168,18 +164,17 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
                         [&](const glm::ivec3& node, auto callback) {
                             // Neighbor expansion - call callback for each valid neighbor
                             auto cell = getCell(node);
-                            if (!cell || !cell->isValidForPath()) {
+                            if (!cell) {
                                 return;
                             }
                             
-                            auto neighbors = cell->getConnectedNeighbors();
-                            for (const auto& neighbor : neighbors) {
+                            cell->forEachConnectedNeighbor([&](const glm::ivec3& neighbor) {
                                 auto neighborCell = getCell(neighbor);
-                                if (neighborCell && neighborCell->isValidForPath()) {
+                                if (neighborCell) {
                                     double cost = static_cast<double>(neighborCell->getCost());
                                     callback(neighbor, cost);
                                 }
-                            }
+                            });
                         },
                         [&](const glm::ivec3& node) {
                             // Heuristic function - Manhattan distance
@@ -244,7 +239,7 @@ std::pair<bool, std::pair<glm::ivec3, glm::ivec3>> StochasticAnalyzer<CellType>:
         size_t firstIndex = getRandomIndex(m_costOneCellsCache.size());
         auto cell = getCell(m_costOneCellsCache[firstIndex]);
         
-        if (cell && cell->isValidForPath() && cell->getCost() == 1) {
+        if (cell && cell->getCost() == 1) {
             firstCell = m_costOneCellsCache[firstIndex];
             foundFirst = true;
         } else {
@@ -264,7 +259,7 @@ std::pair<bool, std::pair<glm::ivec3, glm::ivec3>> StochasticAnalyzer<CellType>:
         size_t secondIndex = getRandomIndex(m_costOneCellsCache.size());
         auto cell = getCell(m_costOneCellsCache[secondIndex]);
         
-        if (cell && cell->isValidForPath() && cell->getCost() == 1 && m_costOneCellsCache[secondIndex] != firstCell) {
+        if (cell && cell->getCost() == 1 && m_costOneCellsCache[secondIndex] != firstCell) {
             secondCell = m_costOneCellsCache[secondIndex];
             foundSecond = true;
         } else {
