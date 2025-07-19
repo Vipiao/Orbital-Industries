@@ -1,6 +1,7 @@
 #include "MeshHandler.h"
 
 #include "STBImageLoader.h"
+#include "../math/DekkerArithmetic.h"
 
 #include <iterator>
 #include <iostream>
@@ -538,7 +539,8 @@ void MeshHandler::render(
    GLint frameLoc = glGetUniformLocation(programID, "u_frame");
    GLint timeLoc = glGetUniformLocation(programID, "u_time");
    GLint timeRemainderLoc = glGetUniformLocation(programID, "u_timeRemainder");
-   GLint camPosLoc = glGetUniformLocation(programID, "u_camPos");
+   GLint cameraPosHighLoc = glGetUniformLocation(programID, "u_cameraPositionHigh");
+   GLint cameraPosLowLoc = glGetUniformLocation(programID, "u_cameraPositionLow");
    GLint lightPosLoc = glGetUniformLocation(programID, "u_lightPos");
    
    // Set the uniforms
@@ -556,15 +558,27 @@ void MeshHandler::render(
    
    if (timeRemainderLoc != -1)
        glUniform1f(timeRemainderLoc, (float)timeRemainder);
-   
-   if (camPosLoc != -1) {
-       glm::vec3 camPosFloat(camPos); // Convert double to float
-       glUniform3fv(camPosLoc, 1, glm::value_ptr(camPosFloat));
-   }
+
+  // Set camera position as Dekker number
+  if (cameraPosHighLoc == -1 || cameraPosLowLoc == -1) {
+      throw std::runtime_error("Camera position Dekker uniforms not found in shader");
+  }
+  {
+      using DekkerFloat = DekkerArithmetic<float>;
+      DekkerFloat::DekkerNumber camX(camPos.x);
+      DekkerFloat::DekkerNumber camY(camPos.y);
+      DekkerFloat::DekkerNumber camZ(camPos.z);
+      glm::vec3 camPosHigh(camX.main, camY.main, camZ.main);
+      glm::vec3 camPosLow(camX.error, camY.error, camZ.error);
+      glUniform3fv(cameraPosHighLoc, 1, glm::value_ptr(camPosHigh));
+      glUniform3fv(cameraPosLowLoc, 1, glm::value_ptr(camPosLow));
+  }
    
    if (lightPosLoc != -1) {
-       glm::vec3 lightPosFloat(lightPos); // Convert double to float
-       glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+      // Convert light position to L-space (camera-relative)
+      glm::dvec3 lightPosL = lightPos - camPos;
+      glm::vec3 lightPosFloat(lightPosL); // Convert double to float
+      glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
    }
 
    // Enable depth testing
@@ -611,7 +625,15 @@ void MeshHandler::updateMeshData(
    // "angularVelocity" describes the angular velocity with x,y,z components as a unit vector,
    // and w being the angular velocity.
    MeshData data{};
-   data.position = glm::vec4(*position, 0.);
+
+   // Convert position to Dekker number
+   using DekkerFloat = DekkerArithmetic<float>;
+   DekkerFloat::DekkerNumber posX(position->x);
+   DekkerFloat::DekkerNumber posY(position->y); 
+   DekkerFloat::DekkerNumber posZ(position->z);
+   data.positionHigh = glm::vec4(posX.main, posY.main, posZ.main, 0.0f);
+   data.positionLow = glm::vec4(posX.error, posY.error, posZ.error, 0.0f);
+
    data.velocity = glm::vec4(*velocity, 0.);
    glm::dvec4 orientationVector{ orientation.x, orientation.y, orientation.z, orientation.w };
    data.orientation = orientationVector;

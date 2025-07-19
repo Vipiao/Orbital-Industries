@@ -2,7 +2,8 @@
 
 out vec4 FragColor;
 
-uniform vec3 u_camPos;
+uniform vec3 u_cameraPositionHigh;
+uniform vec3 u_cameraPositionLow;
 uniform sampler2D u_textures[16];
 uniform uint u_time;
 uniform float u_timeRemainder;
@@ -36,10 +37,10 @@ void main() {
       objectColor = vec3(1.0, 1.0, 1.0);
    }
 
-   // Calculate light and view directions
+   // Calculate light and view directions (all in L-space now)
    vec3 lightVec = u_lightPos - vert_pos;
    vec3 lightDir = normalize(lightVec);
-   vec3 viewDir = normalize(u_camPos - vert_pos);
+   vec3 viewDir = normalize(-vert_pos); // Camera is at origin in L-space
    float sqrDist = dot(lightVec, lightVec);
    float attenuation = 32./sqrDist;// + 4./length(lightVec);
    attenuation = 1. - 1./(1+attenuation); // Soft max 1.

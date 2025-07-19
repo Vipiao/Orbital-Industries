@@ -1,16 +1,17 @@
 #version 460 core
 
 struct MeshData {
-   vec4 position;            // Offset= 0, size=16 bytes.
-   vec4 velocity;            // Offset=16, size=16 bytes.
-   vec4 orientation;         // Offset=32, size=16 bytes. Quaternion
-   vec4 angVel;              // Offset=48, size=16 bytes. Unit axis (xyz)
-   vec4 centerOfRotation;    // Offset=64, size=16 bytes.
-   vec4 scale;               // Offset=80, size=16 bytes. (xyz = scale, w = padding)
-   uint time;                // Offset=96, size= 4 bytes.
-   int colorTextureUnit;     // Offset=100, size= 4 bytes. (-1 means no textures)
-   int normalTextureUnit;    // Offset=104, size= 4 bytes. (-1 means no textures)
-   uint padding2;            // Offset=108, size= 4 bytes. (padding)
+   vec4 positionHigh;        // Offset= 0, size=16 bytes.
+   vec4 positionLow;         // Offset=16, size=16 bytes.
+   vec4 velocity;            // Offset=32, size=16 bytes.
+   vec4 orientation;         // Offset=48, size=16 bytes. Quaternion
+   vec4 angVel;              // Offset=64, size=16 bytes. Unit axis (xyz)
+   vec4 centerOfRotation;    // Offset=80, size=16 bytes.
+   vec4 scale;               // Offset=96, size=16 bytes. (xyz = scale, w = padding)
+   uint time;                // Offset=112, size= 4 bytes.
+   int colorTextureUnit;     // Offset=116, size= 4 bytes. (-1 means no textures)
+   int normalTextureUnit;    // Offset=120, size= 4 bytes. (-1 means no textures)
+   uint padding2;            // Offset=124, size= 4 bytes. (padding)
 }; // Make sure to pad so size is divisible by 16 because you have a vec4.
 
 layout(std430, binding = 0) buffer MeshDataBuffer {
@@ -28,6 +29,8 @@ layout (location = 6) in uint triangleIndex;
 uniform uint u_frame;
 uniform uint u_time;
 uniform float u_timeRemainder;
+uniform vec3 u_cameraPositionHigh;
+uniform vec3 u_cameraPositionLow;
 
 uniform mat4 view;
 uniform mat4 projection;
@@ -86,6 +89,21 @@ mat3 rotationMatrix(float angle, vec3 unitAxis) {
     );
 }
 
+// Dekker subtraction: result = a - b  
+vec3 dekkerSubtract(vec3 aHigh, vec3 aLow, vec3 bHigh, vec3 bLow) {
+    vec3 r = aHigh - bHigh;
+    vec3 error;
+    // Use the larger magnitude for better precision
+    for(int i = 0; i < 3; i++) {
+        if(abs(aHigh[i]) > abs(bHigh[i])) {
+            error[i] = aHigh[i] - r[i] - bHigh[i] + aLow[i] - bLow[i];
+        } else {
+            error[i] = -bHigh[i] - r[i] + aHigh[i] + aLow[i] - bLow[i];
+        }
+    }
+    return r + error; // Convert back to single precision
+}
+
 void main() {
    vert_normal = normalize(normal);
    vert_occlusionFactor = occlusionFactor;
@@ -98,7 +116,14 @@ void main() {
    uint deltaTime = u_time - meshData.time;
    float deltaTimeFloat = float(deltaTime) + u_timeRemainder;
 
-   vec3 meshPosition = meshData.position.xyz + meshData.velocity.xyz * deltaTimeFloat;
+   // Convert base position to camera-relative space (L-space) using Dekker subtraction
+   vec3 meshPositionL = dekkerSubtract(
+       meshData.positionHigh.xyz, meshData.positionLow.xyz,
+       u_cameraPositionHigh, u_cameraPositionLow
+   );
+   // Add velocity in camera-relative space (velocity is already small relative to camera distance)
+   vec3 velocityDelta = meshData.velocity.xyz * deltaTimeFloat;
+   meshPositionL += velocityDelta;
    
    mat3 orientation = fromQuaternion(meshData.orientation);
    orientation = rotationMatrix(
@@ -126,7 +151,7 @@ void main() {
    vert_TBN = mat3(T, B, N);
    vert_normal = N;
 
-   vec4 worldPos = vec4(meshPosition + rotatedPosition, 1.0);
+   vec4 worldPos = vec4(meshPositionL + rotatedPosition, 1.0);
    vert_pos = worldPos.xyz;
    gl_Position = projection * view * worldPos;
 }

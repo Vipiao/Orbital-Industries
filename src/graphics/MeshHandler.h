@@ -101,16 +101,17 @@ struct Vertex {
    uint32_t triangleId;
 };
 struct MeshData {
-   glm::vec4 position{};            // Offset= 0, size=16 bytes.
-   glm::vec4 velocity{};            // Offset=16, size=16 bytes.
-   glm::vec4 orientation{};         // Offset=32, size=16 bytes. Quaternion
-   glm::vec4 angVel{};              // Offset=48, size=16 bytes. Unit axis (xyz)
-   glm::vec4 centerOfRotation{};    // Offset=64, size=16 bytes.
-   glm::vec4 scale{};               // Offset=80, size=16 bytes. (xyz = scale, w = padding)
-   uint32_t time{};                 // Offset=96, size= 4 bytes.
-   int32_t colorTextureUnit{};      // Offset=100, size= 4 bytes. (-1 means no textures)
-   int32_t normalTextureUnit{};     // Offset=104, size= 4 bytes. (-1 means no textures)
-   uint32_t padding2{};             // Offset=108, size= 4 bytes. (padding)
+  glm::vec4 positionHigh{};        // Offset= 0, size=16 bytes. High part of Dekker position
+  glm::vec4 positionLow{};         // Offset=16, size=16 bytes. Low part of Dekker position
+   glm::vec4 velocity{};            // Offset=32, size=16 bytes.
+   glm::vec4 orientation{};         // Offset=48, size=16 bytes. Quaternion
+   glm::vec4 angVel{};              // Offset=64, size=16 bytes. Unit axis (xyz)
+   glm::vec4 centerOfRotation{};    // Offset=80, size=16 bytes.
+   glm::vec4 scale{};               // Offset=96, size=16 bytes. (xyz = scale, w = padding)
+   uint32_t time{};                 // Offset=112, size= 4 bytes.
+   int32_t colorTextureUnit{};      // Offset=116, size= 4 bytes. (-1 means no textures)
+   int32_t normalTextureUnit{};     // Offset=120, size= 4 bytes. (-1 means no textures)
+   uint32_t padding2{};             // Offset=124, size= 4 bytes. (padding)
 }; // Make sure to pad so size is divisible by 16 because you have a vec4.
 #pragma pack(pop)
 

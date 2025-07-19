@@ -165,7 +165,8 @@ void GraphicsEngineBase::startRenderLoop() {
       double ss{ glm::sqrt(2.) / 2. };
       glm::dquat test{ glm::dquat{ ss, -ss, 0., 0. } * glm::conjugate(m_camOri) };
       viewMatrix = glm::toMat4(glm::dquat{ ss, -ss, 0., 0. } * glm::conjugate(m_camOri));
-      viewMatrix = glm::translate(viewMatrix, -m_camPos); // Apply local translation. (Right side mutiplication).
+      // View matrix is now rotation-only (L-space: camera-relative coordinate system)
+      // Camera is at origin in this space, objects are positioned relative to camera
 
       glm::dmat4 projectionMatrix;
       double aspectRatio{};
