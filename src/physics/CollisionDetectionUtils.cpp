@@ -552,13 +552,13 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         }
 
         // Debug visualization of contact points
-        if (DebugGlobals::getDebugRenderer()) {
-            DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("contact_point_");
-            for (size_t i = 0; i < result.m_contactPoints.size(); ++i) {
-                std::string sphereName = "contact_point_" + std::to_string(i);
-                DebugGlobals::getDebugRenderer()->createSphere(sphereName, result.m_contactPoints[i], 0.1);
-            }
-        }
+        //if (DebugGlobals::getDebugRenderer()) {
+        //    DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("contact_point_");
+        //    for (size_t i = 0; i < result.m_contactPoints.size(); ++i) {
+        //        std::string sphereName = "contact_point_" + std::to_string(i);
+        //        DebugGlobals::getDebugRenderer()->createSphere(sphereName, result.m_contactPoints[i], 0.1);
+        //    }
+        //}
         
         return result;
     }
