@@ -287,13 +287,13 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     // Check filter normals from both cubes
     for (const glm::dvec3& filterNormal : filterNormalsA) {
         if (glm::dot(collisionNormal, filterNormal) > filterTolerance) {
-            return CollisionResult(true, {}, {}, {}, cubeA, cubeB); // Collision detected but filtered
+            return CollisionResult(cubeA, cubeB, true); // True means is filtered.
         }
     }
     
     for (const glm::dvec3& filterNormal : filterNormalsB) {
         if (glm::dot(-collisionNormal, filterNormal) > filterTolerance) {
-            return CollisionResult(true, {}, {}, {}, cubeA, cubeB); // Collision detected but filtered  
+            return CollisionResult(cubeA, cubeB, true); // True means is filtered.
         }
     }
 
@@ -316,9 +316,9 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
                           std::vector<double>{contactInfo.penetration},
                           cubeA, cubeB);
     
-    // Reduce contact points if there are too many
-    if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
-        reduceContactPoints(result);
+    // Reduce contact points if there are too close
+    if (result.m_contactPoints.size() > 1) {
+        mergeCloseContactPoints(result);
     }
 
     return result;
@@ -401,11 +401,6 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     if (!allNormals.empty()) {
         CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, ball, grid);
         
-        // Reduce contact points if there are too many
-        if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
-            reduceContactPoints(result);
-        }
-        
         return result;
     }
     
@@ -458,9 +453,9 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     if (!allNormals.empty()) {
         CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, cube, grid);
         
-        // Reduce contact points if there are too many
-        if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
-            reduceContactPoints(result);
+        // Simple contact point reduction - remove points within 10cm of each other
+        if (result.m_contactPoints.size() > 1) {
+            mergeCloseContactPoints(result);
         }
         
         return result;
@@ -480,14 +475,14 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         return CollisionResult();
     }
 
-    // Check cached contact point count from previous iteration
-    int cachedContactCount = 0;
-    bool hasCachedData = PairCache<int>::getCachedData(gridA, gridB, cachedContactCount);
+    // Check cached collision pair count from previous iteration
+    int cachedCollisionPairCount = 0;
+    bool hasCachedData = PairCache<int>::getCachedData(gridA, gridB, cachedCollisionPairCount);
     //hasCachedData = false;
 
-    // Use simplified contact generation if previous iteration had too many contact points
-    const int CONTACT_COMPLEXITY_THRESHOLD = 16;
-    bool useSimplifiedContactGeneration = hasCachedData && cachedContactCount > CONTACT_COMPLEXITY_THRESHOLD;
+    // Use simplified contact generation if previous iteration had too many collision pairs
+    const int CONTACT_COMPLEXITY_THRESHOLD = 6;
+    bool useSimplifiedContactGeneration = hasCachedData && cachedCollisionPairCount > CONTACT_COMPLEXITY_THRESHOLD;
     
     // Choose the smaller grid as the query grid for optimization
     const GridCollider* queryGrid;
@@ -509,6 +504,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
     std::vector<double> allPenetrationDepths;
+    int collisionPairCount = 0;
     
     // Iterate through query grid cells
     for (const auto& queryPair : queryCells) {
@@ -537,6 +533,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
                                                    useSimplifiedContactGeneration);
             
             if (result.m_hasCollision) {
+                collisionPairCount++;
                 // Add all collision data to our result, flipping normals if needed
                 for (const auto& normal : result.m_normals) {
                     allNormals.push_back(normalFlip ? -normal : normal);
@@ -549,9 +546,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
-        // Cache the contact point count before reduction for next iteration
-        int contactCountBeforeReduction = static_cast<int>(allContactPoints.size());
-        PairCache<int>::setCachedData(gridA, gridB, contactCountBeforeReduction);
+        // Cache the collision pair count for next iteration
+        PairCache<int>::setCachedData(gridA, gridB, collisionPairCount);
         CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, 
                                gridA, gridB);
         
@@ -561,18 +557,18 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         }
 
         // Debug visualization of contact points
-        //if (DebugGlobals::getDebugRenderer()) {
-        //    DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("contact_point_");
-        //    for (size_t i = 0; i < result.m_contactPoints.size(); ++i) {
-        //        std::string sphereName = "contact_point_" + std::to_string(i);
-        //        DebugGlobals::getDebugRenderer()->createSphere(sphereName, result.m_contactPoints[i], 0.1);
-        //    }
-        //}
+        if (DebugGlobals::getDebugRenderer()) {
+            DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("contact_point_");
+            for (size_t i = 0; i < result.m_contactPoints.size(); ++i) {
+                std::string sphereName = "contact_point_" + std::to_string(i);
+                DebugGlobals::getDebugRenderer()->createSphere(sphereName, result.m_contactPoints[i], 0.1);
+            }
+        }
         
         return result;
     }
     
-    // No collision detected - cache 0 contact points
+    // No collision detected - cache 0 collision pairs
     PairCache<int>::setCachedData(gridA, gridB, 0);
 
     return CollisionResult();
@@ -1041,6 +1037,26 @@ std::vector<glm::dvec3> CollisionDetectionUtils::projectToWorld(
     }
     
     return points3D;
+}
+
+void CollisionDetectionUtils::mergeCloseContactPoints(CollisionResult& collision, double mergeDistance) {
+    if (collision.m_contactPoints.size() <= 1) {
+        return;
+    }
+    
+    // Remove contact points that are too close to earlier ones
+    for (size_t i = collision.m_contactPoints.size() - 1; i > 0; --i) {
+        for (size_t j = 0; j < i; ++j) {
+            if (glm::length(collision.m_contactPoints[i] - collision.m_contactPoints[j]) < mergeDistance) {
+                collision.m_contactPoints.erase(collision.m_contactPoints.begin() + i);
+                collision.m_normals.erase(collision.m_normals.begin() + i);
+                collision.m_penetrationDepths.erase(collision.m_penetrationDepths.begin() + i);
+                collision.m_contactPointsLocalA.erase(collision.m_contactPointsLocalA.begin() + i);
+                collision.m_contactPointsLocalB.erase(collision.m_contactPointsLocalB.begin() + i);
+                break;
+            }
+        }
+    }
 }
 
 void CollisionDetectionUtils::reduceContactPoints(CollisionResult& collision, int maxPoints) {

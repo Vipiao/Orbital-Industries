@@ -12,8 +12,7 @@ class CubeCollider;
 class GridCollider;
 
 // Contact point reduction thresholds
-static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 10;
-static constexpr int MAX_CONTACT_POINTS = 10;
+static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 11;
 
 class CollisionDetectionUtils {
 public:
@@ -111,7 +110,10 @@ private:
         double averageZ = 0.0);
 
     // Contact point reduction for performance optimization
-    static void reduceContactPoints(CollisionResult& collision, int maxPoints = MAX_CONTACT_POINTS);
+    static void mergeCloseContactPoints(CollisionResult& collision, double mergeDistance = 0.3);
+    
+    // Complex contact point reduction for grid-grid only
+    static void reduceContactPoints(CollisionResult& collision, int maxPoints = CONTACT_REDUCTION_THRESHOLD);
 
     static glm::dmat3 createPlaneTransform(const glm::dvec3& normal);
 

@@ -258,7 +258,7 @@ protected:
                     PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
                     if (body) {
                         // Apply force in the view direction
-                        const double forceStrength = 0.002 * body->m_mass * forceMultiplier;
+                        const double forceStrength = 0.001 * body->m_mass * forceMultiplier;
                         glm::dvec3 force = forward * forceStrength;
                         
                         // Apply the force at the camera position

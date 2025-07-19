@@ -21,6 +21,7 @@ struct CollisionResult {
     // For collision resolution optimization
     std::vector<double> m_collisionMasses;      // Collision mass for each contact point
     bool m_collisionMassesCalculated = false;   // Flag to avoid recalculation
+    bool m_isFiltered = false;                  // Flag to indicate collision was filtered out
 
     // For collision resolution - now type-safe!
     Collider* m_colliderA = nullptr;
@@ -54,6 +55,12 @@ struct CollisionResult {
             m_penetrationDepths.push_back(depth);
             calculateLocalContactPoints();
         }
+    }
+
+    // Constructor for filtered collision results
+    CollisionResult(Collider* a, Collider* b, bool filtered)
+        : m_hasCollision(false), m_isFiltered(filtered), m_colliderA(a), m_colliderB(b) {
+        // Vectors remain empty by default
     }
 
 private:
