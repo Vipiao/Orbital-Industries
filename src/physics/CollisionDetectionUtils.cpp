@@ -253,11 +253,12 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
             glm::dvec3 crossProduct = glm::cross(axisA, axisB);
             
             // Skip nearly parallel edges
-            if (glm::length2(crossProduct) < 0.1) {
+            double ll{ glm::length2(crossProduct) };
+            if (ll < 0.01) {
                 continue;
             }
             
-            crossProduct = glm::normalize(crossProduct);
+            crossProduct = crossProduct / ll; // Normalize.
             SeparatingAxisResult result = testSeparatingAxis(crossProduct, verticesA, verticesB);
             if (result.isSeparating) {
                 // Cache this separating axis
