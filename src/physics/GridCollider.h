@@ -32,6 +32,10 @@ public:
 
     // Allow access to cells for collision detection utils
     const std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash>& getCells() const { return m_cells; }
+
+    // Access to local AABB bounds for optimization
+    const glm::ivec3& getLocalAABBMin() const { return m_localAABBMin; }
+    const glm::ivec3& getLocalAABBMax() const { return m_localAABBMax; }
     
     glm::dvec3 gridToWorld(const glm::dvec3& gridCoord) const;
     glm::dvec3 worldToGrid(const glm::dvec3& worldCoord) const;

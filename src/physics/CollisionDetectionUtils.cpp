@@ -512,6 +512,16 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
 
         const double gridCellHalfDiagonal = 0.5 * std::sqrt(3.0);
         const double searchRadius = gridCellHalfDiagonal;
+
+        // Early AABB test optimization - check if query cell can possibly intersect target grid
+        glm::dvec3 expandedMin = glm::dvec3(targetGrid->getLocalAABBMin()) - glm::dvec3(searchRadius);
+        glm::dvec3 expandedMax = glm::dvec3(targetGrid->getLocalAABBMax()) + glm::dvec3(1.0) + glm::dvec3(searchRadius);
+        
+        if (targetSpaceCenter.x < expandedMin.x || targetSpaceCenter.x > expandedMax.x ||
+            targetSpaceCenter.y < expandedMin.y || targetSpaceCenter.y > expandedMax.y ||
+            targetSpaceCenter.z < expandedMin.z || targetSpaceCenter.z > expandedMax.z) {
+            continue; // Query cell is too far from target grid's AABB
+        }
         
         // Find colliders within search area
         std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(targetGrid, queryCellCenter, searchRadius);
