@@ -263,3 +263,33 @@ void GridCollider::updateLocalCorners() {
     m_localCorners[6] = glm::dvec3(expandedMin.x, expandedMax.y, expandedMax.z);
     m_localCorners[7] = glm::dvec3(expandedMax.x, expandedMax.y, expandedMax.z);
 }
+
+std::vector<CubeCollider*> GridCollider::findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const {
+    std::vector<CubeCollider*> foundColliders;
+    
+    if (m_cells.empty()) {
+        return foundColliders;
+    }
+    
+    // Calculate spatial search bounds
+    glm::dvec3 gridSpaceCenter = worldToGrid(worldPos);
+    glm::ivec3 minCoord = glm::floor(gridSpaceCenter - glm::dvec3(searchRadius));
+    glm::ivec3 maxCoord = glm::floor(gridSpaceCenter + glm::dvec3(searchRadius));
+    
+    for (int x = minCoord.x; x <= maxCoord.x; ++x) {
+        for (int y = minCoord.y; y <= maxCoord.y; ++y) {
+            for (int z = minCoord.z; z <= maxCoord.z; ++z) {
+                glm::ivec3 targetCoord(x, y, z);
+                
+                auto cellIt = m_cells.find(targetCoord);
+                if (cellIt == m_cells.end()) {
+                    continue; // No cell at this coordinate
+                }
+                
+                foundColliders.push_back(cellIt->second.get());
+            }
+        }
+    }
+    
+    return foundColliders;
+}

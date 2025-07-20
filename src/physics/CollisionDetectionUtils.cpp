@@ -319,38 +319,6 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     return result;
 }
 
-// Helper function to find grid cells within search radius
-static std::vector<CubeCollider*> performSpatialGridSearch(
-    const GridCollider* grid,
-    const glm::dvec3& objectWorldPos,
-    double searchRadius) {
-    
-    std::vector<CubeCollider*> foundColliders;
-    const auto& cells = grid->getCells();
-    
-    // Calculate spatial search bounds
-    glm::dvec3 gridSpaceCenter = grid->worldToGrid(objectWorldPos);
-    glm::ivec3 minCoord = glm::floor(gridSpaceCenter - glm::dvec3(searchRadius));
-    glm::ivec3 maxCoord = glm::floor(gridSpaceCenter + glm::dvec3(searchRadius));
-    
-    for (int x = minCoord.x; x <= maxCoord.x; ++x) {
-        for (int y = minCoord.y; y <= maxCoord.y; ++y) {
-            for (int z = minCoord.z; z <= maxCoord.z; ++z) {
-                glm::ivec3 targetCoord(x, y, z);
-                
-                auto cellIt = cells.find(targetCoord);
-                if (cellIt == cells.end()) {
-                    continue; // No cell at this coordinate
-                }
-                
-                foundColliders.push_back(cellIt->second.get());
-            }
-        }
-    }
-    
-    return foundColliders;
-}
-
 
 CollisionResult CollisionDetectionUtils::detectBallGrid(
     BallCollider* ball, GridCollider* grid) {
@@ -359,16 +327,12 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     double ballRadius = ball->m_radius;
 
     // Early exit if grid is empty
-    const auto& cells = grid->getCells();
-    if (cells.empty()) {
+    if (grid->getCells().empty()) {
         return CollisionResult();
     }
     
-    // Calculate search radius: just ball radius
-    const double searchRadius = ballRadius;
-    
-    // Find colliders within search area
-    std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(grid, ballPos, searchRadius);
+    // Find colliders within search area using ball radius
+    std::vector<CubeCollider*> nearbyColliders = grid->findCellsInRadius(ballPos, ballRadius);
     
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
@@ -410,17 +374,13 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     double cubeWidth = cube->m_width;
     
     // Early exit if grid is empty
-    const auto& cells = grid->getCells();
-    if (cells.empty()) {
+    if (grid->getCells().empty()) {
         return CollisionResult();
     }
     
-    // Calculate search radius: cube half-diagonal + grid cell half-diagonal
-    const double cubeHalfDiagonal = cubeWidth * 0.5 * std::sqrt(3.0);
-    const double searchRadius = cubeHalfDiagonal;
-    
-    // Find colliders within search area
-    std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(grid, cubePos, searchRadius);
+    // Calculate search radius: cube half-diagonal
+    const double searchRadius = cubeWidth * 0.5 * std::sqrt(3.0);
+    std::vector<CubeCollider*> nearbyColliders = grid->findCellsInRadius(cubePos, searchRadius);
     
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
@@ -510,8 +470,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         glm::dvec3 queryCellCenter = queryGrid->gridToWorld(glm::dvec3(queryCoord) + glm::dvec3(0.5));
         glm::dvec3 targetSpaceCenter = targetGrid->worldToGrid(queryCellCenter);
 
-        const double gridCellHalfDiagonal = 0.5 * std::sqrt(3.0);
-        const double searchRadius = gridCellHalfDiagonal;
+        const double searchRadius = 0.5 * std::sqrt(3.0);
 
         // Early AABB test optimization - check if query cell can possibly intersect target grid
         glm::dvec3 expandedMin = glm::dvec3(targetGrid->getLocalAABBMin()) - glm::dvec3(searchRadius);
@@ -524,7 +483,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         }
         
         // Find colliders within search area
-        std::vector<CubeCollider*> nearbyColliders = performSpatialGridSearch(targetGrid, queryCellCenter, searchRadius);
+        std::vector<CubeCollider*> nearbyColliders = targetGrid->findCellsInRadius(queryCellCenter, searchRadius);
 
         // Test collision with each found collider
         for (CubeCollider* targetCollider : nearbyColliders) {

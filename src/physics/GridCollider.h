@@ -30,6 +30,9 @@ public:
     // Get sub-collider for a specific cell
     CubeCollider* getCell(const glm::ivec3& coord);
 
+    // Spatial search within radius
+    std::vector<CubeCollider*> findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const;
+
     // Allow access to cells for collision detection utils
     const std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash>& getCells() const { return m_cells; }
 
