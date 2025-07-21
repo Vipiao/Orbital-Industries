@@ -316,9 +316,7 @@ void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& c
 
     // Calculate angular velocity from momentum for velocity correction
     glm::dmat3 orientationMatrix = glm::mat3_cast(m_rigidBody->m_orientation);
-    glm::dvec3 angularVelocityBody = m_rigidBody->m_invInertiaTensor * m_rigidBody->m_angularMomentumBody;
-    glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
-    m_rigidBody->m_velocity += glm::cross(angularVelocity, m_rigidBody->m_orientation * cmShift);
+    m_rigidBody->m_velocity += glm::cross(m_rigidBody->getAngularVelocityWorld(), m_rigidBody->m_orientation * cmShift);
     updateRigidBodyInverses();
 }
 
@@ -339,13 +337,10 @@ void Grid::recalculateMassAndInertia() {
     if (glm::length(change) > 0.00001) {
         m_rigidBody->m_position += m_rigidBody->m_orientation * change;
 
-        // Calculate angular velocity from momentum for velocity correction
-        glm::dmat3 orientationMatrix = glm::mat3_cast(m_rigidBody->m_orientation);
-        glm::dvec3 angularVelocityBody = m_rigidBody->m_invInertiaTensor * m_rigidBody->m_angularMomentumBody;
-        glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
-        m_rigidBody->m_velocity += glm::cross(angularVelocity, m_rigidBody->m_orientation * change);
+        m_rigidBody->m_velocity += glm::cross(m_rigidBody->getAngularVelocityWorld(), m_rigidBody->m_orientation * change);
     }
     updateRigidBodyInverses();
+    m_rigidBody->invalidateInertiaTensor();
 }
 
 void Grid::updateRigidBodyInverses() {
@@ -406,12 +401,7 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
     
     PhysicsEngine::RigidBody* body = m_rigidBody;
 
-    // Calculate angular velocity from angular momentum
-    glm::dmat3 orientationMatrix = glm::mat3_cast(body->m_orientation);
-    glm::dvec3 angularVelocityBody = body->m_invInertiaTensor * body->m_angularMomentumBody;
-    glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
-    
-    glm::dvec3 angVelAxis = angularVelocity;
+    glm::dvec3 angVelAxis = body->getAngularVelocityWorld();
     double angVelMagnitude = glm::length(angVelAxis);
     if (angVelMagnitude > 0.00001) {
         angVelAxis = angVelAxis / angVelMagnitude;
@@ -428,7 +418,7 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
         body->m_position,
         body->m_orientation,
         body->m_velocity,
-        angularVelocity,
+        body->getAngularVelocityWorld(),
         m_centerOfMass,
         currentPhysicsTimeStep,
         getApproximateRadius()

@@ -418,12 +418,7 @@ protected:
                 
                 // Apply drag to angular velocity
                 if (glm::length(body->m_angularMomentumBody) > 0.0) {
-                    // Transform inertia tensor to world space for drag calculation
-                    glm::dmat3 orientationMatrix = glm::mat3_cast(body->m_orientation);
-                    glm::dvec3 angularVelocityBody = body->m_invInertiaTensor * body->m_angularMomentumBody;
-                    glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
-                    glm::dmat3 worldInertiaTensor = orientationMatrix * body->m_inertiaTensor * glm::transpose(orientationMatrix);
-                    glm::dvec3 angularDrag = -dragCoefficient * worldInertiaTensor * angularVelocity;
+                    glm::dvec3 angularDrag = -dragCoefficient * body->getWorldInertiaTensor() * body->getAngularVelocityWorld();
 
                     m_physicsEngine->applyTorque(body, angularDrag);
                 }

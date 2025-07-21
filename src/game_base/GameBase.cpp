@@ -195,9 +195,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     glm::dvec3 originalVelocity = sourceBody->m_velocity;
     
     // Calculate angular velocity from angular momentum
-    glm::dmat3 orientationMatrix = glm::mat3_cast(sourceBody->m_orientation);
-    glm::dvec3 angularVelocityBody = sourceBody->m_invInertiaTensor * sourceBody->m_angularMomentumBody;
-    glm::dvec3 originalAngularVelocity = orientationMatrix * angularVelocityBody;
+    glm::dvec3 originalAngularVelocity = sourceBody->getAngularVelocityWorld();
     glm::dquat originalOrientation = sourceBody->m_orientation;
     
     std::vector<PartitionPhysics> partitionPhysics(result.partitions.size());
@@ -289,8 +287,9 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
             newBody->m_velocity = partitionPhysics[i].velocity;
             
             // Set angular momentum instead of angular velocity
-            glm::dvec3 angularVelocityBody = glm::transpose(orientationMatrix) * originalAngularVelocity;
+            glm::dvec3 angularVelocityBody = glm::transpose(sourceBody->getOrientationMatrix()) * originalAngularVelocity;
             newBody->m_angularMomentumBody = newBody->m_inertiaTensor * angularVelocityBody;
+            newBody->invalidateAngularMomentum();
             newBody->m_orientation = originalOrientation;
         }
         
@@ -298,8 +297,9 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     }
 
     // Recalculate original partition local angular momentum as its mass has now changed.
-    angularVelocityBody = glm::transpose(orientationMatrix) * originalAngularVelocity;
+    glm::dvec3 angularVelocityBody = glm::transpose(sourceBody->getOrientationMatrix()) * originalAngularVelocity;
     sourceBody->m_angularMomentumBody = sourceBody->m_inertiaTensor * angularVelocityBody;
+    sourceBody->invalidateAngularMomentum();
     
     std::cout << "Created " << newGrids.size() << " new grids from split" << std::endl;
 }
