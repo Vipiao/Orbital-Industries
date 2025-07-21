@@ -38,7 +38,7 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
         position,
         orientation,
         0.0,  // Mass
-        0.0,  // Moment of inertia
+        glm::dmat3(0.0),  // Inertia tensor
         false, // Not static
         m_collider.get() // Pass the sphere collider
     );
@@ -291,27 +291,34 @@ void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& c
 
     // Constants for block properties
     const double blockMass = 60.0;
-    const double blockBaseInertia = (2.0/3.0) * blockMass * 0.5 * 0.5 * 0.5;
+    const double blockWidth = 1.0;
+    const double blockBaseInertiaValue = (blockMass / 6.0) * blockWidth * blockWidth; // I = (m/6)*w² for cube
+    const glm::dmat3 blockBaseInertiaTensor = glm::dmat3(blockBaseInertiaValue); // Identity * scalar
     
     glm::dvec3 oldCM = m_centerOfMass;
     
     // Calculate incremental update directly on rigid body properties
-    MassInertiaCalculator::calculateScalarInertiaIncremental(
+    MassInertiaCalculator::calculateTensorInertiaIncremental(
         cellCoords,
-        [this, blockMass, blockBaseInertia, isRemoval](const glm::ivec3& coord) { 
+        [this, blockMass, blockBaseInertiaTensor, isRemoval](const glm::ivec3& coord) {
             bool exists = m_cells.find(coord) != m_cells.end();
             double massSign = isRemoval ? -1.0 : 1.0;
-            double inertiaSign = isRemoval ? -1.0 : 1.0;
-            return MassInertiaCalculator::ObjectData{glm::dvec3(coord) + glm::dvec3{0.5}, 
+            glm::dmat3 inertiaSign = isRemoval ? glm::dmat3(-1.0) : glm::dmat3(1.0);
+            return MassInertiaCalculator::TensorObjectData{glm::dvec3(coord) + glm::dvec3{0.5},
                                                     exists ? blockMass * massSign : 0.0, 
-                                                    exists ? blockBaseInertia * inertiaSign : 0.0};
+                                                    exists ? blockBaseInertiaTensor * inertiaSign : glm::dmat3(0.0)};
         },
-        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_momentOfInertia);
+        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_inertiaTensor);
 
     // Update physics body with momentum conservation
     glm::dvec3 cmShift = m_centerOfMass - oldCM;
     m_rigidBody->m_position += m_rigidBody->m_orientation * cmShift;
-    m_rigidBody->m_velocity += glm::cross(m_rigidBody->m_angularVelocity, m_rigidBody->m_orientation * cmShift);
+
+    // Calculate angular velocity from momentum for velocity correction
+    glm::dmat3 orientationMatrix = glm::mat3_cast(m_rigidBody->m_orientation);
+    glm::dvec3 angularVelocityBody = m_rigidBody->m_invInertiaTensor * m_rigidBody->m_angularMomentumBody;
+    glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
+    m_rigidBody->m_velocity += glm::cross(angularVelocity, m_rigidBody->m_orientation * cmShift);
     updateRigidBodyInverses();
 }
 
@@ -320,16 +327,23 @@ void Grid::recalculateMassAndInertia() {
 
     glm::dvec3 oldCM = m_centerOfMass;
     const double blockMass = 60.0;
-    const double blockBaseInertia = (2.0/3.0) * blockMass * 0.5 * 0.5 * 0.5;
+    const double blockWidth = 1.0;
+    const double blockBaseInertiaValue = (blockMass / 6.0) * blockWidth * blockWidth; // I = (m/6)*w² for cube
+    const glm::dmat3 blockBaseInertiaTensor = glm::dmat3(blockBaseInertiaValue); // Identity * scalar
     
-    MassInertiaCalculator::calculateScalarInertia(
+    MassInertiaCalculator::calculateTensorInertia(
         m_cells, 
-        [=](const auto& pair) { return MassInertiaCalculator::ObjectData{glm::dvec3(pair.first) + glm::dvec3{0.5}, blockMass, blockBaseInertia}; },
-        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_momentOfInertia);
+        [=](const auto& pair) { return MassInertiaCalculator::TensorObjectData{glm::dvec3(pair.first) + glm::dvec3{0.5}, blockMass, blockBaseInertiaTensor}; },
+        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_inertiaTensor);
     glm::dvec3 change = m_centerOfMass - oldCM;
     if (glm::length(change) > 0.00001) {
         m_rigidBody->m_position += m_rigidBody->m_orientation * change;
-        m_rigidBody->m_velocity += glm::cross(m_rigidBody->m_angularVelocity, m_rigidBody->m_orientation * change);
+
+        // Calculate angular velocity from momentum for velocity correction
+        glm::dmat3 orientationMatrix = glm::mat3_cast(m_rigidBody->m_orientation);
+        glm::dvec3 angularVelocityBody = m_rigidBody->m_invInertiaTensor * m_rigidBody->m_angularMomentumBody;
+        glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
+        m_rigidBody->m_velocity += glm::cross(angularVelocity, m_rigidBody->m_orientation * change);
     }
     updateRigidBodyInverses();
 }
@@ -339,7 +353,10 @@ void Grid::updateRigidBodyInverses() {
 
     // Update inverse values with safety checks
     m_rigidBody->m_invMass = (m_rigidBody->m_mass > 1e-15) ? (1.0 / m_rigidBody->m_mass) : std::numeric_limits<double>::max();
-    m_rigidBody->m_invMomentOfInertia = (m_rigidBody->m_momentOfInertia > 1e-15) ? (1.0 / m_rigidBody->m_momentOfInertia) : std::numeric_limits<double>::max();
+
+    // Update inverse inertia tensor with safety check
+    double determinant = glm::determinant(m_rigidBody->m_inertiaTensor);
+    m_rigidBody->m_invInertiaTensor = (determinant > 1e-15) ? glm::inverse(m_rigidBody->m_inertiaTensor) : glm::dmat3(std::numeric_limits<double>::max());
 
     m_rigidBody->m_colliderOffset = m_centerOfMass;
 }
@@ -389,7 +406,12 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
     
     PhysicsEngine::RigidBody* body = m_rigidBody;
 
-    glm::dvec3 angVelAxis = body->m_angularVelocity;
+    // Calculate angular velocity from angular momentum
+    glm::dmat3 orientationMatrix = glm::mat3_cast(body->m_orientation);
+    glm::dvec3 angularVelocityBody = body->m_invInertiaTensor * body->m_angularMomentumBody;
+    glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
+    
+    glm::dvec3 angVelAxis = angularVelocity;
     double angVelMagnitude = glm::length(angVelAxis);
     if (angVelMagnitude > 0.00001) {
         angVelAxis = angVelAxis / angVelMagnitude;
@@ -406,7 +428,7 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
         body->m_position,
         body->m_orientation,
         body->m_velocity,
-        body->m_angularVelocity,
+        angularVelocity,
         m_centerOfMass,
         currentPhysicsTimeStep,
         getApproximateRadius()

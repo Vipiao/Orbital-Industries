@@ -40,10 +40,16 @@ public:
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
         PhysicsEngine::RigidBody* bb = initialGrid->getRigidBody();
+        bb->m_position = {0,0,0};
         //bb->m_velocity = {0.0,0.0,-0.01};
-        //addGridBlock(initialGrid, 0, 0, 0);  // Center block
-        //addGridBlock(initialGrid, 1, 0, 0);  // Block to the right
-        //addGridBlock(initialGrid, 2, 0, 0);  // Block to the right right
+        addGridBlock(initialGrid, 0, 0, 0);
+        addGridBlock(initialGrid, 1, 0, 0);
+        addGridBlock(initialGrid, 2, 0, 0);
+        addGridBlock(initialGrid, 3, 0, 0);
+        addGridBlock(initialGrid, 4, 0, 0);
+        addGridBlock(initialGrid, 5, 0, 0);
+        addGridBlock(initialGrid, 6, 0, 0);
+        addGridBlock(initialGrid, 3, 1, 0);
         //addGridBlock(initialGrid, 0, -1, -2);
         //addGridBlock(initialGrid, 0, -1, -1);
         //addGridBlock(initialGrid, -1, -1, -1);
@@ -99,18 +105,18 @@ public:
         //    }
         //}
         // Ground.
-        int size{ 50 };
-        for (int ii = -size; ii < size; ii++)
-        {
-            for (int jj = -size; jj < size; jj++)
-            {
-                for (int kk = -3; kk < -2; kk++)
-                {
-                    addGridBlock(initialGrid, ii, jj, kk);
-                    std::cout << ii << std::endl;
-                }
-            }
-        }
+        //int size{ 50 };
+        //for (int ii = -size; ii < size; ii++)
+        //{
+        //    for (int jj = -size; jj < size; jj++)
+        //    {
+        //        for (int kk = -3; kk < -2; kk++)
+        //        {
+        //            addGridBlock(initialGrid, ii, jj, kk);
+        //            std::cout << ii << std::endl;
+        //        }
+        //    }
+        //}
         
         //Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         //addGridBlock(gg, 0, 0, 0);  // Center block
@@ -402,7 +408,7 @@ protected:
             PhysicsEngine::RigidBody* body = grid->getRigidBody();
             if (body && !body->m_isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
-                const double dragCoefficient = 0.04 * 0.4;
+                const double dragCoefficient = 0.04 * 0.1;
                 
                 // Apply drag to linear velocity
                 if (glm::length(body->m_velocity) > 0.0) {
@@ -411,8 +417,14 @@ protected:
                 }
                 
                 // Apply drag to angular velocity
-                if (glm::length(body->m_angularVelocity) > 0.0) {
-                    glm::dvec3 angularDrag = -dragCoefficient * body->m_angularVelocity * body->m_momentOfInertia;
+                if (glm::length(body->m_angularMomentumBody) > 0.0) {
+                    // Transform inertia tensor to world space for drag calculation
+                    glm::dmat3 orientationMatrix = glm::mat3_cast(body->m_orientation);
+                    glm::dvec3 angularVelocityBody = body->m_invInertiaTensor * body->m_angularMomentumBody;
+                    glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
+                    glm::dmat3 worldInertiaTensor = orientationMatrix * body->m_inertiaTensor * glm::transpose(orientationMatrix);
+                    glm::dvec3 angularDrag = -dragCoefficient * worldInertiaTensor * angularVelocity;
+
                     m_physicsEngine->applyTorque(body, angularDrag);
                 }
             }

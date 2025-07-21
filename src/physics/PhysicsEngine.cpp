@@ -22,7 +22,7 @@ PhysicsEngine::~PhysicsEngine() {
 PhysicsEngine::RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position, 
                                const glm::dquat& orientation,
                                double mass, 
-                               double momentOfInertia,
+                               const glm::dmat3& inertiaTensor,
                                bool isStatic,
                                Collider* collider) {
     
@@ -32,18 +32,18 @@ PhysicsEngine::RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position
     body->m_forces = glm::dvec3{0.0, 0.0, 0.0};
     
     body->m_orientation = glm::normalize(orientation); // Ensure unit quaternion
-    body->m_angularVelocity = glm::dvec3{0.0, 0.0, 0.0};
+    body->m_angularMomentumBody = glm::dvec3{0.0, 0.0, 0.0};
     body->m_torques = glm::dvec3{0.0, 0.0, 0.0};
     
     body->m_mass = mass;
-    body->m_momentOfInertia = momentOfInertia;
+    body->m_inertiaTensor = inertiaTensor;
     // Handle zero mass/inertia cases
     body->m_invMass = (mass > 1e-15) ? (1.0 / mass) : std::numeric_limits<double>::max();
-    body->m_invMomentOfInertia = (momentOfInertia > 1e-15) ? (1.0 / momentOfInertia) : std::numeric_limits<double>::max();
+    body->m_invInertiaTensor = (glm::determinant(inertiaTensor) > 1e-15) ? glm::inverse(inertiaTensor) : glm::dmat3(std::numeric_limits<double>::max());
     // Static bodies should have infinite mass (zero inverse mass)
     if (isStatic) {
         body->m_invMass = 0.0;
-        body->m_invMomentOfInertia = 0.0;
+        body->m_invInertiaTensor = glm::dmat3(0.0);
     }
     body->m_isStatic = isStatic;
     body->m_collider = collider;
@@ -240,31 +240,49 @@ void PhysicsEngine::updatePositions() {
         // (deltaTime already incorporated into velocity)
         body->m_position += body->m_velocity;
         
-        // Angular motion update
-        // Calculate angular acceleration: α = τ/I
-        glm::dvec3 angularAcceleration = body->m_torques * body->m_invMomentOfInertia;
+        // Angular motion update using angular momentum (ensures conservation)
+        // Transform world torques to body space and update angular momentum
+        glm::dmat3 orientationMatrix = glm::mat3_cast(body->m_orientation);
+        glm::dvec3 torquesBody = glm::transpose(orientationMatrix) * body->m_torques;
+
+        // Apply external torques first, then correct for rotating coordinate system
+        body->m_angularMomentumBody += torquesBody;
+        double currentMagnitude = glm::length(body->m_angularMomentumBody);
         
-        // Update angular velocity: ω = ω + α
-        // (deltaTime already incorporated into angular velocity)
-        body->m_angularVelocity += angularAcceleration;
+        glm::dvec3 angularVelocityBody = body->m_invInertiaTensor * body->m_angularMomentumBody;
+        glm::dvec3 fictitiousTorque = glm::cross(angularVelocityBody, body->m_angularMomentumBody);
+        body->m_angularMomentumBody += -fictitiousTorque;
+        double turnedMagnitude = glm::length(body->m_angularMomentumBody);
+        if (turnedMagnitude > 0.) {
+            body->m_angularMomentumBody *= currentMagnitude / turnedMagnitude;
+        }
+        
+        // Calculate final angular velocity for orientation update
+        angularVelocityBody = body->m_invInertiaTensor * body->m_angularMomentumBody;
+        
+        // Transform angular velocity back to world space for orientation update
+        glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
+
+        // Debug: Print global angular momentum to verify conservation
+        //static int debugCounter = 0;
+        //if (++debugCounter % 10 == 0) { // Print every ~2 seconds at 60fps
+        //    glm::dvec3 globalAngularMomentum = orientationMatrix * body->m_angularMomentumBody;
+        //    double globalMagnitude = glm::length(globalAngularMomentum);
+        //    std::cout << "Global L: (" << globalAngularMomentum.x << ", " << globalAngularMomentum.y << ", " << globalAngularMomentum.z 
+        //              << ") |L| = " << globalMagnitude << std::endl;
+        //}
         
         // Update orientation: q = q + (q * ω) * 0.5
-        // This is a simplified quaternion integration
-        //glm::dquat angularVelocityQuat{0.0, 
-        //                             body->m_angularVelocity.x, 
-        //                             body->m_angularVelocity.y, 
-        //                             body->m_angularVelocity.z};
-        //body->m_orientation += (angularVelocityQuat * body->m_orientation) * 0.5;
-        double angle{ glm::length(body->m_angularVelocity) };
+        double angle{ glm::length(angularVelocity) };
         glm::dquat angularVelocityQuat{};
         if (angle > 0.) {
-            angularVelocityQuat = glm::angleAxis(angle, body->m_angularVelocity / angle);
+            angularVelocityQuat = glm::angleAxis(angle, angularVelocity / angle);
         } else {
             angularVelocityQuat = glm::dquat{1, 0, 0, 0};
         }
         body->m_orientation = (angularVelocityQuat * body->m_orientation);
         body->m_orientation = glm::normalize(body->m_orientation); // Renormalize to prevent drift
-        
+
         // Reset forces and torques for next frame
         body->m_forces = glm::dvec3{0.0, 0.0, 0.0};
         body->m_torques = glm::dvec3{0.0, 0.0, 0.0};
@@ -300,6 +318,12 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         collision.m_collisionMassesCalculated = true;
     }
 
+    // Transform local inverse inertia tensors to world space (needed for impulse application)
+    glm::dmat3 orientationMatrixA = glm::mat3_cast(bodyA->m_orientation);
+    glm::dmat3 orientationMatrixB = glm::mat3_cast(bodyB->m_orientation);
+    glm::dmat3 worldInvInertiaTensorA = orientationMatrixA * bodyA->m_invInertiaTensor * glm::transpose(orientationMatrixA);
+    glm::dmat3 worldInvInertiaTensorB = orientationMatrixB * bodyB->m_invInertiaTensor * glm::transpose(orientationMatrixB);
+
     // Process each contact point
     for (size_t i = 0; i < collision.m_normals.size(); ++i) {
         glm::dvec3 normal = collision.m_normals[i];
@@ -308,10 +332,16 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         // Calculate relative position vectors from center of mass to contact point
         glm::dvec3 rA = contactPoint - bodyA->m_position;
         glm::dvec3 rB = contactPoint - bodyB->m_position;
+
+        // Calculate angular velocities from body momentum for relative velocity calculation
+        glm::dvec3 angularVelocityBodyA = bodyA->m_invInertiaTensor * bodyA->m_angularMomentumBody;
+        glm::dvec3 angularVelocityBodyB = bodyB->m_invInertiaTensor * bodyB->m_angularMomentumBody;
+        glm::dvec3 angularVelocityA = orientationMatrixA * angularVelocityBodyA;
+        glm::dvec3 angularVelocityB = orientationMatrixB * angularVelocityBodyB;
         
         // Calculate relative velocity at contact point
-        glm::dvec3 velA = bodyA->m_velocity + glm::cross(bodyA->m_angularVelocity, rA);
-        glm::dvec3 velB = bodyB->m_velocity + glm::cross(bodyB->m_angularVelocity, rB);
+        glm::dvec3 velA = bodyA->m_velocity + glm::cross(angularVelocityA, rA);
+        glm::dvec3 velB = bodyB->m_velocity + glm::cross(angularVelocityB, rB);
         glm::dvec3 relativeVel = velA - velB;
         
         // Project relative velocity onto collision normal
@@ -330,11 +360,18 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         // Apply impulse
         glm::dvec3 impulse = normal * impulseMagnitude;
         
-        bodyA->m_velocity += impulse * bodyA->m_invMass;
-        bodyA->m_angularVelocity += glm::cross(rA, impulse) * bodyA->m_invMomentOfInertia;
+        // Apply impulse only to non-static bodies
+        if (!bodyA->m_isStatic) {
+            bodyA->m_velocity += impulse * bodyA->m_invMass;
+            glm::dvec3 angularImpulseBody = glm::transpose(orientationMatrixA) * glm::cross(rA, impulse);
+            bodyA->m_angularMomentumBody += angularImpulseBody;
+        }
         
-        bodyB->m_velocity -= impulse * bodyB->m_invMass;
-        bodyB->m_angularVelocity -= glm::cross(rB, impulse) * bodyB->m_invMomentOfInertia;
+        if (!bodyB->m_isStatic) {
+            bodyB->m_velocity -= impulse * bodyB->m_invMass;
+            glm::dvec3 angularImpulseBody = glm::transpose(orientationMatrixB) * glm::cross(rB, impulse);
+            bodyB->m_angularMomentumBody -= angularImpulseBody;
+        }
     }
 }
 
@@ -361,6 +398,12 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         }
         collision.m_collisionMassesCalculated = true;
     }
+
+    // Transform local inverse inertia tensors to world space (needed for position correction)
+    glm::dmat3 orientationMatrixA = glm::mat3_cast(bodyA->m_orientation);
+    glm::dmat3 orientationMatrixB = glm::mat3_cast(bodyB->m_orientation);
+    glm::dmat3 worldInvInertiaTensorA = orientationMatrixA * bodyA->m_invInertiaTensor * glm::transpose(orientationMatrixA);
+    glm::dmat3 worldInvInertiaTensorB = orientationMatrixB * bodyB->m_invInertiaTensor * glm::transpose(orientationMatrixB);
 
     // Process each contact point for position correction with dynamic overlap calculation
     for (size_t ii = 0; ii < collision.m_normals.size(); ++ii) {
@@ -402,17 +445,21 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         double scale = 0.3;
         glm::dvec3 correction = normal * correctionMagnitude * scale;
 
-        // Apply linear position corrections
-        bodyA->m_position -= correction * bodyA->m_invMass;
-        bodyB->m_position += correction * bodyB->m_invMass;
+        // Apply linear position corrections only to non-static bodies
+        if (!bodyA->m_isStatic) {
+            bodyA->m_position -= correction * bodyA->m_invMass;
+        }
+        if (!bodyB->m_isStatic) {
+            bodyB->m_position += correction * bodyB->m_invMass;
+        }
         
         // Apply angular position corrections (to orientation)
-        glm::dvec3 angularCorrectionA = -glm::cross(rA, correction) * bodyA->m_invMomentOfInertia;
-        glm::dvec3 angularCorrectionB = +glm::cross(rB, correction) * bodyB->m_invMomentOfInertia;
+        glm::dvec3 angularCorrectionA = -worldInvInertiaTensorA * glm::cross(rA, correction);
+        glm::dvec3 angularCorrectionB = +worldInvInertiaTensorB * glm::cross(rB, correction);
         
         // Convert angular corrections to quaternion rotations and apply
         double angularCorrectionALengthSq = glm::dot(angularCorrectionA, angularCorrectionA);
-        if (angularCorrectionALengthSq > 1e-18) { // 1e-9 squared
+        if (!bodyA->m_isStatic && angularCorrectionALengthSq > 1e-18) { // 1e-9 squared
             double angleA = glm::length(angularCorrectionA);
             glm::dvec3 axisA = angularCorrectionA / angleA;
             glm::dquat rotationA = glm::angleAxis(angleA, axisA);
@@ -421,7 +468,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         }
         
         double angularCorrectionBLengthSq = glm::dot(angularCorrectionB, angularCorrectionB);
-        if (angularCorrectionBLengthSq > 1e-18) { // 1e-9 squared
+        if (!bodyB->m_isStatic && angularCorrectionBLengthSq > 1e-18) { // 1e-9 squared
             double angleB = glm::sqrt(angularCorrectionBLengthSq);
            glm::dvec3 axisB = angularCorrectionB / angleB;
             glm::dquat rotationB = glm::angleAxis(angleB, axisB);
@@ -430,8 +477,12 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         }
         
         // Update collider transforms after position changes
-        updateColliderTransform(bodyA);
-        updateColliderTransform(bodyB);
+        if (!bodyA->m_isStatic) {
+            updateColliderTransform(bodyA);
+        }
+        if (!bodyB->m_isStatic) {
+            updateColliderTransform(bodyB);
+        }
     }
 }
 
@@ -442,16 +493,23 @@ double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB,
     glm::dvec3 rA = contactPoint - bodyA->m_position;
     glm::dvec3 rB = contactPoint - bodyB->m_position;
 
-    // Cross products for rotational terms
-    glm::dvec3 rAcrossN = glm::cross(rA, normal);
-    glm::dvec3 rBcrossN = glm::cross(rB, normal);
+    // Cross products with normal
+    glm::dvec3 rA_cross_n = glm::cross(rA, normal);
+    glm::dvec3 rB_cross_n = glm::cross(rB, normal);
+
+    // Transform local inverse inertia tensors to world space: I_world^(-1) = R * I_local^(-1) * R^T
+    glm::dmat3 orientationMatrixA = glm::mat3_cast(bodyA->m_orientation);
+    glm::dmat3 orientationMatrixB = glm::mat3_cast(bodyB->m_orientation);
+    glm::dmat3 worldInvInertiaTensorA = orientationMatrixA * bodyA->m_invInertiaTensor * glm::transpose(orientationMatrixA);
+    glm::dmat3 worldInvInertiaTensorB = orientationMatrixB * bodyB->m_invInertiaTensor * glm::transpose(orientationMatrixB);
     
-    // Calculate collision mass using the formula: 1/(invMassA + invMassB + (rA x n)²*invInertiaA + (rB x n)²*invInertiaB)
-    double collisionMass = 1.0 / (
-        bodyA->m_invMass + bodyB->m_invMass + 
-        glm::dot(rAcrossN, rAcrossN) * bodyA->m_invMomentOfInertia + 
-        glm::dot(rBcrossN, rBcrossN) * bodyB->m_invMomentOfInertia
-    );
+    // Rotational contributions using inertia tensors: (r × n)ᵀ · I⁻¹ · (r × n)
+    glm::dvec3 rotContribA = worldInvInertiaTensorA * rA_cross_n;
+    glm::dvec3 rotContribB = worldInvInertiaTensorB * rB_cross_n;
+    double rotTermA = glm::dot(rA_cross_n, rotContribA);
+    double rotTermB = glm::dot(rB_cross_n, rotContribB);
     
-    return collisionMass;
+    // Complete effective mass calculation
+    double invEffectiveMass = bodyA->m_invMass + bodyB->m_invMass + rotTermA + rotTermB;
+    return 1.0 / invEffectiveMass;
 }

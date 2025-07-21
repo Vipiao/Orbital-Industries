@@ -23,13 +23,13 @@ public:
         glm::dvec3 m_forces;          // Accumulated forces
         
         glm::dquat m_orientation;     // Orientation quaternion
-        glm::dvec3 m_angularVelocity; // Angular velocity (already includes deltaTime)
+        glm::dvec3 m_angularMomentumBody; // Angular momentum L in body space (primary state variable)
         glm::dvec3 m_torques;         // Accumulated torques
         
         double m_mass;                // Mass in kg
-        double m_momentOfInertia;     // Simplified moment of inertia (scalar)
+        glm::dmat3 m_inertiaTensor;   // Inertia tensor in local space
         double m_invMass;             // Cached inverse mass (1/mass)
-        double m_invMomentOfInertia;  // Cached inverse moment of inertia (1/momentOfInertia)
+        glm::dmat3 m_invInertiaTensor; // Cached inverse inertia tensor in local space
         
         bool m_isStatic;              // If true, this body won't move
 
@@ -54,7 +54,7 @@ public:
     RigidBody* addRigidBody(const glm::dvec3& position, 
                            const glm::dquat& orientation,
                            double mass = 1.0, 
-                           double momentOfInertia = 1.0,
+                           const glm::dmat3& inertiaTensor = glm::dmat3(1.0),
                            bool isStatic = false,
                            Collider* collider = nullptr);
     

@@ -193,7 +193,11 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     PhysicsEngine::RigidBody* sourceBody = sourceGrid->getRigidBody();
     glm::dvec3 originalCenterOfMass = sourceBody->m_position;
     glm::dvec3 originalVelocity = sourceBody->m_velocity;
-    glm::dvec3 originalAngularVelocity = sourceBody->m_angularVelocity;
+    
+    // Calculate angular velocity from angular momentum
+    glm::dmat3 orientationMatrix = glm::mat3_cast(sourceBody->m_orientation);
+    glm::dvec3 angularVelocityBody = sourceBody->m_invInertiaTensor * sourceBody->m_angularMomentumBody;
+    glm::dvec3 originalAngularVelocity = orientationMatrix * angularVelocityBody;
     glm::dquat originalOrientation = sourceBody->m_orientation;
     
     std::vector<PartitionPhysics> partitionPhysics(result.partitions.size());
@@ -283,12 +287,19 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
             glm::dvec3 worldCenterOfMass = partitionPhysics[i].centerOfMass;
             newBody->m_position = worldCenterOfMass;
             newBody->m_velocity = partitionPhysics[i].velocity;
-            newBody->m_angularVelocity = originalAngularVelocity;
+            
+            // Set angular momentum instead of angular velocity
+            glm::dvec3 angularVelocityBody = glm::transpose(orientationMatrix) * originalAngularVelocity;
+            newBody->m_angularMomentumBody = newBody->m_inertiaTensor * angularVelocityBody;
             newBody->m_orientation = originalOrientation;
         }
         
         newGrids.push_back(newGrid);
     }
+
+    // Recalculate original partition local angular momentum as its mass has now changed.
+    angularVelocityBody = glm::transpose(orientationMatrix) * originalAngularVelocity;
+    sourceBody->m_angularMomentumBody = sourceBody->m_inertiaTensor * angularVelocityBody;
     
     std::cout << "Created " << newGrids.size() << " new grids from split" << std::endl;
 }
