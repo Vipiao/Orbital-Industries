@@ -4,6 +4,14 @@
 #include <algorithm>
 #include "../utils/PairCache.h"
 #include <iostream>
+#include "../utils/TimeHandler.h"
+ 
+CollisionDetector::CollisionDetector(TimeHandler* timeHandler) 
+    : m_timeHandler(timeHandler) {
+    if (!m_timeHandler) {
+        throw std::invalid_argument("TimeHandler cannot be null");
+    }
+}
 
 void CollisionDetector::addCollider(Collider* collider) {
     if (!collider) return;
@@ -55,9 +63,16 @@ void CollisionDetector::removeCollider(Collider* collider) {
     }
 }
 
-void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
+void CollisionDetector::setEndTime(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    m_endTime = endTime;
+}
+
+Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions) {
     // Update all collision boxes
     updateAllCollidersAndAABB();
+    if (m_timeHandler->now() >= m_endTime) {
+        co_yield true; // Need more time
+    }
 
     std::set<std::pair<Collider*, Collider*>> potentialCollisions;
 
@@ -78,24 +93,43 @@ void CollisionDetector::run(std::vector<CollisionResult>& collisions) {
     
     // Update all edge values
     updateAllEdgeValues();
+    if (m_timeHandler->now() >= m_endTime) {
+        co_yield true; // Need more time
+    }
     
     // Sort and detect collisions for each axis
     sortAndDetectPotentialCollisions(edgesX, potentialCollisions);
+    if (m_timeHandler->now() >= m_endTime) {
+        co_yield true; // Need more time
+    }
     sortAndDetectPotentialCollisions(edgesY, potentialCollisions);
+    if (m_timeHandler->now() >= m_endTime) {
+        co_yield true; // Need more time
+    }
     sortAndDetectPotentialCollisions(edgesZ, potentialCollisions);
-
-    static int bb = 0;bb++;
+    if (m_timeHandler->now() >= m_endTime) {
+        co_yield true; // Need more time
+    }
 
     // Now check potential collisions that overlap on ALL axes
+    int processed = 0;
     for (const auto& pair : potentialCollisions) {
         if (pair.first->checkAABBCollision(pair.second)) {
             // Add to active collisions
             m_activeAABBS.insert(pair);
+
+            // Check time every 50 successful AABB checks
+            if (++processed % 50 == 0 && m_timeHandler->now() >= m_endTime) {
+                co_yield true; // Need more time
+            }
         }
     }
     
     // Perform detailed collision detection on all active collisions
     for (const auto& pair : m_activeAABBS) {
+        if (m_timeHandler->now() >= m_endTime) {
+            co_yield true; // Need more time
+        }
         checkCollision(pair.first, pair.second, collisions);
     }
 }

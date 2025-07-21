@@ -105,18 +105,18 @@ public:
         //    }
         //}
         // Ground.
-        //int size{ 50 };
-        //for (int ii = -size; ii < size; ii++)
-        //{
-        //    for (int jj = -size; jj < size; jj++)
-        //    {
-        //        for (int kk = -3; kk < -2; kk++)
-        //        {
-        //            addGridBlock(initialGrid, ii, jj, kk);
-        //            std::cout << ii << std::endl;
-        //        }
-        //    }
-        //}
+        int size{ 50 };
+        for (int ii = -size; ii < size; ii++)
+        {
+            for (int jj = -size; jj < size; jj++)
+            {
+                for (int kk = -3; kk < -2; kk++)
+                {
+                    addGridBlock(initialGrid, ii, jj, kk);
+                    std::cout << ii << std::endl;
+                }
+            }
+        }
         
         //Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         //addGridBlock(gg, 0, 0, 0);  // Center block
@@ -406,7 +406,7 @@ protected:
         // Apply drag to all objects before running physics
         for (const auto& grid : m_grids) {
             RigidBody* body = grid->getRigidBody();
-            if (body && !body->m_isStatic) {
+            if (body && !body->m_isStatic && body->m_forces == glm::dvec3{0,0,0}) {
                 // Simple drag force calculation: -dragCoefficient * velocity
                 const double dragCoefficient = 0.04 * 0.4;
                 

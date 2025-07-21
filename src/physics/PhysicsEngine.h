@@ -7,6 +7,7 @@
 #include "CollisionDetector.h"
 #include "CollisionResult.h"
 #include <chrono>
+#include "../utils/Generator.h"
 
 // Forward declaration
 class TimeHandler;
@@ -78,6 +79,7 @@ private:
     // State machine variables
     RunState m_runState = RunState::APPLY_FORCES;
     CollisionProcessState m_collisionProcessState = CollisionProcessState::DETECT;
+    std::unique_ptr<Generator<bool>> m_collisionGenerator;
     size_t m_currentCollisionIndex = 0;
     int m_separationIteration = 0;
     std::vector<CollisionResult> m_activeCollisions;

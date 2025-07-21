@@ -7,10 +7,15 @@
 #include <vector>
 #include <set>
 #include <memory>
+#include <chrono>
+#include "../utils/Generator.h"
+
+// Forward declaration
+class TimeHandler;
 
 class CollisionDetector {
 public:
-    CollisionDetector() = default;
+    CollisionDetector(TimeHandler* timeHandler);
     ~CollisionDetector() = default;
     
     // Add a collider to the collision detection system
@@ -20,7 +25,10 @@ public:
     void removeCollider(Collider* collider);
     
     // Run collision detection
-    void run(std::vector<CollisionResult>& collisions);
+    Generator<bool> run(std::vector<CollisionResult>& collisions);
+    
+    // Set the end time for the current collision detection run
+    void setEndTime(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     
 private:
     std::vector<Collider*> colliders;
@@ -30,6 +38,9 @@ private:
 
     // Active collision pairs
     std::set<std::pair<Collider*, Collider*>> m_activeAABBS;
+
+    TimeHandler* m_timeHandler;
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_endTime;
 
     // Helper functions
     void updateAllCollidersAndAABB();

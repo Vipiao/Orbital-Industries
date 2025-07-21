@@ -8,7 +8,7 @@
 #include "../utils/TimeHandler.h"
 
 PhysicsEngine::PhysicsEngine(TimeHandler* timeHandler)
-    : m_timeHandler(timeHandler)
+    : m_timeHandler(timeHandler), m_collisionDetector(timeHandler)
 {
     if (!m_timeHandler) {
         throw std::invalid_argument("TimeHandler cannot be null");
@@ -167,14 +167,31 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
 bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
     const size_t COLLISION_BATCH_SIZE = 5; // Process this many collisions before checking time
     
+    extern int hit_count;
+    int hh = hit_count;
     while (m_timeHandler->now() < endTime) {
         switch (m_collisionProcessState) {
             case CollisionProcessState::DETECT:
-                // Collect collision results
-                m_activeCollisions.clear();
-                m_collisionDetector.run(m_activeCollisions);
-                m_currentCollisionIndex = 0;
-                m_collisionProcessState = CollisionProcessState::RESOLVE;
+                if (!m_collisionGenerator) {
+                    m_activeCollisions.clear();
+                    m_collisionGenerator = std::make_unique<Generator<bool>>(m_collisionDetector.run(m_activeCollisions));
+                }
+                
+                // Update end time (for new calls or resuming)
+                m_collisionDetector.setEndTime(endTime);
+                
+                // Continue collision detection
+                ++(*m_collisionGenerator);
+                
+                if (!*m_collisionGenerator) {
+                    // Collision detection complete
+                    m_collisionGenerator.reset();
+                    m_currentCollisionIndex = 0;
+                    m_collisionProcessState = CollisionProcessState::RESOLVE;
+                } else {
+                    // Generator yielded - needs more time
+                    return true;
+                }
                 break;
                 
             case CollisionProcessState::RESOLVE:
