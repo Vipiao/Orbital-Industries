@@ -702,7 +702,7 @@ CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoi
         avgNegative /= static_cast<double>(negativeVertices.size());
         
         glm::dvec3 center = (avgPositive + avgNegative) * 0.5;
-        const double radius = 0.3;
+        const double radius = 0.2;
         
         // Choose plane perpendicular to collision normal's largest component
         if (std::abs(normal.x) > std::abs(normal.y) && std::abs(normal.x) > std::abs(normal.z)) {
