@@ -283,7 +283,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     glm::dvec3 collisionNormal = glm::normalize(separatingAxis);
     
     // Check if this collision should be filtered based on filter normals
-    const double filterTolerance = 0.8; // arccos(0.8) = 36.87 deg tolerance
+    const double filterTolerance = 0.7; // arccos(0.7) ~ 45.57 deg tolerance
     
     // Check filter normals from both cubes
     for (const glm::dvec3& filterNormal : filterNormalsA) {
