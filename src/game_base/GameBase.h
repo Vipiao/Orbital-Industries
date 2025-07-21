@@ -2,7 +2,7 @@
 #pragma once
 
 #include "../graphics/GraphicsEngine.h"
-#include "../utils/JobManager.h"
+#include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
 #include "../utils/TimeHandler.h"
 #include "../utils/HashFunctions.h"

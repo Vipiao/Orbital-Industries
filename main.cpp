@@ -39,7 +39,7 @@ public:
         
         // Create a center grid that will be our player object
         Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
-        PhysicsEngine::RigidBody* bb = initialGrid->getRigidBody();
+        RigidBody* bb = initialGrid->getRigidBody();
         bb->m_position = {0,0,0};
         //bb->m_velocity = {0.0,0.0,-0.01};
         addGridBlock(initialGrid, 0, 0, 0);
@@ -120,10 +120,10 @@ public:
         
         //Grid* gg = createGrid(glm::dvec3(0, 0, 0));
         //addGridBlock(gg, 0, 0, 0);  // Center block
-        //PhysicsEngine::RigidBody* bb = gg->getRigidBody();
+        //RigidBody* bb = gg->getRigidBody();
         //bb->m_position = {0.5, -2, 0.5};
         
-        PhysicsEngine::RigidBody* body = initialGrid->getRigidBody();
+        RigidBody* body = initialGrid->getRigidBody();
         //body->m_angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
         //body->m_velocity = {0,0,-1};
         //body->m_orientation = glm::angleAxis(glm::radians(180.0), glm::dvec3{1.0, 0.,0.});
@@ -248,7 +248,7 @@ protected:
             // Handle the different actions based on what was found
             if (doTrackSpeed) {
                 if (blockFound && targetGrid) {
-                    PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
+                    RigidBody* body = targetGrid->getRigidBody();
                     if (body) {
                         // Set camera velocity to match the rigid body's velocity
                         //m_cameraVelocity = body->m_velocity;
@@ -261,7 +261,7 @@ protected:
             }
             if (doForce) {
                 if (blockFound && targetGrid) {
-                    PhysicsEngine::RigidBody* body = targetGrid->getRigidBody();
+                    RigidBody* body = targetGrid->getRigidBody();
                     if (body) {
                         // Apply force in the view direction
                         const double forceStrength = 0.001 * body->m_mass * forceMultiplier;
@@ -405,10 +405,10 @@ protected:
     virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) override {
         // Apply drag to all objects before running physics
         for (const auto& grid : m_grids) {
-            PhysicsEngine::RigidBody* body = grid->getRigidBody();
+            RigidBody* body = grid->getRigidBody();
             if (body && !body->m_isStatic) {
                 // Simple drag force calculation: -dragCoefficient * velocity
-                const double dragCoefficient = 0.04 * 0.1;
+                const double dragCoefficient = 0.04 * 0.4;
                 
                 // Apply drag to linear velocity
                 if (glm::length(body->m_velocity) > 0.0) {

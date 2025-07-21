@@ -3,6 +3,7 @@
 #include <set>
 #include "Grid.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include "../physics/PhysicsEngine.h"
 #include "MassInertiaCalculator.h"
 #include "../debug/DebugGlobals.h"
 #include <limits>
@@ -399,7 +400,7 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
         return;
     }
     
-    PhysicsEngine::RigidBody* body = m_rigidBody;
+    RigidBody* body = m_rigidBody;
 
     glm::dvec3 angVelAxis = body->getAngularVelocityWorld();
     double angVelMagnitude = glm::length(angVelAxis);

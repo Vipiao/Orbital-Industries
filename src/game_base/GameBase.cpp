@@ -190,7 +190,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     std::cout << "Grid split detected! " << result.partitions.size() << " partitions found." << std::endl;
     
     // Step 3: Pre-calculate physics properties for each partition
-    PhysicsEngine::RigidBody* sourceBody = sourceGrid->getRigidBody();
+    RigidBody* sourceBody = sourceGrid->getRigidBody();
     glm::dvec3 originalCenterOfMass = sourceBody->m_position;
     glm::dvec3 originalVelocity = sourceBody->m_velocity;
     
@@ -279,7 +279,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         }
 
         // Set physics properties using pre-calculated values
-        PhysicsEngine::RigidBody* newBody = newGrid->getRigidBody();
+        RigidBody* newBody = newGrid->getRigidBody();
         if (newBody) {
             // Transform center of mass to world space and set position
             glm::dvec3 worldCenterOfMass = partitionPhysics[i].centerOfMass;

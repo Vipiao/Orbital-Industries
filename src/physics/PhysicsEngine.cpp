@@ -7,65 +7,6 @@
 #include "../debug/DebugRenderer.h"
 #include "../utils/TimeHandler.h"
 
-// RigidBody cached getter implementations
-const glm::dmat3& PhysicsEngine::RigidBody::getOrientationMatrix() const {
-    if (m_orientationMatrixDirty) {
-        m_cachedOrientationMatrix = glm::mat3_cast(m_orientation);
-        m_orientationMatrixDirty = false;
-    }
-    return m_cachedOrientationMatrix;
-}
-
-const glm::dvec3& PhysicsEngine::RigidBody::getAngularVelocityBody() const {
-    if (m_angularVelocityDirty) {
-        m_cachedAngularVelocityBody = m_invInertiaTensor * m_angularMomentumBody;
-        m_angularVelocityDirty = false;
-    }
-    return m_cachedAngularVelocityBody;
-}
-
-const glm::dvec3& PhysicsEngine::RigidBody::getAngularVelocityWorld() const {
-    if (m_angularVelocityDirty) {
-        m_cachedAngularVelocityWorld = getOrientationMatrix() * getAngularVelocityBody();
-        m_angularVelocityDirty = false;
-    }
-    return m_cachedAngularVelocityWorld;
-}
-
-const glm::dmat3& PhysicsEngine::RigidBody::getWorldInertiaTensor() const {
-    if (m_worldInertiaDirty) {
-        const glm::dmat3& orientationMatrix = getOrientationMatrix();
-        m_cachedWorldInertiaTensor = orientationMatrix * m_inertiaTensor * glm::transpose(orientationMatrix);
-        m_worldInertiaDirty = false;
-    }
-    return m_cachedWorldInertiaTensor;
-}
-
-const glm::dmat3& PhysicsEngine::RigidBody::getWorldInvInertiaTensor() const {
-    if (m_worldInertiaDirty) {
-        const glm::dmat3& orientationMatrix = getOrientationMatrix();
-        m_cachedWorldInvInertiaTensor = orientationMatrix * m_invInertiaTensor * glm::transpose(orientationMatrix);
-        m_worldInertiaDirty = false;
-    }
-    return m_cachedWorldInvInertiaTensor;
-}
-
-// RigidBody invalidation methods
-void PhysicsEngine::RigidBody::invalidateOrientation() {
-    m_orientationMatrixDirty = true;
-    m_angularVelocityDirty = true;
-    m_worldInertiaDirty = true;
-}
-
-void PhysicsEngine::RigidBody::invalidateAngularMomentum() {
-    m_angularVelocityDirty = true;
-}
-
-void PhysicsEngine::RigidBody::invalidateInertiaTensor() {
-    m_angularVelocityDirty = true;
-    m_worldInertiaDirty = true;
-}
-
 PhysicsEngine::PhysicsEngine(TimeHandler* timeHandler)
     : m_timeHandler(timeHandler)
 {
@@ -78,7 +19,7 @@ PhysicsEngine::~PhysicsEngine() {
     // Vector of unique_ptr will handle cleanup automatically
 }
 
-PhysicsEngine::RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position, 
+RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position,
                                const glm::dquat& orientation,
                                double mass, 
                                const glm::dmat3& inertiaTensor,

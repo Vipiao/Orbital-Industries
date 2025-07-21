@@ -1,7 +1,7 @@
 // Grid.h
 #pragma once
 
-#include "../physics/PhysicsEngine.h"
+#include "../physics/RigidBody.h"
 #include "../physics/GridCollider.h"
 #include "MassInertiaCalculator.h"
 #include "../utils/HashFunctions.h"
@@ -15,6 +15,9 @@
 #include <memory>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
+
+// Forward declarations
+class PhysicsEngine;
 
 // Forward declaration
 class Grid;
@@ -56,7 +59,7 @@ public:
     // Graphics updates
     void updateGraphics(const glm::dvec3& cameraPos);
     
-    PhysicsEngine::RigidBody* getRigidBody() const { return m_rigidBody; }
+    RigidBody* getRigidBody() const { return m_rigidBody; }
 
     // Convert world coordinates to grid-local coordinates
     glm::dvec3 worldToGrid(const glm::dvec3& worldPos) const;
@@ -91,7 +94,7 @@ private:
         
     // External system references
     PhysicsEngine* m_physics;
-    PhysicsEngine::RigidBody* m_rigidBody{nullptr};
+    RigidBody* m_rigidBody{nullptr};
     std::unique_ptr<GridCollider> m_collider;
 
     // Graphics subsystem
