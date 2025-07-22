@@ -10,6 +10,7 @@
 class BallCollider;
 class CubeCollider;
 class GridCollider;
+class PolyhedronCollider;
 
 // Contact point reduction thresholds
 static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 11;
@@ -27,9 +28,9 @@ public:
     static CollisionResult detectBallCube(
         BallCollider* ball, CubeCollider* cube);
     
-    // Cube-Cube collision
-    static CollisionResult detectCubeCube(
-        CubeCollider* cubeA, CubeCollider* cubeB,
+    // Polyhedron-Polyhedron collision
+    static CollisionResult detectPolyhedronPolyhedron(
+        PolyhedronCollider* polyA, PolyhedronCollider* polyB,
         bool useSimplifiedContactGeneration = false);
     
     // Ball-Grid collision

@@ -3,6 +3,7 @@
 #include "BallCollider.h"
 #include "CubeCollider.h"
 #include "GridCollider.h"
+#include "PolyhedronCollider.h"
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
@@ -41,9 +42,9 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                         static_cast<CubeCollider*>(colliderA),
                         static_cast<BallCollider*>(colliderB));
                 case CubeCollider::TYPE_ID:
-                    return detectCubeCube(
-                        static_cast<CubeCollider*>(colliderA),
-                        static_cast<CubeCollider*>(colliderB));
+                    return detectPolyhedronPolyhedron(
+                        static_cast<PolyhedronCollider*>(colliderA),
+                        static_cast<PolyhedronCollider*>(colliderB));
                 case GridCollider::TYPE_ID:
                     return detectCubeGrid(
                         static_cast<CubeCollider*>(colliderA),
@@ -175,21 +176,21 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
     return CollisionResult();
 }
 
-CollisionResult CollisionDetectionUtils::detectCubeCube(
-    CubeCollider* cubeA, CubeCollider* cubeB,
+CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
+    PolyhedronCollider* polyA, PolyhedronCollider* polyB,
     bool useSimplifiedContactGeneration) {
 
     // Update accurate AABBs for precise collision detection
-    cubeA->updateAdvancedAABB();
-    cubeB->updateAdvancedAABB();
+    polyA->updateAdvancedAABB();
+    polyB->updateAdvancedAABB();
     
-    if (!cubeA->checkAABBCollision(cubeB)) {
+    if (!polyA->checkAABBCollision(polyB)) {
         return CollisionResult(); // No collision after precise AABB check
     }
     
     // Get vertices for both cubes - will use cached vertices
-    std::vector<glm::dvec3> verticesA = cubeA->getVertices();
-    std::vector<glm::dvec3> verticesB = cubeB->getVertices();
+    std::vector<glm::dvec3> verticesA = polyA->getVertices();
+    std::vector<glm::dvec3> verticesB = polyB->getVertices();
 
     //if (DebugGlobals::getDebugRenderer()) {
     //    std::string vertA = DebugGlobals::getDebugRenderer()->generateGeogebraCommands(verticesA);
@@ -202,19 +203,19 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     //std::cout << geogebraCommands << std::endl;
     
     // Get axes for both cubes
-    auto [faceAxesA, edgeAxesA, filterNormalsA] = cubeA->getCollisionAxes();
-    auto [faceAxesB, edgeAxesB, filterNormalsB] = cubeB->getCollisionAxes();
+    auto [faceAxesA, edgeAxesA, filterNormalsA] = polyA->getCollisionAxes();
+    auto [faceAxesB, edgeAxesB, filterNormalsB] = polyB->getCollisionAxes();
     
     double minPenetration = std::numeric_limits<double>::max();
     glm::dvec3 separatingAxis;
 
     // Try cached axis first
     glm::dvec3 cachedAxis;
-    if (PairCache<glm::dvec3>::getCachedData(cubeA, cubeB, cachedAxis)) {
+    if (PairCache<glm::dvec3>::getCachedData(polyA, polyB, cachedAxis)) {
         SeparatingAxisResult result = testSeparatingAxis(cachedAxis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis again (it worked!)
-            PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, cachedAxis);
+            PairCache<glm::dvec3>::setCachedData(polyA, polyB, cachedAxis);
             return CollisionResult();
         }
     }
@@ -224,7 +225,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, glm::normalize(axis));
+            PairCache<glm::dvec3>::setCachedData(polyA, polyB, glm::normalize(axis));
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -238,7 +239,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, glm::normalize(axis));
+            PairCache<glm::dvec3>::setCachedData(polyA, polyB, glm::normalize(axis));
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -262,7 +263,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
             SeparatingAxisResult result = testSeparatingAxis(crossProduct, verticesA, verticesB);
             if (result.isSeparating) {
                 // Cache this separating axis
-                PairCache<glm::dvec3>::setCachedData(cubeA, cubeB, crossProduct);
+                PairCache<glm::dvec3>::setCachedData(polyA, polyB, crossProduct);
                 return CollisionResult();
             }
             if (result.penetration < minPenetration) {
@@ -274,7 +275,7 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     
     // If we reach here, there's a collision
     // Ensure normal points from A toward B
-    glm::dvec3 centerToCenter = cubeB->m_position - cubeA->m_position;
+    glm::dvec3 centerToCenter = polyB->m_position - polyA->m_position;
     if (glm::dot(separatingAxis, centerToCenter) < 0.0) {
         separatingAxis = -separatingAxis;
     }
@@ -288,13 +289,13 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     // Check filter normals from both cubes
     for (const glm::dvec3& filterNormal : filterNormalsA) {
         if (glm::dot(collisionNormal, filterNormal) > filterTolerance) {
-            return CollisionResult(cubeA, cubeB, true); // True means is filtered.
+            return CollisionResult(polyA, polyB, true); // True means is filtered.
         }
     }
     
     for (const glm::dvec3& filterNormal : filterNormalsB) {
         if (glm::dot(-collisionNormal, filterNormal) > filterTolerance) {
-            return CollisionResult(cubeA, cubeB, true); // True means is filtered.
+            return CollisionResult(polyA, polyB, true); // True means is filtered.
         }
     }
 
@@ -305,11 +306,11 @@ CollisionResult CollisionDetectionUtils::detectCubeCube(
     CollisionResult result(true, contactInfo.contactPoints.size() > 0 ? 
                           std::vector<glm::dvec3>(contactInfo.contactPoints.size(), contactInfo.normal) :
                           std::vector<glm::dvec3>{contactInfo.normal},
-                          contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints : std::vector<glm::dvec3>{cubeA->m_position},
+                          contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints : std::vector<glm::dvec3>{polyA->m_position},
                           contactInfo.contactPoints.size() > 0 ? 
                           std::vector<double>(contactInfo.contactPoints.size(), contactInfo.penetration) :
                           std::vector<double>{contactInfo.penetration},
-                          cubeA, cubeB);
+                          polyA, polyB);
     
     // Reduce contact points if there are too close
     if (result.m_contactPoints.size() > 1) {
@@ -394,7 +395,7 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
         }
         
         // Perform detailed collision detection (cube-cube)
-        CollisionResult result = detectCubeCube(cube, gridCell);
+        CollisionResult result = detectPolyhedronPolyhedron(cube, gridCell);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -494,7 +495,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
                 // Quick AABB check first
                 if (queryCollider->checkAABBCollision(targetCollider)) {
                     // Perform detailed collision detection
-                    CollisionResult result = detectCubeCube(queryCollider, targetCollider, 
+                    CollisionResult result = detectPolyhedronPolyhedron(queryCollider, targetCollider,
                                                            useSimplifiedContactGeneration);
                     
                     if (result.m_hasCollision) {
