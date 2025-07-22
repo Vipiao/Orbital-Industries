@@ -54,6 +54,17 @@ public:
         GridCollider* grid, CubeCollider* cube);
 
 private:
+    // Helper function to eliminate vector copying between cube-grid and grid-grid detection
+    static void processCubeGridCollision(
+        CubeCollider* cube, 
+        GridCollider* grid,
+        std::vector<glm::dvec3>& allNormals,
+        std::vector<glm::dvec3>& allContactPoints,
+        std::vector<double>& allPenetrationDepths,
+        int& collisionPairCount,
+        bool useSimplifiedContactGeneration = false,
+        bool normalFlip = false);
+
     // Helper structures for cube collision detection
     struct SeparatingAxisResult {
         bool isSeparating;

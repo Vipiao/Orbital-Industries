@@ -367,43 +367,88 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     return CollisionResult();
 }
 
+void CollisionDetectionUtils::processCubeGridCollision(
+    CubeCollider* cube, 
+    GridCollider* grid,
+    std::vector<glm::dvec3>& allNormals,
+    std::vector<glm::dvec3>& allContactPoints,
+    std::vector<double>& allPenetrationDepths,
+    int& collisionPairCount,
+    bool useSimplifiedContactGeneration,
+    bool normalFlip) {
+    
+    // Early exit if grid is empty
+    if (grid->getCells().empty()) {
+        return;
+    }
+    
+    // Get center position of cube
+    glm::dvec3 cubeCenter = cube->m_position;
+    glm::dvec3 gridSpaceCenter = grid->worldToGrid(cubeCenter);
+
+    const double searchRadius = 0.5 * std::sqrt(3.0);
+
+    // Early AABB test optimization - check if cube can possibly intersect grid
+    glm::dvec3 expandedMin = glm::dvec3(grid->getLocalAABBMin()) - glm::dvec3(searchRadius);
+    glm::dvec3 expandedMax = glm::dvec3(grid->getLocalAABBMax()) + glm::dvec3(1.0) + glm::dvec3(searchRadius);
+    
+    if (gridSpaceCenter.x < expandedMin.x || gridSpaceCenter.x > expandedMax.x ||
+        gridSpaceCenter.y < expandedMin.y || gridSpaceCenter.y > expandedMax.y ||
+        gridSpaceCenter.z < expandedMin.z || gridSpaceCenter.z > expandedMax.z) {
+        return; // Cube is too far from grid's AABB
+    }
+    
+    // Optimization: Use precomputed neighborhoods if available
+    glm::ivec3 gridCenterCoord = glm::ivec3(glm::floor(gridSpaceCenter));
+    auto neighborhoodIt = grid->m_neighborhoods.find(gridCenterCoord);
+    
+    if (neighborhoodIt != grid->m_neighborhoods.end()) {
+        const auto& neighborhood = neighborhoodIt->second;
+        
+        // Process all cells in neighborhood (center cell first, then neighbors)
+        for (CubeCollider* gridCollider : neighborhood.m_neighbors) {
+            // Quick AABB check first
+            if (cube->checkAABBCollision(gridCollider)) {
+                // Perform detailed collision detection
+                CollisionResult result = detectPolyhedronPolyhedron(cube, gridCollider, useSimplifiedContactGeneration);
+                
+                if (result.m_hasCollision) {
+                    collisionPairCount++; // Increment by 1 per collision pair, not per contact point
+                    
+                    // Directly append collision data to result vectors
+                    if (normalFlip) {
+                        for (const auto& normal : result.m_normals) {
+                            allNormals.push_back(-normal);
+                        }
+                    } else {
+                        for (const auto& normal : result.m_normals) {
+                            allNormals.push_back(normal);
+                        }
+                    }
+                    allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
+                    allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
+                }
+            }
+        }
+    }
+}
+
 CollisionResult CollisionDetectionUtils::detectCubeGrid(
     CubeCollider* cube, GridCollider* grid) {
-    
-    const glm::dvec3& cubePos = cube->m_position;
-    const glm::dquat& cubeOri = cube->m_orientation;
-    double cubeWidth = cube->m_width;
     
     // Early exit if grid is empty
     if (grid->getCells().empty()) {
         return CollisionResult();
     }
     
-    // Calculate search radius: cube half-diagonal
-    const double searchRadius = cubeWidth * 0.5 * std::sqrt(3.0);
-    std::vector<CubeCollider*> nearbyColliders = grid->findCellsInRadius(cubePos, searchRadius);
-    
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
     std::vector<double> allPenetrationDepths;
+    int collisionPairCount = 0;
     
-    // Test collision with each found collider
-    for (CubeCollider* gridCell : nearbyColliders) {
-        // Quick AABB check first
-        if (!gridCell->checkAABBCollision(cube)) {
-            continue;
-        }
-        
-        // Perform detailed collision detection (cube-cube)
-        CollisionResult result = detectPolyhedronPolyhedron(cube, gridCell);
-        
-        if (result.m_hasCollision) {
-            // Add all collision data to our result
-            allNormals.insert(allNormals.end(), result.m_normals.begin(), result.m_normals.end());
-            allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
-            allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
-        }
-    }
+    // Use helper function to process collision
+    processCubeGridCollision(cube, grid, allNormals, allContactPoints, allPenetrationDepths, 
+                           collisionPairCount, false, false);
     
     // Return combined result
     if (!allNormals.empty()) {
@@ -441,8 +486,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     bool useSimplifiedContactGeneration = hasCachedData && cachedCollisionPairCount > CONTACT_COMPLEXITY_THRESHOLD;
     
     // Choose the smaller grid as the query grid for optimization
-    const GridCollider* queryGrid;
-    const GridCollider* targetGrid;
+    GridCollider* queryGrid;
+    GridCollider* targetGrid;
     bool normalFlip = false; // Track if we need to flip normals due to order change
     
     if (cellsA.size() <= cellsB.size()) {
@@ -462,54 +507,14 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     std::vector<double> allPenetrationDepths;
     int collisionPairCount = 0;
     
-    // Iterate through query grid cells
+    // Iterate through query grid cells and use helper function
     for (const auto& queryPair : queryCells) {
-        const glm::ivec3& queryCoord = queryPair.first;
         CubeCollider* queryCollider = queryPair.second.get();
         
-        // Get center position of query cell
-        glm::dvec3 queryCellCenter = queryGrid->gridToWorld(glm::dvec3(queryCoord) + glm::dvec3(0.5));
-        glm::dvec3 targetSpaceCenter = targetGrid->worldToGrid(queryCellCenter);
-
-        const double searchRadius = 0.5 * std::sqrt(3.0);
-
-        // Early AABB test optimization - check if query cell can possibly intersect target grid
-        glm::dvec3 expandedMin = glm::dvec3(targetGrid->getLocalAABBMin()) - glm::dvec3(searchRadius);
-        glm::dvec3 expandedMax = glm::dvec3(targetGrid->getLocalAABBMax()) + glm::dvec3(1.0) + glm::dvec3(searchRadius);
-        
-        if (targetSpaceCenter.x < expandedMin.x || targetSpaceCenter.x > expandedMax.x ||
-            targetSpaceCenter.y < expandedMin.y || targetSpaceCenter.y > expandedMax.y ||
-            targetSpaceCenter.z < expandedMin.z || targetSpaceCenter.z > expandedMax.z) {
-            continue; // Query cell is too far from target grid's AABB
-        }
-        
-        // Optimization: Use precomputed neighborhoods if available
-        glm::ivec3 targetCenterCoord = glm::ivec3(glm::floor(targetSpaceCenter));
-        auto neighborhoodIt = targetGrid->m_neighborhoods.find(targetCenterCoord);
-        
-        if (neighborhoodIt != targetGrid->m_neighborhoods.end()) {
-            const auto& neighborhood = neighborhoodIt->second;
-            
-            // Process all cells in neighborhood (center cell first, then neighbors)
-            for (CubeCollider* targetCollider : neighborhood.m_neighbors) {
-                // Quick AABB check first
-                if (queryCollider->checkAABBCollision(targetCollider)) {
-                    // Perform detailed collision detection
-                    CollisionResult result = detectPolyhedronPolyhedron(queryCollider, targetCollider,
-                                                           useSimplifiedContactGeneration);
-                    
-                    if (result.m_hasCollision) {
-                        collisionPairCount++;
-                        // Add all collision data to our result, flipping normals if needed
-                        for (const auto& normal : result.m_normals) {
-                            allNormals.push_back(normalFlip ? -normal : normal);
-                        }
-                        allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
-                        allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
-                    }
-                }
-            }
-        }
+        // Use helper function to process collision
+        processCubeGridCollision(queryCollider, targetGrid, allNormals, allContactPoints, 
+                               allPenetrationDepths, collisionPairCount, 
+                               useSimplifiedContactGeneration, normalFlip);
     }
     
     // Return combined result
