@@ -8,6 +8,20 @@
 #include <unordered_map>
 #include <memory>
 
+/**
+ * @brief Pre-computed neighborhood of cells for fast spatial queries
+ * Stores pointers to nearby cells within a fixed radius to avoid repeated hash lookups
+ */
+class CellNeighborhood {
+public:
+    std::vector<CubeCollider*> m_neighbors;         // All cells: center cell first (if exists), then neighbors
+    bool m_hasCenter = false;                       // True if first element is the center cell
+    
+    CellNeighborhood() {
+        m_neighbors.reserve(27); // 3x3x3 = 27 max cells (center + neighbors)
+    }
+};
+
 class GridCollider : public Collider {
 public:
     GridCollider(const glm::dvec3& position = glm::dvec3(0.0),
@@ -36,9 +50,16 @@ public:
     // Allow access to cells for collision detection utils
     const std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash>& getCells() const { return m_cells; }
 
+    // Optimization: Pre-computed neighborhoods for fast spatial queries
+    static constexpr int NEIGHBORHOOD_RADIUS = 1; // 3x3x3 neighborhood
+    std::unordered_map<glm::ivec3, CellNeighborhood, IVec3Hash> m_neighborhoods;
+
     // Access to local AABB bounds for optimization
     const glm::ivec3& getLocalAABBMin() const { return m_localAABBMin; }
     const glm::ivec3& getLocalAABBMax() const { return m_localAABBMax; }
+
+    // Allow CollisionDetectionUtils to access neighborhoods for optimization
+    friend class CollisionDetectionUtils;
     
     glm::dvec3 gridToWorld(const glm::dvec3& gridCoord) const;
     glm::dvec3 worldToGrid(const glm::dvec3& worldCoord) const;

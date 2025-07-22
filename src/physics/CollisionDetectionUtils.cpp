@@ -482,28 +482,31 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             continue; // Query cell is too far from target grid's AABB
         }
         
-        // Find colliders within search area
-        std::vector<CubeCollider*> nearbyColliders = targetGrid->findCellsInRadius(queryCellCenter, searchRadius);
-
-        // Test collision with each found collider
-        for (CubeCollider* targetCollider : nearbyColliders) {
-            // Quick AABB check first
-            if (!queryCollider->checkAABBCollision(targetCollider)) {
-                continue;
-            }
+        // Optimization: Use precomputed neighborhoods if available
+        glm::ivec3 targetCenterCoord = glm::ivec3(glm::floor(targetSpaceCenter));
+        auto neighborhoodIt = targetGrid->m_neighborhoods.find(targetCenterCoord);
+        
+        if (neighborhoodIt != targetGrid->m_neighborhoods.end()) {
+            const auto& neighborhood = neighborhoodIt->second;
             
-            // Perform detailed collision detection with correct order
-            CollisionResult result = detectCubeCube(queryCollider, targetCollider, 
-                                                   useSimplifiedContactGeneration);
-            
-            if (result.m_hasCollision) {
-                collisionPairCount++;
-                // Add all collision data to our result, flipping normals if needed
-                for (const auto& normal : result.m_normals) {
-                    allNormals.push_back(normalFlip ? -normal : normal);
+            // Process all cells in neighborhood (center cell first, then neighbors)
+            for (CubeCollider* targetCollider : neighborhood.m_neighbors) {
+                // Quick AABB check first
+                if (queryCollider->checkAABBCollision(targetCollider)) {
+                    // Perform detailed collision detection
+                    CollisionResult result = detectCubeCube(queryCollider, targetCollider, 
+                                                           useSimplifiedContactGeneration);
+                    
+                    if (result.m_hasCollision) {
+                        collisionPairCount++;
+                        // Add all collision data to our result, flipping normals if needed
+                        for (const auto& normal : result.m_normals) {
+                            allNormals.push_back(normalFlip ? -normal : normal);
+                        }
+                        allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
+                        allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
+                    }
                 }
-                allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
-                allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
             }
         }
     }

@@ -114,11 +114,51 @@ void GridCollider::addCell(const glm::ivec3& coord, double width) {
     }
 
     updateFilterNormalsForCell(coord);
+
+    // Update neighborhoods for collision detection optimization
+    CubeCollider* newCell = m_cells[coord].get();
+    
+    // Get or create neighborhood for this coordinate
+    auto& neighborhood = m_neighborhoods[coord];
+
+    // Check if this is a new neighborhood (empty neighbors list)
+    bool isNewNeighborhood = neighborhood.m_neighbors.empty();
+
+    // Insert center cell as first element
+    neighborhood.m_neighbors.insert(neighborhood.m_neighbors.begin(), newCell);
+    neighborhood.m_hasCenter = true;
+    
+    // Update mutual references with all neighboring coordinates
+    for (int dx = -NEIGHBORHOOD_RADIUS; dx <= NEIGHBORHOOD_RADIUS; ++dx) {
+        for (int dy = -NEIGHBORHOOD_RADIUS; dy <= NEIGHBORHOOD_RADIUS; ++dy) {
+            for (int dz = -NEIGHBORHOOD_RADIUS; dz <= NEIGHBORHOOD_RADIUS; ++dz) {
+                if (dx == 0 && dy == 0 && dz == 0) continue; // Skip center
+                
+                glm::ivec3 neighborCoord = coord + glm::ivec3(dx, dy, dz);
+                auto neighborhoodIt = m_neighborhoods.find(neighborCoord);
+                if (neighborhoodIt != m_neighborhoods.end()) {
+                    // Always add ourselves to neighbor's list
+                    neighborhoodIt->second.m_neighbors.push_back(newCell);
+                    
+                    // No need to add neighbor's center to our list since it already did when it was created.
+                    //if (isNewNeighborhood && neighborhoodIt->second.m_hasCenter) {
+                    //    neighborhood.m_neighbors.push_back(neighborhoodIt->second.m_neighbors[0]);
+                    //}
+                } else {
+                    // Create neighbor and add reference to us
+                    m_neighborhoods.emplace(neighborCoord, CellNeighborhood()).first->second.m_neighbors.push_back(newCell);
+                }
+            }
+        }
+    }
 }
 
 void GridCollider::removeCell(const glm::ivec3& coord) {
     auto it = m_cells.find(coord);
     if (it != m_cells.end()) {
+        // Get pointer before erasing for neighborhood updates
+        CubeCollider* removedCell = it->second.get();
+
         // Check if this cell is on the border before removing
         bool onBorder = (coord.x == m_localAABBMin.x || coord.x == m_localAABBMax.x ||
                         coord.y == m_localAABBMin.y || coord.y == m_localAABBMax.y ||
@@ -150,6 +190,44 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
 
         m_cells.erase(it);
         updateFilterNormalsAfterRemoval(coord);
+
+        // Update neighborhoods for collision detection optimization
+        for (int dx = -NEIGHBORHOOD_RADIUS; dx <= NEIGHBORHOOD_RADIUS; ++dx) {
+            for (int dy = -NEIGHBORHOOD_RADIUS; dy <= NEIGHBORHOOD_RADIUS; ++dy) {
+                for (int dz = -NEIGHBORHOOD_RADIUS; dz <= NEIGHBORHOOD_RADIUS; ++dz) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue; // Skip center
+                    
+                    glm::ivec3 neighborCoord = coord + glm::ivec3(dx, dy, dz);
+                    auto neighborhoodIt = m_neighborhoods.find(neighborCoord);
+                    if (neighborhoodIt != m_neighborhoods.end()) {
+                        // Remove this cell from neighbor's list
+                        auto& neighbors = neighborhoodIt->second.m_neighbors;
+                        neighbors.erase(std::remove(neighbors.begin(), neighbors.end(), removedCell), neighbors.end());
+                        
+                        // Clean up neighbor if it's now empty (inline cleanup)
+                        if (neighborhoodIt->second.m_neighbors.empty()) {
+                            m_neighborhoods.erase(neighborhoodIt);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Remove this neighborhood
+        auto selfNeighborhoodIt = m_neighborhoods.find(coord);
+        if (selfNeighborhoodIt != m_neighborhoods.end()) {
+            // Remove self from own neighbors list and clear center flag
+            auto& selfNeighbors = selfNeighborhoodIt->second.m_neighbors;
+            selfNeighbors.erase(std::remove(selfNeighbors.begin(), selfNeighbors.end(), removedCell), selfNeighbors.end());
+            selfNeighborhoodIt->second.m_hasCenter = false;
+            
+            // Only remove neighborhood if no neighbors left
+            if (selfNeighbors.empty()) {
+                m_neighborhoods.erase(selfNeighborhoodIt);
+            }
+        } else {
+            throw std::runtime_error("GridCollider::removeCell: Neighborhood not found for removed cell coordinate");
+        }
     }
 }
 
