@@ -1,5 +1,6 @@
 // GridCollider.cpp
 #include "GridCollider.h"
+#include "CubeCollider.h"
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
 
@@ -83,12 +84,14 @@ bool GridCollider::checkAABBCollision(const Collider* other) const {
             m_AABBMax.z >= other->m_AABBMin.z);
 }
 
-void GridCollider::addCell(const glm::ivec3& coord, double width) {
-    // Create a new cube collider for this cell
-    glm::dvec3 worldPos = gridToWorld(glm::dvec3(coord));
-    auto cubeCollider = std::make_unique<CubeCollider>(worldPos, m_orientation, width, m_reference);
+void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> collider) {
+    // Position the collider at the grid coordinate
+    glm::dvec3 worldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
+    collider->m_position = worldPos;
+    collider->m_orientation = m_orientation;
+    collider->m_reference = m_reference;
     
-    m_cells[coord] = std::move(cubeCollider);
+    m_cells[coord] = std::move(collider);
 
     // Update axis counts
     m_xAxisCounts[coord.x]++;
@@ -116,7 +119,7 @@ void GridCollider::addCell(const glm::ivec3& coord, double width) {
     updateFilterNormalsForCell(coord);
 
     // Update neighborhoods for collision detection optimization
-    CubeCollider* newCell = m_cells[coord].get();
+    Collider* newCell = m_cells[coord].get();
     
     // Get or create neighborhood for this coordinate
     auto& neighborhood = m_neighborhoods[coord];
@@ -157,7 +160,7 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
     auto it = m_cells.find(coord);
     if (it != m_cells.end()) {
         // Get pointer before erasing for neighborhood updates
-        CubeCollider* removedCell = it->second.get();
+        Collider* removedCell = it->second.get();
 
         // Check if this cell is on the border before removing
         bool onBorder = (coord.x == m_localAABBMin.x || coord.x == m_localAABBMax.x ||
@@ -235,7 +238,7 @@ bool GridCollider::hasCell(const glm::ivec3& coord) const {
     return m_cells.find(coord) != m_cells.end();
 }
 
-CubeCollider* GridCollider::getCell(const glm::ivec3& coord) {
+Collider* GridCollider::getCell(const glm::ivec3& coord) {
     auto it = m_cells.find(coord);
     if (it != m_cells.end()) {
         return it->second.get();
@@ -247,7 +250,7 @@ void GridCollider::updateSubColliderTransformsAndAABB() {
     // Update position and orientation of all sub-colliders
     for (const auto& pair : m_cells) {
         const glm::ivec3& coord = pair.first;
-        CubeCollider* subCollider = pair.second.get();
+        Collider* subCollider = pair.second.get();
         
         // Calculate world position for this grid cell center
         glm::dvec3 cellCenter = glm::dvec3(coord) + glm::dvec3(0.5);
@@ -282,7 +285,7 @@ void GridCollider::updateFilterNormalsForCell(const glm::ivec3& coord) {
         { 0.0,  0.0, -1.0}   // -Z
     };
     
-    CubeCollider* currentCube = getCell(coord);
+    Collider* currentCube = getCell(coord);
     if (!currentCube) return;
     
     // Clear existing filter normals for this cube
@@ -291,7 +294,7 @@ void GridCollider::updateFilterNormalsForCell(const glm::ivec3& coord) {
     // Check each direction for neighbors
     for (int i = 0; i < 6; ++i) {
         glm::ivec3 neighborCoord = coord + glm::ivec3(directions[i]);
-        CubeCollider* neighborCube = getCell(neighborCoord);
+        Collider* neighborCube = getCell(neighborCoord);
         
         if (neighborCube) {
             // Add filter normal pointing toward neighbor
@@ -317,7 +320,7 @@ void GridCollider::updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoor
     // Update neighbors of the removed cell
     for (int i = 0; i < 6; ++i) {
         glm::ivec3 neighborCoord = removedCoord + glm::ivec3(directions[i]);
-        CubeCollider* neighborCube = getCell(neighborCoord);
+        Collider* neighborCube = getCell(neighborCoord);
         
         if (neighborCube) {
             // Remove filter normal pointing toward the removed cube
@@ -342,8 +345,8 @@ void GridCollider::updateLocalCorners() {
     m_localCorners[7] = glm::dvec3(expandedMax.x, expandedMax.y, expandedMax.z);
 }
 
-std::vector<CubeCollider*> GridCollider::findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const {
-    std::vector<CubeCollider*> foundColliders;
+std::vector<Collider*> GridCollider::findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const {
+    std::vector<Collider*> foundColliders;
     
     if (m_cells.empty()) {
         return foundColliders;

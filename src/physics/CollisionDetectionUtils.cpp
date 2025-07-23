@@ -333,21 +333,21 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     }
     
     // Find colliders within search area using ball radius
-    std::vector<CubeCollider*> nearbyColliders = grid->findCellsInRadius(ballPos, ballRadius);
+    std::vector<Collider*> nearbyColliders = grid->findCellsInRadius(ballPos, ballRadius);
     
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
     std::vector<double> allPenetrationDepths;
     
     // Test collision with each found collider
-    for (CubeCollider* gridCell : nearbyColliders) {
+    for (Collider* gridCell : nearbyColliders) {
         // Quick AABB check first
         if (!gridCell->checkAABBCollision(ball)) {
             continue;
         }
         
         // Perform detailed collision detection
-        CollisionResult result = detectBallCube(ball, gridCell);
+        CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(gridCell));
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -367,8 +367,8 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     return CollisionResult();
 }
 
-void CollisionDetectionUtils::processCubeGridCollision(
-    CubeCollider* cube, 
+void CollisionDetectionUtils::processPolyhedronGridCollision(
+    PolyhedronCollider* polyhedron,
     GridCollider* grid,
     std::vector<glm::dvec3>& allNormals,
     std::vector<glm::dvec3>& allContactPoints,
@@ -382,9 +382,9 @@ void CollisionDetectionUtils::processCubeGridCollision(
         return;
     }
     
-    // Get center position of cube
-    glm::dvec3 cubeCenter = cube->m_position;
-    glm::dvec3 gridSpaceCenter = grid->worldToGrid(cubeCenter);
+    // Get center position of polyhedron
+    glm::dvec3 polyhedronCenter = polyhedron->m_position;
+    glm::dvec3 gridSpaceCenter = grid->worldToGrid(polyhedronCenter);
 
     const double searchRadius = 0.5 * std::sqrt(3.0);
 
@@ -395,7 +395,7 @@ void CollisionDetectionUtils::processCubeGridCollision(
     if (gridSpaceCenter.x < expandedMin.x || gridSpaceCenter.x > expandedMax.x ||
         gridSpaceCenter.y < expandedMin.y || gridSpaceCenter.y > expandedMax.y ||
         gridSpaceCenter.z < expandedMin.z || gridSpaceCenter.z > expandedMax.z) {
-        return; // Cube is too far from grid's AABB
+        return; // Polyhedron is too far from grid's AABB
     }
     
     // Optimization: Use precomputed neighborhoods if available
@@ -406,11 +406,11 @@ void CollisionDetectionUtils::processCubeGridCollision(
         const auto& neighborhood = neighborhoodIt->second;
         
         // Process all cells in neighborhood (center cell first, then neighbors)
-        for (CubeCollider* gridCollider : neighborhood.m_neighbors) {
+        for (Collider* gridCollider : neighborhood.m_neighbors) {
             // Quick AABB check first
-            if (cube->checkAABBCollision(gridCollider)) {
+            if (polyhedron->checkAABBCollision(gridCollider)) {
                 // Perform detailed collision detection
-                CollisionResult result = detectPolyhedronPolyhedron(cube, gridCollider, useSimplifiedContactGeneration);
+                CollisionResult result = detectPolyhedronPolyhedron(polyhedron, static_cast<PolyhedronCollider*>(gridCollider), useSimplifiedContactGeneration);
                 
                 if (result.m_hasCollision) {
                     collisionPairCount++; // Increment by 1 per collision pair, not per contact point
@@ -447,7 +447,7 @@ CollisionResult CollisionDetectionUtils::detectCubeGrid(
     int collisionPairCount = 0;
     
     // Use helper function to process collision
-    processCubeGridCollision(cube, grid, allNormals, allContactPoints, allPenetrationDepths, 
+    processPolyhedronGridCollision(cube, grid, allNormals, allContactPoints, allPenetrationDepths,
                            collisionPairCount, false, false);
     
     // Return combined result
@@ -509,10 +509,10 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     
     // Iterate through query grid cells and use helper function
     for (const auto& queryPair : queryCells) {
-        CubeCollider* queryCollider = queryPair.second.get();
+        PolyhedronCollider* queryCollider = static_cast<PolyhedronCollider*>(queryPair.second.get());
         
         // Use helper function to process collision
-        processCubeGridCollision(queryCollider, targetGrid, allNormals, allContactPoints, 
+        processPolyhedronGridCollision(queryCollider, targetGrid, allNormals, allContactPoints,
                                allPenetrationDepths, collisionPairCount, 
                                useSimplifiedContactGeneration, normalFlip);
     }

@@ -14,7 +14,7 @@
  */
 class CellNeighborhood {
 public:
-    std::vector<CubeCollider*> m_neighbors;         // All cells: center cell first (if exists), then neighbors
+    std::vector<Collider*> m_neighbors;             // All cells: center cell first (if exists), then neighbors
     bool m_hasCenter = false;                       // True if first element is the center cell
     
     CellNeighborhood() {
@@ -37,18 +37,23 @@ public:
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Grid-specific methods
-    void addCell(const glm::ivec3& coord, double width = 1.0);
+    /**
+     * @brief Add a collider to the grid at the specified coordinate
+     * @param coord Grid coordinate where the collider will be placed
+     * @param collider Collider to add (ownership is transferred - caller's unique_ptr becomes null after this call)
+     */
+    void addCell(const glm::ivec3& coord, std::unique_ptr<Collider> collider);
     void removeCell(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;
     
     // Get sub-collider for a specific cell
-    CubeCollider* getCell(const glm::ivec3& coord);
+    Collider* getCell(const glm::ivec3& coord);
 
-    // Spatial search within radius
-    std::vector<CubeCollider*> findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const;
+    // Spatial search within radius  
+    std::vector<Collider*> findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const;
 
     // Allow access to cells for collision detection utils
-    const std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash>& getCells() const { return m_cells; }
+    const std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, IVec3Hash>& getCells() const { return m_cells; }
 
     // Optimization: Pre-computed neighborhoods for fast spatial queries
     static constexpr int NEIGHBORHOOD_RADIUS = 1; // 3x3x3 neighborhood
@@ -83,7 +88,7 @@ private:
     bool m_advancedAABBDirty = true;
 
     // Map of grid coordinates to cube colliders
-    std::unordered_map<glm::ivec3, std::unique_ptr<CubeCollider>, IVec3Hash> m_cells;
+    std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, IVec3Hash> m_cells;
     
     // Helper methods
     void updateSubColliderTransformsAndAABB();

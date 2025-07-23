@@ -55,8 +55,8 @@ public:
 
 private:
     // Helper function to eliminate vector copying between cube-grid and grid-grid detection
-    static void processCubeGridCollision(
-        CubeCollider* cube, 
+    static void processPolyhedronGridCollision(
+        PolyhedronCollider* polyhedron, 
         GridCollider* grid,
         std::vector<glm::dvec3>& allNormals,
         std::vector<glm::dvec3>& allContactPoints,

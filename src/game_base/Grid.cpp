@@ -6,6 +6,7 @@
 #include "../physics/PhysicsEngine.h"
 #include "MassInertiaCalculator.h"
 #include "../debug/DebugGlobals.h"
+#include "../physics/CubeCollider.h"
 #include <limits>
 #include <iostream>
 #include "../debug/DebugRenderer.h"
@@ -71,7 +72,8 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
     if (hasCell(coord)) return;
 
     // Add cell to collider
-    m_collider->addCell(coord, 1.0);  // Use 1.0 width for cube cells
+    auto cubeCollider = std::make_unique<CubeCollider>(glm::dvec3(0.0), glm::dquat(1.0, 0.0, 0.0, 0.0), 1.0);
+    m_collider->addCell(coord, std::move(cubeCollider));
 
     // Cancel existing analysis to prevent accessing deleted cells
     cancelStructuralAnalysis();

@@ -44,6 +44,15 @@ public:
         return glm::conjugate(m_orientation) * (worldPoint - m_position);
     }
     
+    // Filter normal management (default no-op implementations)
+    virtual void addFilterNormal(const glm::dvec3& normal) {}
+    virtual void removeFilterNormal(const glm::dvec3& normal) {}
+    virtual void clearFilterNormals() {}
+    virtual const std::vector<glm::dvec3>& getFilterNormals() const { 
+        static const std::vector<glm::dvec3> empty; 
+        return empty; 
+    }
+
     // Public member variables
     glm::dvec3 m_position;
     glm::dquat m_orientation;
