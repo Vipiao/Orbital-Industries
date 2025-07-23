@@ -37,21 +37,21 @@ public:
     static CollisionResult detectBallGrid(
         BallCollider* ball, GridCollider* grid);
     
-    // Cube-Grid collision
-    static CollisionResult detectCubeGrid(
-        CubeCollider* cube, GridCollider* grid);
+    // Polyhedron-Grid collision
+    static CollisionResult detectPolyhedronGrid(
+        PolyhedronCollider* polyhedron, GridCollider* grid);
     
     // Grid-Grid collision
     static CollisionResult detectGridGrid(
         GridCollider* gridA, GridCollider* gridB);
 
     // Reverse-order functions with normal flipping
-    static CollisionResult detectCubeBall(
-        CubeCollider* cube, BallCollider* ball);
+    static CollisionResult detectPolyhedronBall(
+        PolyhedronCollider* polyhedron, BallCollider* ball);
     static CollisionResult detectGridBall(
         GridCollider* grid, BallCollider* ball);
-    static CollisionResult detectGridCube(
-        GridCollider* grid, CubeCollider* cube);
+    static CollisionResult detectGridPolyhedron(
+        GridCollider* grid, PolyhedronCollider* polyhedron);
 
 private:
     // Helper function to eliminate vector copying between cube-grid and grid-grid detection
