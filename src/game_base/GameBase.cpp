@@ -165,7 +165,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         co_return;
     }
 
-    //co_yield true; // Allow time check before expensive operation
+    co_yield true; // Allow time check before expensive operation
     
     // Step 1: Analyze partitions using PartitionCalculator
     auto result = PartitionCalculator<GridCell>::analyzePartitions(
@@ -180,7 +180,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         }
     );
 
-    //co_yield true; // Allow time check after expensive analysis
+    co_yield true; // Allow time check after expensive analysis
     
     // Step 2: If no split detected, return empty vector
     if (!result.hasSplit || result.partitions.size() <= 1) {
@@ -201,7 +201,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     std::vector<PartitionPhysics> partitionPhysics(result.partitions.size());
     const double blockMass = 60.0; // Match Grid.cpp value
 
-    //co_yield true; // Allow time check before physics calculations
+    co_yield true; // Allow time check before physics calculations
     
     for (size_t i = 0; i < result.partitions.size(); ++i) {
         const std::vector<glm::ivec3>& partition = result.partitions[i];
@@ -229,7 +229,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
                   << ", vel=(" << partitionVelocity.x << "," << partitionVelocity.y << "," << partitionVelocity.z << ")" << std::endl;
     }
 
-    //co_yield true; // Allow time check before grid operations
+    co_yield true; // Allow time check before grid operations
     
     // Step 4: Find the largest partition (this stays with the original grid)
     size_t largestPartitionIndex = 0;
@@ -246,7 +246,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     
     // Step 5: Create new grids for all partitions except the largest
 
-    //co_yield true; // Allow time check before creating new grids
+    co_yield true; // Allow time check before creating new grids
     
     for (size_t i = 0; i < result.partitions.size(); ++i) {
         if (i == largestPartitionIndex) {
@@ -260,7 +260,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         
         std::cout << "Moving " << partition.size() << " cells to new grid" << std::endl;
         
-        //co_yield true; // Allow time check before moving cells
+        co_yield true; // Allow time check before moving cells
 
         // Move cells from source grid to new grid
         size_t cellsProcessed = 0;
@@ -274,7 +274,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
 
             // Yield every 5 cells to avoid blocking too long
             if (++cellsProcessed % 5 == 0) {
-                //co_yield true;
+                co_yield true;
             }
         }
 
