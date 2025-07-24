@@ -412,7 +412,7 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
 void CollisionDetectionUtils::processPolyhedronGridCollision(
     PolyhedronCollider* polyhedron,
     GridCollider* grid,
-    const glm::dvec3& gridSpaceCenter,
+    const glm::dvec3& gridSpacePolyCenterPos,
     std::vector<glm::dvec3>& allNormals,
     std::vector<glm::dvec3>& allContactPoints,
     std::vector<double>& allPenetrationDepths,
@@ -432,21 +432,29 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
     glm::dvec3 expandedMin = glm::dvec3(grid->getLocalAABBMin()) - glm::dvec3(searchRadius);
     glm::dvec3 expandedMax = glm::dvec3(grid->getLocalAABBMax()) + glm::dvec3(1.0) + glm::dvec3(searchRadius);
     
-    if (gridSpaceCenter.x < expandedMin.x || gridSpaceCenter.x > expandedMax.x ||
-        gridSpaceCenter.y < expandedMin.y || gridSpaceCenter.y > expandedMax.y ||
-        gridSpaceCenter.z < expandedMin.z || gridSpaceCenter.z > expandedMax.z) {
+    if (gridSpacePolyCenterPos.x < expandedMin.x || gridSpacePolyCenterPos.x > expandedMax.x ||
+        gridSpacePolyCenterPos.y < expandedMin.y || gridSpacePolyCenterPos.y > expandedMax.y ||
+        gridSpacePolyCenterPos.z < expandedMin.z || gridSpacePolyCenterPos.z > expandedMax.z) {
         return; // Polyhedron is too far from grid's AABB
     }
     
     // Optimization: Use precomputed neighborhoods if available
-    glm::ivec3 gridCenterCoord = glm::ivec3(glm::floor(gridSpaceCenter));
+    glm::ivec3 gridCenterCoord = glm::ivec3(glm::floor(gridSpacePolyCenterPos));
     auto neighborhoodIt = grid->m_neighborhoods.find(gridCenterCoord);
     
     if (neighborhoodIt != grid->m_neighborhoods.end()) {
         const auto& neighborhood = neighborhoodIt->second;
+
+        // Update polyhedron position
+        polyhedron->updatePosition(currentTimestep);
+        polyhedron->updateAdvancedAABB(currentTimestep);
         
         // Process all cells in neighborhood (center cell first, then neighbors)
         for (Collider* gridCollider : neighborhood.m_neighbors) {
+            // Update this neighbor's transform
+            gridCollider->updatePosition(currentTimestep);
+            gridCollider->updateAdvancedAABB(currentTimestep);
+
             // Quick AABB check first
             if (polyhedron->checkAABBCollision(gridCollider)) {
                 // Perform detailed collision detection
@@ -488,8 +496,8 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronGrid(
     int collisionPairCount = 0;
     
     // Use helper function to process collision
-    glm::dvec3 gridSpaceCenter = grid->worldToGrid(polyhedron->m_position);
-    processPolyhedronGridCollision(polyhedron, grid, gridSpaceCenter, allNormals, allContactPoints, allPenetrationDepths,
+    glm::dvec3 gridSpacePolyCenterPos = grid->worldToGrid(polyhedron->m_position);
+    processPolyhedronGridCollision(polyhedron, grid, gridSpacePolyCenterPos, allNormals, allContactPoints, allPenetrationDepths,
                            collisionPairCount, false, currentTimestep, false);
     
     // Return combined result
@@ -562,10 +570,10 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         // Single matrix-vector multiplication to transform cell coordinate to target grid space
         glm::dvec4 homogeneousCoord = glm::dvec4(queryCoord, 1.0);
         glm::dvec4 transformedCoord = queryCornerToWorldToTarget * homogeneousCoord;
-        glm::dvec3 gridSpaceCenter = glm::dvec3(transformedCoord);
+        glm::dvec3 gridSpacePolyCenterPos = glm::dvec3(transformedCoord);
 
         // Use helper function to process collision
-        processPolyhedronGridCollision(queryCollider, targetGrid, gridSpaceCenter, allNormals, allContactPoints,
+        processPolyhedronGridCollision(queryCollider, targetGrid, gridSpacePolyCenterPos, allNormals, allContactPoints,
                                allPenetrationDepths, collisionPairCount, 
                                useSimplifiedContactGeneration, currentTimestep, normalFlip);
     }

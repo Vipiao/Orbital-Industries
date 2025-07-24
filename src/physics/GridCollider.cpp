@@ -64,20 +64,8 @@ void GridCollider::updateAdvancedAABB(uint64_t currentTimestep) {
         return;
     }
     
-    // Update all sub-colliders first
-    updateSubColliderTransformsAndAABB(currentTimestep);
-    
-    // Calculate precise AABB from all sub-colliders
-    auto it = m_cells.begin();
-    m_AABBMin = it->second->m_AABBMin;
-    m_AABBMax = it->second->m_AABBMax;
-    
-    for (const auto& pair : m_cells) {
-        const auto& cubeCollider = pair.second;
-        m_AABBMin = glm::min(m_AABBMin, cubeCollider->m_AABBMin);
-        m_AABBMax = glm::max(m_AABBMax, cubeCollider->m_AABBMax);
-    }
-    m_advancedAABBValidUntilTime = currentTimestep;
+    // Use simple AABB as placeholder
+    updateSimpleAABB(currentTimestep);
 }
 
 bool GridCollider::checkAABBCollision(const Collider* other) const {
@@ -96,6 +84,10 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     collider->m_position = worldPos;
     collider->m_orientation = m_orientation;
     collider->m_reference = m_reference;
+
+    // Set up dependent positioning
+    collider->m_dependentPosition = this;
+    collider->m_dependentOffset = glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5);
     
     m_cells[coord] = std::move(collider);
 

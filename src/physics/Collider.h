@@ -7,18 +7,30 @@
 #include <utility>
 #include <vector>
 
-class Collider {
+class CoordinateSystem {
+public:
+    glm::dvec3 m_position;
+    glm::dquat m_orientation;
+    
+    CoordinateSystem(const glm::dvec3& position = glm::dvec3(0.0), 
+                     const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0))
+        : m_position(position), m_orientation(orientation) {}
+    
+    virtual ~CoordinateSystem() = default;
+};
+
+class Collider : public CoordinateSystem {
 public:
     Collider(const glm::dvec3& position = glm::dvec3(0.0), 
              const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
              ColliderReference* reference = nullptr)
-        : m_position(position)
-        , m_orientation(orientation)
+        : CoordinateSystem(position, orientation)
         , m_reference(reference)
         , m_AABBMin(0.0)
         , m_AABBMax(0.0)
         , m_simpleAABBValidUntilTime(0)
         , m_advancedAABBValidUntilTime(0)
+        , m_positionValidUntilTime(0)
     {}
     
     virtual ~Collider() = default;
@@ -55,10 +67,16 @@ public:
         return empty; 
     }
 
+    // Dependent positioning system
+    void updatePosition(uint64_t currentTimestep);
+
     // Public member variables
-    glm::dvec3 m_position;
-    glm::dquat m_orientation;
     ColliderReference* m_reference;
+
+    // Dependent positioning
+    CoordinateSystem* m_dependentPosition = nullptr;
+    glm::dvec3 m_dependentOffset{0.0};
+    uint64_t m_positionValidUntilTime = 0;
 
     // Timestep-based validity tracking
     uint64_t m_simpleAABBValidUntilTime;
