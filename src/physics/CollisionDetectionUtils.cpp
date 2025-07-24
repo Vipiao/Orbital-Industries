@@ -402,6 +402,7 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
 void CollisionDetectionUtils::processPolyhedronGridCollision(
     PolyhedronCollider* polyhedron,
     GridCollider* grid,
+    const glm::dvec3& gridSpaceCenter,
     std::vector<glm::dvec3>& allNormals,
     std::vector<glm::dvec3>& allContactPoints,
     std::vector<double>& allPenetrationDepths,
@@ -413,10 +414,6 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
     if (grid->getCells().empty()) {
         return;
     }
-    
-    // Get center position of polyhedron
-    glm::dvec3 polyhedronCenter = polyhedron->m_position;
-    glm::dvec3 gridSpaceCenter = grid->worldToGrid(polyhedronCenter);
 
     const double searchRadius = 0.5 * std::sqrt(3.0);
 
@@ -479,7 +476,8 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronGrid(
     int collisionPairCount = 0;
     
     // Use helper function to process collision
-    processPolyhedronGridCollision(polyhedron, grid, allNormals, allContactPoints, allPenetrationDepths,
+    glm::dvec3 gridSpaceCenter = grid->worldToGrid(polyhedron->m_position);
+    processPolyhedronGridCollision(polyhedron, grid, gridSpaceCenter, allNormals, allContactPoints, allPenetrationDepths,
                            collisionPairCount, false, false);
     
     // Return combined result
@@ -538,13 +536,23 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     std::vector<glm::dvec3> allContactPoints;
     std::vector<double> allPenetrationDepths;
     int collisionPairCount = 0;
-    
+
+    glm::dmat4 worldToTargetGrid = glm::translate(glm::mat4_cast(glm::conjugate(targetGrid->m_orientation)), -targetGrid->m_position);
+    glm::dmat4 queryCenterToWorldToTarget = glm::translate(worldToTargetGrid, queryGrid->m_position) * glm::mat4_cast(queryGrid->m_orientation);
+    glm::dmat4 queryCornerToWorldToTarget = glm::translate(queryCenterToWorldToTarget, glm::dvec3(0.5, 0.5, 0.5));
+
     // Iterate through query grid cells and use helper function
     for (const auto& queryPair : queryCells) {
         PolyhedronCollider* queryCollider = static_cast<PolyhedronCollider*>(queryPair.second.get());
+        const glm::ivec3& queryCoord = queryPair.first;
         
+        // Single matrix-vector multiplication to transform cell coordinate to target grid space
+        glm::dvec4 homogeneousCoord = glm::dvec4(queryCoord, 1.0);
+        glm::dvec4 transformedCoord = queryCornerToWorldToTarget * homogeneousCoord;
+        glm::dvec3 gridSpaceCenter = glm::dvec3(transformedCoord);
+
         // Use helper function to process collision
-        processPolyhedronGridCollision(queryCollider, targetGrid, allNormals, allContactPoints,
+        processPolyhedronGridCollision(queryCollider, targetGrid, gridSpaceCenter, allNormals, allContactPoints,
                                allPenetrationDepths, collisionPairCount, 
                                useSimplifiedContactGeneration, normalFlip);
     }

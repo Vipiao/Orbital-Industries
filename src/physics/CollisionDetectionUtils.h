@@ -58,6 +58,7 @@ private:
     static void processPolyhedronGridCollision(
         PolyhedronCollider* polyhedron, 
         GridCollider* grid,
+        const glm::dvec3& gridSpaceCenter,
         std::vector<glm::dvec3>& allNormals,
         std::vector<glm::dvec3>& allContactPoints,
         std::vector<double>& allPenetrationDepths,
