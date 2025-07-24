@@ -163,7 +163,6 @@ void GraphicsEngineBase::startRenderLoop() {
 
       glm::dmat4 viewMatrix{ 1 };
       double ss{ glm::sqrt(2.) / 2. };
-      glm::dquat test{ glm::dquat{ ss, -ss, 0., 0. } * glm::conjugate(m_camOri) };
       viewMatrix = glm::toMat4(glm::dquat{ ss, -ss, 0., 0. } * glm::conjugate(m_camOri));
       // View matrix is now rotation-only (L-space: camera-relative coordinate system)
       // Camera is at origin in this space, objects are positioned relative to camera
