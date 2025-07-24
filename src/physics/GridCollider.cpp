@@ -12,18 +12,24 @@ GridCollider::GridCollider(const glm::dvec3& position,
     
 }
 
-void GridCollider::updateSimpleAABB() {
+void GridCollider::updateSimpleAABB(uint64_t currentTimestep) {
+    // Check if simple AABB is still valid
+    if (currentTimestep <= m_simpleAABBValidUntilTime) {
+        return; // Still valid, no need to recalculate
+    }
+
     if (m_cells.empty()) {
         // If no cells, set a minimal AABB
         m_AABBMin = m_position - glm::dvec3(0.1);
         m_AABBMax = m_position + glm::dvec3(0.1);
+        m_simpleAABBValidUntilTime = currentTimestep;
         return;
     }
 
     // Update cached corners if needed
-    if (m_cornersDirty) {
+    if (currentTimestep > m_cornersValidUntilTime) {
         updateLocalCorners();
-        m_cornersDirty = false;
+        m_cornersValidUntilTime = currentTimestep;
     }
     
     // Transform first corner to initialize world AABB
@@ -38,19 +44,18 @@ void GridCollider::updateSimpleAABB() {
         m_AABBMax = glm::max(m_AABBMax, worldCorner);
     }
 
-    // Mark advanced AABB as dirty since position/orientation may have changed
-    // This happens when the grid collider's transform is updated by the physics system
-    m_advancedAABBDirty = true;
+    // Mark simple AABB as valid for this timestep
+    m_simpleAABBValidUntilTime = currentTimestep;
 }
 
-void GridCollider::updateAdvancedAABB() {
-    // Only recalculate if dirty
-    if (!m_advancedAABBDirty) {
-        return;
+void GridCollider::updateAdvancedAABB(uint64_t currentTimestep) {
+    // Check if advanced AABB is still valid
+    if (currentTimestep <= m_advancedAABBValidUntilTime) {
+        return; // Still valid, no need to recalculate
     }
 
-    // Mark as clean
-    m_advancedAABBDirty = false;
+    // Mark advanced AABB as valid for this timestep
+    m_advancedAABBValidUntilTime = currentTimestep;
 
     if (m_cells.empty()) {
         // If no cells, set a minimal AABB
@@ -60,7 +65,7 @@ void GridCollider::updateAdvancedAABB() {
     }
     
     // Update all sub-colliders first
-    updateSubColliderTransformsAndAABB();
+    updateSubColliderTransformsAndAABB(currentTimestep);
     
     // Calculate precise AABB from all sub-colliders
     auto it = m_cells.begin();
@@ -72,6 +77,7 @@ void GridCollider::updateAdvancedAABB() {
         m_AABBMin = glm::min(m_AABBMin, cubeCollider->m_AABBMin);
         m_AABBMax = glm::max(m_AABBMax, cubeCollider->m_AABBMax);
     }
+    m_advancedAABBValidUntilTime = currentTimestep;
 }
 
 bool GridCollider::checkAABBCollision(const Collider* other) const {
@@ -103,7 +109,7 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
         // First cell - initialize AABB
         m_localAABBMin = coord;
         m_localAABBMax = coord;
-        m_cornersDirty = true;
+        m_cornersValidUntilTime = 0; // Invalidate corners
     } else {
         // Expand AABB to include new cell
         glm::ivec3 newMin = glm::min(m_localAABBMin, coord);
@@ -112,7 +118,7 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
         if (newMin != m_localAABBMin || newMax != m_localAABBMax) {
             m_localAABBMin = newMin;
             m_localAABBMax = newMax;
-            m_cornersDirty = true;
+            m_cornersValidUntilTime = 0; // Invalidate corners
         }
     }
 
@@ -188,7 +194,7 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
             auto zRange = std::minmax_element(m_zAxisCounts.begin(), m_zAxisCounts.end());
             m_localAABBMin = glm::ivec3(xRange.first->first, yRange.first->first, zRange.first->first);
             m_localAABBMax = glm::ivec3(xRange.second->first, yRange.second->first, zRange.second->first);
-            m_cornersDirty = true;
+            m_cornersValidUntilTime = 0; // Invalidate corners
         }
 
         m_cells.erase(it);
@@ -246,7 +252,7 @@ Collider* GridCollider::getCell(const glm::ivec3& coord) {
     return nullptr;
 }
 
-void GridCollider::updateSubColliderTransformsAndAABB() {
+void GridCollider::updateSubColliderTransformsAndAABB(uint64_t currentTimestep) {
     // Update position and orientation of all sub-colliders
     for (const auto& pair : m_cells) {
         const glm::ivec3& coord = pair.first;
@@ -258,7 +264,7 @@ void GridCollider::updateSubColliderTransformsAndAABB() {
         subCollider->m_orientation = m_orientation;
         
         // Update the sub-collider's AABB
-        subCollider->updateSimpleAABB();
+        subCollider->updateSimpleAABB(currentTimestep);
     }
 }
 

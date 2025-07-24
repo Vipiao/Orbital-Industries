@@ -17,6 +17,8 @@ public:
         , m_reference(reference)
         , m_AABBMin(0.0)
         , m_AABBMax(0.0)
+        , m_simpleAABBValidUntilTime(0)
+        , m_advancedAABBValidUntilTime(0)
     {}
     
     virtual ~Collider() = default;
@@ -26,10 +28,10 @@ public:
     virtual int getTypeId() const = 0;
     
     // Pure virtual methods that must be implemented by derived classes
-    virtual void updateSimpleAABB() = 0;
+    virtual void updateSimpleAABB(uint64_t currentTimestep) = 0;
 
     // Advanced AABB update for precise collision detection (default calls updateSimpleAABB)
-    virtual void updateAdvancedAABB() { updateSimpleAABB(); }
+    virtual void updateAdvancedAABB(uint64_t currentTimestep) { updateSimpleAABB(currentTimestep); }
 
     // Axis-aligned bounding box collision detection
     virtual bool checkAABBCollision(const Collider* other) const = 0;
@@ -57,6 +59,10 @@ public:
     glm::dvec3 m_position;
     glm::dquat m_orientation;
     ColliderReference* m_reference;
+
+    // Timestep-based validity tracking
+    uint64_t m_simpleAABBValidUntilTime;
+    uint64_t m_advancedAABBValidUntilTime;
 
     // AABB data
     glm::dvec3 m_AABBMin;

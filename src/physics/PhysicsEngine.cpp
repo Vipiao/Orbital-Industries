@@ -131,6 +131,8 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
         switch (m_runState) {
             case RunState::APPLY_FORCES:
                 applyForces();
+                // Set current timestep for collision detection
+                m_collisionDetector.setTimestep(m_currentPhysicsTimeStep);
                 m_runState = RunState::UPDATE_POSITIONS;
                 
                 break;

@@ -13,7 +13,7 @@
 #include "../debug/DebugRenderer.h"
 #include "../utils/PairCache.h"
 
-CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collider* colliderB) {
+CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collider* colliderB, uint64_t currentTimestep) {
     int typeA = colliderA->getTypeId();
     int typeB = colliderB->getTypeId();
     
@@ -24,19 +24,23 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                 case BallCollider::TYPE_ID:
                     return detectBallBall(
                         static_cast<BallCollider*>(colliderA),
-                        static_cast<BallCollider*>(colliderB));
+                        static_cast<BallCollider*>(colliderB),
+                        currentTimestep);
                 case CubeCollider::TYPE_ID:
                     return detectBallCube(
                         static_cast<BallCollider*>(colliderA),
-                        static_cast<CubeCollider*>(colliderB));
+                        static_cast<CubeCollider*>(colliderB),
+                        currentTimestep);
                 case PolyhedronCollider::TYPE_ID:
                     return detectBallCube(
                         static_cast<BallCollider*>(colliderA),
-                        static_cast<CubeCollider*>(colliderB));
+                        static_cast<CubeCollider*>(colliderB),
+                        currentTimestep);
                 case GridCollider::TYPE_ID:
                     return detectBallGrid(
                         static_cast<BallCollider*>(colliderA),
-                        static_cast<GridCollider*>(colliderB));
+                        static_cast<GridCollider*>(colliderB),
+                        currentTimestep);
             }
             break;
         case CubeCollider::TYPE_ID:
@@ -44,19 +48,19 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                 case BallCollider::TYPE_ID:
                     return detectPolyhedronBall(
                         static_cast<CubeCollider*>(colliderA),
-                        static_cast<BallCollider*>(colliderB));
+                        static_cast<BallCollider*>(colliderB), currentTimestep);
                 case PolyhedronCollider::TYPE_ID:
                     return detectPolyhedronPolyhedron(
                         static_cast<PolyhedronCollider*>(colliderA),
-                        static_cast<PolyhedronCollider*>(colliderB));
+                        static_cast<PolyhedronCollider*>(colliderB), currentTimestep);
                 case CubeCollider::TYPE_ID:
                     return detectPolyhedronPolyhedron(
                         static_cast<PolyhedronCollider*>(colliderA),
-                        static_cast<PolyhedronCollider*>(colliderB));
+                        static_cast<PolyhedronCollider*>(colliderB), currentTimestep);
                 case GridCollider::TYPE_ID:
                     return detectPolyhedronGrid(
                         static_cast<CubeCollider*>(colliderA),
-                        static_cast<GridCollider*>(colliderB));
+                        static_cast<GridCollider*>(colliderB), currentTimestep);
             }
             break;
         case PolyhedronCollider::TYPE_ID:
@@ -64,19 +68,19 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                 case BallCollider::TYPE_ID:
                     return detectPolyhedronBall(
                         static_cast<PolyhedronCollider*>(colliderA),
-                        static_cast<BallCollider*>(colliderB));
+                        static_cast<BallCollider*>(colliderB), currentTimestep);
                 case CubeCollider::TYPE_ID:
                     return detectPolyhedronPolyhedron(
                         static_cast<PolyhedronCollider*>(colliderA),
-                        static_cast<PolyhedronCollider*>(colliderB));
+                        static_cast<PolyhedronCollider*>(colliderB), currentTimestep);
                 case PolyhedronCollider::TYPE_ID:
                     return detectPolyhedronPolyhedron(
                         static_cast<PolyhedronCollider*>(colliderA),
-                        static_cast<PolyhedronCollider*>(colliderB));
+                        static_cast<PolyhedronCollider*>(colliderB), currentTimestep);
                 case GridCollider::TYPE_ID:
                     return detectPolyhedronGrid(
                         static_cast<PolyhedronCollider*>(colliderA),
-                        static_cast<GridCollider*>(colliderB));
+                        static_cast<GridCollider*>(colliderB), currentTimestep);
             }
             break;
         case GridCollider::TYPE_ID:
@@ -84,19 +88,21 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                 case BallCollider::TYPE_ID:
                     return detectGridBall(
                         static_cast<GridCollider*>(colliderA),
-                        static_cast<BallCollider*>(colliderB));
+                        static_cast<BallCollider*>(colliderB),
+                        currentTimestep);
                 case CubeCollider::TYPE_ID:
                     return detectGridPolyhedron(
                         static_cast<GridCollider*>(colliderA),
-                        static_cast<CubeCollider*>(colliderB));
+                        static_cast<CubeCollider*>(colliderB), currentTimestep);
                 case PolyhedronCollider::TYPE_ID:
                     return detectGridPolyhedron(
                         static_cast<GridCollider*>(colliderA),
-                        static_cast<PolyhedronCollider*>(colliderB));
+                        static_cast<PolyhedronCollider*>(colliderB), currentTimestep);
                 case GridCollider::TYPE_ID:
                     return detectGridGrid(
                         static_cast<GridCollider*>(colliderA),
-                        static_cast<GridCollider*>(colliderB));
+                        static_cast<GridCollider*>(colliderB),
+                        currentTimestep);
             }
             break;
     }
@@ -106,7 +112,8 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
 }
 
 CollisionResult CollisionDetectionUtils::detectBallBall(
-    BallCollider* ballA, BallCollider* ballB) {
+    BallCollider* ballA, BallCollider* ballB,
+    uint64_t currentTimestep) {
 
     const glm::dvec3& posA = ballA->m_position;
     const glm::dvec3& posB = ballB->m_position;
@@ -149,7 +156,8 @@ CollisionResult CollisionDetectionUtils::detectBallBall(
 }
 
 CollisionResult CollisionDetectionUtils::detectBallCube(
-    BallCollider* ball, CubeCollider* cube) {
+    BallCollider* ball, CubeCollider* cube,
+    uint64_t currentTimestep) {
 
     const glm::dvec3& ballPos = ball->m_position;
     double ballRadius = ball->m_radius;
@@ -210,19 +218,20 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
 
 CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     PolyhedronCollider* polyA, PolyhedronCollider* polyB,
+    uint64_t currentTimestep,
     bool useSimplifiedContactGeneration) {
 
     // Update accurate AABBs for precise collision detection
-    polyA->updateAdvancedAABB();
-    polyB->updateAdvancedAABB();
+    polyA->updateAdvancedAABB(currentTimestep);
+    polyB->updateAdvancedAABB(currentTimestep);
     
     if (!polyA->checkAABBCollision(polyB)) {
         return CollisionResult(); // No collision after precise AABB check
     }
     
     // Get vertices for both cubes - will use cached vertices
-    std::vector<glm::dvec3> verticesA = polyA->getVertices();
-    std::vector<glm::dvec3> verticesB = polyB->getVertices();
+    std::vector<glm::dvec3> verticesA = polyA->getVertices(currentTimestep);
+    std::vector<glm::dvec3> verticesB = polyB->getVertices(currentTimestep);
 
     //if (DebugGlobals::getDebugRenderer()) {
     //    std::string vertA = DebugGlobals::getDebugRenderer()->generateGeogebraCommands(verticesA);
@@ -235,8 +244,8 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     //std::cout << geogebraCommands << std::endl;
     
     // Get axes for both cubes
-    auto [faceAxesA, edgeAxesA, filterNormalsA] = polyA->getCollisionAxes();
-    auto [faceAxesB, edgeAxesB, filterNormalsB] = polyB->getCollisionAxes();
+    auto [faceAxesA, edgeAxesA, filterNormalsA] = polyA->getCollisionAxes(currentTimestep);
+    auto [faceAxesB, edgeAxesB, filterNormalsB] = polyB->getCollisionAxes(currentTimestep);
     
     double minPenetration = std::numeric_limits<double>::max();
     glm::dvec3 separatingAxis;
@@ -354,7 +363,8 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
 
 
 CollisionResult CollisionDetectionUtils::detectBallGrid(
-    BallCollider* ball, GridCollider* grid) {
+    BallCollider* ball, GridCollider* grid,
+    uint64_t currentTimestep) {
     
     const glm::dvec3& ballPos = ball->m_position;
     double ballRadius = ball->m_radius;
@@ -379,7 +389,7 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
         }
         
         // Perform detailed collision detection
-        CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(gridCell));
+        CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(gridCell), currentTimestep);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
@@ -408,6 +418,7 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
     std::vector<double>& allPenetrationDepths,
     int& collisionPairCount,
     bool useSimplifiedContactGeneration,
+    uint64_t currentTimestep,
     bool normalFlip) {
     
     // Early exit if grid is empty
@@ -439,7 +450,7 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
             // Quick AABB check first
             if (polyhedron->checkAABBCollision(gridCollider)) {
                 // Perform detailed collision detection
-                CollisionResult result = detectPolyhedronPolyhedron(polyhedron, static_cast<PolyhedronCollider*>(gridCollider), useSimplifiedContactGeneration);
+                CollisionResult result = detectPolyhedronPolyhedron(polyhedron, static_cast<PolyhedronCollider*>(gridCollider), currentTimestep, useSimplifiedContactGeneration);
                 
                 if (result.m_hasCollision) {
                     collisionPairCount++; // Increment by 1 per collision pair, not per contact point
@@ -463,7 +474,8 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
 }
 
 CollisionResult CollisionDetectionUtils::detectPolyhedronGrid(
-    PolyhedronCollider* polyhedron, GridCollider* grid) {
+    PolyhedronCollider* polyhedron, GridCollider* grid,
+    uint64_t currentTimestep) {
     
     // Early exit if grid is empty
     if (grid->getCells().empty()) {
@@ -478,7 +490,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronGrid(
     // Use helper function to process collision
     glm::dvec3 gridSpaceCenter = grid->worldToGrid(polyhedron->m_position);
     processPolyhedronGridCollision(polyhedron, grid, gridSpaceCenter, allNormals, allContactPoints, allPenetrationDepths,
-                           collisionPairCount, false, false);
+                           collisionPairCount, false, currentTimestep, false);
     
     // Return combined result
     if (!allNormals.empty()) {
@@ -496,7 +508,8 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronGrid(
 }
 
 CollisionResult CollisionDetectionUtils::detectGridGrid(
-    GridCollider* gridA, GridCollider* gridB) {
+    GridCollider* gridA, GridCollider* gridB,
+    uint64_t currentTimestep) {
 
     const auto& cellsA = gridA->getCells();
     const auto& cellsB = gridB->getCells();
@@ -554,7 +567,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         // Use helper function to process collision
         processPolyhedronGridCollision(queryCollider, targetGrid, gridSpaceCenter, allNormals, allContactPoints,
                                allPenetrationDepths, collisionPairCount, 
-                               useSimplifiedContactGeneration, normalFlip);
+                               useSimplifiedContactGeneration, currentTimestep, normalFlip);
     }
     
     // Return combined result
@@ -588,9 +601,10 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
 }
 
 CollisionResult CollisionDetectionUtils::detectPolyhedronBall(
-    PolyhedronCollider* polyhedron, BallCollider* ball) {
+    PolyhedronCollider* polyhedron, BallCollider* ball,
+    uint64_t currentTimestep) {
     // Use ball-cube detection and flip normals
-    CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(polyhedron));
+    CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(polyhedron), currentTimestep);
     
     // Flip normal direction since we called ball-cube instead of cube-ball
     for (glm::dvec3& normal : result.m_normals) {
@@ -601,9 +615,10 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronBall(
 }
 
 CollisionResult CollisionDetectionUtils::detectGridBall(
-    GridCollider* grid, BallCollider* ball) {
+    GridCollider* grid, BallCollider* ball,
+    uint64_t currentTimestep) {
     // Use ball-grid detection and flip normals
-    CollisionResult result = detectBallGrid(ball, grid);
+    CollisionResult result = detectBallGrid(ball, grid, currentTimestep);
     
     // Flip normal direction since we called ball-grid instead of grid-ball
     for (glm::dvec3& normal : result.m_normals) {
@@ -614,9 +629,10 @@ CollisionResult CollisionDetectionUtils::detectGridBall(
 }
 
 CollisionResult CollisionDetectionUtils::detectGridPolyhedron(
-    GridCollider* grid, PolyhedronCollider* polyhedron) {
+    GridCollider* grid, PolyhedronCollider* polyhedron,
+    uint64_t currentTimestep) {
     // Use cube-grid detection and flip normals
-    CollisionResult result = detectPolyhedronGrid(polyhedron, grid);
+    CollisionResult result = detectPolyhedronGrid(polyhedron, grid, currentTimestep);
     
     // Flip normal direction since we called cube-grid instead of grid-cube
     for (glm::dvec3& normal : result.m_normals) {

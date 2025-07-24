@@ -29,6 +29,9 @@ public:
     
     // Set the end time for the current collision detection run
     void setEndTime(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
+
+    // Set the current timestep for AABB validity tracking
+    void setTimestep(uint64_t timestep);
     
 private:
     std::vector<Collider*> colliders;
@@ -40,6 +43,7 @@ private:
     std::set<std::pair<Collider*, Collider*>> m_activeAABBS;
 
     TimeHandler* m_timeHandler;
+    uint64_t m_currentTimestep = 0;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_endTime;
 
     // Helper functions

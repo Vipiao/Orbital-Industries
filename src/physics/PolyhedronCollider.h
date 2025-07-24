@@ -18,13 +18,13 @@ public:
     
     // Override base class methods
     virtual int getTypeId() const override { return TYPE_ID; }
-    virtual void updateSimpleAABB() override;
-    virtual void updateAdvancedAABB() override;
+    virtual void updateSimpleAABB(uint64_t currentTimestep) override;
+    virtual void updateAdvancedAABB(uint64_t currentTimestep) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Polyhedron interface (public so collision detection can access)
-    std::vector<glm::dvec3> getVertices() const;
-    std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes() const;
+    std::vector<glm::dvec3> getVertices(uint64_t currentTimestep = 0) const;
+    std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes(uint64_t currentTimestep = 0) const;
     
     // Filter normal management
     void addFilterNormal(const glm::dvec3& normal);
@@ -43,15 +43,14 @@ protected:
 
     // Protected access for derived class optimizations
     mutable std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> m_cachedCollisionAxes;
-    mutable bool m_collisionAxesDirty = true;
+    mutable uint64_t m_collisionAxesValidUntilTime = 0;
     std::vector<glm::dvec3> m_filterNormals;
     virtual void updateCachedCollisionAxes() const;
 
 private:
     // Cached vertices with dirty flag for lazy calculation
     mutable std::vector<glm::dvec3> m_cachedVertices;
-    mutable bool m_verticesDirty = true;
-    mutable bool m_advancedAABBDirty = true;
+    mutable uint64_t m_verticesValidUntilTime = 0;
     
     void updateCachedVertices() const;
     void calculateHalfMaxWidth();

@@ -15,7 +15,7 @@ public:
     
     // Override base class methods
     virtual int getTypeId() const override { return TYPE_ID; }
-    virtual void updateSimpleAABB() override;
+    virtual void updateSimpleAABB(uint64_t currentTimestep) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
     
     // Public member variable

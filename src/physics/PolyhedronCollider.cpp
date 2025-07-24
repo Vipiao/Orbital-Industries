@@ -40,27 +40,32 @@ void PolyhedronCollider::calculateHalfMaxWidth() {
     m_halfMaxWidth = maxDimension * 0.5;
 }
 
-void PolyhedronCollider::updateSimpleAABB() {
+void PolyhedronCollider::updateSimpleAABB(uint64_t currentTimestep) {
+    // Check if simple AABB is still valid
+    if (currentTimestep <= m_simpleAABBValidUntilTime) {
+        return; // Still valid, no need to recalculate
+    }
+
     // Simple AABB using half max width (conservative sphere)
     double halfDiagonal = m_halfMaxWidth * std::sqrt(3.0);
     m_AABBMin = m_position - glm::dvec3(halfDiagonal);
     m_AABBMax = m_position + glm::dvec3(halfDiagonal);
 
-    // Mark cached vertices as dirty since position/orientation may have changed
-    m_verticesDirty = true;
-    // Mark advanced AABB as dirty since position/orientation may have changed
-    m_advancedAABBDirty = true;
-    // Mark collision axes as dirty since orientation may have changed
-    m_collisionAxesDirty = true;
+    // Mark simple AABB as valid for this timestep
+    m_simpleAABBValidUntilTime = currentTimestep;
+
+    // Invalidate cached data since position/orientation may have changed
+    m_verticesValidUntilTime = 0;
+    m_collisionAxesValidUntilTime = 0;
 }
 
-void PolyhedronCollider::updateAdvancedAABB() {
-    // Only recalculate if dirty
-    if (!m_advancedAABBDirty) {
-        return;
+void PolyhedronCollider::updateAdvancedAABB(uint64_t currentTimestep) {
+    // Check if advanced AABB is still valid
+    if (currentTimestep <= m_advancedAABBValidUntilTime) {
+        return; // Still valid, no need to recalculate
     }
 
-    std::vector<glm::dvec3> vertices = getVertices();
+    std::vector<glm::dvec3> vertices = getVertices(currentTimestep);
     
     if (vertices.empty()) {
         throw std::runtime_error("PolyhedronCollider::updateAdvancedAABB: No vertices available for AABB calculation");
@@ -76,8 +81,8 @@ void PolyhedronCollider::updateAdvancedAABB() {
         m_AABBMax = glm::max(m_AABBMax, vertices[i]);
     }
 
-    // Mark as clean
-    m_advancedAABBDirty = false;
+    // Mark advanced AABB as valid for this timestep
+    m_advancedAABBValidUntilTime = currentTimestep;
 }
 
 bool PolyhedronCollider::checkAABBCollision(const Collider* other) const {
@@ -90,11 +95,11 @@ bool PolyhedronCollider::checkAABBCollision(const Collider* other) const {
             m_AABBMax.z >= other->m_AABBMin.z);
 }
 
-std::vector<glm::dvec3> PolyhedronCollider::getVertices() const {
-    // Lazy calculation - only recalculate if dirty
-    if (m_verticesDirty) {
+std::vector<glm::dvec3> PolyhedronCollider::getVertices(uint64_t currentTimestep) const {
+    // Lazy calculation - only recalculate if invalid
+    if (currentTimestep > m_verticesValidUntilTime) {
         updateCachedVertices();
-        m_verticesDirty = false;
+        m_verticesValidUntilTime = currentTimestep;
     }
     return m_cachedVertices;
 }
@@ -110,11 +115,11 @@ void PolyhedronCollider::updateCachedVertices() const {
     }
 }
 
-std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> PolyhedronCollider::getCollisionAxes() const {
-    // Lazy calculation - only recalculate if dirty
-    if (m_collisionAxesDirty) {
+std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> PolyhedronCollider::getCollisionAxes(uint64_t currentTimestep) const {
+    // Lazy calculation - only recalculate if invalid
+    if (currentTimestep > m_collisionAxesValidUntilTime) {
         updateCachedCollisionAxes();
-        m_collisionAxesDirty = false;
+        m_collisionAxesValidUntilTime = currentTimestep;
     }
     return m_cachedCollisionAxes;
 }
@@ -157,8 +162,7 @@ void PolyhedronCollider::addFilterNormal(const glm::dvec3& normal) {
     glm::dvec3 normalizedNormal = glm::normalize(normal);
     m_filterNormals.push_back(normalizedNormal);
 
-    // Mark collision axes as dirty since filter normals changed
-    m_collisionAxesDirty = true;
+    m_collisionAxesValidUntilTime = 0; // Invalidate collision axes
 }
 
 void PolyhedronCollider::removeFilterNormal(const glm::dvec3& normal) {
@@ -172,15 +176,13 @@ void PolyhedronCollider::removeFilterNormal(const glm::dvec3& normal) {
     
     m_filterNormals.erase(it, m_filterNormals.end());
 
-    // Mark collision axes as dirty since filter normals changed
-    m_collisionAxesDirty = true;
+    m_collisionAxesValidUntilTime = 0; // Invalidate collision axes
 }
 
 void PolyhedronCollider::clearFilterNormals() {
     m_filterNormals.clear();
 
-    // Mark collision axes as dirty since filter normals changed
-    m_collisionAxesDirty = true;
+    m_collisionAxesValidUntilTime = 0; // Invalidate collision axes
 }
 
 const std::vector<glm::dvec3>& PolyhedronCollider::getFilterNormals() const {

@@ -67,6 +67,10 @@ void CollisionDetector::setEndTime(std::chrono::time_point<std::chrono::high_res
     m_endTime = endTime;
 }
 
+void CollisionDetector::setTimestep(uint64_t timestep) {
+    m_currentTimestep = timestep;
+}
+
 Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions) {
     // Update all collision boxes
     updateAllCollidersAndAABB();
@@ -137,7 +141,7 @@ Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions)
 void CollisionDetector::updateAllCollidersAndAABB() {
     for (Collider* collider : colliders) {
         if (collider) {
-            collider->updateSimpleAABB();
+            collider->updateSimpleAABB(m_currentTimestep);
         }
     }
 }
@@ -187,8 +191,8 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2,
     if (!collider1 || !collider2 || collider1 == collider2) return;
 
     // Update advanced AABBs for precise collision detection
-    collider1->updateAdvancedAABB();
-    collider2->updateAdvancedAABB();
+    collider1->updateAdvancedAABB(m_currentTimestep);
+    collider2->updateAdvancedAABB(m_currentTimestep);
     
     // Do precise AABB test with updated bounds
     if (!collider1->checkAABBCollision(collider2)) {
@@ -196,7 +200,7 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2,
     }
     
     // Perform collision detection between the two colliders
-    CollisionResult result = CollisionDetectionUtils::collideWith(collider1, collider2);
+    CollisionResult result = CollisionDetectionUtils::collideWith(collider1, collider2, m_currentTimestep);
     
     if (result.m_hasCollision) {
         //std::cout << "Collision detected between two colliders!" << std::endl;

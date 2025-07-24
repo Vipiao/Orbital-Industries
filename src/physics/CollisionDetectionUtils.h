@@ -18,40 +18,49 @@ static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 11;
 class CollisionDetectionUtils {
 public:
     // Main collision entry point - replaces double dispatch
-    static CollisionResult collideWith(Collider* colliderA, Collider* colliderB);
+    static CollisionResult collideWith(Collider* colliderA, Collider* colliderB, uint64_t currentTimestep);
 
     // Ball-Ball collision
     static CollisionResult detectBallBall(
-        BallCollider* ballA, BallCollider* ballB);
+        BallCollider* ballA, BallCollider* ballB,
+        uint64_t currentTimestep);
     
     // Ball-Cube collision
     static CollisionResult detectBallCube(
-        BallCollider* ball, CubeCollider* cube);
+        BallCollider* ball, CubeCollider* cube,
+        uint64_t currentTimestep);
     
     // Polyhedron-Polyhedron collision
     static CollisionResult detectPolyhedronPolyhedron(
         PolyhedronCollider* polyA, PolyhedronCollider* polyB,
+        uint64_t currentTimestep,
         bool useSimplifiedContactGeneration = false);
     
     // Ball-Grid collision
     static CollisionResult detectBallGrid(
-        BallCollider* ball, GridCollider* grid);
+        BallCollider* ball, GridCollider* grid,
+        uint64_t currentTimestep);
     
     // Polyhedron-Grid collision
     static CollisionResult detectPolyhedronGrid(
-        PolyhedronCollider* polyhedron, GridCollider* grid);
+        PolyhedronCollider* polyhedron, GridCollider* grid,
+        uint64_t currentTimestep);
     
     // Grid-Grid collision
     static CollisionResult detectGridGrid(
-        GridCollider* gridA, GridCollider* gridB);
+        GridCollider* gridA, GridCollider* gridB,
+        uint64_t currentTimestep);
 
     // Reverse-order functions with normal flipping
     static CollisionResult detectPolyhedronBall(
-        PolyhedronCollider* polyhedron, BallCollider* ball);
+        PolyhedronCollider* polyhedron, BallCollider* ball,
+        uint64_t currentTimestep);
     static CollisionResult detectGridBall(
-        GridCollider* grid, BallCollider* ball);
+        GridCollider* grid, BallCollider* ball,
+        uint64_t currentTimestep);
     static CollisionResult detectGridPolyhedron(
-        GridCollider* grid, PolyhedronCollider* polyhedron);
+        GridCollider* grid, PolyhedronCollider* polyhedron, 
+        uint64_t currentTimestep);
 
 private:
     // Helper function to eliminate vector copying between cube-grid and grid-grid detection
@@ -64,6 +73,7 @@ private:
         std::vector<double>& allPenetrationDepths,
         int& collisionPairCount,
         bool useSimplifiedContactGeneration = false,
+        uint64_t currentTimestep = 0,
         bool normalFlip = false);
 
     // Helper structures for cube collision detection

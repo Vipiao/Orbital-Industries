@@ -12,9 +12,15 @@ BallCollider::BallCollider(const glm::dvec3& position,
     
 }
 
-void BallCollider::updateSimpleAABB() {
+void BallCollider::updateSimpleAABB(uint64_t currentTimestep) {
+    // Check if simple AABB is still valid
+    if (currentTimestep <= m_simpleAABBValidUntilTime) {
+        return; // Still valid, no need to recalculate
+    }
+
     m_AABBMin = m_position - glm::dvec3(m_radius);
     m_AABBMax = m_position + glm::dvec3(m_radius);
+    m_simpleAABBValidUntilTime = currentTimestep;
 }
 
 bool BallCollider::checkAABBCollision(const Collider* other) const {
