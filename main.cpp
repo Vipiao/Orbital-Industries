@@ -192,8 +192,10 @@ protected:
         }
         
         // Check for input actions that require grid traversal
-        bool doCreate = mouseHandler->rightClick();
-        bool doRemove = mouseHandler->leftClick();
+        bool doCreate = mouseHandler->rightClick()
+            || mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32;
+        bool doRemove = mouseHandler->leftClick()
+            || mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32;
         bool doForce = keyboard->m_f.isDown();
         bool doTrackSpeed = keyboard->m_z.justPressed();
         double forceMultiplier = (keyboard->m_f.timeDown() * 0.01 + 1.);
