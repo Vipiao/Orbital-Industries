@@ -27,6 +27,11 @@ const glm::dvec3& RigidBody::getAngularVelocityWorld() const {
     return m_cachedAngularVelocityWorld;
 }
 
+void RigidBody::setAngularVelocityBody(glm::dvec3 angularVelocity) {
+    glm::dvec3 localAngularVelocity = glm::transpose(getOrientationMatrix()) * angularVelocity;
+    m_angularMomentumBody = m_inertiaTensor * localAngularVelocity;
+}
+
 const glm::dmat3& RigidBody::getWorldInertiaTensor() const {
     if (m_worldInertiaDirty) {
         const glm::dmat3& orientationMatrix = getOrientationMatrix();

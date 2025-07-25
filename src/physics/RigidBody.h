@@ -47,6 +47,7 @@ public:
     const glm::dmat3& getOrientationMatrix() const;
     const glm::dvec3& getAngularVelocityBody() const;
     const glm::dvec3& getAngularVelocityWorld() const;
+    void setAngularVelocityBody(glm::dvec3 angularVelocity);
     const glm::dmat3& getWorldInertiaTensor() const;
     const glm::dmat3& getWorldInvInertiaTensor() const;
     
