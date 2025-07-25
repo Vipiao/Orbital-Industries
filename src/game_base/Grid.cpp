@@ -33,7 +33,7 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
     m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager);
 
     // Create grid collider for the grid
-    m_collider = std::make_unique<GridCollider>(position, orientation);
+    m_collider = std::make_unique<GridCollider>(position, orientation, nullptr, jobManager, timeHandler);
     
     // Create rigid body in physics engine
     m_rigidBody = m_physics->addRigidBody(

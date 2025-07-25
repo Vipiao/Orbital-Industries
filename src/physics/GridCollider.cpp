@@ -3,13 +3,22 @@
 #include "CubeCollider.h"
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
+#include "../utils/JobManager.h"
+#include "../utils/TimeHandler.h"
+#include "../game_base/JobPriorities.h"
 
 GridCollider::GridCollider(const glm::dvec3& position,
                           const glm::dquat& orientation,
-                          ColliderReference* reference)
+                          ColliderReference* reference,
+                          JobManager* jobManager,
+                          TimeHandler* timeHandler)
     : Collider(position, orientation, reference)
+    , m_jobManager(jobManager)
+    , m_timeHandler(timeHandler)
 {
-    
+    if (!m_jobManager || !m_timeHandler) {
+        throw std::invalid_argument("GridCollider requires JobManager and TimeHandler");
+    }
 }
 
 void GridCollider::updateSimpleAABB(uint64_t currentTimestep) {
@@ -85,6 +94,10 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     collider->m_orientation = m_orientation;
     collider->m_reference = m_reference;
 
+    // Create and set metadata on the collider
+    CellMetadata* metadata = new CellMetadata();
+    collider->set_pointer<CellMetadata>(metadata);
+
     // Set up dependent positioning
     collider->m_dependentPosition = this;
     collider->m_dependentOffset = glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5);
@@ -115,6 +128,18 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     }
 
     updateFilterNormalsForCell(coord);
+
+    // Queue this coordinate and its 6 neighbors for classification update
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0}, {-1, 0, 0},   // +X, -X
+        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
+        {0, 0, 1}, {0, 0, -1}    // +Z, -Z
+    };
+    
+    queueCoordinateForClassification(coord);
+    for (int i = 0; i < 6; ++i) {
+        queueCoordinateForClassification(coord + directions[i]);
+    }
 
     // Update neighborhoods for collision detection optimization
     Collider* newCell = m_cells[coord].get();
@@ -160,6 +185,12 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
         // Get pointer before erasing for neighborhood updates
         Collider* removedCell = it->second.get();
 
+        // Clean up metadata before removing collider
+        CellMetadata* metadata = removedCell->get_pointer<CellMetadata>();
+        if (metadata) {
+            delete metadata;
+        }
+
         // Check if this cell is on the border before removing
         bool onBorder = (coord.x == m_localAABBMin.x || coord.x == m_localAABBMax.x ||
                         coord.y == m_localAABBMin.y || coord.y == m_localAABBMax.y ||
@@ -191,6 +222,17 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
 
         m_cells.erase(it);
         updateFilterNormalsAfterRemoval(coord);
+
+        // Queue this coordinate and its 6 neighbors for classification update
+        static const glm::ivec3 directions[6] = {
+            {1, 0, 0}, {-1, 0, 0},   // +X, -X
+            {0, 1, 0}, {0, -1, 0},   // +Y, -Y
+            {0, 0, 1}, {0, 0, -1}    // +Z, -Z
+        };
+        
+        for (int i = 0; i < 6; ++i) {
+            queueCoordinateForClassification(coord + directions[i]);
+        }
 
         // Update neighborhoods for collision detection optimization
         for (int dx = -NEIGHBORHOOD_RADIUS; dx <= NEIGHBORHOOD_RADIUS; ++dx) {
@@ -372,3 +414,93 @@ std::vector<Collider*> GridCollider::findCellsInRadius(const glm::dvec3& worldPo
     
     return foundColliders;
 }
+
+void GridCollider::queueCoordinateForClassification(const glm::ivec3& coord) {
+    // Only add if not already queued
+    if (m_queuedCoordinates.find(coord) == m_queuedCoordinates.end()) {
+        m_classificationQueue.push(coord);
+        m_queuedCoordinates.insert(coord);
+        scheduleClassificationJob();
+    }
+}
+
+void GridCollider::scheduleClassificationJob() {
+    if (m_classificationJob.lock()) {
+        return; // Job exists (active or cancelled) - don't schedule another
+    }
+    
+    m_classificationJob = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
+        return processClassificationQueue(endTime);
+    }, JobPriorities::STRUCTURAL_ANALYSIS);
+}
+
+bool GridCollider::processClassificationQueue(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    while (!m_classificationQueue.empty() && m_timeHandler->now() < endTime) {
+        glm::ivec3 coord = m_classificationQueue.front();
+        m_classificationQueue.pop();
+        m_queuedCoordinates.erase(coord);
+        
+        // Check if cell exists in the collider
+        Collider* collider = getCell(coord);
+        if (!collider) {
+            continue; // Skip non-existent cells
+        }
+        
+        // Classify the cell and update its metadata
+        CellMetadata::CellClassification newClassification = classifyCell(coord);
+        
+        CellMetadata* metadata = collider->get_pointer<CellMetadata>();
+        if (metadata) {
+            metadata->classification = newClassification;
+        }
+    }
+    
+    return !m_classificationQueue.empty(); // Return true if more work needed
+}
+
+CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& coord) {
+    // Standard 6-directional neighbors
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0}, {-1, 0, 0},   // +X, -X
+        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
+        {0, 0, 1}, {0, 0, -1}    // +Z, -Z
+    };
+    
+    std::array<bool, 6> hasNeighbor;
+    int occupiedCount = 0;
+    
+    // Check each neighbor using hash lookup
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = coord + directions[i];
+        hasNeighbor[i] = hasCell(neighborCoord);
+        if (hasNeighbor[i]) {
+            occupiedCount++;
+        }
+    }
+    
+    // Apply classification rules
+    if (occupiedCount == 6) {
+        return CellMetadata::CellClassification::INNER;
+    }
+    
+    if (occupiedCount == 4) {
+        // Check if the 2 empty directions are opposite pairs
+        for (int i = 0; i < 6; i += 2) {
+            if (!hasNeighbor[i] && !hasNeighbor[i + 1]) {
+                return CellMetadata::CellClassification::FACE;
+            }
+        }
+    }
+    
+    if (occupiedCount >= 2) {
+        // Check if there's at least one opposite pair
+        for (int i = 0; i < 6; i += 2) {
+            if (hasNeighbor[i] && hasNeighbor[i + 1]) {
+                return CellMetadata::CellClassification::EDGE;
+            }
+        }
+    }
+    
+    return CellMetadata::CellClassification::CORNER;
+}
+

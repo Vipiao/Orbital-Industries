@@ -6,6 +6,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <utility>
 #include <vector>
+#include "../utils/PointerStorage.h"
 
 class CoordinateSystem {
 public:
@@ -19,7 +20,7 @@ public:
     virtual ~CoordinateSystem() = default;
 };
 
-class Collider : public CoordinateSystem {
+class Collider : public CoordinateSystem, public IPointerStorage {
 public:
     Collider(const glm::dvec3& position = glm::dvec3(0.0), 
              const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),

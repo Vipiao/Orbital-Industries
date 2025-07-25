@@ -7,6 +7,27 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include <memory>
+#include <queue>
+#include <unordered_set>
+#include <chrono>
+ 
+class Job;
+class JobManager;
+class TimeHandler;
+
+// Metadata for grid cells
+class CellMetadata {
+public:
+    // Cell classification for optimization
+    enum class CellClassification {
+        INNER,   // All 6 neighbors occupied
+        FACE,    // 4/6 neighbors, 2 empty in opposite directions
+        EDGE,    // At least 2 neighbors with at least one opposite pair
+        CORNER   // Everything else
+    };
+    
+    CellClassification classification = CellClassification::CORNER;
+};
 
 /**
  * @brief Pre-computed neighborhood of cells for fast spatial queries
@@ -26,7 +47,9 @@ class GridCollider : public Collider {
 public:
     GridCollider(const glm::dvec3& position = glm::dvec3(0.0),
                  const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
-                 ColliderReference* reference = nullptr);
+                 ColliderReference* reference = nullptr,
+                 JobManager* jobManager = nullptr,
+                 TimeHandler* timeHandler = nullptr);
     
     virtual ~GridCollider() = default;
     
@@ -73,6 +96,15 @@ public:
     static constexpr int TYPE_ID = hashColliderName("GridCollider");
 
 private:
+    // Job system references for classification
+    JobManager* m_jobManager;
+    TimeHandler* m_timeHandler;
+    
+    // Classification system
+    std::queue<glm::ivec3> m_classificationQueue;
+    std::unordered_set<glm::ivec3, IVec3Hash> m_queuedCoordinates;
+    std::weak_ptr<Job> m_classificationJob;
+
     // Axis counts for efficient AABB calculation
     std::unordered_map<int, int> m_xAxisCounts;
     std::unordered_map<int, int> m_yAxisCounts;
@@ -98,4 +130,10 @@ private:
 
     // Helper to update cached corners when local AABB changes
     void updateLocalCorners();
+
+    // Classification methods
+    void queueCoordinateForClassification(const glm::ivec3& coord);
+    void scheduleClassificationJob();
+    bool processClassificationQueue(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
+    CellMetadata::CellClassification classifyCell(const glm::ivec3& coord);
 };
