@@ -437,16 +437,19 @@ private:
 int main() {
     try {
         // Create the TimeHandler with appropriate mode
-        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::NONE);
+        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::PLAY);
 
         // Use existing GraphicsEngineBase::Mode for controls
-        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE;
+        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::PLAY;
 
         MyGame game(timeHandler, controlMode); // Updated
         game.run();
         
         // Clean up TimeHandler
         delete timeHandler; // New
+    } catch (const std::bad_alloc& e) {
+        std::cerr << "Out of memory: " << e.what() << std::endl;
+        return 1;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;
