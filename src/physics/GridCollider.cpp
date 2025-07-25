@@ -482,6 +482,10 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
     if (occupiedCount == 6) {
         return CellMetadata::CellClassification::INNER;
     }
+
+    if (occupiedCount == 5) {
+        return CellMetadata::CellClassification::FACE;
+    }
     
     if (occupiedCount == 4) {
         // Check if the 2 empty directions are opposite pairs
