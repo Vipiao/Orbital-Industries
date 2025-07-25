@@ -426,6 +426,15 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
         return;
     }
 
+    // Get polyhedron classification if it's part of a grid
+    CellMetadata::CellClassification polyhedronClass = CellMetadata::CellClassification::CORNER; // Default to corner
+    bool hasPolyhedronClass = false;
+    CellMetadata* polyhedronMetadata = polyhedron->get_pointer<CellMetadata>();
+    if (polyhedronMetadata) {
+        polyhedronClass = polyhedronMetadata->classification;
+        hasPolyhedronClass = true;
+    }
+
     const double searchRadius = 0.5 * std::sqrt(3.0);
 
     // Early AABB test optimization - check if cube can possibly intersect grid
@@ -451,6 +460,24 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
         
         // Process all cells in neighborhood (center cell first, then neighbors)
         for (Collider* gridCollider : neighborhood.m_neighbors) {
+            // Apply classification-based filtering if polyhedron has classification
+            if (hasPolyhedronClass) {
+                CellMetadata* gridMetadata = gridCollider->get_pointer<CellMetadata>();
+                if (gridMetadata) {
+                    CellMetadata::CellClassification gridClass = gridMetadata->classification;
+                    
+                    // Skip if both are not corners AND not both are edges
+                    bool shouldSkip = (polyhedronClass != CellMetadata::CellClassification::CORNER && 
+                                     gridClass != CellMetadata::CellClassification::CORNER) &&
+                                    !(polyhedronClass == CellMetadata::CellClassification::EDGE && 
+                                      gridClass == CellMetadata::CellClassification::EDGE);
+                    
+                    if (shouldSkip) {
+                        continue;
+                    }
+                }
+            }
+
             // Update this neighbor's transform
             gridCollider->updatePosition(currentTimestep);
             gridCollider->updateAdvancedAABB(currentTimestep);
