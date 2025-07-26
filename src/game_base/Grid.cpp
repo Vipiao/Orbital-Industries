@@ -103,8 +103,11 @@ void Grid::removeCell(const glm::ivec3& coord) {
     cancelStructuralAnalysis();
 
     removeNeighborConnections(coord);
+
     // Recalculate mass and inertia incrementally before removing the cell
+    glm::dvec3 originalAngularVelocity{ m_rigidBody->getAngularVelocityBody()  };
     recalculateMassAndInertiaIncremental({coord}, true);
+    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
     
     // Remove from collider
     m_collider->removeCell(coord);
