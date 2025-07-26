@@ -155,14 +155,23 @@ public:
 
     void addGridBlock(Grid* grid, int x, int y, int z) {
         if (grid) {
-            grid->addCell(glm::ivec3(x, y, z));
+            // Schedule as job with priority 1
+            auto jobHandle = m_jobManager->schedule([grid, x, y, z](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+                grid->addCell(glm::ivec3(x, y, z));
+                return false; // Job complete
+            }, 1);
+            trackJob(jobHandle);
         }
     }
     
-    // New - Method to remove a block from the grid
     void removeGridBlock(Grid* grid, int x, int y, int z) {
         if (grid) {
-            grid->removeCell(glm::ivec3(x, y, z));
+            // Schedule as job with priority 1
+            auto jobHandle = m_jobManager->schedule([grid, x, y, z](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+                grid->removeCell(glm::ivec3(x, y, z));
+                return false; // Job complete
+            }, 1);
+            trackJob(jobHandle);
         }
     }
     
