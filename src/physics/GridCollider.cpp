@@ -38,7 +38,7 @@ void GridCollider::updateSimpleAABB(uint64_t currentTimestep) {
     // Update cached corners if needed
     if (currentTimestep > m_cornersValidUntilTime) {
         updateLocalCorners();
-        m_cornersValidUntilTime = currentTimestep;
+        m_cornersValidUntilTime = std::numeric_limits<uint64_t>::max();
     }
     
     // Transform first corner to initialize world AABB
