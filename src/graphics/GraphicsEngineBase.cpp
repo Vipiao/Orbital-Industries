@@ -79,7 +79,7 @@ GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& f
 #ifdef V_SYNC_OFF
    setSwapInterval(0);
 #else
-   setSwapInterval(0);
+   setSwapInterval(1);
 #endif
    glEnable(GL_DEPTH_TEST);
    glEnable(GL_CULL_FACE);
