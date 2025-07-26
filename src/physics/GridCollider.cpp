@@ -102,7 +102,12 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     collider->m_dependentPosition = this;
     collider->m_dependentOffset = glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5);
     
+    // Store pointer before move for classification map
+    Collider* cellPtr = collider.get();
     m_cells[coord] = std::move(collider);
+
+    // Add to corner cells map (default classification)
+    m_cornerCells[coord] = cellPtr;
 
     // Update axis counts
     m_xAxisCounts[coord.x]++;
@@ -180,6 +185,9 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
 }
 
 void GridCollider::removeCell(const glm::ivec3& coord) {
+    extern int hit_count;
+    int hh = hit_count++;
+
     auto it = m_cells.find(coord);
     if (it != m_cells.end()) {
         // Get pointer before erasing for neighborhood updates
@@ -222,6 +230,10 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
 
         m_cells.erase(it);
         updateFilterNormalsAfterRemoval(coord);
+
+        // Remove from classification maps
+        m_cornerCells.erase(coord);
+        m_edgeCells.erase(coord);
 
         // Queue this coordinate and its 6 neighbors for classification update
         static const glm::ivec3 directions[6] = {
@@ -372,8 +384,8 @@ void GridCollider::updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoor
 void GridCollider::updateLocalCorners() {
     // Expand local AABB by half diagonal of cube to encompass entire cubes
     const double halfDiagonal = std::sqrt(3.0) * 0.5;
-    glm::dvec3 expandedMin = glm::dvec3(m_localAABBMin) - glm::dvec3(halfDiagonal);
-    glm::dvec3 expandedMax = glm::dvec3(m_localAABBMax) + glm::dvec3(halfDiagonal) + glm::dvec3(1.0);
+    glm::dvec3 expandedMin = glm::dvec3(m_localAABBMin) - glm::dvec3(halfDiagonal - 0.5);
+    glm::dvec3 expandedMax = glm::dvec3(m_localAABBMax) + glm::dvec3(halfDiagonal + 0.5);
     
     m_localCorners[0] = glm::dvec3(expandedMin.x, expandedMin.y, expandedMin.z);
     m_localCorners[1] = glm::dvec3(expandedMax.x, expandedMin.y, expandedMin.z);
@@ -451,7 +463,25 @@ bool GridCollider::processClassificationQueue(std::chrono::time_point<std::chron
         
         CellMetadata* metadata = collider->get_pointer<CellMetadata>();
         if (metadata) {
+            CellMetadata::CellClassification oldClassification = metadata->classification;
             metadata->classification = newClassification;
+
+            // Update classification maps to match new classification
+            if (oldClassification == CellMetadata::CellClassification::CORNER) {
+                m_cornerCells.erase(coord);
+            }
+            if (oldClassification == CellMetadata::CellClassification::EDGE) {
+                m_edgeCells.erase(coord);
+            }
+            
+            if (newClassification == CellMetadata::CellClassification::CORNER) {
+                m_cornerCells[coord] = collider;
+            }
+            if (newClassification == CellMetadata::CellClassification::EDGE) {
+                m_edgeCells[coord] = collider;
+            }
+            // Note: FACE and INNER classifications are not added to any map
+            // since they don't participate in collision detection optimization
         }
     }
     

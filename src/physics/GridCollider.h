@@ -105,6 +105,10 @@ private:
     std::unordered_set<glm::ivec3, IVec3Hash> m_queuedCoordinates;
     std::weak_ptr<Job> m_classificationJob;
 
+    // Classification-based cell maps for optimized collision detection
+    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_cornerCells;
+    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_edgeCells;
+
     // Axis counts for efficient AABB calculation
     std::unordered_map<int, int> m_xAxisCounts;
     std::unordered_map<int, int> m_yAxisCounts;

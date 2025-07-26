@@ -545,12 +545,9 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronGrid(
 CollisionResult CollisionDetectionUtils::detectGridGrid(
     GridCollider* gridA, GridCollider* gridB,
     uint64_t currentTimestep) {
-
-    const auto& cellsA = gridA->getCells();
-    const auto& cellsB = gridB->getCells();
     
     // Early exit if either grid is empty
-    if (cellsA.empty() || cellsB.empty()) {
+    if (gridA->getCells().empty() || gridB->getCells().empty()) {
         return CollisionResult();
     }
 
@@ -563,46 +560,78 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     const int CONTACT_COMPLEXITY_THRESHOLD = 6;
     bool useSimplifiedContactGeneration = hasCachedData && cachedCollisionPairCount > CONTACT_COMPLEXITY_THRESHOLD;
     
-    // Choose the smaller grid as the query grid for optimization
-    GridCollider* queryGrid;
-    GridCollider* targetGrid;
-    bool normalFlip = false; // Track if we need to flip normals due to order change
-    
-    if (cellsA.size() <= cellsB.size()) {
-        queryGrid = gridA;
-        targetGrid = gridB;
-        normalFlip = false;
-    } else {
-        queryGrid = gridB;
-        targetGrid = gridA;
-        normalFlip = true; // We swapped order, so normals need to be flipped
-    }
-
-    const auto& queryCells = queryGrid->getCells();
+    // Calculate the 4 options to find optimal iteration strategy
+    size_t totalCorners = gridA->m_cornerCells.size() + gridB->m_cornerCells.size();
+    size_t optionA = gridA->getCells().size(); // All cells in A
+    size_t optionB = gridB->getCells().size(); // All cells in B
+    size_t optionC = gridA->m_edgeCells.size() + totalCorners; // Edges A + All Corners
+    size_t optionD = gridB->m_edgeCells.size() + totalCorners; // Edges B + All Corners
     
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
     std::vector<double> allPenetrationDepths;
     int collisionPairCount = 0;
 
-    glm::dmat4 worldToTargetGrid = glm::translate(glm::mat4_cast(glm::conjugate(targetGrid->m_orientation)), -targetGrid->m_position);
-    glm::dmat4 queryCenterToWorldToTarget = glm::translate(worldToTargetGrid, queryGrid->m_position) * glm::mat4_cast(queryGrid->m_orientation);
-    glm::dmat4 queryCornerToWorldToTarget = glm::translate(queryCenterToWorldToTarget, glm::dvec3(0.5, 0.5, 0.5));
-
-    // Iterate through query grid cells and use helper function
-    for (const auto& queryPair : queryCells) {
-        PolyhedronCollider* queryCollider = static_cast<PolyhedronCollider*>(queryPair.second.get());
-        const glm::ivec3& queryCoord = queryPair.first;
+    // Helper function to process a group of cells
+    auto processGroup = [&](const auto& cellMap, const glm::dmat4& transform, GridCollider* targetGrid, bool normalFlip, auto extractCollider) {
+        for (const auto& [queryCoord, mapValue] : cellMap) {
+            PolyhedronCollider* queryCollider = static_cast<PolyhedronCollider*>(extractCollider(mapValue));
         
-        // Single matrix-vector multiplication to transform cell coordinate to target grid space
-        glm::dvec4 homogeneousCoord = glm::dvec4(queryCoord, 1.0);
-        glm::dvec4 transformedCoord = queryCornerToWorldToTarget * homogeneousCoord;
-        glm::dvec3 gridSpacePolyCenterPos = glm::dvec3(transformedCoord);
+            // Transform cell coordinate to target grid space
+            glm::dvec4 homogeneousCoord = glm::dvec4(queryCoord, 1.0);
+            glm::dvec4 transformedCoord = transform * homogeneousCoord;
+            glm::dvec3 gridSpacePolyCenterPos = glm::dvec3(transformedCoord);
 
-        // Use helper function to process collision
-        processPolyhedronGridCollision(queryCollider, targetGrid, gridSpacePolyCenterPos, allNormals, allContactPoints,
-                               allPenetrationDepths, collisionPairCount, 
-                               useSimplifiedContactGeneration, currentTimestep, normalFlip);
+            processPolyhedronGridCollision(queryCollider, targetGrid, gridSpacePolyCenterPos, allNormals, allContactPoints,
+                                   allPenetrationDepths, collisionPairCount, 
+                                   useSimplifiedContactGeneration, currentTimestep, normalFlip);
+        }
+    };
+    
+    // Choose optimal strategy and execute
+    if (optionA <= optionB && optionA <= optionC && optionA <= optionD) {
+        // Option A: Iterate over all cells in A, check against all cells in B
+        glm::dmat4 worldToGridB = glm::translate(glm::mat4_cast(glm::conjugate(gridB->m_orientation)), -gridB->m_position);
+        glm::dmat4 gridACenterToWorldToGridB = glm::translate(worldToGridB, gridA->m_position) * glm::mat4_cast(gridA->m_orientation);
+        glm::dmat4 gridACornerToWorldToGridB = glm::translate(gridACenterToWorldToGridB, glm::dvec3(0.5, 0.5, 0.5));
+        
+        processGroup(gridA->getCells(), gridACornerToWorldToGridB, gridB, false, [](const auto& uniquePtr) { return uniquePtr.get(); });
+    }
+    else if (optionB <= optionC && optionB <= optionD) {
+        // Option B: Iterate over all cells in B, check against all cells in A
+        glm::dmat4 worldToGridA = glm::translate(glm::mat4_cast(glm::conjugate(gridA->m_orientation)), -gridA->m_position);
+        glm::dmat4 gridBCenterToWorldToGridA = glm::translate(worldToGridA, gridB->m_position) * glm::mat4_cast(gridB->m_orientation);
+        glm::dmat4 gridBCornerToWorldToGridA = glm::translate(gridBCenterToWorldToGridA, glm::dvec3(0.5, 0.5, 0.5));
+        
+        processGroup(gridB->getCells(), gridBCornerToWorldToGridA, gridA, true, [](const auto& uniquePtr) { return uniquePtr.get(); });
+    }
+    else if (optionC <= optionD) {
+        // Option C: Edges A + All Corners
+        glm::dmat4 worldToGridB = glm::translate(glm::mat4_cast(glm::conjugate(gridB->m_orientation)), -gridB->m_position);
+        glm::dmat4 gridACenterToWorldToGridB = glm::translate(worldToGridB, gridA->m_position) * glm::mat4_cast(gridA->m_orientation);
+        glm::dmat4 gridACornerToWorldToGridB = glm::translate(gridACenterToWorldToGridB, glm::dvec3(0.5, 0.5, 0.5));
+        
+        glm::dmat4 worldToGridA = glm::translate(glm::mat4_cast(glm::conjugate(gridA->m_orientation)), -gridA->m_position);
+        glm::dmat4 gridBCenterToWorldToGridA = glm::translate(worldToGridA, gridB->m_position) * glm::mat4_cast(gridB->m_orientation);
+        glm::dmat4 gridBCornerToWorldToGridA = glm::translate(gridBCenterToWorldToGridA, glm::dvec3(0.5, 0.5, 0.5));
+        
+        processGroup(gridA->m_edgeCells, gridACornerToWorldToGridB, gridB, false, [](Collider* ptr) { return ptr; });
+        processGroup(gridA->m_cornerCells, gridACornerToWorldToGridB, gridB, false, [](Collider* ptr) { return ptr; });
+        processGroup(gridB->m_cornerCells, gridBCornerToWorldToGridA, gridA, true, [](Collider* ptr) { return ptr; });
+    }
+    else {
+        // Option D: Edges B + All Corners
+        glm::dmat4 worldToGridA = glm::translate(glm::mat4_cast(glm::conjugate(gridA->m_orientation)), -gridA->m_position);
+        glm::dmat4 gridBCenterToWorldToGridA = glm::translate(worldToGridA, gridB->m_position) * glm::mat4_cast(gridB->m_orientation);
+        glm::dmat4 gridBCornerToWorldToGridA = glm::translate(gridBCenterToWorldToGridA, glm::dvec3(0.5, 0.5, 0.5));
+        
+        glm::dmat4 worldToGridB = glm::translate(glm::mat4_cast(glm::conjugate(gridB->m_orientation)), -gridB->m_position);
+        glm::dmat4 gridACenterToWorldToGridB = glm::translate(worldToGridB, gridA->m_position) * glm::mat4_cast(gridA->m_orientation);
+        glm::dmat4 gridACornerToWorldToGridB = glm::translate(gridACenterToWorldToGridB, glm::dvec3(0.5, 0.5, 0.5));
+
+        processGroup(gridB->m_edgeCells, gridBCornerToWorldToGridA, gridA, true, [](Collider* ptr) { return ptr; });
+        processGroup(gridA->m_cornerCells, gridACornerToWorldToGridB, gridB, false, [](Collider* ptr) { return ptr; });
+        processGroup(gridB->m_cornerCells, gridBCornerToWorldToGridA, gridA, true, [](Collider* ptr) { return ptr; });
     }
     
     // Return combined result

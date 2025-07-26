@@ -22,10 +22,14 @@ public:
 
 class Collider : public CoordinateSystem, public IPointerStorage {
 public:
+    // Unique ID for debugging
+    const int m_debugId;
+
     Collider(const glm::dvec3& position = glm::dvec3(0.0), 
              const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
              ColliderReference* reference = nullptr)
         : CoordinateSystem(position, orientation)
+        , m_debugId(s_nextId++)
         , m_reference(reference)
         , m_AABBMin(0.0)
         , m_AABBMax(0.0)
@@ -86,4 +90,7 @@ public:
     // AABB data
     glm::dvec3 m_AABBMin;
     glm::dvec3 m_AABBMax;
+
+private:
+    static int s_nextId;
 };

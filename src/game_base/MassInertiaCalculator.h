@@ -135,16 +135,16 @@ void MassInertiaCalculator::calculateScalarInertiaIncremental(
     glm::dvec3 newCM;
     calculateScalarInertia(newContainer, getData, &newMass, &newCM, &newInertia);
     
-    if (existingMass <= 0.0) {
-        // No existing mass, just use new values
-        if (inOutTotalMass) *inOutTotalMass = newMass;
-        if (inOutCenterOfMass) *inOutCenterOfMass = newCM;
-        if (inOutScalarInertia) *inOutScalarInertia = newInertia;
-        return;
-    }
-    
     // Combine masses
     double totalMass = existingMass + newMass;
+
+    // Handle case where total mass becomes zero or negative
+    if (totalMass <= 0.0) {
+        if (inOutTotalMass) *inOutTotalMass = 0.0;
+        if (inOutCenterOfMass) *inOutCenterOfMass = glm::dvec3(0.0);
+        if (inOutScalarInertia) *inOutScalarInertia = 0.0;
+        return;
+    }
     
     // Combine center of mass
     glm::dvec3 combinedCM = (existingCM * existingMass + newCM * newMass) / totalMass;
@@ -242,6 +242,14 @@ void MassInertiaCalculator::calculateTensorInertiaIncremental(
     
     // Combine masses
     double totalMass = existingMass + newMass;
+
+    // Handle case where total mass becomes zero or negative
+    if (totalMass <= 0.0) {
+        if (inOutTotalMass) *inOutTotalMass = 0.0;
+        if (inOutCenterOfMass) *inOutCenterOfMass = glm::dvec3(0.0);
+        if (inOutInertiaTensor) *inOutInertiaTensor = glm::dmat3(0.0);
+        return;
+    }
     
     // Combine center of mass
     glm::dvec3 combinedCM = (existingCM * existingMass + newCM * newMass) / totalMass;

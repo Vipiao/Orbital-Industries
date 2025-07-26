@@ -1,6 +1,9 @@
 // Collider.cpp
 #include "Collider.h"
 
+// Initialize static ID counter
+int Collider::s_nextId = 0;
+
 void Collider::updatePosition(uint64_t currentTimestep) {
     // Update position if needed and we have a dependent position system
     if (currentTimestep > m_positionValidUntilTime && m_dependentPosition) {

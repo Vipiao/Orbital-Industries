@@ -72,6 +72,9 @@ void CollisionDetector::setTimestep(uint64_t timestep) {
 }
 
 Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions) {
+    extern int hit_count;
+    int hh = hit_count;
+    
     // Update all collision boxes
     updateAllCollidersAndAABB();
     if (m_timeHandler->now() >= m_endTime) {

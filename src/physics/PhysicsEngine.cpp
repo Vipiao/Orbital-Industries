@@ -246,6 +246,13 @@ void PhysicsEngine::updatePositions() {
         if (body->m_isStatic) {
             continue; // Static bodies don't move
         }
+
+        // Skip physics calculations for zero mass bodies
+        if (body->m_mass == 0.0) {
+            body->m_forces = glm::dvec3{0.0, 0.0, 0.0};
+            body->m_torques = glm::dvec3{0.0, 0.0, 0.0};
+            continue;
+        }
         
         // Linear motion update
         // Calculate acceleration: a = F/m
@@ -322,7 +329,7 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
     RigidBody* bodyA = static_cast<RigidBody*>(collision.m_colliderA->m_reference);
     RigidBody* bodyB = static_cast<RigidBody*>(collision.m_colliderB->m_reference);
 
-    if (!bodyA || !bodyB) {
+    if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
         return; // Skip if we can't find bodies
     }
     
@@ -392,8 +399,8 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
     // Find the rigid bodies associated with these colliders
     RigidBody* bodyA = static_cast<RigidBody*>(collision.m_colliderA->m_reference);
     RigidBody* bodyB = static_cast<RigidBody*>(collision.m_colliderB->m_reference);
-     
-    if (!bodyA || !bodyB) {
+    
+    if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
         return; // Skip if we can't find bodies
     }
     
