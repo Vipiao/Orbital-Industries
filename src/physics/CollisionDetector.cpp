@@ -139,6 +139,8 @@ Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions)
         }
         checkCollision(pair.first, pair.second, collisions);
     }
+
+    co_return;
 }
 
 void CollisionDetector::updateAllCollidersAndAABB() {

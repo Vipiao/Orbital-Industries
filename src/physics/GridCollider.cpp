@@ -21,6 +21,13 @@ GridCollider::GridCollider(const glm::dvec3& position,
     }
 }
 
+GridCollider::~GridCollider() {
+    // Cancel pending classification job
+    if (!m_classificationJob.expired()) {
+        m_jobManager->cancel(m_classificationJob);
+    }
+}
+
 void GridCollider::updateSimpleAABB(uint64_t currentTimestep) {
     // Check if simple AABB is still valid
     if (currentTimestep <= m_simpleAABBValidUntilTime) {
@@ -443,7 +450,7 @@ void GridCollider::scheduleClassificationJob() {
     
     m_classificationJob = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
         return processClassificationQueue(endTime);
-    }, JobPriorities::STRUCTURAL_ANALYSIS);
+    }, JobPriorities::GRID_CELL_CLASSIFICATION);
 }
 
 bool GridCollider::processClassificationQueue(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {

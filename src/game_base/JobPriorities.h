@@ -13,6 +13,9 @@ namespace JobPriorities {
     static constexpr int CELL_OPERATIONS = 2;
     static constexpr int GRID_CLEANUP = 1;
     
+    // Classify inner, faces, edges, corners
+    static constexpr int GRID_CELL_CLASSIFICATION = -3;
+    
     // Analysis subsystem priorities
-    static constexpr int STRUCTURAL_ANALYSIS = -3;
+    static constexpr int STRUCTURAL_ANALYSIS = -4;
 }

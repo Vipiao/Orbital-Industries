@@ -68,6 +68,7 @@ private:
     template <typename T>
     void record(const T& data) {
         m_file.write(reinterpret_cast<const char*>(&data), sizeof(T));
+        m_file.flush();
     }
 
     template <typename T>

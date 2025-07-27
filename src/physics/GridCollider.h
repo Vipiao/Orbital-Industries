@@ -51,7 +51,7 @@ public:
                  JobManager* jobManager = nullptr,
                  TimeHandler* timeHandler = nullptr);
     
-    virtual ~GridCollider() = default;
+    virtual ~GridCollider();
     
     // Override base class methods
     virtual int getTypeId() const override { return TYPE_ID; }
