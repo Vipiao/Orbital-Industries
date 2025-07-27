@@ -77,11 +77,12 @@ public:
    template <typename T>
    void record(const T& data) {
       m_file.write(reinterpret_cast<const char*>(&data), sizeof(T));
+      m_file.flush();
    }
 
    template <typename T>
    T playback() {
-      T data;
+      T data{};
       m_file.read(reinterpret_cast<char*>(&data), sizeof(T));
       if (m_file.eof() || !m_file.good()) {
          m_file.close();
