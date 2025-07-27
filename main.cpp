@@ -154,25 +154,11 @@ public:
     }
 
     void addGridBlock(Grid* grid, int x, int y, int z) {
-        if (grid) {
-            // Schedule as job with priority 1
-            auto jobHandle = m_jobManager->schedule([grid, x, y, z](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-                grid->addCell(glm::ivec3(x, y, z));
-                return false; // Job complete
-            }, 2);
-            trackJob(jobHandle);
-        }
+        if (grid) grid->addCell(glm::ivec3(x, y, z));
     }
     
     void removeGridBlock(Grid* grid, int x, int y, int z) {
-        if (grid) {
-            // Schedule as job with priority 1
-            auto jobHandle = m_jobManager->schedule([grid, x, y, z](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-                grid->removeCell(glm::ivec3(x, y, z));
-                return false; // Job complete
-            }, 2);
-            trackJob(jobHandle);
-        }
+        if (grid) grid->removeCell(glm::ivec3(x, y, z));
     }
     
 protected:
@@ -326,16 +312,7 @@ protected:
                 std::cout << "Scheduled grid split check for removed block at (" 
                           << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
 
-                    // Schedule empty grid removal check at lower priority
-                    Grid* gridToCheck = targetGrid; // Capture for lambda
-                    auto jobHandle = m_jobManager->schedule([this, gridToCheck](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-                        if (gridToCheck->isEmpty()) {
-                            std::cout << "Grid is now empty, removing grid" << std::endl;
-                            removeGrid(gridToCheck);
-                        }
-                        return false; // Job complete
-                    }, 1);
-                    trackJob(jobHandle);
+                    removeGrid(targetGrid);
                 } else {
                     std::cout << "No block found to remove" << std::endl;
                 }

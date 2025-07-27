@@ -62,12 +62,19 @@ Grid::~Grid() {
         m_physics->removeRigidBody(m_rigidBody);
     }
 
+    // Cancel all pending jobs
+    for (auto& jobHandle : m_pendingJobs) {
+        if (!jobHandle.expired()) {
+            m_jobManager->cancel(jobHandle);
+        }
+    }
+
     // Cancel any pending analysis job
     cancelStructuralAnalysis();
 }
 
 // Add a cell to the grid
-void Grid::addCell(const glm::ivec3& coord, CellType type) {
+void Grid::addCellImmediately(const glm::ivec3& coord, CellType type) {
     // If cell already exists, return
     if (hasCell(coord)) return;
 
@@ -94,8 +101,17 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
     recalculateMassAndInertiaIncremental({coord});
 }
 
+void Grid::addCell(const glm::ivec3& coord, CellType type) {
+    // Schedule as job
+    auto jobHandle = m_jobManager->schedule([this, coord, type](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        addCellImmediately(coord, type);
+        return false; // Job complete
+    }, JobPriorities::CELL_OPERATIONS);
+    trackJob(jobHandle);
+}
+
 // Remove a cell from the grid
-void Grid::removeCell(const glm::ivec3& coord) {
+void Grid::removeCellImmediately(const glm::ivec3& coord) {
     // If cell doesn't exist, return
     if (!hasCell(coord)) return;
 
@@ -123,6 +139,25 @@ void Grid::removeCell(const glm::ivec3& coord) {
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();
+}
+
+void Grid::removeCell(const glm::ivec3& coord) {
+    // Schedule as job
+    auto jobHandle = m_jobManager->schedule([this, coord](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        removeCellImmediately(coord);
+        return false; // Job complete
+    }, JobPriorities::CELL_OPERATIONS);
+    trackJob(jobHandle);
+}
+
+void Grid::trackJob(std::weak_ptr<Job> jobHandle) {
+    // Clean up expired handles periodically to prevent unbounded growth
+    if (m_pendingJobs.size() % 50 == 0) {
+        m_pendingJobs.erase(std::remove_if(m_pendingJobs.begin(), m_pendingJobs.end(),
+            [](const std::weak_ptr<Job>& handle) { return handle.expired(); }), m_pendingJobs.end());
+    }
+    
+    m_pendingJobs.push_back(jobHandle);
 }
 
 GridCell* Grid::getCell(const glm::ivec3& coord) {

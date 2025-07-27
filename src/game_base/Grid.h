@@ -48,8 +48,10 @@ public:
     ~Grid();
     
     // Cell management methods
+    void addCellImmediately(const glm::ivec3& coord, CellType type = CellType::ARMOR);
     void addCell(const glm::ivec3& coord, CellType type = CellType::ARMOR);
     void removeCell(const glm::ivec3& coord);
+    void removeCellImmediately(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;
     bool isEmpty() const;
 
@@ -104,6 +106,9 @@ private:
     bool performStructuralAnalysisUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     void scheduleStructuralAnalysis();
     void cancelStructuralAnalysis();
+
+    std::vector<std::weak_ptr<Job>> m_pendingJobs;
+    void trackJob(std::weak_ptr<Job> jobHandle);
 
     // Neighbor connection management
     void updateNeighborConnections(const glm::ivec3& coord);

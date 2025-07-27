@@ -24,6 +24,7 @@ public:
     virtual ~GameBase();
     
     Grid* createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
+    void removeGridImmediately(Grid* grid);
     void removeGrid(Grid* grid);
     void run();
 

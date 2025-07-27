@@ -8,6 +8,10 @@ namespace JobPriorities {
     
     // Physics subsystem priorities  
     static constexpr int PHYSICS_UPDATE = 0;
+
+    // Grid cell operations
+    static constexpr int CELL_OPERATIONS = 2;
+    static constexpr int GRID_CLEANUP = 1;
     
     // Analysis subsystem priorities
     static constexpr int STRUCTURAL_ANALYSIS = -3;

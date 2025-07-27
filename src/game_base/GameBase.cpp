@@ -76,7 +76,7 @@ Grid* GameBase::createGrid(const glm::dvec3& position, const glm::dquat& orienta
     return gridPtr;
 }
 
-void GameBase::removeGrid(Grid* grid) {
+void GameBase::removeGridImmediately(Grid* grid) {
     auto it = std::find_if(m_grids.begin(), m_grids.end(),
         [grid](const std::unique_ptr<Grid>& item) {
             return item.get() == grid;
@@ -90,6 +90,18 @@ void GameBase::removeGrid(Grid* grid) {
         }
         m_grids.erase(it);
     }
+}
+
+void GameBase::removeGrid(Grid* grid) {
+    // Schedule empty grid removal check
+    auto jobHandle = m_jobManager->schedule([this, grid](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        if (grid->isEmpty()) {
+            std::cout << "Grid is now empty, removing grid" << std::endl;
+            removeGridImmediately(grid);
+        }
+        return false; // Job complete
+    }, JobPriorities::GRID_CLEANUP);
+    trackJob(jobHandle);
 }
 
 void GameBase::scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
@@ -269,8 +281,8 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
             CellType cellType = CellType::ARMOR;
             
             // Remove from source grid and add to new grid
-            sourceGrid->removeCell(cellCoord);
-            newGrid->addCell(cellCoord, cellType);
+            sourceGrid->removeCellImmediately(cellCoord);
+            newGrid->addCellImmediately(cellCoord, cellType);
 
             // Yield every 5 cells to avoid blocking too long
             if (++cellsProcessed % 5 == 0) {
