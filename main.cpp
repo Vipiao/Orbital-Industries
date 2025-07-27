@@ -8,104 +8,99 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-//static int hit_count = 0; ++hit_count; std::cout << "Hit: " << hit_count << std::endl;
-
 // Define the global debug renderer (must be in exactly one .cpp file)
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 
-class MyGame : public GameBase {
+class Game : public GraphicsEngine::CallBack {
 private:
+    std::unique_ptr<GameBase> m_gameBase;
     std::unique_ptr<DebugVisualization> m_debugViz;
-    // Keep debug guard alive for the lifetime of the game
     DebugRendererGuard m_debugGuard;
+    double m_moveSpeed = 0.05;
+
 public:
-    MyGame(TimeHandler* timeHandler, 
-           GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) 
-      : GameBase(800, 600, "3D Grid Demo", timeHandler, controlMode) {
+    Game(TimeHandler* timeHandler, 
+         GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) {
         
-        // Create debug visualization system
+        // Create the game base instance
+        m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
+        
+        // Set ourselves as the callback object instead of GameBase
+        m_gameBase->m_graphicsEngine->removeCallbackObject(m_gameBase.get());
+        m_gameBase->m_graphicsEngine->addCallbackObject(this);
+        
+        // Setup debug visualization
         setupDebugVisualization();
 
         // Set global debug renderer with RAII guard  
         m_debugGuard = DebugGlobals::setDebugRenderer(m_debugViz.get());
 
         // Set up initial camera position and orientation
-        m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
-        m_graphicsEngine->m_camOri = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
-        m_graphicsEngine->m_fieldOfView = glm::radians(90.0);
+        m_gameBase->m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
+        m_gameBase->m_graphicsEngine->m_camOri = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
+        m_gameBase->m_graphicsEngine->m_fieldOfView = glm::radians(90.0);
         
         // Enable mouse lock for camera control
-        m_graphicsEngine->m_mouseHandler->setMouseLock(true);
+        m_gameBase->m_graphicsEngine->m_mouseHandler->setMouseLock(true);
         
         // Create a center grid that will be our player object
-        Grid* initialGrid = createGrid(glm::dvec3(0, 0, 0));
+        Grid* initialGrid = m_gameBase->createGrid(glm::dvec3(0, 0, 0));
         RigidBody* bb = initialGrid->getRigidBody();
         bb->m_position = {0,0,0};
         //bb->m_velocity = {0.0,0.0,-0.01};
-        addGridBlock(initialGrid, 0, 0, 0);
-        addGridBlock(initialGrid, 1, 0, 0);
-        addGridBlock(initialGrid, 2, 0, 0);
-        addGridBlock(initialGrid, 3, 0, 0);
-        //addGridBlock(initialGrid, 4, 0, 0);
-        //addGridBlock(initialGrid, 5, 0, 0);
-        //addGridBlock(initialGrid, 6, 0, 0);
-        //addGridBlock(initialGrid, 3, 1, 0);
-        //addGridBlock(initialGrid, 0, -1, -2);
-        //addGridBlock(initialGrid, 0, -1, -1);
-        //addGridBlock(initialGrid, -1, -1, -1);
-        //addGridBlock(initialGrid, -2, -1, -1);
-        //addGridBlock(initialGrid, -2, -1, -2);
-        //addGridBlock(initialGrid, 0, -2, -2);
-        //addGridBlock(initialGrid, 0, -2, -1);
-        //addGridBlock(initialGrid, -1, 0, -2);
-        //for (int ll = 0; ll < 2; ll++) {
-        //    for (int ii = -3; ii < 4; ii++)
-        //    {
-        //        for (int jj = -3; jj < 4; jj++)
-        //        {
-        //            
-        //            for (int kk = -3; kk < 4; kk++)
-        //            {
-        //                addGridBlock(initialGrid, ii + ll*10, jj, kk);
-        //            }
-        //        }
-        //    }
-        //    for (int ii = -2; ii < 3; ii++)
-        //    {
-        //        for (int jj = -2; jj < 3; jj++)
-        //        {
-        //            
-        //            for (int kk = -2; kk < 3; kk++)
-        //            {
-        //                removeGridBlock(initialGrid, ii + ll*10, jj, kk);
-        //            }
-        //        }
-        //    }
-        //}
-        //for (int ii = 4; ii < 7; ii++)
-        //{
-        //    for (int jj = -1; jj < 2; jj++)
-        //    {
-        //        
-        //        for (int kk = -2; kk < 2; kk++)
-        //        {
-        //            addGridBlock(initialGrid, ii, jj, kk);
-        //        }
-        //    }
-        //}
-        //for (int ii = 4-1; ii < 7+1; ii++)
-        //{
-        //    for (int jj = -1+1; jj < 2-1; jj++)
-        //    {
-        //        
-        //        for (int kk = -2+1; kk < 2-1; kk++)
-        //        {
-        //            removeGridBlock(initialGrid, ii, jj, kk);
-        //        }
-        //    }
-        //}
+        //addGridBlock(initialGrid, 0, 0, 0);
+        //addGridBlock(initialGrid, 1, 0, 0);
+        //addGridBlock(initialGrid, 2, 0, 0);
+        //addGridBlock(initialGrid, 3, 0, 0);
+        
+        for (int ll = 0; ll < 2; ll++) {
+            for (int ii = -3; ii < 4; ii++)
+            {
+                for (int jj = -3; jj < 4; jj++)
+                {
+                    
+                    for (int kk = -3; kk < 4; kk++)
+                    {
+                        addGridBlock(initialGrid, ii + ll*10, jj, kk);
+                    }
+                }
+            }
+            for (int ii = -2; ii < 3; ii++)
+            {
+                for (int jj = -2; jj < 3; jj++)
+                {
+                    
+                    for (int kk = -2; kk < 3; kk++)
+                    {
+                        removeGridBlock(initialGrid, ii + ll*10, jj, kk);
+                    }
+                }
+            }
+        }
+        for (int ii = 4; ii < 7; ii++)
+        {
+            for (int jj = -1; jj < 2; jj++)
+            {
+                
+                for (int kk = -2; kk < 2; kk++)
+                {
+                    addGridBlock(initialGrid, ii, jj, kk);
+                }
+            }
+        }
+        for (int ii = 4-1; ii < 7+1; ii++)
+        {
+            for (int jj = -1+1; jj < 2-1; jj++)
+            {
+                
+                for (int kk = -2+1; kk < 2-1; kk++)
+                {
+                    removeGridBlock(initialGrid, ii, jj, kk);
+                }
+            }
+        }
         // Ground.
-        int size{ 50 };
+        int size{ 0 };
         for (int ii = -size; ii < size; ii++)
         {
             for (int jj = -size; jj < size; jj++)
@@ -117,16 +112,6 @@ public:
                 }
             }
         }
-        
-        //Grid* gg = createGrid(glm::dvec3(0, 0, 0));
-        //addGridBlock(gg, 0, 0, 0);  // Center block
-        //RigidBody* bb = gg->getRigidBody();
-        //bb->m_position = {0.5, -2, 0.5};
-        
-        RigidBody* body = initialGrid->getRigidBody();
-        //body->m_angularVelocity = glm::dvec3{ 0, 0, glm::radians(180.) };
-        //body->m_velocity = {0,0,-1};
-        //body->m_orientation = glm::angleAxis(glm::radians(180.0), glm::dvec3{1.0, 0.,0.});
         
         // Print instructions
         std::cout << "3D Grid Block Demo" << std::endl;
@@ -140,17 +125,14 @@ public:
         std::cout << "  Q: Remove block at (1,1,1)" << std::endl;
     }
 
+    void run() {
+        m_gameBase->run();
+    }
+
     // Helper method for setting up debug visualization
     void setupDebugVisualization() {
-        // Create debug visualization system
-        m_debugViz = std::make_unique<DebugVisualization>(m_graphicsEngine->m_meshHandler.get());
-        
-        // Set debug renderer for the game and all subsystems
-        setDebugRenderer(m_debugViz.get());
-        
-        // Create some test debug spheres
-        //m_debugViz->createSphere("origin", glm::dvec3(0.0, 0.0, 0.0), 0.5);
-        //m_debugViz->createSphere("test_point", glm::dvec3(2.0, 2.0, 2.0), 0.3);
+        m_debugViz = std::make_unique<DebugVisualization>(m_gameBase->m_graphicsEngine->m_meshHandler.get());
+        m_gameBase->setDebugRenderer(m_debugViz.get());
     }
 
     void addGridBlock(Grid* grid, int x, int y, int z) {
@@ -160,41 +142,65 @@ public:
     void removeGridBlock(Grid* grid, int x, int y, int z) {
         if (grid) grid->removeCell(glm::ivec3(x, y, z));
     }
-    
-protected:
-    double m_moveSpeed = 0.05;
 
-    virtual void processInput() override {
-        MouseHandler* mouseHandler = m_graphicsEngine->m_mouseHandler;
-        KeyboardHandler* keyboard = m_graphicsEngine->m_keyboardHandler;
+    // Override GraphicsEngine::CallBack methods
+    virtual void preRenderCallback(uint64_t frameNum) override {
+        // Process input BEFORE calling gamebase preRenderCallback
+        processInputLogic();
+        
+        // Apply drag forces to all grids before physics update
+        applyDragForces();
+        
+        // Call the game base preRenderCallback to handle physics and other updates
+        m_gameBase->preRenderCallback(frameNum);
+    }
+
+    virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
+        // Delegate to game base
+        m_gameBase->renderCallback(viewMatrix, projectionMatrix);
+    }
+
+    virtual void framebufferSizeCallback(int width, int height) override {
+        // Delegate to game base
+        m_gameBase->framebufferSizeCallback(width, height);
+    }
+
+    virtual void windowPosCallback(int xpos, int ypos) override {
+        // Delegate to game base
+        m_gameBase->windowPosCallback(xpos, ypos);
+    }
+
+private:
+    void processInputLogic() {
+        MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->m_mouseHandler;
+        KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
         
         // Camera movement speed
         const double mouseSensitivity = 0.002;
         
         // Calculate movement vectors based on camera orientation
-        glm::dvec3 right = m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
-        glm::dvec3 forward = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
-        glm::dvec3 up = m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
+        glm::dvec3 right = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
+        glm::dvec3 forward = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 up = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
 
         // Structural analysis with G key
         if (keyboard->m_g.justPressed()) {
-            std::cout << "Visualizing structural analysis on " << m_grids.size() << " grids..." << std::endl;
+            std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
             
-            for (const auto& grid : m_grids) {
+            for (const auto& grid : m_gameBase->m_grids) {
                 grid->visualizeStructuralIntegrity();
             }
-            
         }
         
         // Check for input actions that require grid traversal
         bool doCreate = mouseHandler->rightClick()
-            || mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32;
+            || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32);
         bool doRemove = mouseHandler->leftClick()
-            || mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32;
+            || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
         bool doForce = keyboard->m_f.isDown();
         bool doTrackSpeed = keyboard->m_z.justPressed();
-        double forceMultiplier = (keyboard->m_f.timeDown() * 0.01 + 1.);
-        
+        double forceMultiplier = (keyboard->m_f.timeDown() * 0.01 + 1.0);
+
         if (doCreate || doRemove || doForce || doTrackSpeed) {
             // Perform unified grid traversal for all actions
             Grid* targetGrid = nullptr;
@@ -204,11 +210,11 @@ protected:
             double shortestSquaredDistance = DBL_MAX;
             
             // Camera position and direction
-            glm::dvec3 startPos = m_graphicsEngine->m_camPos;
-            glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 10 units forward
+            glm::dvec3 startPos = m_gameBase->m_graphicsEngine->m_camPos;
+            glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
             
             // Check all grids for ray intersections
-            for (const auto& gridPtr : m_grids) {
+            for (const auto& gridPtr : m_gameBase->m_grids) {
                 Grid* grid = gridPtr.get();
                 
                 // Convert camera ray to grid space
@@ -228,7 +234,7 @@ protected:
                         // Calculate squared distance from camera to cube center
                         glm::dvec3 distanceVec = hitCubeCenterWorld - startPos;
                         double squaredDistance = glm::dot(distanceVec, distanceVec);
-                        
+                                
                         // Check if this is the closest hit so far
                         if (squaredDistance < shortestSquaredDistance) {
                             shortestSquaredDistance = squaredDistance;
@@ -256,6 +262,7 @@ protected:
                     //std::cout << "No target found for speed tracking - camera velocity reset" << std::endl;
                 }
             }
+            
             if (doForce) {
                 if (blockFound && targetGrid) {
                     RigidBody* body = targetGrid->getRigidBody();
@@ -265,12 +272,13 @@ protected:
                         glm::dvec3 force = forward * forceStrength;
                         
                         // Apply the force at the camera position
-                        glm::dvec3 applicationPoint = m_graphicsEngine->m_camPos;
+                        glm::dvec3 applicationPoint = m_gameBase->m_graphicsEngine->m_camPos;
                         
                         // Apply force at the point
-                        m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
+                        m_gameBase->m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
                         
-                        std::cout << "Applied force to grid at distance: " << std::sqrt(shortestSquaredDistance) << std::endl;                    }
+                        std::cout << "Applied force to grid at distance: " << std::sqrt(shortestSquaredDistance) << std::endl;
+                    }
                 } else {
                     std::cout << "No target found for force application" << std::endl;
                 }
@@ -284,7 +292,7 @@ protected:
                 } else {
                     // No block found, create a new grid 2 units ahead
                     glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
-                    Grid* newGrid = createGrid(newGridPos);
+                    Grid* newGrid = m_gameBase->createGrid(newGridPos);
                     addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
                     std::cout << "Created new grid with block at world position (" 
                             << newGridPos.x << ", " << newGridPos.y << ", " << newGridPos.z << ")" << std::endl;
@@ -308,12 +316,11 @@ protected:
                     };
                     
                     // Schedule the grid split check for later processing
-                    scheduleGridSplitCheck(targetGrid, edgeCoords);
+                    m_gameBase->scheduleGridSplitCheck(targetGrid, edgeCoords);
                     std::cout << "Scheduled grid split check for removed block at (" 
                           << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
-                    if (targetGrid->isEmpty())
-                    {
-                        removeGrid(targetGrid);
+                    if (targetGrid->isEmpty()) {
+                        m_gameBase->removeGrid(targetGrid);
                     }
                 } else {
                     std::cout << "No block found to remove" << std::endl;
@@ -358,8 +365,8 @@ protected:
             glm::dquat rollQuat = glm::angleAxis(rollAngle, glm::dvec3(0.0, 1.0, 0.0));
             
             // Apply rotations to camera orientation
-            m_graphicsEngine->m_camOri = m_graphicsEngine->m_camOri * yawQuat * pitchQuat* rollQuat;
-            m_graphicsEngine->m_camOri = glm::normalize(m_graphicsEngine->m_camOri);
+            m_gameBase->m_graphicsEngine->m_camOri = m_gameBase->m_graphicsEngine->m_camOri * yawQuat * pitchQuat * rollQuat;
+            m_gameBase->m_graphicsEngine->m_camOri = glm::normalize(m_gameBase->m_graphicsEngine->m_camOri);
         }
         
         // Normalize the vectors
@@ -392,13 +399,13 @@ protected:
         // Apply movement if any keys were pressed
         if (glm::length(moveDirection) > 0.0) {
             moveDirection = glm::normalize(moveDirection) * m_moveSpeed;
-            m_graphicsEngine->m_camPos += moveDirection;
+            m_gameBase->m_graphicsEngine->m_camPos += moveDirection;
         }
     }
-    
-    virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) override {
+
+    void applyDragForces() {
         // Apply drag to all objects before running physics
-        for (const auto& grid : m_grids) {
+        for (const auto& grid : m_gameBase->m_grids) {
             RigidBody* body = grid->getRigidBody();
             if (body && !body->m_isStatic && body->m_forces == glm::dvec3{0,0,0}) {
                 // Simple drag force calculation: -dragCoefficient * velocity
@@ -407,23 +414,17 @@ protected:
                 // Apply drag to linear velocity
                 if (glm::length(body->m_velocity) > 0.0) {
                     glm::dvec3 dragForce = -dragCoefficient * body->m_velocity * body->m_mass;
-                    m_physicsEngine->applyForce(body, dragForce);
+                    m_gameBase->m_physicsEngine->applyForce(body, dragForce);
                 }
                 
                 // Apply drag to angular velocity
                 if (glm::length(body->m_angularMomentumBody) > 0.0) {
                     glm::dvec3 angularDrag = -dragCoefficient * body->getWorldInertiaTensor() * body->getAngularVelocityWorld();
-
-                    m_physicsEngine->applyTorque(body, angularDrag);
+                    m_gameBase->m_physicsEngine->applyTorque(body, angularDrag);
                 }
             }
         }
-        
-        // Call the base class implementation to run the physics simulation  
-        return GameBase::updatePhysics(endTime);
     }
-    
-private:
 };
 
 int main() {
@@ -434,11 +435,11 @@ int main() {
         // Use existing GraphicsEngineBase::Mode for controls
         GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE;
 
-        MyGame game(timeHandler, controlMode); // Updated
+        Game game(timeHandler, controlMode);
         game.run();
         
         // Clean up TimeHandler
-        delete timeHandler; // New
+        delete timeHandler;
     } catch (const std::bad_alloc& e) {
         std::cerr << "Out of memory: " << e.what() << std::endl;
         return 1;
