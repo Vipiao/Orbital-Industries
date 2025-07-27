@@ -46,10 +46,10 @@ public:
         addGridBlock(initialGrid, 1, 0, 0);
         addGridBlock(initialGrid, 2, 0, 0);
         addGridBlock(initialGrid, 3, 0, 0);
-        addGridBlock(initialGrid, 4, 0, 0);
-        addGridBlock(initialGrid, 5, 0, 0);
-        addGridBlock(initialGrid, 6, 0, 0);
-        addGridBlock(initialGrid, 3, 1, 0);
+        //addGridBlock(initialGrid, 4, 0, 0);
+        //addGridBlock(initialGrid, 5, 0, 0);
+        //addGridBlock(initialGrid, 6, 0, 0);
+        //addGridBlock(initialGrid, 3, 1, 0);
         //addGridBlock(initialGrid, 0, -1, -2);
         //addGridBlock(initialGrid, 0, -1, -1);
         //addGridBlock(initialGrid, -1, -1, -1);
@@ -297,22 +297,24 @@ protected:
                     removeGridBlock(targetGrid, hitPos.x, hitPos.y, hitPos.z);
                     std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
 
-                // Check for grid splits by testing connectivity of neighboring blocks
-                std::vector<glm::ivec3> edgeCoords = {
-                    glm::ivec3(hitPos.x + 1, hitPos.y, hitPos.z),  // +X
-                    glm::ivec3(hitPos.x - 1, hitPos.y, hitPos.z),  // -X
-                    glm::ivec3(hitPos.x, hitPos.y + 1, hitPos.z),  // +Y
-                    glm::ivec3(hitPos.x, hitPos.y - 1, hitPos.z),  // -Y
-                    glm::ivec3(hitPos.x, hitPos.y, hitPos.z + 1),  // +Z
-                    glm::ivec3(hitPos.x, hitPos.y, hitPos.z - 1)   // -Z
-                };
-                
-                // Schedule the grid split check for later processing
-                scheduleGridSplitCheck(targetGrid, edgeCoords);
-                std::cout << "Scheduled grid split check for removed block at (" 
+                    // Check for grid splits by testing connectivity of neighboring blocks
+                    std::vector<glm::ivec3> edgeCoords = {
+                        glm::ivec3(hitPos.x + 1, hitPos.y, hitPos.z),  // +X
+                        glm::ivec3(hitPos.x - 1, hitPos.y, hitPos.z),  // -X
+                        glm::ivec3(hitPos.x, hitPos.y + 1, hitPos.z),  // +Y
+                        glm::ivec3(hitPos.x, hitPos.y - 1, hitPos.z),  // -Y
+                        glm::ivec3(hitPos.x, hitPos.y, hitPos.z + 1),  // +Z
+                        glm::ivec3(hitPos.x, hitPos.y, hitPos.z - 1)   // -Z
+                    };
+                    
+                    // Schedule the grid split check for later processing
+                    scheduleGridSplitCheck(targetGrid, edgeCoords);
+                    std::cout << "Scheduled grid split check for removed block at (" 
                           << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
-
-                    removeGrid(targetGrid);
+                    if (targetGrid->isEmpty())
+                    {
+                        removeGrid(targetGrid);
+                    }
                 } else {
                     std::cout << "No block found to remove" << std::endl;
                 }

@@ -74,7 +74,7 @@ Grid::~Grid() {
 }
 
 // Add a cell to the grid
-void Grid::addCellImmediately(const glm::ivec3& coord, CellType type) {
+void Grid::addCell(const glm::ivec3& coord, CellType type) {
     // If cell already exists, return
     if (hasCell(coord)) return;
 
@@ -101,17 +101,8 @@ void Grid::addCellImmediately(const glm::ivec3& coord, CellType type) {
     recalculateMassAndInertiaIncremental({coord});
 }
 
-void Grid::addCell(const glm::ivec3& coord, CellType type) {
-    // Schedule as job
-    auto jobHandle = m_jobManager->schedule([this, coord, type](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-        addCellImmediately(coord, type);
-        return false; // Job complete
-    }, JobPriorities::CELL_OPERATIONS);
-    trackJob(jobHandle);
-}
-
 // Remove a cell from the grid
-void Grid::removeCellImmediately(const glm::ivec3& coord) {
+void Grid::removeCell(const glm::ivec3& coord) {
     // If cell doesn't exist, return
     if (!hasCell(coord)) return;
 
@@ -139,15 +130,6 @@ void Grid::removeCellImmediately(const glm::ivec3& coord) {
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();
-}
-
-void Grid::removeCell(const glm::ivec3& coord) {
-    // Schedule as job
-    auto jobHandle = m_jobManager->schedule([this, coord](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-        removeCellImmediately(coord);
-        return false; // Job complete
-    }, JobPriorities::CELL_OPERATIONS);
-    trackJob(jobHandle);
 }
 
 void Grid::trackJob(std::weak_ptr<Job> jobHandle) {
