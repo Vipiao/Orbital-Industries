@@ -200,11 +200,11 @@ void Grid::visualizeStructuralIntegrity() {
             const glm::ivec3& coord = pair.first;
             const StructuralBlock& cell = pair.second;
             
-            if (cell.getStructuralWeakness() > 1.0) {
+            if (cell.structuralWeakness > 1.0) {
                 glm::dvec3 cellWorldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
                 std::string sphereName = "cost_cell_" + std::to_string(coord.x) + "_" + 
                                        std::to_string(coord.y) + "_" + std::to_string(coord.z);
-                double radius = 0.0 + glm::pow((cell.getStructuralWeakness() - 1.0) * 0.02, 1./3.);
+                double radius = 0.0 + glm::pow((cell.structuralWeakness - 1.0) * 0.02, 1./3.);
                 DebugGlobals::getDebugRenderer()->createSphere(sphereName, cellWorldPos, radius);
             }
         }
@@ -251,17 +251,17 @@ bool Grid::performStructuralAnalysisUntil(std::chrono::time_point<std::chrono::h
         // Current iteration completed, update running averages
         for (auto& pair : m_cells) {
             StructuralBlock& cell = pair.second;
-            double currentCost = static_cast<double>(cell.getCost());
+            double currentCost = static_cast<double>(cell.cost);
             
-            if (cell.hasStructuralData()) {
+            if (cell.structuralWeakness >= 0.0) {
                 // Update running average: new = old * (1-f) + current * f
-                double oldWeakness = cell.getStructuralWeakness();
+                double oldWeakness = cell.structuralWeakness;
                 double newWeakness = oldWeakness * (1.0 - WEAKNESS_BLEND_FACTOR) + 
                                    currentCost * WEAKNESS_BLEND_FACTOR;
-                cell.setStructuralWeakness(newWeakness);
+                cell.structuralWeakness = newWeakness;
             } else {
                 // First data point (was -1)
-                cell.setStructuralWeakness(currentCost);
+                cell.structuralWeakness = currentCost;
             }
         }
         
