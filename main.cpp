@@ -11,7 +11,7 @@
 // Define the global debug renderer (must be in exactly one .cpp file)
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 
-class Game : public GraphicsEngine::CallBack {
+class Game : public GraphicsEngine::CallBack, public GameBase::Callback {
 private:
     std::unique_ptr<GameBase> m_gameBase;
     std::unique_ptr<DebugVisualization> m_debugViz;
@@ -19,6 +19,13 @@ private:
     double m_moveSpeed = 0.05;
 
 public:
+    // Input flags
+    bool doCreate = false;
+    bool doRemove = false; 
+    bool doForce = false;
+    bool doTrackSpeed = false;
+    double forceMultiplier = 1.0;
+
     Game(TimeHandler* timeHandler, 
          GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) {
         
@@ -27,6 +34,9 @@ public:
         
         // Set ourselves as the callback object instead of GameBase
         m_gameBase->m_graphicsEngine->addCallbackObject(this);
+
+        // Register physics callback
+        m_gameBase->addCallback(this);
         
         // Setup debug visualization
         setupDebugVisualization();
@@ -128,75 +138,8 @@ public:
         m_gameBase->run();
     }
 
-    // Helper method for setting up debug visualization
-    void setupDebugVisualization() {
-        m_debugViz = std::make_unique<DebugVisualization>(m_gameBase->m_graphicsEngine->m_meshHandler.get());
-        m_gameBase->setDebugRenderer(m_debugViz.get());
-    }
-
-    void addGridBlock(Grid* grid, int x, int y, int z) {
-        if (grid) grid->addCell(glm::ivec3(x, y, z));
-    }
-    
-    void removeGridBlock(Grid* grid, int x, int y, int z) {
-        if (grid) grid->removeCell(glm::ivec3(x, y, z));
-    }
-
-    // Override GraphicsEngine::CallBack methods
-    virtual void preRenderCallback(uint64_t frameNum) override {
-        // Process input BEFORE calling gamebase preRenderCallback
-        processInputLogic();
-        
-        // Apply drag forces to all grids before physics update
-        applyDragForces();
-        
-        // Call the game base preRenderCallback to handle physics and other updates
-        m_gameBase->preRenderCallback(frameNum);
-    }
-
-    virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
-        //
-    }
-
-    virtual void framebufferSizeCallback(int width, int height) override {
-        //
-    }
-
-    virtual void windowPosCallback(int xpos, int ypos) override {
-        //
-    }
-
-private:
-    void processInputLogic() {
-        MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->m_mouseHandler;
-        KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
-        
-        // Camera movement speed
-        const double mouseSensitivity = 0.002;
-        
-        // Calculate movement vectors based on camera orientation
-        glm::dvec3 right = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
-        glm::dvec3 forward = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
-        glm::dvec3 up = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
-
-        // Structural analysis with G key
-        if (keyboard->m_g.justPressed()) {
-            std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
-            
-            for (const auto& grid : m_gameBase->m_grids) {
-                grid->visualizeStructuralIntegrity();
-            }
-        }
-        
-        // Check for input actions that require grid traversal
-        bool doCreate = mouseHandler->rightClick()
-            || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32);
-        bool doRemove = mouseHandler->leftClick()
-            || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
-        bool doForce = keyboard->m_f.isDown();
-        bool doTrackSpeed = keyboard->m_z.justPressed();
-        double forceMultiplier = (keyboard->m_f.timeDown() * 0.01 + 1.0);
-
+    // GameBase::Callback implementation
+    virtual void onPhysicsUpdateComplete() override {
         if (doCreate || doRemove || doForce || doTrackSpeed) {
             // Perform unified grid traversal for all actions
             Grid* targetGrid = nullptr;
@@ -207,6 +150,7 @@ private:
             
             // Camera position and direction
             glm::dvec3 startPos = m_gameBase->m_graphicsEngine->m_camPos;
+            glm::dvec3 forward = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
             glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
             
             // Check all grids for ray intersections
@@ -322,6 +266,91 @@ private:
                     std::cout << "No block found to remove" << std::endl;
                 }
             }
+        }
+
+        // Reset flags
+        doCreate = false;
+        doRemove = false;
+        doForce = false;
+        doTrackSpeed = false;
+    }
+
+    // Helper method for setting up debug visualization
+    void setupDebugVisualization() {
+        m_debugViz = std::make_unique<DebugVisualization>(m_gameBase->m_graphicsEngine->m_meshHandler.get());
+        m_gameBase->setDebugRenderer(m_debugViz.get());
+    }
+
+    void addGridBlock(Grid* grid, int x, int y, int z) {
+        if (grid) grid->addCell(glm::ivec3(x, y, z));
+    }
+    
+    void removeGridBlock(Grid* grid, int x, int y, int z) {
+        if (grid) grid->removeCell(glm::ivec3(x, y, z));
+    }
+
+    // Override GraphicsEngine::CallBack methods
+    virtual void preRenderCallback(uint64_t frameNum) override {
+        // Process input BEFORE calling gamebase preRenderCallback
+        processInputLogic();
+        
+        // Apply drag forces to all grids before physics update
+        applyDragForces();
+        
+        // Call the game base preRenderCallback to handle physics and other updates
+        m_gameBase->preRenderCallback(frameNum);
+    }
+
+    virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
+        //
+    }
+
+    virtual void framebufferSizeCallback(int width, int height) override {
+        //
+    }
+
+    virtual void windowPosCallback(int xpos, int ypos) override {
+        //
+    }
+
+private:
+    void processInputLogic() {
+        MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->m_mouseHandler;
+        KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
+        
+        // Camera movement speed
+        const double mouseSensitivity = 0.002;
+        
+        // Calculate movement vectors based on camera orientation
+        glm::dvec3 right = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
+        glm::dvec3 forward = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 up = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
+
+        // Structural analysis with G key
+        if (keyboard->m_g.justPressed()) {
+            std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
+            
+            for (const auto& grid : m_gameBase->m_grids) {
+                grid->visualizeStructuralIntegrity();
+            }
+        }
+        
+        // Check for input actions that require grid traversal
+        // Set flags based on input (don't execute immediately)
+        if (mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32)) {
+            doCreate = true;
+        }
+        if (mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32)) {
+            doRemove = true;
+        }
+        if (keyboard->m_f.isDown()) {
+            doForce = true;
+            forceMultiplier = (keyboard->m_f.timeDown() * 0.04 + 1.0);
+        } else {
+            forceMultiplier = 1.;
+        }
+        if (keyboard->m_z.justPressed()) {
+            doTrackSpeed = true;
         }
 
         // Toggle mouse lock with M key

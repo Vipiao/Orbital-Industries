@@ -17,6 +17,11 @@ class DebugRenderer;
 
 class GameBase : public GraphicsEngine::CallBack {
 public:
+    class Callback {
+    public:
+        virtual ~Callback() = default;
+        virtual void onPhysicsUpdateComplete() = 0;
+    };
     GameBase(int screenWidth = 800, int screenHeight = 600, 
              const std::string& windowTitle = "Game", 
              TimeHandler* timeHandler = nullptr,
@@ -26,6 +31,7 @@ public:
     Grid* createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     void removeGrid(Grid* grid);
     void run();
+    void addCallback(Callback* callback);
 
     // Grid partitioning/splitting - now deferred
     void scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
@@ -35,6 +41,7 @@ public:
     std::unique_ptr<JobManager> m_jobManager;
     std::vector<std::unique_ptr<Grid>> m_grids;
     TimeHandler* m_timeHandler;
+    std::vector<Callback*> m_callbacks;
 
     // Track pending jobs for cleanup
     std::vector<std::weak_ptr<Job>> m_pendingJobs;

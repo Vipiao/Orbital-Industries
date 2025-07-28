@@ -302,6 +302,10 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     std::cout << "Created " << newGrids.size() << " new grids from split" << std::endl;
 }
 
+void GameBase::addCallback(Callback* callback) {
+    m_callbacks.push_back(callback);
+}
+
 void GameBase::run() {
     m_graphicsEngine->startRenderLoop();
 }
@@ -413,6 +417,11 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
     // Update graphics only when physics step is complete
     for (auto& grid : m_grids) {
         grid->updateGraphics(m_graphicsEngine->m_camPos);
+    }
+
+    // Call physics update callbacks
+    for (auto* callback : m_callbacks) {
+        callback->onPhysicsUpdateComplete();
     }
     
     return false;
