@@ -26,7 +26,6 @@ public:
 
     // Structural analysis data
     double structuralWeakness = -1.0; // Running average structural weakness (-1 = no data yet)
-    uint32_t cost = 1; // For stochastic analysis
     
     GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType)
         : coordinates(coords), parentGrid(parent), type(cellType) {}
