@@ -49,7 +49,7 @@ void main() {
    // Phong lighting model components
    
    // 1. Ambient light - base illumination
-   float ambientStrength = 0.2;
+   float ambientStrength = 0.3;
    vec3 ambient = ambientStrength * objectColor;
    
    // 2. Diffuse light - varies with surface orientation to light
