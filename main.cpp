@@ -296,9 +296,6 @@ public:
         
         // Apply drag forces to all grids before physics update
         applyDragForces();
-        
-        // Call the game base preRenderCallback to handle physics and other updates
-        m_gameBase->preRenderCallback(frameNum);
     }
 
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
