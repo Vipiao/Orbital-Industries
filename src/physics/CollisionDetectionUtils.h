@@ -6,6 +6,27 @@
 #include <vector>
 #include "CollisionResult.h"
 
+// Collision cache data structure for spatial coherence optimization
+struct CollisionCacheData {
+    // Previous spatial relationship (B relative to A)
+    glm::dvec3 prevBCenterInA;
+    glm::dquat prevBOrientationInA;
+    glm::dquat prevAOrientationWorld; // Store A's world orientation for normal rotation
+    
+    // Cached collision result
+    std::vector<glm::dvec3> contactPoints;
+    std::vector<glm::dvec3> contactPointsLocalA;
+    std::vector<glm::dvec3> contactPointsLocalB;
+    std::vector<glm::dvec3> normals;
+    std::vector<double> penetrationDepths;
+    int collisionPairCount = 0;
+    
+    // Cache validity tracking
+    uint64_t gridAShapeTimestamp = static_cast<uint64_t>(-1); // -1 means uninitialized
+    uint64_t gridBShapeTimestamp = static_cast<uint64_t>(-1);
+    uint64_t cacheTimestamp = 0;
+};
+
 // Forward declarations
 class BallCollider;
 class CubeCollider;

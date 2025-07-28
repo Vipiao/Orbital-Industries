@@ -86,6 +86,12 @@ public:
     const glm::ivec3& getLocalAABBMin() const { return m_localAABBMin; }
     const glm::ivec3& getLocalAABBMax() const { return m_localAABBMax; }
 
+    // Shape change tracking for cache invalidation
+    uint64_t getShapeChangeTimestamp() const { return m_shapeChangeTimestamp; }
+    
+    // Get approximate radius for collision optimization
+    double getApproximateRadius() const;
+
     // Allow CollisionDetectionUtils to access neighborhoods for optimization
     friend class CollisionDetectionUtils;
     
@@ -125,6 +131,9 @@ private:
     // Map of grid coordinates to cube colliders
     std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, IVec3Hash> m_cells;
     
+    // Shape change tracking for cache invalidation
+    uint64_t m_shapeChangeTimestamp = 0;
+
     // Helper methods
     void updateSubColliderTransformsAndAABB(uint64_t currentTimestep);
 

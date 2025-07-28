@@ -141,6 +141,9 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
 
     updateFilterNormalsForCell(coord);
 
+    // Increment shape change timestamp to invalidate collision cache
+    m_shapeChangeTimestamp++;
+
     // Queue this coordinate and its 6 neighbors for classification update
     static const glm::ivec3 directions[6] = {
         {1, 0, 0}, {-1, 0, 0},   // +X, -X
@@ -237,6 +240,9 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
 
         m_cells.erase(it);
         updateFilterNormalsAfterRemoval(coord);
+
+        // Increment shape change timestamp to invalidate collision cache
+        m_shapeChangeTimestamp++;
 
         // Remove from classification maps
         m_cornerCells.erase(coord);
@@ -386,6 +392,17 @@ void GridCollider::updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoor
             neighborCube->removeFilterNormal(-directions[i]);
         }
     }
+}
+
+double GridCollider::getApproximateRadius() const {
+    if (!m_cells.empty()) {
+        glm::dvec3 bboxSize = m_AABBMax - m_AABBMin;
+        double maxDimension = glm::max(glm::max(bboxSize.x, bboxSize.y), bboxSize.z);
+        return maxDimension * 0.5;
+    }
+    
+    // Fallback to radius = 1.0
+    return 1.0;
 }
 
 void GridCollider::updateLocalCorners() {

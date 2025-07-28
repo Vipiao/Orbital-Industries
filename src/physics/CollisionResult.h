@@ -43,6 +43,18 @@ struct CollisionResult {
         }
     }
     
+    // Constructor with pre-calculated local contact points (for cache optimization)
+    CollisionResult(bool collision, const std::vector<glm::dvec3>& norms, const std::vector<glm::dvec3>& contacts, 
+                   const std::vector<double>& depths, Collider* a, Collider* b,
+                   const std::vector<glm::dvec3>& localA, const std::vector<glm::dvec3>& localB)
+        : m_hasCollision(collision), m_normals(norms), m_contactPoints(contacts), m_penetrationDepths(depths), 
+          m_contactPointsLocalA(localA), m_contactPointsLocalB(localB), m_colliderA(a), m_colliderB(b) {
+        if (collision && (!a || !b)) {
+            throw std::invalid_argument("CollisionResult: Colliders cannot be null for collision results");
+        }
+        // Skip calculateLocalContactPoints() since we already have the local coords
+    }
+
     // Single contact point constructor
     CollisionResult(bool collision, const glm::dvec3& norm, const glm::dvec3& contact, double depth, Collider* a, Collider* b)
         : m_hasCollision(collision), m_colliderA(a), m_colliderB(b) {

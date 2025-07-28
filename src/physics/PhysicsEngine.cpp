@@ -127,6 +127,9 @@ void PhysicsEngine::updateColliderTransform(RigidBody* body) {
 }
 
 bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    extern int hit_count;
+    int hh = hit_count;
+    
     while (m_timeHandler->now() < endTime) {
         switch (m_runState) {
             case RunState::APPLY_FORCES:

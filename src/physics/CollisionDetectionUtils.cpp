@@ -551,14 +551,96 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         return CollisionResult();
     }
 
-    // Check cached collision pair count from previous iteration
-    int cachedCollisionPairCount = 0;
-    bool hasCachedData = PairCache<int>::getCachedData(gridA, gridB, cachedCollisionPairCount);
+    // Check cached collision data from previous iteration
+    CollisionCacheData cacheData;
+    bool hasCachedData = PairCache<CollisionCacheData>::getCachedData(gridA, gridB, cacheData);
+    
+    // Get AABB centers instead of positions (more representative of actual object centers)
+    glm::dvec3 gridACenterWorld = (gridA->m_AABBMax + gridA->m_AABBMin) * 0.5;
+    glm::dvec3 gridBCenterWorld = (gridB->m_AABBMax + gridB->m_AABBMin) * 0.5;
+    
+    // Calculate B's center in A's coordinate space using worldToGrid
+    glm::dvec3 currentBCenterInA = gridA->worldToGrid(gridBCenterWorld);
+    glm::dquat currentBOrientationInA = glm::conjugate(gridA->m_orientation) * gridB->m_orientation;
+    
+    // Check if we can reuse cached collision data
+    bool canUseCachedContacts = false;
+    if (hasCachedData) {
+        // Check if grid shapes have changed since cache was created (use -1 as uninitialized marker)
+        bool shapesUnchanged = (cacheData.gridAShapeTimestamp != static_cast<uint64_t>(-1) &&
+                               cacheData.gridBShapeTimestamp != static_cast<uint64_t>(-1) &&
+                               cacheData.gridAShapeTimestamp == gridA->getShapeChangeTimestamp() &&
+                               cacheData.gridBShapeTimestamp == gridB->getShapeChangeTimestamp());
+        
+        if (shapesUnchanged) {
+            // Calculate movement threshold using approximate radius (like GridGraphics)
+            double approxRadiusB = gridB->getApproximateRadius();
+            
+            // Position delta
+            double positionDelta = glm::length(currentBCenterInA - cacheData.prevBCenterInA);
+            
+            // Orientation delta (convert to angle difference)
+            double orientationDot = glm::abs(glm::dot(currentBOrientationInA, cacheData.prevBOrientationInA));
+            orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
+            double angleDiff = 2.0 * glm::acos(orientationDot);
+            double orientationDelta = angleDiff * approxRadiusB;
+            
+            // Movement threshold (similar to GridGraphics adaptive thresholds)
+            const double POSITION_THRESHOLD = 0.08;
+            double maxMovement = positionDelta + orientationDelta;
+            double movementThreshold = POSITION_THRESHOLD;
+            
+            canUseCachedContacts = (maxMovement < movementThreshold);
+        }
+    }
+    
+    if (canUseCachedContacts) {
+        //std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        // Reuse cached collision data
+        if (!cacheData.contactPoints.empty()) {
+            // Precalculate local-to-world transform matrices
+            glm::dmat4 gridAToWorld = glm::translate(glm::dmat4(1.0), gridA->m_position) * 
+                                     glm::mat4_cast(gridA->m_orientation);
+            glm::dmat4 gridBToWorld = glm::translate(glm::dmat4(1.0), gridB->m_position) * 
+                                     glm::mat4_cast(gridB->m_orientation);
+            
+            // Calculate how much grid A has rotated since cache was created
+            glm::dquat rotationDifference = gridA->m_orientation * glm::conjugate(cacheData.prevAOrientationWorld);
+            
+            // Rotate the cached normals by the rotation difference
+            std::vector<glm::dvec3> updatedNormals;
+            updatedNormals.reserve(cacheData.normals.size());
+            for (const glm::dvec3& cachedNormal : cacheData.normals) {
+                glm::dvec3 rotatedNormal = rotationDifference * cachedNormal;
+                updatedNormals.push_back(rotatedNormal);
+            }
+
+            // Transform cached local coordinates to current world coordinates
+            std::vector<glm::dvec3> updatedContactPoints;
+            updatedContactPoints.reserve(cacheData.contactPointsLocalA.size());
+            
+            for (size_t i = 0; i < cacheData.contactPointsLocalA.size(); ++i) {
+                glm::dvec3 worldFromA = glm::dvec3(gridAToWorld * glm::dvec4(cacheData.contactPointsLocalA[i], 1.0));
+                glm::dvec3 worldFromB = glm::dvec3(gridBToWorld * glm::dvec4(cacheData.contactPointsLocalB[i], 1.0));
+                glm::dvec3 averagedWorld = (worldFromA + worldFromB) * 0.5;
+                updatedContactPoints.push_back(averagedWorld);
+            }
+
+            CollisionResult result(true, updatedNormals, updatedContactPoints,
+                                   cacheData.penetrationDepths, gridA, gridB,
+                                   cacheData.contactPointsLocalA, cacheData.contactPointsLocalB);
+            return result;
+        } else {
+            return CollisionResult(); // No collision cached
+        }
+    } else {
+        //std::cout << "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO" << std::endl;
+    }
     //hasCachedData = false;
 
     // Use simplified contact generation if previous iteration had too many collision pairs
     const int CONTACT_COMPLEXITY_THRESHOLD = 6;
-    bool useSimplifiedContactGeneration = hasCachedData && cachedCollisionPairCount > CONTACT_COMPLEXITY_THRESHOLD;
+    bool useSimplifiedContactGeneration = hasCachedData && cacheData.collisionPairCount > CONTACT_COMPLEXITY_THRESHOLD;
     
     // Calculate the 4 options to find optimal iteration strategy
     size_t totalCorners = gridA->m_cornerCells.size() + gridB->m_cornerCells.size();
@@ -636,8 +718,6 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     
     // Return combined result
     if (!allNormals.empty()) {
-        // Cache the collision pair count for next iteration
-        PairCache<int>::setCachedData(gridA, gridB, collisionPairCount);
         CollisionResult result(true, allNormals, allContactPoints, allPenetrationDepths, 
                                gridA, gridB);
         
@@ -645,6 +725,22 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         if (result.m_contactPoints.size() > CONTACT_REDUCTION_THRESHOLD) {
             reduceContactPoints(result);
         }
+
+        // Cache the collision data for next iteration
+        CollisionCacheData newCacheData;
+        newCacheData.prevBCenterInA = currentBCenterInA;
+        newCacheData.prevBOrientationInA = currentBOrientationInA;
+        newCacheData.prevAOrientationWorld = gridA->m_orientation;
+        newCacheData.contactPoints = result.m_contactPoints;
+        newCacheData.contactPointsLocalA = result.m_contactPointsLocalA;
+        newCacheData.contactPointsLocalB = result.m_contactPointsLocalB;
+        newCacheData.normals = result.m_normals;
+        newCacheData.penetrationDepths = result.m_penetrationDepths;
+        newCacheData.collisionPairCount = collisionPairCount;
+        newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
+        newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
+        newCacheData.cacheTimestamp = currentTimestep;
+        PairCache<CollisionCacheData>::setCachedData(gridA, gridB, newCacheData);
 
         // Debug visualization of contact points
         //if (DebugGlobals::getDebugRenderer()) {
@@ -658,8 +754,16 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         return result;
     }
     
-    // No collision detected - cache 0 collision pairs
-    PairCache<int>::setCachedData(gridA, gridB, 0);
+    // No collision detected - cache empty collision data
+    CollisionCacheData newCacheData;
+    newCacheData.prevBCenterInA = currentBCenterInA;
+    newCacheData.prevBOrientationInA = currentBOrientationInA;
+    newCacheData.prevAOrientationWorld = gridA->m_orientation;
+    newCacheData.collisionPairCount = 0;
+    newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
+    newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
+    newCacheData.cacheTimestamp = currentTimestep;
+    PairCache<CollisionCacheData>::setCachedData(gridA, gridB, newCacheData);
 
     return CollisionResult();
 }
