@@ -26,7 +26,6 @@ public:
         m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
         
         // Set ourselves as the callback object instead of GameBase
-        m_gameBase->m_graphicsEngine->removeCallbackObject(m_gameBase.get());
         m_gameBase->m_graphicsEngine->addCallbackObject(this);
         
         // Setup debug visualization
@@ -156,18 +155,15 @@ public:
     }
 
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
-        // Delegate to game base
-        m_gameBase->renderCallback(viewMatrix, projectionMatrix);
+        //
     }
 
     virtual void framebufferSizeCallback(int width, int height) override {
-        // Delegate to game base
-        m_gameBase->framebufferSizeCallback(width, height);
+        //
     }
 
     virtual void windowPosCallback(int xpos, int ypos) override {
-        // Delegate to game base
-        m_gameBase->windowPosCallback(xpos, ypos);
+        //
     }
 
 private:
