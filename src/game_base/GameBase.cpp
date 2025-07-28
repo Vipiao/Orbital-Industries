@@ -168,10 +168,10 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     co_yield true; // Allow time check before expensive operation
     
     // Step 1: Analyze partitions using PartitionCalculator
-    auto result = PartitionCalculator<GridCell>::analyzePartitions(
+    auto result = PartitionCalculator<StructuralBlock>::analyzePartitions(
         &sourceGrid->getCells(),
         edgeCoords,
-        [](const GridCell& cell) -> std::vector<glm::ivec3> {
+        [](const StructuralBlock& cell) -> std::vector<glm::ivec3> {
             std::vector<glm::ivec3> neighbors;
             cell.forEachConnectedNeighbor([&](const glm::ivec3& neighbor) {
                 neighbors.push_back(neighbor);

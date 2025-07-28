@@ -9,6 +9,7 @@
 #include "GridGraphics.h"
 #include "GridGeometry.h"
 #include "CellType.h"
+#include "StructuralBlock.h"
 #include "../utils/TimeHandler.h"
 #include <glm/glm.hpp>
 #include "../utils/JobManager.h"
@@ -18,26 +19,6 @@
 
 // Forward declarations
 class PhysicsEngine;
-
-// Forward declaration
-class Grid;
-
-// Cell structure to hold face triangle IDs
-struct GridCell : public IStochasticCell {
-    CellType type;
-    glm::ivec3 coordinates; // Store coordinates for this cell
-    Grid* parentGrid; // Reference to parent grid for neighbor lookup
-    double structuralWeakness = -1.0; // Running average structural weakness (-1 = no data yet)
-    
-    // Direct neighbor pointers for fast access (Right, Left, Front, Back, Top, Bottom)
-    std::array<GridCell*, 6> neighbors{nullptr};
-    
-    GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType = CellType::ARMOR) 
-        : coordinates(coords), parentGrid(parent), type(cellType) {}
-    
-    // Implement IStochasticCell interface
-    virtual void forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> callback) const override;
-};
 
 class Grid {
 public:
@@ -73,7 +54,7 @@ public:
     glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
 
     // Access to cells for partitioning
-    const std::unordered_map<glm::ivec3, GridCell, IVec3Hash>& getCells() const { return m_cells; }
+    const std::unordered_map<glm::ivec3, StructuralBlock, IVec3Hash>& getCells() const { return m_cells; }
     
 private:
     // Job management
@@ -87,10 +68,10 @@ private:
     static constexpr double WEAKNESS_BLEND_FACTOR = 0.2; // New result weight in running average
     
     // Core data for block grid
-    std::unordered_map<glm::ivec3, GridCell, IVec3Hash> m_cells;
+    std::unordered_map<glm::ivec3, StructuralBlock, IVec3Hash> m_cells;
 
     // Stochastic analysis
-    std::unique_ptr<StochasticAnalyzer<GridCell>> m_stochasticAnalyzer;
+    std::unique_ptr<StochasticAnalyzer<StructuralBlock>> m_stochasticAnalyzer;
         
     // External system references
     PhysicsEngine* m_physics;
@@ -113,7 +94,7 @@ private:
     void removeNeighborConnections(const glm::ivec3& coord);
     
     // Internal cell access
-    GridCell* getCell(const glm::ivec3& coord);
+    StructuralBlock* getCell(const glm::ivec3& coord);
     
     // Face visibility and mesh management methods
     void recalculateMassAndInertia();
