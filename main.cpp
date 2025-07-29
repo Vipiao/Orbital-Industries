@@ -330,7 +330,7 @@ private:
         KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
         
         // Camera movement speed
-        const double mouseSensitivity = 0.002;
+        const double mouseSensitivity = 0.0014;
         
         // Calculate movement vectors based on camera orientation
         glm::dvec3 right = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
