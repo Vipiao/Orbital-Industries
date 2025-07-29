@@ -1,0 +1,221 @@
+// src/graphics/MeshManager2D.cpp
+#include "MeshManager2D.h"
+#include "STBImageLoader.h"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+
+MeshManager2D::MeshManager2D(size_t maxInstancesPerGeometry)
+    : m_maxInstancesPerGeometry(maxInstancesPerGeometry), m_nextTextureUnit(0) {
+    initializeShaders();
+}
+
+MeshManager2D::~MeshManager2D() {
+    // Cleanup textures
+    for (const auto& texture : m_textures) {
+        glDeleteTextures(1, &texture.textureId);
+    }
+}
+
+void MeshManager2D::initializeShaders() {
+    // Basic 2D instanced vertex shader
+    std::string vertexShader = R"(
+        #version 460 core
+        
+        layout (location = 0) in vec2 aPosition;
+        layout (location = 1) in vec2 aTexCoord;
+        layout (location = 2) in vec2 aInstancePosition;
+        layout (location = 3) in vec2 aInstanceScale;
+        layout (location = 4) in float aInstanceOrientation;
+        
+        uniform mat4 uProjection;
+        
+        out vec2 vTexCoord;
+        
+        void main() {
+            // Apply instance transformations
+            float cosTheta = cos(aInstanceOrientation);
+            float sinTheta = sin(aInstanceOrientation);
+            
+            // Scale
+            vec2 scaledPos = aPosition * aInstanceScale;
+            
+            // Rotate
+            vec2 rotatedPos;
+            rotatedPos.x = scaledPos.x * cosTheta - scaledPos.y * sinTheta;
+            rotatedPos.y = scaledPos.x * sinTheta + scaledPos.y * cosTheta;
+            
+            // Translate
+            vec2 finalPos = rotatedPos + aInstancePosition;
+            
+            gl_Position = uProjection * vec4(finalPos, 0.0, 1.0);
+            vTexCoord = aTexCoord;
+        }
+    )";
+    
+    // Basic 2D fragment shader
+    std::string fragmentShader = R"(
+        #version 460 core
+        
+        in vec2 vTexCoord;
+        out vec4 FragColor;
+        
+        uniform sampler2D uTexture;
+        uniform bool uHasTexture;
+        
+        void main() {
+            if (uHasTexture) {
+                vec4 texColor = texture(uTexture, vTexCoord);
+                if (texColor.a < 0.01) {
+                    discard;
+                }
+                FragColor = texture(uTexture, vTexCoord);
+            } else {
+                FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            }
+        }
+    )";
+    
+    m_shaderProgram.loadVertexShader(vertexShader);
+    m_shaderProgram.loadFragmentShader(fragmentShader);
+    m_shaderProgram.linkShaders();
+}
+
+int MeshManager2D::createTexture(const std::string& path) {
+    // Load new texture
+    GLuint textureId;
+    glGenTextures(1, &textureId);
+    glBindTexture(GL_TEXTURE_2D, textureId);
+    
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    
+    // Load image data
+    int width, height, nrChannels;
+    unsigned char* data = STBImageLoader::load(true, path, &width, &height, &nrChannels);
+    
+    if (data) {
+        GLenum format = (nrChannels == 3) ? GL_RGB : GL_RGBA;
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        STBImageLoader::free(data);
+        
+        // Store texture info
+        Texture texture;
+        texture.textureId = textureId;
+        texture.textureUnit = m_nextTextureUnit++;
+        texture.path = path;
+        
+        m_textures.push_back(texture);
+        
+        std::cout << "MeshManager2D: Loaded texture " << path << " as unit " << texture.textureUnit << std::endl;
+        
+        return texture.textureUnit;
+    } else {
+        glDeleteTextures(1, &textureId);
+        std::cerr << "MeshManager2D: Failed to load texture " << path << std::endl;
+        return -1;
+    }
+}
+
+std::weak_ptr<GeometryData> MeshManager2D::loadMesh(const std::string& geometryPath,
+                                                   const std::string& texturePath,
+                                                   int textureUnit,
+                                                   bool enableTransparency) {
+    // Load geometry data using AssimpLoader
+    std::vector<AssetMeshData> meshDataList;
+    try {
+        AssimpLoader::load(geometryPath, &meshDataList);
+    } catch (const std::exception& e) {
+        std::cerr << "MeshManager2D: Failed to load geometry from " << geometryPath << ": " << e.what() << std::endl;
+        return std::weak_ptr<GeometryData>();
+    }
+    
+    if (meshDataList.empty()) {
+        std::cerr << "MeshManager2D: No mesh data found in " << geometryPath << std::endl;
+        return std::weak_ptr<GeometryData>();
+    }
+    
+    // Use first mesh for 2D (assuming single mesh)
+    const AssetMeshData& meshData = meshDataList[0];
+    
+    // Convert 3D data to 2D (use X,Y components)
+    std::vector<Vertex2D> vertices;
+    std::vector<unsigned int> indices;
+    
+    for (size_t i = 0; i < meshData.indices.size(); ++i) {
+        int idx = meshData.indices[i];
+        
+        Vertex2D vertex;
+        vertex.position = glm::vec2(meshData.positionsData[idx][0], meshData.positionsData[idx][1]);
+        
+        if (idx < meshData.uvsData.size()) {
+            vertex.texCoord = glm::vec2(meshData.uvsData[idx][0], meshData.uvsData[idx][1]);
+        } else {
+            vertex.texCoord = glm::vec2(0.0f, 0.0f);
+        }
+        
+        vertices.push_back(vertex);
+        indices.push_back(static_cast<unsigned int>(i));
+    }
+    
+    if (vertices.empty() || indices.empty()) {
+        std::cerr << "MeshManager2D: Failed to load geometry from " << geometryPath << std::endl;
+        return std::weak_ptr<GeometryData>();
+    }
+    
+    // Handle texture
+    GLuint textureId = 0;
+    int finalTextureUnit = -1;
+    if (!texturePath.empty() && textureUnit == -1) {
+        finalTextureUnit = createTexture(texturePath);
+        if (finalTextureUnit >= 0) {
+            textureId = m_textures[finalTextureUnit].textureId;
+        }
+    } else if (textureUnit >= 0) {
+        finalTextureUnit = textureUnit;
+        // TODO: Support
+        throw std::runtime_error("Error: Setting textures not implemented.");
+    }
+    
+    auto geometry = std::make_shared<GeometryData>(vertices, indices,
+                                                  textureId, finalTextureUnit, enableTransparency, m_maxInstancesPerGeometry);
+    
+    std::weak_ptr<GeometryData> result = geometry;
+    m_geometries.push_back(std::move(geometry));
+    
+    return result;
+}
+
+std::weak_ptr<GeometryInstance> MeshManager2D::createInstance(std::weak_ptr<GeometryData> geometryData) {
+    if (auto geometry = geometryData.lock()) {
+        return geometry->createInstance();
+    }
+    return std::weak_ptr<GeometryInstance>();
+}
+
+void MeshManager2D::render(const glm::mat4& projection) {
+    m_shaderProgram.use();
+    
+    // Set uniforms
+    m_shaderProgram.setUniformMatrix4f("uProjection", projection);
+    
+    // Render all geometries (they handle their own texture binding)
+    for (const auto& geometry : m_geometries) {
+        m_shaderProgram.setUniformInt("uTexture", geometry->getTextureUnit());
+        m_shaderProgram.setUniformBool("uHasTexture", geometry->getTextureId() != 0);
+        
+        geometry->render();
+    }
+}
+
+size_t MeshManager2D::getTotalInstanceCount() const {
+    size_t total = 0;
+    for (const auto& geometry : m_geometries) {
+        total += geometry->getInstanceCount();
+    }
+    return total;
+}

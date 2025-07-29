@@ -4,6 +4,7 @@
 #include "src/debug/DebugVisualization.h"
 #include "src/debug/DebugRenderer.h"
 #include "src/debug/DebugGlobals.h"
+#include "src/graphics/MeshManager2D.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -17,6 +18,7 @@ private:
     std::unique_ptr<DebugVisualization> m_debugViz;
     DebugRendererGuard m_debugGuard;
     double m_moveSpeed = 0.05;
+    std::unique_ptr<MeshManager2D> m_meshManager;
 
 public:
     // Input flags
@@ -31,7 +33,15 @@ public:
         
         // Create the game base instance
         m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
-        
+
+        //
+        m_meshManager = std::make_unique<MeshManager2D>(1000);
+        auto geometryData = m_meshManager->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
+        auto crossHair = m_meshManager->createInstance(geometryData);
+        auto pp = crossHair.lock();
+        pp->setPosition(glm::vec2(.0f, .0f));
+        pp->setScale(glm::vec2(0.05f, 0.05f));
+
         // Set ourselves as the callback object instead of GameBase
         m_gameBase->m_graphicsEngine->addCallbackObject(this);
 
@@ -300,6 +310,10 @@ public:
 
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
         //
+        float aspectRatio = m_gameBase->m_graphicsEngine->m_screen_width /
+            (float)m_gameBase->m_graphicsEngine->m_screen_height;
+        glm::mat4 projection = glm::ortho(-1.0f, 1.0f, -1.0f/aspectRatio, 1.0f/aspectRatio);
+        m_meshManager->render(projection);
     }
 
     virtual void framebufferSizeCallback(int width, int height) override {
