@@ -12,6 +12,7 @@
 #include "../debug/DebugGlobals.h"
 #include "../debug/DebugRenderer.h"
 #include "../utils/PairCache.h"
+#include <cmath>
 
 CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collider* colliderB, uint64_t currentTimestep) {
     int typeA = colliderA->getTypeId();
@@ -556,7 +557,6 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     bool hasCachedData = PairCache<CollisionCacheData>::getCachedData(gridA, gridB, cacheData);
     
     // Get AABB centers instead of positions (more representative of actual object centers)
-    glm::dvec3 gridACenterWorld = (gridA->m_AABBMax + gridA->m_AABBMin) * 0.5;
     glm::dvec3 gridBCenterWorld = (gridB->m_AABBMax + gridB->m_AABBMin) * 0.5;
     
     // Calculate B's center in A's coordinate space using worldToGrid
@@ -567,30 +567,70 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     bool canUseCachedContacts = false;
     if (hasCachedData) {
         // Check if grid shapes have changed since cache was created (use -1 as uninitialized marker)
-        bool shapesUnchanged = (cacheData.gridAShapeTimestamp != static_cast<uint64_t>(-1) &&
-                               cacheData.gridBShapeTimestamp != static_cast<uint64_t>(-1) &&
-                               cacheData.gridAShapeTimestamp == gridA->getShapeChangeTimestamp() &&
+        bool shapesUnchanged = (cacheData.gridAShapeTimestamp == gridA->getShapeChangeTimestamp() &&
                                cacheData.gridBShapeTimestamp == gridB->getShapeChangeTimestamp());
         
         if (shapesUnchanged) {
             // Calculate movement threshold using approximate radius (like GridGraphics)
             double approxRadiusB = gridB->getApproximateRadius();
             
+            //// Position delta
+            //double positionDelta = glm::length(currentBCenterInA - cacheData.prevBCenterInA);
+
+            //// Orientation delta (convert to angle difference)
+            //double orientationDot = glm::abs(glm::dot(currentBOrientationInA, cacheData.prevBOrientationInA));
+            //orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
+            //double angleDiff = 2.0 * glm::acos(orientationDot);
+            //double orientationDelta = angleDiff * approxRadiusB;
+            //
+            //// Movement threshold (similar to GridGraphics adaptive thresholds)
+            //const double POSITION_THRESHOLD = 0.08;
+            //double maxMovement = positionDelta + orientationDelta;
+            //canUseCachedContacts = maxMovement < POSITION_THRESHOLD;
+
+            // The above canUseCachedContacts test is simplified
+            // to the below according to the following math.
+            // positionDelta + orientationDelta < POSITION_THRESHOLD
+            // orientationDelta < POSITION_THRESHOLD - positionDelta
+            // approxRadiusB * 2.0 * glm::acos(orientationDot) <
+            //     POSITION_THRESHOLD - positionDelta
+            // glm::acos(orientationDot) <
+            //     (POSITION_THRESHOLD - positionDelta) /
+            //     (approxRadiusB * 2.0)
+            // glm::cos(glm::acos(orientationDot)) >
+            //     glm::cos((POSITION_THRESHOLD - positionDelta) /
+            //     (approxRadiusB * 2.0))
+            // orientationDot >
+            //     glm::cos((POSITION_THRESHOLD - positionDelta) /
+            //     (approxRadiusB * 2.0))
+            // For small x, cos(x) ~ 1-1/x^2
+            // nn = 2. * glm::sqrt(2)
+            // remainder = (POSITION_THRESHOLD - positionDelta) /
+            //     (nn * approxRadiusB);
+            // orientationDot > 1.0 - remainder * remainder
+            // Also notice the larger than sign switch due to
+            // cos(x) is strictly decreasing close to 0. But what if x is large?
+            // No worries as my 1-1/x^2 approximation is always strictly decreasing.
+            
+            canUseCachedContacts = true;
             // Position delta
             double positionDelta = glm::length(currentBCenterInA - cacheData.prevBCenterInA);
-            
-            // Orientation delta (convert to angle difference)
-            double orientationDot = glm::abs(glm::dot(currentBOrientationInA, cacheData.prevBOrientationInA));
-            orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
-            double angleDiff = 2.0 * glm::acos(orientationDot);
-            double orientationDelta = angleDiff * approxRadiusB;
-            
-            // Movement threshold (similar to GridGraphics adaptive thresholds)
             const double POSITION_THRESHOLD = 0.08;
-            double maxMovement = positionDelta + orientationDelta;
-            double movementThreshold = POSITION_THRESHOLD;
-            
-            canUseCachedContacts = (maxMovement < movementThreshold);
+            if (positionDelta > POSITION_THRESHOLD)
+            {
+                canUseCachedContacts = false;
+            } else {
+                // Orientation delta (convert to angle difference)
+                double orientationDot = glm::abs(glm::dot(currentBOrientationInA, cacheData.prevBOrientationInA));
+                orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
+
+                double constexpr nn = 2. * glm::sqrt(2);
+                double remainder = (POSITION_THRESHOLD - positionDelta) / (nn * approxRadiusB);
+                if (orientationDot < 1.0 - remainder * remainder)
+                {
+                    canUseCachedContacts = false;
+                }
+            }
         }
     }
     
@@ -633,8 +673,6 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         } else {
             return CollisionResult(); // No collision cached
         }
-    } else {
-        //std::cout << "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO" << std::endl;
     }
     //hasCachedData = false;
 
