@@ -31,9 +31,9 @@ struct CollisionResult {
     CollisionResult() = default;
     
     // Constructor with collider references (mandatory for collisions)
-    CollisionResult(bool collision, const std::vector<glm::dvec3>& norms, const std::vector<glm::dvec3>& contacts, 
-                   const std::vector<double>& depths, Collider* a, Collider* b)
-        : m_hasCollision(collision), m_normals(norms), m_contactPoints(contacts), m_penetrationDepths(depths), 
+    CollisionResult(bool collision, std::vector<glm::dvec3> norms, std::vector<glm::dvec3> contacts, 
+                   std::vector<double> depths, Collider* a, Collider* b)
+        : m_hasCollision(collision), m_normals(std::move(norms)), m_contactPoints(std::move(contacts)), m_penetrationDepths(std::move(depths)),
           m_colliderA(a), m_colliderB(b) {
         if (collision) {
             if (!a || !b) {
@@ -44,11 +44,11 @@ struct CollisionResult {
     }
     
     // Constructor with pre-calculated local contact points (for cache optimization)
-    CollisionResult(bool collision, const std::vector<glm::dvec3>& norms, const std::vector<glm::dvec3>& contacts, 
-                   const std::vector<double>& depths, Collider* a, Collider* b,
-                   const std::vector<glm::dvec3>& localA, const std::vector<glm::dvec3>& localB)
-        : m_hasCollision(collision), m_normals(norms), m_contactPoints(contacts), m_penetrationDepths(depths), 
-          m_contactPointsLocalA(localA), m_contactPointsLocalB(localB), m_colliderA(a), m_colliderB(b) {
+    CollisionResult(bool collision, std::vector<glm::dvec3> norms, std::vector<glm::dvec3> contacts, 
+                   std::vector<double> depths, Collider* a, Collider* b,
+                   std::vector<glm::dvec3> localA, std::vector<glm::dvec3> localB)
+        : m_hasCollision(collision), m_normals(std::move(norms)), m_contactPoints(std::move(contacts)), m_penetrationDepths(std::move(depths)), 
+          m_contactPointsLocalA(std::move(localA)), m_contactPointsLocalB(std::move(localB)), m_colliderA(a), m_colliderB(b) {
         if (collision && (!a || !b)) {
             throw std::invalid_argument("CollisionResult: Colliders cannot be null for collision results");
         }

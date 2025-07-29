@@ -23,18 +23,17 @@ public:
     virtual ~PairCache() = default;
     
     /**
-     * @brief Get cached data for a pair of objects from global cache
+     * @brief Get const reference to cached data for a pair of objects from global cache
      * @param objA First object pointer (used as cache key)
      * @param objB Second object pointer (used as cache key)  
-     * @param data Output parameter for cached data
-     * @return true if cached data was found, false otherwise
+     * @return Pointer to cached data, or nullptr if not found
      */
-    static bool getCachedData(const void* objA, const void* objB, DataType& data) {
+    static const DataType* getCachedData(const void* objA, const void* objB) {
         auto cacheKey = makeCacheKey(objA, objB);
         auto it = s_globalCache.find(cacheKey);
         
         if (it == s_globalCache.end()) {
-            return false; // No cached entry
+            return nullptr; // No cached entry
         }
         
         const CachedInfo& info = it->second;
@@ -42,8 +41,7 @@ public:
         // Update access order for LRU
         const_cast<CachedInfo&>(info).accessOrder = ++s_accessCounter;
         
-        data = info.data;
-        return true;
+        return &info.data;
     }
     
     /**
@@ -52,7 +50,7 @@ public:
      * @param objB Second object pointer (used as cache key)
      * @param data Data to cache
      */
-    static void setCachedData(const void* objA, const void* objB, const DataType& data) {
+    static void setCachedData(const void* objA, const void* objB, DataType data) {
         // Check if we need to evict old entries
         if (s_globalCache.size() >= MAX_CACHE_SIZE) {
             evictOldestCacheEntries();
@@ -61,7 +59,7 @@ public:
         auto cacheKey = makeCacheKey(objA, objB);
         
         CachedInfo info;
-        info.data = data;
+        info.data = std::move(data);
         info.accessOrder = ++s_accessCounter;
         
         s_globalCache[cacheKey] = info;
