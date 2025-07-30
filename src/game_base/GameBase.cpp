@@ -433,6 +433,17 @@ void GameBase::update(double deltaTime) {
 }
 
 void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
+    for (size_t ii = 0; ii < m_pendingJobs.size(); ii++)
+    {
+        if (!m_pendingJobs[ii].expired())
+        {
+            std::cout << "Physics frame drop" << std::endl;
+            //extern int hit_count;
+            //std::cout << "hit_count" << hit_count << std::endl;
+        }
+        
+    }
+    
     // Clean up expired handles periodically to prevent unbounded growth
     if (m_pendingJobs.size() % 20 == 0) {
         m_pendingJobs.erase(std::remove_if(m_pendingJobs.begin(), m_pendingJobs.end(),
