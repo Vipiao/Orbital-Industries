@@ -13,11 +13,11 @@ _deps/
 CMakeUserPresets.json
 
 # Build directories
-build/
-bin/
-out/
-debug/
-release/
+/build/
+/bin/
+/out/
+/debug/
+/release/
 
 # Cache files
 .cache/
