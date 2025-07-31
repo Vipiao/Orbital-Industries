@@ -301,7 +301,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
                 continue;
             }
             
-            crossProduct = crossProduct / ll; // Normalize.
+            crossProduct = crossProduct / glm::sqrt(ll); // Normalize.
             SeparatingAxisResult result = testSeparatingAxis(crossProduct, verticesA, verticesB);
             if (result.isSeparating) {
                 // Cache this separating axis
