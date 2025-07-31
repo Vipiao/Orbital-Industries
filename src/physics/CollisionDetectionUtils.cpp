@@ -1303,8 +1303,12 @@ std::vector<glm::dvec2> CollisionDetectionUtils::sutherlandHodgmanClip(
                 if (crossS < 0) { // s is outside
                     // Find intersection
                     glm::dvec2 se = e - s;
-                    double t = -(clipEdge.x * toS.y - clipEdge.y * toS.x) / 
-                              (clipEdge.x * se.y - clipEdge.y * se.x);
+                    double denominator = clipEdge.x * se.y - clipEdge.y * se.x;
+                    if (std::abs(denominator) < 1e-9) {
+                        // Segments are parallel, skip intersection
+                        continue;
+                    }
+                    double t = -(clipEdge.x * toS.y - clipEdge.y * toS.x) / denominator;
                     glm::dvec2 intersection = s + t * se;
                     outputList.push_back(intersection);
                 }
@@ -1312,8 +1316,12 @@ std::vector<glm::dvec2> CollisionDetectionUtils::sutherlandHodgmanClip(
             } else if (crossS >= 0) { // s is inside, e is outside
                 // Find intersection
                 glm::dvec2 se = e - s;
-                double t = -(clipEdge.x * toS.y - clipEdge.y * toS.x) / 
-                          (clipEdge.x * se.y - clipEdge.y * se.x);
+                double denominator = clipEdge.x * se.y - clipEdge.y * se.x;
+                if (std::abs(denominator) < 1e-9) {
+                    // Segments are parallel, skip intersection
+                    continue;
+                }
+                double t = -(clipEdge.x * toS.y - clipEdge.y * toS.x) / denominator;
                 glm::dvec2 intersection = s + t * se;
                 outputList.push_back(intersection);
             }
