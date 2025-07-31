@@ -162,7 +162,8 @@ std::vector<uint32_t> MeshHandler::appendTrianglesToMesh(
    newVertexData.reserve(vertices->size());
 
    // Create the new vertex data based on the new triangles
-   std::vector<uint32_t> newIds{};
+   std::vector<uint32_t> newIds;
+   newIds.reserve(vertices->size() / 3);
    for (size_t ii = 0; ii < vertices->size(); ++ii) {
       // Update the triangle index every three vertices (start of each triangle)
       if (ii % 3 == 0) {
@@ -221,6 +222,7 @@ void MeshHandler::removeTrianglesFromMesh(int meshIndex, const std::vector<uint3
 
    // Sort all the triangle indices.
    std::vector<int64_t> sortedIndices;
+   sortedIndices.reserve(idsToRemove.size());
    for (const auto& id : idsToRemove) {
       sortedIndices.push_back(meshInfo.triangleIndices[id]);
    }
@@ -394,6 +396,7 @@ void MeshHandler::updateTrianglesInformation(
 
    // Collect and sort the indices of the vertex data to be updated
    std::vector<int64_t> vertexDataIndices;
+   vertexDataIndices.reserve(triangleIds->size());
    for (const auto& triangleId : *triangleIds) {
       int64_t vertexDataIndex = meshInfo.triangleIndices[triangleId];
       vertexDataIndices.push_back(vertexDataIndex);
@@ -447,6 +450,7 @@ void MeshHandler::removeMesh(int meshIndex) {
 
    // Sort all the triangle indices.
    std::vector<int64_t> sortedIndices;
+   sortedIndices.reserve(info.triangleIndices.size());
    for (const auto& pair : info.triangleIndices) {
       sortedIndices.push_back(pair.second);
    }
@@ -703,22 +707,10 @@ void MeshHandler::unitTest() {
          int numVertices = 3 * n;
 
          // Create a vector of vertices
-         std::vector<glm::dvec3> vertices;
-         for (int j = 0; j < numVertices; ++j) {
-            vertices.push_back(glm::dvec3(0.0, 0.0, 0.0));
-         }
-         std::vector<glm::dvec3> normals;
-         for (int j = 0; j < numVertices; ++j) {
-            normals.push_back(glm::dvec3(0.0, 0.0, 0.0));
-         }
-         std::vector<glm::dvec3> tangents;  // New tangent vector
-         for (int j = 0; j < numVertices; ++j) {
-            tangents.push_back(glm::dvec3(1.0, 0.0, 0.0));  // Default tangent (pointing right)
-         }
-         std::vector<glm::dvec2> uvs;
-         for (int j = 0; j < numVertices; ++j) {
-            uvs.push_back(glm::dvec2(0.0, 0.0));
-         }
+         std::vector<glm::dvec3> vertices(numVertices, glm::dvec3(0.0, 0.0, 0.0));
+         std::vector<glm::dvec3> normals(numVertices, glm::dvec3(0.0, 0.0, 0.0));
+         std::vector<glm::dvec3> tangents(numVertices, glm::dvec3(1.0, 0.0, 0.0));
+         std::vector<glm::dvec2> uvs(numVertices, glm::dvec2(0.0, 0.0));
 
          // Add a mesh
          int meshId = addMesh();
@@ -750,22 +742,10 @@ void MeshHandler::unitTest() {
          int n = rand() % 11;
          int numVertices = 3 * n;
 
-         std::vector<glm::dvec3> vertices{};
-         for (int j = 0; j < numVertices; ++j) {
-            vertices.push_back(glm::dvec3(0.0, 0.0, 0.0));
-         }
-         std::vector<glm::dvec3> normals{};
-         for (int j = 0; j < numVertices; ++j) {
-            normals.push_back(glm::dvec3(0.0, 0.0, 0.0));
-         }
-         std::vector<glm::dvec3> tangents{};  // New tangent vector
-         for (int j = 0; j < numVertices; ++j) {
-            tangents.push_back(glm::dvec3(1.0, 0.0, 0.0));  // Default tangent (pointing right)
-         }
-         std::vector<glm::dvec2> uvs{};
-         for (int j = 0; j < numVertices; ++j) {
-            uvs.push_back(glm::dvec2(0.0, 0.0));
-         }
+         std::vector<glm::dvec3> vertices(numVertices, glm::dvec3(0.0, 0.0, 0.0));
+         std::vector<glm::dvec3> normals(numVertices, glm::dvec3(0.0, 0.0, 0.0));
+         std::vector<glm::dvec3> tangents(numVertices, glm::dvec3(1.0, 0.0, 0.0));
+         std::vector<glm::dvec2> uvs(numVertices, glm::dvec2(0.0, 0.0));
 
          std::vector<uint32_t> appendedTriangles = 
             appendTrianglesToMesh(meshIdToAppend, &vertices, &normals, &tangents, &uvs);
@@ -780,6 +760,7 @@ void MeshHandler::unitTest() {
 
          int numTrianglesToRemove = rand() % (testMeshes[indexToRemove].triangleIndices.size() + 1);
          std::vector<uint32_t> indicesToRemove;
+         indicesToRemove.reserve(numTrianglesToRemove);
 
          for (int j = 0; j < numTrianglesToRemove; ++j) {
             if (testMeshes[indexToRemove].triangleIndices.empty()) break;
