@@ -701,8 +701,22 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
 
     // Helper function to process a group of cells
     auto processGroup = [&](const auto& cellMap, const glm::dmat4& transform, GridCollider* targetGrid, bool normalFlip, auto extractCollider) {
+        // Collect items into vector for deterministic iteration
+        std::vector<std::pair<glm::ivec3, PolyhedronCollider*>> sortedItems;
+        sortedItems.reserve(cellMap.size());
+        
         for (const auto& [queryCoord, mapValue] : cellMap) {
             PolyhedronCollider* queryCollider = static_cast<PolyhedronCollider*>(extractCollider(mapValue));
+            sortedItems.emplace_back(queryCoord, queryCollider);
+        }
+        
+        // Sort by coordinates (lexicographic order: x, then y, then z)
+        std::sort(sortedItems.begin(), sortedItems.end(), 
+            [](const auto& a, const auto& b) {
+                return std::tie(a.first.x, a.first.y, a.first.z) < std::tie(b.first.x, b.first.y, b.first.z);
+            });
+        
+        for (const auto& [queryCoord, queryCollider] : sortedItems) {
         
             // Transform cell coordinate to target grid space
             glm::dvec4 homogeneousCoord = glm::dvec4(queryCoord, 1.0);
