@@ -252,12 +252,12 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     glm::dvec3 separatingAxis;
 
     // Try cached axis first
-    const glm::dvec3* cachedAxis = PairCache<glm::dvec3>::getCachedData(polyA, polyB);
+    const glm::dvec3* cachedAxis = PairCache<glm::dvec3>::getCachedData(polyA->m_debugId, polyB->m_debugId);
     if (cachedAxis) {
         SeparatingAxisResult result = testSeparatingAxis(*cachedAxis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis again (it worked!)
-            PairCache<glm::dvec3>::setCachedData(polyA, polyB, std::move(*cachedAxis));
+            PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, *cachedAxis);
             return CollisionResult();
         }
     }
@@ -267,7 +267,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            PairCache<glm::dvec3>::setCachedData(polyA, polyB, glm::normalize(axis));
+            PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, glm::normalize(axis));
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -281,7 +281,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            PairCache<glm::dvec3>::setCachedData(polyA, polyB, glm::normalize(axis));
+            PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, glm::normalize(axis));
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -305,7 +305,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
             SeparatingAxisResult result = testSeparatingAxis(crossProduct, verticesA, verticesB);
             if (result.isSeparating) {
                 // Cache this separating axis
-                PairCache<glm::dvec3>::setCachedData(polyA, polyB, crossProduct);
+                PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, crossProduct);
                 return CollisionResult();
             }
             if (result.penetration < minPenetration) {
@@ -555,7 +555,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     }
 
     // Check cached collision data from previous iteration
-    const CollisionCacheData* cacheData = PairCache<CollisionCacheData>::getCachedData(gridA, gridB);
+    const CollisionCacheData* cacheData = PairCache<CollisionCacheData>::getCachedData(gridA->m_debugId, gridB->m_debugId);
     
     // Get AABB centers instead of positions (more representative of actual object centers)
     glm::dvec3 gridBCenterWorld = (gridB->m_AABBMax + gridB->m_AABBMin) * 0.5;
@@ -800,7 +800,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
         newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
         newCacheData.cacheTimestamp = currentTimestep;
-        PairCache<CollisionCacheData>::setCachedData(gridA, gridB, std::move(newCacheData));
+        PairCache<CollisionCacheData>::setCachedData(gridA->m_debugId, gridB->m_debugId, std::move(newCacheData));
 
         // Debug visualization of contact points
         //if (DebugGlobals::getDebugRenderer()) {
@@ -823,7 +823,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
     newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
     newCacheData.cacheTimestamp = currentTimestep;
-    PairCache<CollisionCacheData>::setCachedData(gridA, gridB, std::move(newCacheData));
+    PairCache<CollisionCacheData>::setCachedData(gridA->m_debugId, gridB->m_debugId, std::move(newCacheData));
 
     return CollisionResult();
 }

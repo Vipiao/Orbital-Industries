@@ -5,7 +5,6 @@
 #include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
 #include "../utils/IHashable.h"
-#include "../utils/TimeHandler.h"
 #include "../utils/HashFunctions.h"
 #include "Grid.h"
 #include "../utils/Generator.h"
@@ -14,6 +13,7 @@
 #include <chrono>
 
 // Forward declaration
+class TimeHandler;
 class DebugRenderer;
 
 class GameBase : public GraphicsEngine::CallBack, public IHashable {
@@ -69,7 +69,7 @@ protected:
 
 private:
     // Deferred grid splitting
-    std::unordered_map<Grid*, std::unordered_set<glm::ivec3, IVec3Hash>> m_pendingGridSplits;
+    std::unordered_map<uint64_t, std::unordered_set<glm::ivec3, IVec3Hash>> m_pendingGridSplits;
     bool handlePendingSplits(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     Generator<bool> handlePendingSplitsAsync();
     Generator<bool> performGridSplitAsync(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);

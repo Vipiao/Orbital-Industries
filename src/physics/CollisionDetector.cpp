@@ -81,15 +81,15 @@ Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions)
         co_yield true; // Need more time
     }
 
-    std::set<std::pair<Collider*, Collider*>> potentialCollisions;
+    std::set<std::pair<Collider*, Collider*>, ColliderPairComparator> potentialCollisions;
 
     // Check existing active collisions and remove ones that are no longer colliding
     auto it = m_activeAABBS.begin();
     while (it != m_activeAABBS.end()) {
         if (!it->first->checkAABBCollision(it->second)) {
             // Clear cached data for this collider pair since they're no longer colliding
-            PairCache<glm::dvec3>::clearCachedData(it->first, it->second);  // SAT axes
-            PairCache<int>::clearCachedData(it->first, it->second);         // Contact counts
+            PairCache<glm::dvec3>::clearCachedData(it->first->m_debugId, it->second->m_debugId);  // SAT axes
+            PairCache<int>::clearCachedData(it->first->m_debugId, it->second->m_debugId);         // Contact counts
             
             // Remove from active collisions
             it = m_activeAABBS.erase(it);
@@ -164,32 +164,32 @@ void CollisionDetector::updateAllEdgeValues() {
 }
 
 void CollisionDetector::sortAndDetectPotentialCollisions(std::vector<std::unique_ptr<Edge>>& edges, 
-                                               std::set<std::pair<Collider*, Collider*>>& potentialCollisions) {
+        std::set<std::pair<Collider*, Collider*>, ColliderPairComparator>& potentialCollisions) {
     // Sort and collect potential collision pairs during sorting
     insertionSort(edges, potentialCollisions);
 }
 
 void CollisionDetector::insertionSort(std::vector<std::unique_ptr<Edge>>& edges, 
-                                     std::set<std::pair<Collider*, Collider*>>& potentialCollisions) {
-     for (size_t i = 1; i < edges.size(); ++i) {
-         size_t j = i;
-         while (j > 0 && edges[j]->m_value < edges[j-1]->m_value) {
-            // Check if we're swapping a MAX edge past a MIN edge
-            if (edges[j-1]->m_type == EdgeType::MAX && edges[j]->m_type == EdgeType::MIN) {
-                // Potential collision detected
-                auto pair = makePair(edges[j-1]->m_collider, edges[j]->m_collider);
-                potentialCollisions.insert(pair);
-            }
-            
-             std::swap(edges[j], edges[j-1]);
-             j--;
-         }
-     }
+        std::set<std::pair<Collider*, Collider*>, ColliderPairComparator>& potentialCollisions) {
+    for (size_t i = 1; i < edges.size(); ++i) {
+        size_t j = i;
+        while (j > 0 && edges[j]->m_value < edges[j-1]->m_value) {
+           // Check if we're swapping a MAX edge past a MIN edge
+           if (edges[j-1]->m_type == EdgeType::MAX && edges[j]->m_type == EdgeType::MIN) {
+               // Potential collision detected
+               auto pair = makePair(edges[j-1]->m_collider, edges[j]->m_collider);
+               potentialCollisions.insert(pair);
+           }
+           
+            std::swap(edges[j], edges[j-1]);
+            j--;
+        }
+    }
  }
 
 std::pair<Collider*, Collider*> CollisionDetector::makePair(Collider* a, Collider* b) {
     // Ensure consistent ordering to avoid duplicates
-    return (a < b) ? std::make_pair(a, b) : std::make_pair(b, a);
+    return (a->m_debugId < b->m_debugId) ? std::make_pair(a, b) : std::make_pair(b, a);
 }
 
 void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2, std::vector<CollisionResult>& collisions) {

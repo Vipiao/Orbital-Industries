@@ -39,6 +39,13 @@ struct UintPtrPairHash {
     }
 };
 
+// Hash function for std::pair<int, int>
+struct IntPairHash {
+    std::size_t operator()(const std::pair<int, int>& p) const noexcept {
+        return std::hash<int>{}(p.first) ^ (std::hash<int>{}(p.second) << 1);
+    }
+};
+
 // Hash function for glm::dvec3
 struct DVec3Hash {
     size_t operator()(const glm::dvec3& vec) const {

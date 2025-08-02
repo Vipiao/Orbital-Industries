@@ -13,6 +13,16 @@
 // Forward declaration
 class TimeHandler;
 
+// Custom comparator for deterministic collision pair ordering
+struct ColliderPairComparator {
+    bool operator()(const std::pair<Collider*, Collider*>& a, const std::pair<Collider*, Collider*>& b) const {
+        if (a.first->m_debugId != b.first->m_debugId) {
+            return a.first->m_debugId < b.first->m_debugId;
+        }
+        return a.second->m_debugId < b.second->m_debugId;
+    }
+};
+
 class CollisionDetector {
 public:
     CollisionDetector(TimeHandler* timeHandler);
@@ -40,7 +50,7 @@ private:
     std::vector<std::unique_ptr<Edge>> edgesZ;
 
     // Active collision pairs
-    std::set<std::pair<Collider*, Collider*>> m_activeAABBS;
+    std::set<std::pair<Collider*, Collider*>, ColliderPairComparator> m_activeAABBS;
 
     TimeHandler* m_timeHandler;
     uint64_t m_currentTimestep = 0;
@@ -51,10 +61,10 @@ private:
     void updateAllEdgeValues();
     void sortAndDetectPotentialCollisions(
         std::vector<std::unique_ptr<Edge>>& edges,
-        std::set<std::pair<Collider*, Collider*>>& potentialCollisions);
+        std::set<std::pair<Collider*, Collider*>, ColliderPairComparator>& potentialCollisions);
     void checkCollision(Collider* collider1, Collider* collider2, std::vector<CollisionResult>& collisions);
     void insertionSort(
         std::vector<std::unique_ptr<Edge>>& edges,
-        std::set<std::pair<Collider*, Collider*>>& potentialCollisions);
+        std::set<std::pair<Collider*, Collider*>, ColliderPairComparator>& potentialCollisions);
     std::pair<Collider*, Collider*> makePair(Collider* a, Collider* b);
 };

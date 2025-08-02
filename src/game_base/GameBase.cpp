@@ -1,5 +1,6 @@
 // GameBase.cpp
 #include "GameBase.h"
+#include "../utils/TimeHandler.h"
 #include "../debug/DebugRenderer.h"
 #include <iostream>
 #include <algorithm>
@@ -84,7 +85,7 @@ void GameBase::removeGrid(Grid* grid) {
     
     if (it != m_grids.end()) {
         // Remove any pending split operations for this grid
-        auto pendingIt = m_pendingGridSplits.find(grid);
+        auto pendingIt = m_pendingGridSplits.find(grid->uniqueId);
         if (pendingIt != m_pendingGridSplits.end()) {
             m_pendingGridSplits.erase(pendingIt);
         }
@@ -98,7 +99,7 @@ void GameBase::scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::i
     }
     
     // Add edge coordinates to pending splits, automatically deduplicating
-    auto& pendingEdges = m_pendingGridSplits[sourceGrid];
+    auto& pendingEdges = m_pendingGridSplits[sourceGrid->uniqueId];
     pendingEdges.insert(edgeCoords.begin(), edgeCoords.end());
 }
 
@@ -135,8 +136,19 @@ Generator<bool> GameBase::handlePendingSplitsAsync() {
 
     // Process snapshotted splits
     for (const auto& pair : pendingSplitsSnapshot) {
-        Grid* sourceGrid = pair.first;
+        uint64_t gridId = pair.first;
         const auto& edgeCoords = pair.second;
+
+        // Find the grid by ID
+        Grid* sourceGrid = nullptr;
+        for (const auto& grid : m_grids) {
+            if (grid->uniqueId == gridId) {
+                sourceGrid = grid.get();
+                break;
+            }
+        }
+        
+        if (!sourceGrid) continue; // Grid was deleted
         
         // Convert unordered_set back to vector for the analysis function
         std::vector<glm::ivec3> edgeVector(edgeCoords.begin(), edgeCoords.end());
@@ -459,15 +471,7 @@ size_t GameBase::computeHash() const {
     // Hash physics timestep
     hash = combineHashes(hash, std::hash<uint64_t>{}(m_physicsEngine->getCurrentPhysicsTimeStep()));
     
-    // Hash all grids in deterministic order
-    std::vector<Grid*> sortedGrids;
-    sortedGrids.reserve(m_grids.size());
     for (const auto& grid : m_grids) {
-        sortedGrids.push_back(grid.get());
-    }
-    std::sort(sortedGrids.begin(), sortedGrids.end());
-    
-    for (Grid* grid : sortedGrids) {
         hash = combineHashes(hash, grid->computeHash());
     }
     
