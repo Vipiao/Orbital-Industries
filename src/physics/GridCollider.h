@@ -91,12 +91,13 @@ public:
     
     // Get approximate radius for collision optimization
     double getApproximateRadius() const;
-
-    // Allow CollisionDetectionUtils to access neighborhoods for optimization
-    friend class CollisionDetectionUtils;
     
     glm::dvec3 gridToWorld(const glm::dvec3& gridCoord) const;
     glm::dvec3 worldToGrid(const glm::dvec3& worldCoord) const;
+
+    // Classification-based cell maps for optimized collision detection
+    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_cornerCells;
+    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_edgeCells;
 
     // Type identification  
     static constexpr int TYPE_ID = hashColliderName("GridCollider");
@@ -110,10 +111,6 @@ private:
     std::queue<glm::ivec3> m_classificationQueue;
     std::unordered_set<glm::ivec3, IVec3Hash> m_queuedCoordinates;
     std::weak_ptr<Job> m_classificationJob;
-
-    // Classification-based cell maps for optimized collision detection
-    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_cornerCells;
-    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_edgeCells;
 
     // Axis counts for efficient AABB calculation
     std::unordered_map<int, int> m_xAxisCounts;
