@@ -126,7 +126,8 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
     std::chrono::time_point<std::chrono::high_resolution_clock> endTime, 
     TimeHandler& timeHandler) {
     
-    while (timeHandler.now() < endTime) {
+    std::chrono::time_point<std::chrono::high_resolution_clock> current;
+    while ((current = timeHandler.now()) < endTime) {
     //while (true) {
         switch (m_analysisState) {
             case AnalysisState::SELECTING_RANDOM_CELLS:
