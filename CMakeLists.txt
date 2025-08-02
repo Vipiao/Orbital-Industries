@@ -26,10 +26,9 @@ file(GLOB_RECURSE SRC_FILES
 )
 
 # Add the GLAD source file
-set(SOURCES ${SRC_FILES} "C:/Users/user/OneDrive/cpp/libraries/glad/src/glad.c")
 
 # Add the executable
-add_executable(OrbitalIndustries ${SOURCES})
+add_executable(OrbitalIndustries ${SRC_FILES})
 
 # Link with system libraries
 target_link_libraries(OrbitalIndustries
