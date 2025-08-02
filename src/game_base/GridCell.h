@@ -19,6 +19,7 @@ class GridCell : public IStochasticCell, public IHashable {
 public:
     // Basic cell data that all grid cells have
     CellType type;
+    uint64_t uniqueId;
     glm::ivec3 coordinates;
     Grid* parentGrid;
     
@@ -29,7 +30,7 @@ public:
     double structuralWeakness = -1.0; // Running average structural weakness (-1 = no data yet)
     
     GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType)
-        : coordinates(coords), parentGrid(parent), type(cellType) {}
+        : coordinates(coords), parentGrid(parent), type(cellType), uniqueId(getNextId()) {}
     
     virtual ~GridCell() = default;
     
@@ -42,4 +43,8 @@ public:
 protected:
     // Prevent direct instantiation
     GridCell() = default;
+
+private:
+    static uint64_t nextId;
+    static uint64_t getNextId() { return nextId++; }
 };

@@ -2,6 +2,8 @@
 #include "GridCell.h"
 #include "../utils/HashFunctions.h"
 
+// Initialize static member
+uint64_t GridCell::nextId = 0;
 
 void GridCell::forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> callback) const {
     for (int i = 0; i < 6; ++i) {
