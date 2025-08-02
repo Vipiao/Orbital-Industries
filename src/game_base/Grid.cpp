@@ -12,10 +12,13 @@
 #include "../debug/DebugRenderer.h"
 #include "../game_base/JobPriorities.h"
 
+// Initialize static counter
+uint64_t Grid::s_nextUniqueId = 0;
+
 // Updated - Constructor now initializes with physics and graphics references
 Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
            TimeHandler* timeHandler, const glm::dvec3& position, const glm::dquat& orientation) 
-    : m_physics(physics), m_jobManager(jobManager), m_timeHandler(timeHandler)
+    : uniqueId(s_nextUniqueId++), m_physics(physics), m_jobManager(jobManager), m_timeHandler(timeHandler)
 {
     if (!m_jobManager || !m_timeHandler) {
         throw std::invalid_argument("JobManager and TimeHandler cannot be null");

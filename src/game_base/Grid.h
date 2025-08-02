@@ -23,6 +23,9 @@ class PhysicsEngine;
 
 class Grid : public IHashable {
 public:
+    // Unique identifier for deterministic sorting
+    const uint64_t uniqueId;
+
     // Constructor now takes physics and graphics pointers
     Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
          TimeHandler* timeHandler, const glm::dvec3& position,
@@ -71,6 +74,9 @@ private:
     static constexpr int MAX_ANALYSIS_ITERATIONS = 8;
     static constexpr double WEAKNESS_BLEND_FACTOR = 0.2; // New result weight in running average
     
+    // Static counter for unique IDs
+    static uint64_t s_nextUniqueId;
+
     // Core data for block grid
     std::unordered_map<glm::ivec3, StructuralBlock, IVec3Hash> m_cells;
 
