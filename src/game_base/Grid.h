@@ -4,6 +4,7 @@
 #include "../physics/RigidBody.h"
 #include "../physics/GridCollider.h"
 #include "MassInertiaCalculator.h"
+#include "../utils/IHashable.h"
 #include "../utils/HashFunctions.h"
 #include "../utils/StochasticAnalyzer.h"
 #include "GridGraphics.h"
@@ -20,7 +21,7 @@
 // Forward declarations
 class PhysicsEngine;
 
-class Grid {
+class Grid : public IHashable {
 public:
     // Constructor now takes physics and graphics pointers
     Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
@@ -56,6 +57,9 @@ public:
     // Access to cells for partitioning
     const std::unordered_map<glm::ivec3, StructuralBlock, IVec3Hash>& getCells() const { return m_cells; }
     
+    // IHashable interface
+    virtual size_t computeHash() const override;
+
 private:
     // Job management
     JobManager* m_jobManager;

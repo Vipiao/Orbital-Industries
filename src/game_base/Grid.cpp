@@ -441,3 +441,30 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
         getApproximateRadius()
     );
 }
+
+size_t Grid::computeHash() const {
+    size_t hash = 0;
+    
+    // Hash rigid body state (most important)
+    if (m_rigidBody) {
+        hash = combineHashes(hash, m_rigidBody->computeHash());
+    }
+    
+    // Hash center of mass
+    hash = combineHashes(hash, DVec3Hash{}(m_centerOfMass));
+    
+    // Hash all cells in deterministic order
+    std::vector<std::pair<glm::ivec3, const StructuralBlock*>> sortedCells;
+    sortedCells.reserve(m_cells.size());
+    for (const auto& pair : m_cells) {
+        sortedCells.emplace_back(pair.first, &pair.second);
+    }
+    std::sort(sortedCells.begin(), sortedCells.end(), 
+              [](const auto& a, const auto& b) { return a.second->uniqueId < b.second->uniqueId; });
+    
+    for (const auto& pair : sortedCells) {
+        hash = combineHashes(hash, pair.second->computeHash());
+    }
+    
+    return hash;
+}

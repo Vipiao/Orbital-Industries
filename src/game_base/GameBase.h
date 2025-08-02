@@ -4,6 +4,7 @@
 #include "../graphics/GraphicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
+#include "../utils/IHashable.h"
 #include "../utils/TimeHandler.h"
 #include "../utils/HashFunctions.h"
 #include "Grid.h"
@@ -15,7 +16,7 @@
 // Forward declaration
 class DebugRenderer;
 
-class GameBase : public GraphicsEngine::CallBack {
+class GameBase : public GraphicsEngine::CallBack, public IHashable {
 public:
     class Callback {
     public:
@@ -54,6 +55,9 @@ public:
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override;
     virtual void framebufferSizeCallback(int width, int height) override;
     virtual void windowPosCallback(int xpos, int ypos) override;
+    
+    // IHashable interface
+    virtual size_t computeHash() const override;
     
 protected:
     virtual void processInput();

@@ -452,3 +452,24 @@ void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
     
     m_pendingJobs.push_back(jobHandle);
 }
+
+size_t GameBase::computeHash() const {
+    size_t hash = 0;
+    
+    // Hash physics timestep
+    hash = combineHashes(hash, std::hash<uint64_t>{}(m_physicsEngine->getCurrentPhysicsTimeStep()));
+    
+    // Hash all grids in deterministic order
+    std::vector<Grid*> sortedGrids;
+    sortedGrids.reserve(m_grids.size());
+    for (const auto& grid : m_grids) {
+        sortedGrids.push_back(grid.get());
+    }
+    std::sort(sortedGrids.begin(), sortedGrids.end());
+    
+    for (Grid* grid : sortedGrids) {
+        hash = combineHashes(hash, grid->computeHash());
+    }
+    
+    return hash;
+}

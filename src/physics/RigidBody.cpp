@@ -1,5 +1,6 @@
 // RigidBody.cpp
 #include "RigidBody.h"
+#include "../utils/HashFunctions.h"
 #include <glm/gtc/matrix_transform.hpp>
 
 // RigidBody cached getter implementations
@@ -59,6 +60,22 @@ void RigidBody::invalidateOrientation() {
 
 void RigidBody::invalidateAngularMomentum() {
     m_angularVelocityDirty = true;
+}
+
+size_t RigidBody::computeHash() const {
+    size_t hash = 0;
+    
+    hash = combineHashes(hash, DVec3Hash{}(m_position));
+    hash = combineHashes(hash, DVec3Hash{}(m_velocity));
+    hash = combineHashes(hash, DVec3Hash{}(m_forces));
+    hash = combineHashes(hash, DQuatHash{}(m_orientation));
+    hash = combineHashes(hash, DVec3Hash{}(m_angularMomentumBody));
+    hash = combineHashes(hash, DVec3Hash{}(m_torques));
+    hash = combineHashes(hash, std::hash<double>{}(m_mass));
+    hash = combineHashes(hash, std::hash<bool>{}(m_isStatic));
+    // Note: Don't hash cached values or pointers, only core state
+    
+    return hash;
 }
 
 void RigidBody::invalidateInertiaTensor() {

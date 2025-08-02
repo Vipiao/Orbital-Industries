@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <functional>
 #include <array>
+#include "../utils/IHashable.h"
 #include "../utils/StochasticAnalyzer.h"
 #include "CellType.h"
 
@@ -14,7 +15,7 @@ class Grid;
  * * @brief Base class for all grid cell types
  * Defines the interface that all grid cells must implement
  */
-class GridCell : public IStochasticCell {
+class GridCell : public IStochasticCell, public IHashable {
 public:
     // Basic cell data that all grid cells have
     CellType type;
@@ -35,6 +36,9 @@ public:
     // Common interface methods
     virtual void forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> callback) const override;
     
+    // IHashable interface
+    virtual size_t computeHash() const override;
+
 protected:
     // Prevent direct instantiation
     GridCell() = default;
