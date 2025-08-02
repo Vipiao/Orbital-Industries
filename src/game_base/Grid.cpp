@@ -81,7 +81,7 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
     cancelStructuralAnalysis();
     
     // Add cell to map immediately
-    m_cells.emplace(coord, StructuralBlock{coord, this, type});
+    m_cells.emplace(coord, StructuralBlock{coord, type});
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();

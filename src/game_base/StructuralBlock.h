@@ -9,6 +9,6 @@
  */
 class StructuralBlock : public GridCell {
 public:
-    StructuralBlock(const glm::ivec3& coords, Grid* parent, CellType cellType = CellType::ARMOR);
+    StructuralBlock(const glm::ivec3& coords, CellType cellType = CellType::ARMOR);
     virtual ~StructuralBlock() = default;
 };

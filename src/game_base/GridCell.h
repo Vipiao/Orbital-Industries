@@ -8,9 +8,6 @@
 #include "../utils/StochasticAnalyzer.h"
 #include "CellType.h"
 
-// Forward declaration
-class Grid;
-
 /**
  * * @brief Base class for all grid cell types
  * Defines the interface that all grid cells must implement
@@ -21,7 +18,6 @@ public:
     CellType type;
     uint64_t uniqueId;
     glm::ivec3 coordinates;
-    Grid* parentGrid;
     
     // Direct neighbor pointers for fast access (Right, Left, Front, Back, Top, Bottom)
     std::array<GridCell*, 6> neighbors{nullptr};
@@ -29,8 +25,8 @@ public:
     // Structural analysis data
     double structuralWeakness = -1.0; // Running average structural weakness (-1 = no data yet)
     
-    GridCell(const glm::ivec3& coords, Grid* parent, CellType cellType)
-        : coordinates(coords), parentGrid(parent), type(cellType), uniqueId(getNextId()) {}
+    GridCell(const glm::ivec3& coords, CellType cellType)
+        : coordinates(coords), type(cellType), uniqueId(getNextId()) {}
     
     virtual ~GridCell() = default;
     
