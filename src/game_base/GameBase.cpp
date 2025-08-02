@@ -445,11 +445,12 @@ void GameBase::update(double deltaTime) {
 }
 
 void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
+    bool didPrint = false;
     for (size_t ii = 0; ii < m_pendingJobs.size(); ii++)
     {
         if (!m_pendingJobs[ii].expired())
         {
-            std::cout << "Physics frame drop" << std::endl;
+            if (!didPrint) didPrint=true; std::cout << "Physics frame drop" << std::endl;
             //extern int hit_count;
             //std::cout << "hit_count" << hit_count << std::endl;
         }
