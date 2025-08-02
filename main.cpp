@@ -9,8 +9,12 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+int debug1 = 0;
+int debug2 = 0;
+
 // Define the global debug renderer (must be in exactly one .cpp file)
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
+IHashable* DebugGlobals::g_gameBase = nullptr;
 
 class Game : public GraphicsEngine::CallBack, public GameBase::Callback {
 private:
@@ -53,6 +57,9 @@ public:
 
         // Set global debug renderer with RAII guard  
         m_debugGuard = DebugGlobals::setDebugRenderer(m_debugViz.get());
+
+        // Set global GameBase for debugging
+        DebugGlobals::g_gameBase = m_gameBase.get();
 
         // Set up initial camera position and orientation
         m_gameBase->m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);

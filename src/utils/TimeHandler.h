@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <stdexcept>
 #include <iostream>
+#include "../debug/DebugGlobals.h"
+#include "../utils/IHashable.h"
 
 class TimeHandler {
 public:
@@ -82,7 +84,7 @@ private:
             std::cout << "Warning: End of recorded time data reached, switching to real-time." << std::endl;
             return std::chrono::high_resolution_clock::now();
         }
-        //static int gkgkgkg = 0; ++gkgkgkg; std::cout << "Hit: " << gkgkgkg << std::endl;
+        
         return data;
     }
 

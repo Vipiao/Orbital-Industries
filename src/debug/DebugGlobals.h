@@ -2,6 +2,8 @@
 #pragma once
 
 class DebugRenderer;
+class IHashable;
+class GameBase;
 
 /**
  * @brief RAII guard for managing DebugRenderer lifetime in global state
@@ -45,6 +47,9 @@ public:
      * @return Current debug renderer pointer
      */
     static DebugRenderer* getDebugRenderer() { return g_debugRenderer; }
+
+    // Global IHashable pointer for debugging (temporary)
+    static IHashable* g_gameBase;
     
 private:
     friend class DebugRendererGuard;
