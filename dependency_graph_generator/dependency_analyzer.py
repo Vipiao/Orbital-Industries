@@ -9,13 +9,52 @@ from collections import defaultdict
 import math
 import xml.sax.saxutils as saxutils
 
-def find_cpp_files(directory):
-    """Find all .cpp and .h files recursively in the given directory."""
+def find_cpp_files(directory, skip_folders=None):
+    """Find all .cpp and .h files recursively in the given directory, skipping specified folders."""
+    if skip_folders is None:
+        skip_folders = []
+    
     cpp_files = []
+    base_path = Path(directory).resolve()
+    
     for root, dirs, files in os.walk(directory):
+        # Convert current root to Path for easier manipulation
+        current_path = Path(root).resolve()
+        
+        # Check if current directory or any parent should be skipped
+        try:
+            relative_path = current_path.relative_to(base_path)
+            should_skip = False
+            
+            for skip_folder in skip_folders:
+                skip_path = Path(skip_folder)
+                # Check if the relative path starts with any skip folder
+                try:
+                    relative_path.relative_to(skip_path)
+                    should_skip = True
+                    break
+                except ValueError:
+                    # Check if any part of the path matches the skip folder
+                    if skip_path.name in relative_path.parts:
+                        should_skip = True
+                        break
+            
+            if should_skip:
+                # Skip this directory and all subdirectories
+                dirs.clear()
+                continue
+                
+        except ValueError:
+            # current_path is not relative to base_path, shouldn't happen but skip to be safe
+            continue
+        
+        # Remove skip folders from dirs to prevent os.walk from entering them
+        dirs[:] = [d for d in dirs if d not in [Path(skip).name for skip in skip_folders]]
+        
         for file in files:
             if file.endswith(('.cpp', '.h', '.hpp', '.cc', '.cxx')):
                 cpp_files.append(os.path.join(root, file))
+    
     return cpp_files
 
 def extract_filename_without_extension(filepath):
@@ -56,9 +95,9 @@ def sanitize_node_id(name):
         sanitized = 'n' + sanitized
     return sanitized or 'unknown'
 
-def analyze_dependencies(directory):
+def analyze_dependencies(directory, skip_folders=None):
     """Analyze dependencies between C++ files."""
-    cpp_files = find_cpp_files(directory)
+    cpp_files = find_cpp_files(directory, skip_folders)
     dependencies = defaultdict(set)
     all_nodes = set()
     
@@ -415,6 +454,7 @@ def main():
     parser.add_argument('folder', help='Folder to analyze (relative to script location)')
     parser.add_argument('--detect-cycles', action='store_true', help='Detect and report dependency cycles')
     parser.add_argument('--hide-internal-edges', action='store_true', help='Hide arrows between nodes within the same group')
+    parser.add_argument('--skip-folders', nargs='*', default=[], help='Folders to skip (paths relative to the main folder)')
     
     args = parser.parse_args()
     
@@ -433,9 +473,11 @@ def main():
         sys.exit(1)
     
     print(f"Analyzing C++ files in: {target_dir}")
+    if args.skip_folders:
+        print(f"Skipping folders: {args.skip_folders}")
     
     # Analyze dependencies
-    nodes, dependencies = analyze_dependencies(target_dir)
+    nodes, dependencies = analyze_dependencies(target_dir, args.skip_folders)
     
     if not nodes:
         print("No C++ files found in the specified directory")
