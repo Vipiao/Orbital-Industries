@@ -1,6 +1,7 @@
 // PositionSelector.cpp
 #include "PositionSelector.h"
 #include <algorithm>
+#include "../math/CameraProjection.h"
 #include <cmath>
 #include <limits>
 
@@ -25,8 +26,8 @@ SelectorResult PositionSelector::selectFromPositions(
     // Project all 3D positions to screen space
     result.projectedPositions.reserve(worldPositions.size());
     for (const glm::dvec3& worldPos : worldPositions) {
-        glm::dvec2 screenPos = projectToScreen(worldPos, cameraPosition, cameraOrientation, 
-                                              fieldOfView, aspectRatio);
+        glm::dvec2 screenPos = CameraProjection::worldToScreen(worldPos, cameraPosition, cameraOrientation, 
+                                                              fieldOfView, aspectRatio);
         result.projectedPositions.push_back(screenPos);
     }
     
@@ -38,29 +39,6 @@ SelectorResult PositionSelector::selectFromPositions(
                                          result.distanceToClosest);
     
     return result;
-}
-
-glm::dvec2 PositionSelector::projectToScreen(const glm::dvec3& worldPos, const glm::dvec3& cameraPos,
-                                            const glm::dquat& cameraOri, double fov, double aspectRatio) {
-    // Transform to camera space (camera looks down +Y axis)
-    glm::dvec3 cameraSpace = glm::conjugate(cameraOri) * (worldPos - cameraPos);
-    
-    // Check if point is behind camera
-    if (cameraSpace.y <= 0.0) {
-        // Point is behind camera, mark as non-selectable
-        return glm::dvec2(-2.0, -2.0);
-    }
-    
-    // Perspective projection
-    double projectedX = cameraSpace.x / cameraSpace.y;
-    double projectedY = cameraSpace.z / cameraSpace.y;
-    
-    // Convert to normalized screen coordinates using FOV
-    double tanHalfFov = std::tan(fov * 0.5);
-    projectedX /= tanHalfFov;
-    projectedY /= (tanHalfFov / aspectRatio);  // Adjust for aspect ratio
-    
-    return glm::dvec2(projectedX, projectedY);
 }
 
 void PositionSelector::separateOverlappingPoints(std::vector<glm::dvec2>& positions,

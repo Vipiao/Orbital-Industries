@@ -36,8 +36,6 @@ public:
         int separationIterations = 5);
 
 private:
-    static glm::dvec2 projectToScreen(const glm::dvec3& worldPos, const glm::dvec3& cameraPos, 
-                                     const glm::dquat& cameraOri, double fov, double aspectRatio);
     static void separateOverlappingPoints(std::vector<glm::dvec2>& positions, 
                                         double radius, int iterations);
     static int findClosestPoint(const std::vector<glm::dvec2>& positions, const glm::dvec2& cursor, 
