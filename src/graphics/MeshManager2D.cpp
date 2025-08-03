@@ -66,7 +66,7 @@ void MeshManager2D::initializeShaders() {
         void main() {
             if (uHasTexture) {
                 vec4 texColor = texture(uTexture, vTexCoord);
-                if (texColor.a < 0.01) {
+                if (texColor.a < 0.001) {
                     discard;
                 }
                 FragColor = texture(uTexture, vTexCoord);
