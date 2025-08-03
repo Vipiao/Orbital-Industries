@@ -21,9 +21,12 @@
  * // Load a mesh with texture
  * auto geometryData = meshManager.loadMesh("assets/ship.obj", "assets/ship.png");
  * 
- * // Create instances
- * auto instance1 = meshManager.createInstance(geometryData);
- * auto instance2 = meshManager.createInstance(geometryData);
+ * // Create instances directly from geometry
+ * auto instance1 = geometryData.lock()->createInstance();
+ * auto instance2 = geometryData.lock()->createInstance();
+ * 
+ * // Remove instances when needed
+ * geometryData.lock()->removeInstance(instance1);
  * 
  * // Set properties (automatically syncs to GPU)
  * // Lock in case weak pointer does not exist anymore.
@@ -51,9 +54,6 @@ public:
                                           const std::string& texturePath = "",
                                           int textureUnit = -1,
                                           bool enableTransparency = false);
-    
-    // Instance management
-    std::weak_ptr<GeometryInstance> createInstance(std::weak_ptr<GeometryData> geometryData);
     
     // Rendering
     void render(const glm::mat4& projection);

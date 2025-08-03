@@ -190,13 +190,6 @@ std::weak_ptr<GeometryData> MeshManager2D::loadMesh(const std::string& geometryP
     return result;
 }
 
-std::weak_ptr<GeometryInstance> MeshManager2D::createInstance(std::weak_ptr<GeometryData> geometryData) {
-    if (auto geometry = geometryData.lock()) {
-        return geometry->createInstance();
-    }
-    return std::weak_ptr<GeometryInstance>();
-}
-
 void MeshManager2D::render(const glm::mat4& projection) {
     m_shaderProgram.use();
     
