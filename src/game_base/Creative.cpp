@@ -114,7 +114,7 @@ void Creative::physics() {
                 if (targetGrid) {
                     // Place block at the position before the hit
                     addGridBlock(targetGrid.get(), targetPos.x, targetPos.y, targetPos.z);
-                    std::cout << "Added block at (" << targetPos.x << ", " << targetPos.y << ", " << targetPos.z << ")" << std::endl;
+                    //std::cout << "Added block at (" << targetPos.x << ", " << targetPos.y << ", " << targetPos.z << ")" << std::endl;
                 }
             } else {
                 // No block found, create a new grid 2 units ahead
@@ -122,8 +122,8 @@ void Creative::physics() {
                 auto newGridWeak = m_gameBase->createGrid(newGridPos);
                 Grid* newGrid = newGridWeak.lock().get();
                 addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
-                std::cout << "Created new grid with block at world position (" 
-                        << newGridPos.x << ", " << newGridPos.y << ", " << newGridPos.z << ")" << std::endl;
+                //std::cout << "Created new grid with block at world position (" 
+                //        << newGridPos.x << ", " << newGridPos.y << ", " << newGridPos.z << ")" << std::endl;
             }
         }
         
@@ -133,7 +133,7 @@ void Creative::physics() {
                 if (targetGrid) {
                     // Remove the hit block
                     removeGridBlock(targetGrid.get(), hitPos.x, hitPos.y, hitPos.z);
-                    std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+                    //std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
                 }
 
                 // Check for grid splits by testing connectivity of neighboring blocks
@@ -148,13 +148,13 @@ void Creative::physics() {
                 
                 // Schedule the grid split check for later processing
                 m_gameBase->scheduleGridSplitCheck(targetGridWeak, edgeCoords);
-                std::cout << "Scheduled grid split check for removed block at (" 
-                      << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+                //std::cout << "Scheduled grid split check for removed block at (" 
+                //      << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
                 if (targetGrid->isEmpty()) {
                     m_gameBase->removeGrid(targetGridWeak);
                 }
             } else {
-                std::cout << "No block found to remove" << std::endl;
+                //std::cout << "No block found to remove" << std::endl;
             }
         }
     }
@@ -212,7 +212,7 @@ void Creative::processInputLogic() {
 
     // Structural analysis with G key
     if (keyboard->m_g.justPressed()) {
-        std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
+        //std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
         
         for (const auto& gridShared : m_gameBase->m_grids) {
             if (gridShared) gridShared->visualizeStructuralIntegrity();
