@@ -79,65 +79,65 @@ public:
         //addGridBlock(initialGrid, 2, 0, 0);
         //addGridBlock(initialGrid, 3, 0, 0);
         
-        //for (int ll = 0; ll < 2; ll++) {
-        //    for (int ii = -3; ii < 4; ii++)
-        //    {
-        //        for (int jj = -3; jj < 4; jj++)
-        //        {
-        //            
-        //            for (int kk = -3; kk < 4; kk++)
-        //            {
-        //                addGridBlock(initialGrid, ii + ll*10, jj, kk);
-        //            }
-        //        }
-        //    }
-        //    for (int ii = -2; ii < 3; ii++)
-        //    {
-        //        for (int jj = -2; jj < 3; jj++)
-        //        {
-        //            
-        //            for (int kk = -2; kk < 3; kk++)
-        //            {
-        //                removeGridBlock(initialGrid, ii + ll*10, jj, kk);
-        //            }
-        //        }
-        //    }
-        //}
-        //for (int ii = 4; ii < 7; ii++)
-        //{
-        //    for (int jj = -1; jj < 2; jj++)
-        //    {
-        //        
-        //        for (int kk = -2; kk < 2; kk++)
-        //        {
-        //            addGridBlock(initialGrid, ii, jj, kk);
-        //        }
-        //    }
-        //}
-        //for (int ii = 4-1; ii < 7+1; ii++)
-        //{
-        //    for (int jj = -1+1; jj < 2-1; jj++)
-        //    {
-        //        
-        //        for (int kk = -2+1; kk < 2-1; kk++)
-        //        {
-        //            removeGridBlock(initialGrid, ii, jj, kk);
-        //        }
-        //    }
-        //}
-        // Ground.
-        int size{ 70 };
-        for (int ii = -size; ii < size; ii++)
-        {
-            for (int jj = -size; jj < size; jj++)
+        for (int ll = 0; ll < 2; ll++) {
+            for (int ii = -3; ii < 4; ii++)
             {
-                for (int kk = -3; kk < -2; kk++)
+                for (int jj = -3; jj < 4; jj++)
                 {
-                    addGridBlock(initialGrid, ii, jj, kk);
-                    std::cout << ii << std::endl;
+                    
+                    for (int kk = -3; kk < 4; kk++)
+                    {
+                        addGridBlock(initialGrid, ii + ll*10, jj, kk);
+                    }
+                }
+            }
+            for (int ii = -2; ii < 3; ii++)
+            {
+                for (int jj = -2; jj < 3; jj++)
+                {
+                    
+                    for (int kk = -2; kk < 3; kk++)
+                    {
+                        removeGridBlock(initialGrid, ii + ll*10, jj, kk);
+                    }
                 }
             }
         }
+        for (int ii = 4; ii < 7; ii++)
+        {
+            for (int jj = -1; jj < 2; jj++)
+            {
+                
+                for (int kk = -2; kk < 2; kk++)
+                {
+                    addGridBlock(initialGrid, ii, jj, kk);
+                }
+            }
+        }
+        for (int ii = 4-1; ii < 7+1; ii++)
+        {
+            for (int jj = -1+1; jj < 2-1; jj++)
+            {
+                
+                for (int kk = -2+1; kk < 2-1; kk++)
+                {
+                    removeGridBlock(initialGrid, ii, jj, kk);
+                }
+            }
+        }
+        // Ground.
+        //int size{ 70 };
+        //for (int ii = -size; ii < size; ii++)
+        //{
+        //    for (int jj = -size; jj < size; jj++)
+        //    {
+        //        for (int kk = -3; kk < -2; kk++)
+        //        {
+        //            addGridBlock(initialGrid, ii, jj, kk);
+        //            std::cout << ii << std::endl;
+        //        }
+        //    }
+        //}
         
         // Print instructions
         std::cout << "3D Grid Block Demo" << std::endl;
