@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["../src", "--detect-cycles", "--hide-internal-edges"]
+            "args": ["../src", "--detect-cycles", "--hide-internal-edges", "--skip-folders", "debug"]
         }
     ]
 }
