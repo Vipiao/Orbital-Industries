@@ -29,18 +29,18 @@ public:
              GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE);
     virtual ~GameBase();
     
-    Grid* createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
-    void removeGrid(Grid* grid);
+    std::weak_ptr<Grid> createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
+    void removeGrid(std::weak_ptr<Grid> grid);
     void run();
     void addCallback(Callback* callback);
 
     // Grid partitioning/splitting - now deferred
-    void scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
+    void scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
     std::unique_ptr<JobManager> m_jobManager;
-    std::vector<std::unique_ptr<Grid>> m_grids;
+    std::vector<std::shared_ptr<Grid>> m_grids;
     TimeHandler* m_timeHandler;
     std::vector<Callback*> m_callbacks;
 

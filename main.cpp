@@ -68,7 +68,8 @@ public:
         m_gameBase->m_graphicsEngine->m_mouseHandler->setMouseLock(true);
         
         // Create a center grid that will be our player object
-        Grid* initialGrid = m_gameBase->createGrid(glm::dvec3(0, 0, 0));
+        auto initialGridWeak = m_gameBase->createGrid(glm::dvec3(0, 0, 0));
+        auto initialGrid = initialGridWeak.lock();
         RigidBody* bb = initialGrid->getRigidBody();
         bb->m_position = {0,0,0};
         //bb->m_velocity = {0.0,0.0,-0.01};

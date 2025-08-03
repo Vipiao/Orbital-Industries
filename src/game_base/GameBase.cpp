@@ -70,22 +70,24 @@ void GameBase::setDebugRenderer(DebugRenderer* debugRenderer) {
     }
 }
 
-Grid* GameBase::createGrid(const glm::dvec3& position, const glm::dquat& orientation) {
-    auto grid = std::make_unique<Grid>(m_physicsEngine.get(), m_graphicsEngine.get(), m_jobManager.get(), m_timeHandler, position, orientation);
-    Grid* gridPtr = grid.get();
+std::weak_ptr<Grid> GameBase::createGrid(const glm::dvec3& position, const glm::dquat& orientation) {
+    auto grid = std::make_shared<Grid>(m_physicsEngine.get(), m_graphicsEngine.get(), m_jobManager.get(), m_timeHandler, position, orientation);
+    std::weak_ptr<Grid> gridPtr = grid;
     m_grids.push_back(std::move(grid));
     return gridPtr;
 }
 
-void GameBase::removeGrid(Grid* grid) {
+void GameBase::removeGrid(std::weak_ptr<Grid> gridWeak) {
+    auto grid = gridWeak.lock();
+    if (!grid) return; // Grid already destroyed
     auto it = std::find_if(m_grids.begin(), m_grids.end(),
-        [grid](const std::unique_ptr<Grid>& item) {
-            return item.get() == grid;
+        [grid](const std::shared_ptr<Grid>& item) {
+            return item.get() == grid.get();
         });
     
     if (it != m_grids.end()) {
         // Remove any pending split operations for this grid
-        auto pendingIt = m_pendingGridSplits.find(grid->uniqueId);
+        auto pendingIt = m_pendingGridSplits.find(grid.get()->uniqueId);
         if (pendingIt != m_pendingGridSplits.end()) {
             m_pendingGridSplits.erase(pendingIt);
         }
@@ -93,13 +95,14 @@ void GameBase::removeGrid(Grid* grid) {
     }
 }
 
-void GameBase::scheduleGridSplitCheck(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
+void GameBase::scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGridWeak, const std::vector<glm::ivec3>& edgeCoords) {
+    auto sourceGrid = sourceGridWeak.lock();
     if (!sourceGrid || edgeCoords.empty()) {
         return;
     }
     
     // Add edge coordinates to pending splits, automatically deduplicating
-    auto& pendingEdges = m_pendingGridSplits[sourceGrid->uniqueId];
+    auto& pendingEdges = m_pendingGridSplits[sourceGrid.get()->uniqueId];
     pendingEdges.insert(edgeCoords.begin(), edgeCoords.end());
 }
 
@@ -139,11 +142,11 @@ Generator<bool> GameBase::handlePendingSplitsAsync() {
         uint64_t gridId = pair.first;
         const auto& edgeCoords = pair.second;
 
-        // Find the grid by ID
-        Grid* sourceGrid = nullptr;
+        // Find the grid by ID  
+        std::shared_ptr<Grid> sourceGrid = nullptr;
         for (const auto& grid : m_grids) {
             if (grid->uniqueId == gridId) {
-                sourceGrid = grid.get();
+                sourceGrid = grid;
                 break;
             }
         }
@@ -154,7 +157,7 @@ Generator<bool> GameBase::handlePendingSplitsAsync() {
         std::vector<glm::ivec3> edgeVector(edgeCoords.begin(), edgeCoords.end());
         
         // Use async grid split generator
-        auto splitGenerator = performGridSplitAsync(sourceGrid, edgeVector);
+        auto splitGenerator = performGridSplitAsync(sourceGrid.get(), edgeVector);
         ++splitGenerator; // Start the generator
         
         while (splitGenerator) {
@@ -268,7 +271,8 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         const std::vector<glm::ivec3>& partition = result.partitions[i];
         
         // Create new grid - position will be set after adding cells
-        Grid* newGrid = createGrid(glm::dvec3(0.0), originalOrientation);
+        auto newGridWeak = createGrid(glm::dvec3(0.0), originalOrientation);
+        auto newGrid = newGridWeak.lock();
         
         std::cout << "Moving " << partition.size() << " cells to new grid" << std::endl;
         
@@ -304,7 +308,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
             newBody->m_orientation = originalOrientation;
         }
         
-        newGrids.push_back(newGrid);
+        newGrids.push_back(newGrid.get()); // Keep raw pointer for local processing
     }
 
     // Recalculate original partition local angular momentum as its mass has now changed.

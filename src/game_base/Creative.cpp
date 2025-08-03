@@ -22,7 +22,7 @@ void Creative::physics() {
     
     if (doCreate || doRemove || doForce || doTrackSpeed) {
         // Perform unified grid traversal for all actions
-        Grid* targetGrid = nullptr;
+        std::weak_ptr<Grid> targetGridWeak;
         glm::ivec3 targetPos;
         glm::ivec3 hitPos;
         bool blockFound = false;
@@ -34,22 +34,24 @@ void Creative::physics() {
         glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
         
         // Check all grids for ray intersections
-        for (const auto& gridPtr : m_gameBase->m_grids) {
-            Grid* grid = gridPtr.get();
+        for (const auto& gridShared : m_gameBase->m_grids) {
+            if (!gridShared) continue; // Safety check
+            
+            Grid* gridPtr = gridShared.get();
             
             // Convert camera ray to grid space
-            glm::dvec3 startPosLocal = grid->worldToGrid(startPos);
-            glm::dvec3 endPosLocal = grid->worldToGrid(endPos);
+            glm::dvec3 startPosLocal = gridPtr->worldToGrid(startPos);
+            glm::dvec3 endPosLocal = gridPtr->worldToGrid(endPos);
             
             // Perform grid traversal
-            std::vector<glm::ivec3> gridCells = grid->gridTraversal(startPosLocal, endPosLocal);
+            std::vector<glm::ivec3> gridCells = gridPtr->gridTraversal(startPosLocal, endPosLocal);
             
             // Check if ray hits any blocks in this grid
-            for (size_t i = 1; i < gridCells.size(); i++) { // Skip first cell (where camera is)
-                if (grid->hasCell(gridCells[i])) {
+            for (size_t i = 1; i < gridCells.size(); i++) {
+                if (gridPtr->hasCell(gridCells[i])) {
                     // Calculate center of hit cube in world space
                     glm::dvec3 hitCubeCenter = glm::dvec3(gridCells[i]) + glm::dvec3(0.5, 0.5, 0.5);
-                    glm::dvec3 hitCubeCenterWorld = grid->gridToWorld(hitCubeCenter);
+                    glm::dvec3 hitCubeCenterWorld = gridPtr->gridToWorld(hitCubeCenter);
                     
                     // Calculate squared distance from camera to cube center
                     glm::dvec3 distanceVec = hitCubeCenterWorld - startPos;
@@ -58,7 +60,7 @@ void Creative::physics() {
                     // Check if this is the closest hit so far
                     if (squaredDistance < shortestSquaredDistance) {
                         shortestSquaredDistance = squaredDistance;
-                        targetGrid = grid;
+                        targetGridWeak = gridShared;
                         targetPos = gridCells[i-1]; // Position before the hit (for placement)
                         hitPos = gridCells[i];      // Position of the hit block
                         blockFound = true;
@@ -70,8 +72,9 @@ void Creative::physics() {
         
         // Handle the different actions based on what was found
         if (doTrackSpeed) {
-            if (blockFound && targetGrid) {
-                RigidBody* body = targetGrid->getRigidBody();
+            if (blockFound) {
+                auto targetGrid = targetGridWeak.lock();
+                RigidBody* body = targetGrid ? targetGrid->getRigidBody() : nullptr;
                 if (body) {
                     // Set camera velocity to match the rigid body's velocity
                     //m_cameraVelocity = body->m_velocity;
@@ -84,8 +87,9 @@ void Creative::physics() {
         }
         
         if (doForce) {
-            if (blockFound && targetGrid) {
-                RigidBody* body = targetGrid->getRigidBody();
+            if (blockFound) {
+                auto targetGrid = targetGridWeak.lock();
+                RigidBody* body = targetGrid ? targetGrid->getRigidBody() : nullptr;
                 if (body) {
                     // Apply force in the view direction
                     const double forceStrength = 0.001 * body->m_mass * forceMultiplier;
@@ -105,14 +109,18 @@ void Creative::physics() {
         }
         
         if (doCreate) {
-            if (blockFound && targetGrid) {
-                // Place block at the position before the hit
-                addGridBlock(targetGrid, targetPos.x, targetPos.y, targetPos.z);
-                std::cout << "Added block at (" << targetPos.x << ", " << targetPos.y << ", " << targetPos.z << ")" << std::endl;
+            if (blockFound) {
+                auto targetGrid = targetGridWeak.lock();
+                if (targetGrid) {
+                    // Place block at the position before the hit
+                    addGridBlock(targetGrid.get(), targetPos.x, targetPos.y, targetPos.z);
+                    std::cout << "Added block at (" << targetPos.x << ", " << targetPos.y << ", " << targetPos.z << ")" << std::endl;
+                }
             } else {
                 // No block found, create a new grid 2 units ahead
                 glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
-                Grid* newGrid = m_gameBase->createGrid(newGridPos);
+                auto newGridWeak = m_gameBase->createGrid(newGridPos);
+                Grid* newGrid = newGridWeak.lock().get();
                 addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
                 std::cout << "Created new grid with block at world position (" 
                         << newGridPos.x << ", " << newGridPos.y << ", " << newGridPos.z << ")" << std::endl;
@@ -120,10 +128,13 @@ void Creative::physics() {
         }
         
         if (doRemove) {
-            if (blockFound && targetGrid) {
-                // Remove the hit block
-                removeGridBlock(targetGrid, hitPos.x, hitPos.y, hitPos.z);
-                std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+            if (blockFound) {
+                auto targetGrid = targetGridWeak.lock();
+                if (targetGrid) {
+                    // Remove the hit block
+                    removeGridBlock(targetGrid.get(), hitPos.x, hitPos.y, hitPos.z);
+                    std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+                }
 
                 // Check for grid splits by testing connectivity of neighboring blocks
                 std::vector<glm::ivec3> edgeCoords = {
@@ -136,11 +147,11 @@ void Creative::physics() {
                 };
                 
                 // Schedule the grid split check for later processing
-                m_gameBase->scheduleGridSplitCheck(targetGrid, edgeCoords);
+                m_gameBase->scheduleGridSplitCheck(targetGridWeak, edgeCoords);
                 std::cout << "Scheduled grid split check for removed block at (" 
                       << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
                 if (targetGrid->isEmpty()) {
-                    m_gameBase->removeGrid(targetGrid);
+                    m_gameBase->removeGrid(targetGridWeak);
                 }
             } else {
                 std::cout << "No block found to remove" << std::endl;
@@ -165,8 +176,9 @@ void Creative::removeGridBlock(Grid* grid, int x, int y, int z) {
 
 void Creative::applyDragForces() {
     // Apply drag to all objects before running physics
-    for (const auto& grid : m_gameBase->m_grids) {
-        RigidBody* body = grid->getRigidBody();
+    for (const auto& gridShared : m_gameBase->m_grids) {
+        if (!gridShared) continue;
+        RigidBody* body = gridShared->getRigidBody();
         if (body && !body->m_isStatic && body->m_forces == glm::dvec3{0,0,0}) {
             // Simple drag force calculation: -dragCoefficient * velocity
             const double dragCoefficient = 0.04 * 0.4;
@@ -202,8 +214,8 @@ void Creative::processInputLogic() {
     if (keyboard->m_g.justPressed()) {
         std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
         
-        for (const auto& grid : m_gameBase->m_grids) {
-            grid->visualizeStructuralIntegrity();
+        for (const auto& gridShared : m_gameBase->m_grids) {
+            if (gridShared) gridShared->visualizeStructuralIntegrity();
         }
     }
     
