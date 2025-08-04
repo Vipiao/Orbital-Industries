@@ -282,11 +282,10 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         size_t cellsProcessed = 0;
         for (const glm::ivec3& cellCoord : partition) {
             // Get cell type before removing (assume ARMOR for now, could be extended)
-            CellType cellType = CellType::ARMOR;
             
             // Remove from source grid and add to new grid
             sourceGrid->removeCell(cellCoord);
-            newGrid->addCell(cellCoord, cellType);
+            newGrid->addCell(cellCoord);
 
             // Yield every 5 cells to avoid blocking too long
             if (++cellsProcessed % 5 == 0) {

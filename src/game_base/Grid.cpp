@@ -69,7 +69,7 @@ Grid::~Grid() {
 }
 
 // Add a cell to the grid
-void Grid::addCell(const glm::ivec3& coord, CellType type) {
+void Grid::addCell(const glm::ivec3& coord) {
     // If cell already exists, return
     if (hasCell(coord)) return;
 
@@ -81,13 +81,13 @@ void Grid::addCell(const glm::ivec3& coord, CellType type) {
     cancelStructuralAnalysis();
     
     // Add cell to map immediately
-    m_cells.emplace(coord, StructuralBlock{coord, type});
+    m_cells.emplace(coord, StructuralBlock{coord});
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();
 
     // Add to graphics subsystem
-    m_gridGraphics->addCell(coord, type);
+    m_gridGraphics->addCell(coord, StructuralBlock::TYPE);
 
     // Update neighbor connections after all other setup
     updateNeighborConnections(coord);

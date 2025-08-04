@@ -3,5 +3,5 @@
 
 // Cell type enum for grid cells
 enum class CellType { 
-    ARMOR 
+    STRUCTURAL_BLOCK
 };

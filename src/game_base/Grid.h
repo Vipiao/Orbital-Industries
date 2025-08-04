@@ -33,7 +33,7 @@ public:
     ~Grid();
     
     // Cell management methods
-    void addCell(const glm::ivec3& coord, CellType type = CellType::ARMOR);
+    void addCell(const glm::ivec3& coord);
     void removeCell(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;
     bool isEmpty() const;
