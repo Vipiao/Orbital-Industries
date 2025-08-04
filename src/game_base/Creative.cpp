@@ -236,7 +236,7 @@ void Creative::handleConfigureMode(bool blockFound, std::weak_ptr<Grid> targetGr
                       m_selectedGrid.lock().get() == targetGrid.get() &&
                       m_selectedBlockCoord == hitPos;
     
-    if (!isSameBlock) {
+    if (!isSameBlock && !m_cursorNearMarker) {
         // New block selected
         m_hasSelectedBlock = true;
         m_selectedGrid = targetGridWeak;
@@ -260,8 +260,8 @@ void Creative::updateMarkerPositions() {
     m_cursorNearMarker = false;
     m_nearestMarkerIndex = -1;
     
-    if (!m_hasSelectedBlock || m_selectedGrid.expired()) {
-        // Clear all markers if no block selected - properly remove instances first
+    // Helper lambda to clear markers
+    auto clearMarkers = [this]() {
         if (auto geometry = m_marker.lock()) {
             for (auto& instance : m_markerInstances) {
                 if (auto inst = instance.lock()) {
@@ -270,21 +270,28 @@ void Creative::updateMarkerPositions() {
             }
         }
         m_markerInstances.clear();
+    };
+    
+    if (!m_hasSelectedBlock) {
+        clearMarkers();
         return;
     }
-    
+
     auto selectedGrid = m_selectedGrid.lock();
-    if (!selectedGrid) {
+    if (!selectedGrid || !selectedGrid->hasCell(m_selectedBlockCoord)) {
+         m_hasSelectedBlock = false;
+        clearMarkers();
+        return;
+    }
+
+    // Check if camera is too far from the selected block (5m threshold)
+    glm::dvec3 blockWorldPos = selectedGrid->gridToWorld(glm::dvec3(m_selectedBlockCoord) + glm::dvec3(0.5, 0.5, 0.5));
+    glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->m_camPos;
+    double distanceToBlock = glm::length(blockWorldPos - cameraPos);
+
+    if (distanceToBlock > 10.0) {
         m_hasSelectedBlock = false;
-        // Clear all markers - properly remove instances first
-        if (auto geometry = m_marker.lock()) {
-            for (auto& instance : m_markerInstances) {
-                if (auto inst = instance.lock()) {
-                    geometry->removeInstance(inst.get());
-                }
-            }
-        }
-        m_markerInstances.clear();
+        clearMarkers();
         return;
     }
     
