@@ -6,10 +6,21 @@
 #include "../physics/RigidBody.h"
 #include "../game_base/Grid.h"
 #include "../debug/DebugGlobals.h"
+#include "../utils/PositionSelector.h"
 #include <iostream>
 #include <float.h>
 
-Creative::Creative(GameBase* gameBase) : Mode(gameBase) {
+Creative::Creative(GameBase* gameBase, MeshManager2D* meshManager) 
+    : Mode(gameBase), m_meshManager(meshManager), m_hasSelectedBlock(false), 
+      m_cursorNearMarker(false), m_nearestMarkerIndex(-1) {
+    
+    if (!m_meshManager) {
+        throw std::runtime_error("MeshManager2D cannot be null");
+    }
+    
+    // Load marker geometry
+    m_marker = m_meshManager->loadMesh("../media/blender/03_face.obj", "../media/01_marker.png", -1, true);
+    std::cout << "Loaded marker geometry for configuration mode" << std::endl;
 }
 
 void Creative::processInputs() {
@@ -20,7 +31,7 @@ void Creative::physics() {
     // Apply drag forces to all grids before physics update
     applyDragForces();
     
-    if (doCreate || doRemove || doForce || doTrackSpeed) {
+    if (doCreate || doRemove || doForce || doTrackSpeed || doConfigure) {
         // Perform unified grid traversal for all actions
         std::weak_ptr<Grid> targetGridWeak;
         glm::ivec3 targetPos;
@@ -84,6 +95,10 @@ void Creative::physics() {
                 //m_cameraVelocity = glm::dvec3(0.0, 0.0, 0.0);
                 //std::cout << "No target found for speed tracking - camera velocity reset" << std::endl;
             }
+        }
+
+        if (doConfigure) {
+            handleConfigureMode(blockFound, targetGridWeak, hitPos);
         }
         
         if (doForce) {
@@ -162,6 +177,7 @@ void Creative::physics() {
     // Reset flags
     doCreate = false;
     doRemove = false;
+    doConfigure = false;
     doForce = false;
     doTrackSpeed = false;
 }
@@ -198,6 +214,172 @@ void Creative::applyDragForces() {
     }
 }
 
+void Creative::handleConfigureMode(bool blockFound, std::weak_ptr<Grid> targetGridWeak, const glm::ivec3& hitPos) {
+    if (!blockFound) {
+        // No block found, unselect current block if any
+        if (m_hasSelectedBlock) {
+            m_hasSelectedBlock = false;
+            m_selectedGrid.reset();
+            std::cout << "Block unselected - no block found" << std::endl;
+        }
+        return;
+    }
+    
+    auto targetGrid = targetGridWeak.lock();
+    if (!targetGrid) {
+        return;
+    }
+    
+    // Check if this is the same block we already have selected
+    bool isSameBlock = m_hasSelectedBlock && 
+                      !m_selectedGrid.expired() &&
+                      m_selectedGrid.lock().get() == targetGrid.get() &&
+                      m_selectedBlockCoord == hitPos;
+    
+    if (!isSameBlock) {
+        // New block selected
+        m_hasSelectedBlock = true;
+        m_selectedGrid = targetGridWeak;
+        m_selectedBlockCoord = hitPos;
+        std::cout << "Block selected at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
+        return;
+    }
+    
+    // Same block selected - check if cursor is near any marker (calculated in updateMarkerPositions)
+    if (!m_cursorNearMarker) {
+        // No marker nearby, unselect the block
+        m_hasSelectedBlock = false;
+        m_selectedGrid.reset();
+        std::cout << "Block unselected" << std::endl;
+    }
+    // If cursor is near marker, the coordinate printing is handled in updateMarkerPositions
+}
+
+void Creative::updateMarkerPositions() {
+    // Reset cursor proximity state
+    m_cursorNearMarker = false;
+    m_nearestMarkerIndex = -1;
+    
+    if (!m_hasSelectedBlock || m_selectedGrid.expired()) {
+        // Clear all markers if no block selected - properly remove instances first
+        if (auto geometry = m_marker.lock()) {
+            for (auto& instance : m_markerInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst.get());
+                }
+            }
+        }
+        m_markerInstances.clear();
+        return;
+    }
+    
+    auto selectedGrid = m_selectedGrid.lock();
+    if (!selectedGrid) {
+        m_hasSelectedBlock = false;
+        // Clear all markers - properly remove instances first
+        if (auto geometry = m_marker.lock()) {
+            for (auto& instance : m_markerInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst.get());
+                }
+            }
+        }
+        m_markerInstances.clear();
+        return;
+    }
+    
+    // Calculate 8 corner positions in world space
+    std::vector<glm::dvec3> cornerPositions;
+    for (int x = 0; x <= 1; ++x) {
+        for (int y = 0; y <= 1; ++y) {
+            for (int z = 0; z <= 1; ++z) {
+                glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(x, y, z);
+                glm::dvec3 worldCorner = selectedGrid->gridToWorld(corner);
+                cornerPositions.push_back(worldCorner);
+            }
+        }
+    }
+    
+    // Get positions and scales of all markers
+    auto selectorResult = PositionSelector::selectFromPositions(
+        cornerPositions,
+        0.02, // Small projected radius
+        m_gameBase->m_graphicsEngine->m_camPos,
+        m_gameBase->m_graphicsEngine->m_camOri,
+        m_gameBase->m_graphicsEngine->m_fieldOfView,
+        static_cast<double>(m_gameBase->m_graphicsEngine->m_screen_width) / 
+        static_cast<double>(m_gameBase->m_graphicsEngine->m_screen_height),
+        glm::dvec2(0.0, 0.0), // Screen center as cursor position
+        5
+    );
+    
+    // Check if cursor is near any marker and store calculated positions/scales
+    struct MarkerData {
+        glm::vec2 position;
+        glm::vec2 scale;
+    };
+    std::vector<MarkerData> markerData;
+    
+    if (selectorResult.closestIndex >= 0 && selectorResult.distanceToClosest < 0.1) {
+        m_cursorNearMarker = true;
+        m_nearestMarkerIndex = selectorResult.closestIndex;
+        
+        // Print the selected corner coordinate with index
+        glm::dvec3 selectedCorner = cornerPositions[m_nearestMarkerIndex];
+        std::cout << "Near corner " << m_nearestMarkerIndex << ": (" << selectedCorner.x << ", " 
+                 << selectedCorner.y << ", " << selectedCorner.z << ")" << std::endl;
+    }
+    
+    // Calculate data only for visible markers
+    for (size_t i = 0; i < selectorResult.projectedPositions.size(); ++i) {
+        glm::dvec2 screenPos = selectorResult.projectedPositions[i];
+        
+        // Only add markers that are not behind camera
+        if (screenPos.x > -1.9 && screenPos.y > -1.9) {
+            MarkerData data;
+            data.position = glm::vec2(screenPos.x, screenPos.y);
+            
+            // Scale up if this is the nearest marker to cursor
+            bool isNearestMarker = m_cursorNearMarker && static_cast<int>(i) == m_nearestMarkerIndex;
+            float scale = isNearestMarker ? 0.035f : 0.02f;
+            data.scale = glm::vec2(scale, scale);
+            
+            markerData.push_back(data);
+        }
+    }
+    
+    // Adjust instance count to match needed markers
+    size_t needed = markerData.size();
+    
+    // Remove excess instances
+    while (m_markerInstances.size() > needed) {
+        auto instance = m_markerInstances.back();
+        if (auto inst = instance.lock()) {
+            if (auto geometry = m_marker.lock()) {
+                geometry->removeInstance(inst.get());
+            }
+        }
+        m_markerInstances.pop_back();
+    }
+    
+    // Add missing instances
+    while (m_markerInstances.size() < needed) {
+        if (auto geometry = m_marker.lock()) {
+            auto newInstance = geometry->createInstance();
+            m_markerInstances.push_back(newInstance);
+        }
+    }
+    
+    // Update positions and scales from calculated data
+    for (size_t i = 0; i < m_markerInstances.size() && i < markerData.size(); ++i) {
+        if (auto inst = m_markerInstances[i].lock()) {
+            const MarkerData& data = markerData[i];
+            inst->setPosition(data.position);
+            inst->setScale(data.scale);
+        }
+    }
+}
+
 void Creative::processInputLogic() {
     MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->m_mouseHandler;
     KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
@@ -209,6 +391,9 @@ void Creative::processInputLogic() {
     glm::dvec3 right = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
     glm::dvec3 forward = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
     glm::dvec3 up = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
+
+    // Update marker positions every frame for smooth 2D positioning
+    updateMarkerPositions();
 
     // Structural analysis with G key
     if (keyboard->m_g.justPressed()) {
@@ -235,6 +420,10 @@ void Creative::processInputLogic() {
     }
     if (keyboard->m_z.justPressed()) {
         doTrackSpeed = true;
+    }
+
+    if (keyboard->m_r.justPressed()) {
+        doConfigure = true;
     }
 
     // Toggle mouse lock with M key

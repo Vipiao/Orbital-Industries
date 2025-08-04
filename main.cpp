@@ -57,7 +57,7 @@ public:
         DebugGlobals::g_gameBase = m_gameBase.get();
  
         // Create creative mode
-        m_mode = std::make_unique<Creative>(m_gameBase.get());
+        m_mode = std::make_unique<Creative>(m_gameBase.get(), m_meshManager.get());
 
         // Set up initial camera position and orientation
         m_gameBase->m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
@@ -146,7 +146,7 @@ public:
         std::cout << "  Space/Shift: Move up/down" << std::endl;
         std::cout << "  M: Toggle mouse lock" << std::endl;
         std::cout << "  F: Apply force to grid" << std::endl;
-        std::cout << "  E: Add block at (1,1,1)" << std::endl;
+        std::cout << "  R: Configure block (select corners)" << std::endl;
         std::cout << "  Q: Remove block at (1,1,1)" << std::endl;
     }
 

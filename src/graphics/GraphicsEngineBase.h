@@ -45,7 +45,7 @@ public:
    //glm::dquat m_camOri{ glm::sqrt(2.) / 2., -glm::sqrt(2.) / 2.,0,0 }; // 90% rotation around negative x axis.
    glm::dquat m_camOri{ 1,0,0,0 }; // Unit orientation.
    uint64_t m_frameNum{ 0 };
-   double m_fieldOfView{ glm::radians(120.0) };
+   double m_fieldOfView{ glm::radians(120.0) }; // Horizontal field of view.
    // Mouse.
    MouseHandler* m_mouseHandler{ nullptr };
    KeyboardHandler* m_keyboardHandler{ nullptr };

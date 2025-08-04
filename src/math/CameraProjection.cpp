@@ -23,7 +23,7 @@ glm::dvec2 CameraProjection::worldToScreen(const glm::dvec3& worldPos,
     // Convert to normalized screen coordinates using FOV
     double tanHalfFov = std::tan(fov * 0.5);
     projectedX /= tanHalfFov;
-    projectedY /= (tanHalfFov / aspectRatio);  // Adjust for aspect ratio
+    projectedY /= tanHalfFov;  // Don't adjust for aspect ratio
     
     return glm::dvec2(projectedX, projectedY);
 }
