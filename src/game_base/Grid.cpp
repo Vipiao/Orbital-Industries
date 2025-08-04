@@ -11,6 +11,7 @@
 #include <iostream>
 #include "../debug/DebugRenderer.h"
 #include "../game_base/JobPriorities.h"
+#include "../physics/PolyhedronCollider.h"
 
 // Initialize static counter
 uint64_t Grid::s_nextUniqueId = 0;
@@ -73,8 +74,17 @@ void Grid::addCell(const glm::ivec3& coord) {
     // If cell already exists, return
     if (hasCell(coord)) return;
 
-    // Add cell to collider
-    auto cubeCollider = std::make_unique<CubeCollider>(glm::dvec3(0.0), glm::dquat(1.0, 0.0, 0.0, 0.0), 1.0);
+    // Add cell to collider - use PolyhedronCollider with optimized cube generation
+    std::vector<glm::dvec3> vertices = CubeCollider::generateCubeVertices(1.0);
+    std::vector<glm::dvec3> axes = CubeCollider::generateCubeAxes();
+    
+    auto cubeCollider = std::make_unique<PolyhedronCollider>(
+        glm::dvec3(0.0),           // position
+        glm::dquat(1.0, 0.0, 0.0, 0.0), // orientation  
+        vertices,                  // local vertices
+        axes,                      // face axes
+        axes                       // edge axes (same as face for cubes)
+    );
     m_collider->addCell(coord, std::move(cubeCollider));
 
     // Cancel existing analysis to prevent accessing deleted cells
