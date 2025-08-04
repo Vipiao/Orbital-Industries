@@ -45,4 +45,8 @@ private:
     MeshManager2D* m_meshManager;
     std::weak_ptr<GeometryData> m_marker;
     std::vector<std::weak_ptr<GeometryInstance>> m_markerInstances;
+
+    // Selected marker coordinate and direction data
+    glm::ivec3 m_selectedMarkerCoordinate;
+    glm::dvec3 m_selectedMarkerDirection;
 };

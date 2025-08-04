@@ -295,14 +295,28 @@ void Creative::updateMarkerPositions() {
         return;
     }
     
-    // Calculate 8 corner positions in world space
+    // Calculate corner positions in world space (3 per corner = 24 total)
     std::vector<glm::dvec3> cornerPositions;
+    std::vector<glm::ivec3> coordinateData;
+    std::vector<glm::dvec3> directionData;
+    
+    const double offset = 0.3;
     for (int x = 0; x <= 1; ++x) {
         for (int y = 0; y <= 1; ++y) {
             for (int z = 0; z <= 1; ++z) {
-                glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(x, y, z);
-                glm::dvec3 worldCorner = selectedGrid->gridToWorld(corner);
-                cornerPositions.push_back(worldCorner);
+                // Calculate inward-pointing directions for this corner
+                glm::dvec3 directions[3] = {
+                    glm::dvec3((1 - 2*x) * offset, 0, 0),
+                    glm::dvec3(0, (1 - 2*y) * offset, 0),
+                    glm::dvec3(0, 0, (1 - 2*z) * offset)
+                };
+                // Generate 3 positions per corner
+                for (int i = 0; i < 3; ++i) {
+                    glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(x, y, z) + directions[i];
+                    cornerPositions.push_back(selectedGrid->gridToWorld(corner));
+                    coordinateData.push_back(glm::ivec3(x, y, z));
+                    directionData.push_back(directions[i]);
+                }
             }
         }
     }
@@ -310,14 +324,14 @@ void Creative::updateMarkerPositions() {
     // Get positions and scales of all markers
     auto selectorResult = PositionSelector::selectFromPositions(
         cornerPositions,
-        0.02, // Small projected radius
+        0.004, // Small projected radius. (How far is minimum distance)
         m_gameBase->m_graphicsEngine->m_camPos,
         m_gameBase->m_graphicsEngine->m_camOri,
         m_gameBase->m_graphicsEngine->m_fieldOfView,
         static_cast<double>(m_gameBase->m_graphicsEngine->m_screen_width) / 
         static_cast<double>(m_gameBase->m_graphicsEngine->m_screen_height),
         glm::dvec2(0.0, 0.0), // Screen center as cursor position
-        5
+        5 // Seperation iterations
     );
     
     // Check if cursor is near any marker and store calculated positions/scales
@@ -327,9 +341,12 @@ void Creative::updateMarkerPositions() {
     };
     std::vector<MarkerData> markerData;
     
-    if (selectorResult.closestIndex >= 0 && selectorResult.distanceToClosest < 0.1) {
+    if (selectorResult.closestIndex >= 0 && selectorResult.distanceToClosest < 0.04) {
         m_cursorNearMarker = true;
         m_nearestMarkerIndex = selectorResult.closestIndex;
+
+        m_selectedMarkerCoordinate = coordinateData[m_nearestMarkerIndex];
+        m_selectedMarkerDirection = directionData[m_nearestMarkerIndex];
         
         // Print the selected corner coordinate with index
         glm::dvec3 selectedCorner = cornerPositions[m_nearestMarkerIndex];
