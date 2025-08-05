@@ -271,7 +271,7 @@ PolyhedronProcessor::MeshData PolyhedronProcessor::generateMeshData(const std::v
     
     // Collect all 2D projected coordinates for global bounding box calculation
     std::vector<glm::dvec2> allProjectedCoords;
-    allProjectedCoords.reserve(triangles.size() * 3); // Pre-resize for known size
+    allProjectedCoords.reserve(triangles.size() * 3); // Reserve for known size
     
     for (const auto& triangle : triangles) {
         TriangleInfo info;
