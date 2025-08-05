@@ -90,14 +90,18 @@ void Grid::addCell(const glm::ivec3& coord) {
     // Cancel existing analysis to prevent accessing deleted cells
     cancelStructuralAnalysis();
     
-    // Add cell to map immediately
-    m_cells.emplace(coord, StructuralBlock{coord});
+    // Create structural block and generate mesh data
+    StructuralBlock block(coord);
+    auto meshData = block.generateTriangleMeshData();
+    
+    // Move block into cells map
+    m_cells.emplace(coord, std::move(block));
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();
 
     // Add to graphics subsystem
-    m_gridGraphics->addCell(coord, StructuralBlock::TYPE);
+    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData);
 
     // Update neighbor connections after all other setup
     updateNeighborConnections(coord);

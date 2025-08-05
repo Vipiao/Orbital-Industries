@@ -10,25 +10,6 @@ int GridGraphics::s_colorTextureUnit = -1;
 int GridGraphics::s_normalTextureUnit = -1;
 bool GridGraphics::s_texturesLoaded = false;
 
-std::vector<AssetMeshData> GridGraphics::s_faceMeshData;
-bool GridGraphics::s_faceMeshDataLoaded = false;
-
-// Face transform lookup table initialization
-const GridGraphics::FaceTransform GridGraphics::s_faceTransforms[6] = {
-    // Right (+X)
-    {glm::dvec3(0, 1, 0), glm::radians(90.0)},
-    // Left (-X)
-    {glm::dvec3(0, 1, 0), glm::radians(-90.0)},
-    // Front (+Y) 
-    {glm::dvec3(1, 0, 0), glm::radians(-90.0)},
-    // Back (-Y)
-    {glm::dvec3(1, 0, 0), glm::radians(90.0)},
-    // Up (+Z) - No rotation needed
-    {glm::dvec3(1, 0, 0), 0.0},
-    // Down (-Z)
-    {glm::dvec3(1, 0, 0), glm::radians(180.0)}
-};
-
 GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager) 
     : m_graphics(graphics), m_jobManager(jobManager), m_meshId(-1) {
     
@@ -45,9 +26,6 @@ GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager)
     if (m_meshId < 0) {
         throw std::runtime_error("Failed to create mesh for GridGraphics");
     }
-    
-    // Load face mesh data
-    loadFaceMeshData();
     
     // Load textures
     loadTextures();
@@ -88,33 +66,16 @@ void GridGraphics::loadTextures() {
     }
 }
 
-void GridGraphics::loadFaceMeshData() {
-    if (s_faceMeshDataLoaded) return;
-    
-    try {
-        // Load the face mesh using AssimpLoader - a face in positive Z direction
-        AssimpLoader::load("../media/blender/01_face.obj", &s_faceMeshData);
-        s_faceMeshDataLoaded = true;
-        std::cout << "GridGraphics: Face mesh data loaded successfully" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "GridGraphics: Failed to load face mesh data: " << e.what() << std::endl;
-        s_faceMeshDataLoaded = false;
-    }
-}
-
-void GridGraphics::addCell(const glm::ivec3& coord, CellType type) {
+void GridGraphics::addCell(const glm::ivec3& coord, CellType type, const StructuralBlock::MeshData& meshData) {
     // Add graphics cell to map
     m_graphicsCells.emplace(coord, GraphicsCell{});
     
     // Schedule update job for this cell
-    auto jobHandle = m_jobManager->schedule([this, coord](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-        updateCellGraphics(coord);
+    auto jobHandle = m_jobManager->schedule([this, coord, meshData](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        updateCellGraphics(coord, meshData);
         return false; // Job complete
     }, JobPriorities::GRAPHICS_UPDATE);
     trackJob(jobHandle);
-    
-    // Schedule update jobs for neighbors
-    scheduleNeighborUpdateJobs(coord);
 }
 
 void GridGraphics::removeCell(const glm::ivec3& coord) {
@@ -124,10 +85,7 @@ void GridGraphics::removeCell(const glm::ivec3& coord) {
     }
     
     // Capture the triangle IDs before removing the cell
-    std::vector<std::vector<uint32_t>> triangleIds(6);
-    for (int face = 0; face < 6; face++) {
-        triangleIds[face] = cellIt->second.faceTriangleIds[face];
-    }
+    std::vector<uint32_t> triangleIds = cellIt->second.triangleIds;
 
     // Schedule remove job with captured triangle IDs
     auto jobHandle = m_jobManager->schedule([this, triangleIds](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
@@ -135,9 +93,6 @@ void GridGraphics::removeCell(const glm::ivec3& coord) {
         return false; // Job complete
     }, JobPriorities::GRAPHICS_REMOVE);
     trackJob(jobHandle);
-    
-    // Schedule update jobs for neighbors
-    scheduleNeighborUpdateJobs(coord);
 
     // Remove graphics cell from map immediately
     m_graphicsCells.erase(coord);
@@ -152,125 +107,45 @@ GraphicsCell* GridGraphics::getGraphicsCell(const glm::ivec3& coord) {
     return (it != m_graphicsCells.end()) ? &it->second : nullptr;
 }
 
-glm::dmat4 GridGraphics::getFaceTransform(int faceIndex, const glm::ivec3& coord) {
-    glm::dmat4 transform = glm::dmat4(1.0);
-    
-    // Position at grid coordinate
-    transform = glm::translate(transform, glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
-    
-    // Apply rotation based on face lookup table
-    const FaceTransform& faceTransform = s_faceTransforms[faceIndex];
-    if (faceTransform.angle != 0.0) {
-        transform = glm::rotate(transform, faceTransform.angle, faceTransform.axis);
-    }
-    
-    transform = glm::scale(transform, glm::dvec3{0.5, 0.5, 0.5});
-    
-    return transform;
-}
-
-void GridGraphics::removeCellGraphics(const std::vector<std::vector<uint32_t>>& faceTriangleIds) {
-    // Remove all face triangles from the mesh
-    for (int face = 0; face < 6; face++) {
-        if (!faceTriangleIds[face].empty()) {
-            m_graphics->m_meshHandler->removeTrianglesFromMesh(
-                m_meshId, &faceTriangleIds[face]);
-        }
+void GridGraphics::removeCellGraphics(const std::vector<uint32_t>& triangleIds) {
+    // Remove all triangles from the mesh
+    if (!triangleIds.empty()) {
+        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_meshId, &triangleIds);
     }
 }
 
-void GridGraphics::scheduleNeighborUpdateJobs(const glm::ivec3& coord) {
-    // Define the 6 neighbor directions (±X, ±Y, ±Z)
-    static const glm::ivec3 neighbors[6] = {
-        {1, 0, 0}, {-1, 0, 0}, 
-        {0, 1, 0}, {0, -1, 0}, 
-        {0, 0, 1}, {0, 0, -1}
-    };
-    
-    // Schedule update jobs for each neighbor (job will validate existence before executing)
-    for (int i = 0; i < 6; i++) {
-        glm::ivec3 neighborCoord = coord + neighbors[i];
-        
-        auto jobHandle = m_jobManager->schedule([this, neighborCoord](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-            updateCellGraphics(neighborCoord);
-            return false; // Job complete
-        }, JobPriorities::GRAPHICS_UPDATE);
-        trackJob(jobHandle);
-    }
-}
-
-void GridGraphics::updateCellGraphics(const glm::ivec3& coord) {
+void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const StructuralBlock::MeshData& meshData) {
     auto it = m_graphicsCells.find(coord);
     if (it == m_graphicsCells.end()) return; // Cell doesn't exist, job is no-op
     
     GraphicsCell& cell = it->second;
     
-    // Always remove all existing face meshes for this cell first
-    for (int face = 0; face < 6; face++) {
-        if (!cell.faceTriangleIds[face].empty()) {
-            m_graphics->m_meshHandler->removeTrianglesFromMesh(m_meshId, &cell.faceTriangleIds[face]);
-            cell.faceTriangleIds[face].clear();
-        }
+    // Remove existing mesh for this cell first
+    if (!cell.triangleIds.empty()) {
+        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_meshId, &cell.triangleIds);
+        cell.triangleIds.clear();
     }
     
-    // Define the 6 neighbor directions (±X, ±Y, ±Z)
-    static const glm::ivec3 neighbors[6] = {
-        {1, 0, 0}, {-1, 0, 0},  // Right, Left (X)
-        {0, 1, 0}, {0, -1, 0},  // Front, Back (Y)
-        {0, 0, 1}, {0, 0, -1}   // Up, Down (Z)
-    };
+    if (meshData.isEmpty()) {
+        return; // No mesh data to render
+    }
     
-    // Then add faces that should be visible
-    for (int face = 0; face < 6; face++) {
-        // Check if this face is visible (neighbor is empty)
-        glm::ivec3 neighborCoord = coord + neighbors[face];
-        bool faceVisible = !hasGraphicsCell(neighborCoord);
-        
-        if (faceVisible) {
-            // Get transformation for this face
-            glm::dmat4 transform = getFaceTransform(face, coord);
-            
-            // Apply transformation to face mesh data
-            std::vector<glm::dvec3> positions;
-            std::vector<glm::dvec3> normals;
-            std::vector<glm::dvec3> tangents;
-            std::vector<glm::dvec2> uvs;
-            
-            // Get base face data (pointing in +Z direction)
-            if (!s_faceMeshDataLoaded || s_faceMeshData.empty()) {
-                continue; // Skip if mesh data not loaded
-            }
-            
-            const AssetMeshData& faceMesh = s_faceMeshData[0];
-            
-            // Transform vertices according to face direction
-            for (size_t i = 0; i < faceMesh.indices.size(); i++) {
-                int idx = faceMesh.indices[i];
-                
-                // Position
-                const auto& pos = faceMesh.positionsData[idx];
-                glm::dvec4 transformedPos = transform * glm::dvec4(pos[0], pos[1], pos[2], 1.0);
-                positions.push_back(glm::dvec3(transformedPos));
-                
-                // Normal 
-                const auto& norm = faceMesh.normalsData[idx];
-                glm::dvec4 transformedNorm = transform * glm::dvec4(norm[0], norm[1], norm[2], 0.0);
-                normals.push_back(glm::normalize(glm::dvec3(transformedNorm)));
-                
-                // Tangent
-                const auto& tang = faceMesh.tangentsData[idx];
-                glm::dvec4 transformedTang = transform * glm::dvec4(tang[0], tang[1], tang[2], 0.0);
-                tangents.push_back(glm::normalize(glm::dvec3(transformedTang)));
-                
-                // UV coordinates (don't need transformation)
-                const auto& texUV = faceMesh.uvsData[idx];
-                uvs.push_back(glm::dvec2(texUV[0], texUV[1]));
-            }
-            
-            // Add this face to the mesh
-            cell.faceTriangleIds[face] = m_graphics->m_meshHandler->appendTrianglesToMesh(
-                m_meshId, &positions, &normals, &tangents, &uvs);
-        }
+    // Make a copy of mesh data for transformation
+    StructuralBlock::MeshData transformedMeshData = meshData;
+    
+    // Apply translation to position at coord + 0.5 in grid-local coordinates
+    glm::dvec3 offset = glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5)*0.;
+    
+    // Transform positions by adding offset (normals and tangents unchanged for translation)
+    for (size_t i = 0; i < transformedMeshData.positions.size(); ++i) {
+        transformedMeshData.positions[i] += offset;
+    }
+    
+    // Add complete block mesh to graphics
+    if (!transformedMeshData.positions.empty()) {
+        cell.triangleIds = m_graphics->m_meshHandler->appendTrianglesToMesh(
+            m_meshId, &transformedMeshData.positions, &transformedMeshData.normals, 
+            &transformedMeshData.tangents, &transformedMeshData.uvs);
     }
 }
 

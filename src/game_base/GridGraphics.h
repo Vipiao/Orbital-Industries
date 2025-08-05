@@ -5,6 +5,7 @@
 #include "CellType.h"
 #include "../utils/HashFunctions.h"
 #include "../graphics/AssimpLoader.h"
+#include "StructuralBlock.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -18,7 +19,7 @@
  */
 class GraphicsCell {
 public:
-    std::vector<uint32_t> faceTriangleIds[6]; // Triangle IDs for each face direction
+    std::vector<uint32_t> triangleIds; // Triangle IDs for this cell
     
     GraphicsCell() = default;
     ~GraphicsCell() = default;
@@ -41,7 +42,7 @@ public:
     ~GridGraphics();
     
     // Cell management
-    void addCell(const glm::ivec3& coord, CellType type);
+    void addCell(const glm::ivec3& coord, CellType type, const StructuralBlock::MeshData& meshData);
     void removeCell(const glm::ivec3& coord);
     
     // Graphics updates
@@ -60,12 +61,6 @@ public:
     GraphicsCell* getGraphicsCell(const glm::ivec3& coord);
     
 private:
-    // Face transform data structure
-    struct FaceTransform {
-        glm::dvec3 axis;
-        double angle;
-    };
-    
     // Graphics cell storage
     std::unordered_map<glm::ivec3, GraphicsCell, IVec3Hash> m_graphicsCells;
     
@@ -77,11 +72,6 @@ private:
     static int s_colorTextureUnit;
     static int s_normalTextureUnit;
     static bool s_texturesLoaded;
-    
-    // Face mesh data
-    static std::vector<AssetMeshData> s_faceMeshData;
-    static bool s_faceMeshDataLoaded;
-    static const FaceTransform s_faceTransforms[6];
 
     // Job system
     JobManager* m_jobManager;
@@ -104,13 +94,10 @@ private:
     
     // Private methods
     void loadTextures();
-    static void loadFaceMeshData();
-    static glm::dmat4 getFaceTransform(int faceIndex, const glm::ivec3& coord);
     
     // Job-based graphics operations
-    void removeCellGraphics(const std::vector<std::vector<uint32_t>>& faceTriangleIds);
-    void updateCellGraphics(const glm::ivec3& coord);
-    void scheduleNeighborUpdateJobs(const glm::ivec3& coord);
+    void removeCellGraphics(const std::vector<uint32_t>& triangleIds);
+    void updateCellGraphics(const glm::ivec3& coord, const StructuralBlock::MeshData& meshData);
 
     // Helper to track job handles
     void trackJob(std::weak_ptr<Job> jobHandle);
