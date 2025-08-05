@@ -130,22 +130,11 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const StructuralB
         return; // No mesh data to render
     }
     
-    // Make a copy of mesh data for transformation
-    StructuralBlock::MeshData transformedMeshData = meshData;
-    
-    // Apply translation to position at coord + 0.5 in grid-local coordinates
-    glm::dvec3 offset = glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5)*0.;
-    
-    // Transform positions by adding offset (normals and tangents unchanged for translation)
-    for (size_t i = 0; i < transformedMeshData.positions.size(); ++i) {
-        transformedMeshData.positions[i] += offset;
-    }
-    
     // Add complete block mesh to graphics
-    if (!transformedMeshData.positions.empty()) {
+    if (!meshData.positions.empty()) {
         cell.triangleIds = m_graphics->m_meshHandler->appendTrianglesToMesh(
-            m_meshId, &transformedMeshData.positions, &transformedMeshData.normals, 
-            &transformedMeshData.tangents, &transformedMeshData.uvs);
+            m_meshId, &meshData.positions, &meshData.normals, 
+            &meshData.tangents, &meshData.uvs);
     }
 }
 
