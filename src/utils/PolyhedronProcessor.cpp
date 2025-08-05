@@ -2,6 +2,9 @@
 #include <glm/gtx/norm.hpp>
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <unordered_map>
+#include "../math/IntegerVectorMath.h"
 
 bool IVec3Compare::operator()(const glm::ivec3& a, const glm::ivec3& b) const {
     if (a.x != b.x) return a.x < b.x;
@@ -22,13 +25,13 @@ std::array<std::array<int, 3>, 2> PolyhedronProcessor::getConvexTriangulation(
     // Calculate normal of triangle (v0, v1, v2)
     glm::ivec3 edge1 = v1 - v0;
     glm::ivec3 edge2 = v2 - v0;
-    glm::ivec3 normal = glm::cross(edge1, edge2);
+    glm::ivec3 normal = IntegerVectorMath::cross(edge1, edge2);
     
     // Calculate vector from v0 to v3
     glm::ivec3 vec_to_v3 = v3 - v0;
     
     // Check if quad is convex by testing if v3 is on the same side as the normal
-    int dot_product = glm::dot(normal, vec_to_v3);
+    int dot_product = IntegerVectorMath::dot(normal, vec_to_v3);
     
     if (dot_product > 0) {
         // Quad is concave, use alternative triangulation
@@ -71,9 +74,9 @@ PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<g
             
             glm::ivec3 t_edge1 = t_v1 - t_v0;
             glm::ivec3 t_edge2 = t_v2 - t_v0;
-            glm::ivec3 t_normal = glm::cross(t_edge1, t_edge2);
+            glm::ivec3 t_normal = IntegerVectorMath::cross(t_edge1, t_edge2);
             
-            if (glm::length2(t_normal) > 0) {
+            if (IntegerVectorMath::length2(t_normal) > 0) {
                 glm::dvec3 normalized = glm::normalize(glm::dvec3(t_normal));
                 result.faceAxis.insert(normalized);
             }
@@ -84,7 +87,7 @@ PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<g
     for (const auto& edge : CUBE_EDGES) {
         glm::ivec3 edgeVec = vertices[edge[1]] - vertices[edge[0]];
         
-        if (glm::length2(edgeVec) > 0) {
+        if (IntegerVectorMath::length2(edgeVec) > 0) {
             glm::dvec3 normalized = glm::normalize(glm::dvec3(edgeVec));
             result.edgeAxis.insert(normalized);
         }
@@ -137,7 +140,7 @@ std::vector<std::array<glm::dvec3, 3>> PolyhedronProcessor::getTriangles(const s
             glm::ivec3 t_v1 = vertices[triangle[1]];
             glm::ivec3 t_v2 = vertices[triangle[2]];
             
-            glm::ivec3 t_cross = glm::cross(t_v1 - t_v0, t_v2 - t_v0);
+            glm::ivec3 t_cross = IntegerVectorMath::cross(t_v1 - t_v0, t_v2 - t_v0);
             double area = 0.5 * glm::length(glm::dvec3(t_cross));
             
             if (area > Vec3Compare::eps) {
@@ -240,4 +243,132 @@ bool PolyhedronProcessor::validatePolyhedron(const std::vector<glm::ivec3>& vert
     }
     
     return true; // All checks passed
+}
+
+PolyhedronProcessor::MeshData PolyhedronProcessor::generateMeshData(const std::vector<std::array<glm::dvec3, 3>>& triangles) {
+    MeshData meshData;
+    
+    if (triangles.empty()) {
+        return meshData; // Return empty mesh data
+    }
+    
+    // Reserve space for triangle data (3 vertices per triangle)
+    size_t numVertices = triangles.size() * 3;
+    meshData.positions.reserve(numVertices);
+    meshData.normals.reserve(numVertices);
+    meshData.tangents.reserve(numVertices);
+    meshData.uvs.reserve(numVertices);
+    
+    // First pass: Generate positions, normals, and determine projection for each triangle
+    struct TriangleInfo {
+        glm::dvec3 normal;
+        int projectionAxis; // 0=YZ, 1=XZ, 2=XY
+        std::array<glm::dvec2, 3> projectedCoords;
+    };
+    
+    std::vector<TriangleInfo> triangleInfos;
+    triangleInfos.reserve(triangles.size());
+    
+    // Collect all 2D projected coordinates for global bounding box calculation
+    std::vector<glm::dvec2> allProjectedCoords;
+    allProjectedCoords.reserve(triangles.size() * 3); // Pre-resize for known size
+    
+    for (const auto& triangle : triangles) {
+        TriangleInfo info;
+        
+        // Calculate triangle normal
+        glm::dvec3 edge1 = triangle[1] - triangle[0];
+        glm::dvec3 edge2 = triangle[2] - triangle[0];
+        info.normal = glm::normalize(glm::cross(edge1, edge2));
+        
+        // Determine best projection axis based on normal
+        glm::dvec3 absNormal = glm::abs(info.normal);
+        if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z) {
+            info.projectionAxis = 0; // Project to YZ plane
+        } else if (absNormal.y >= absNormal.z) {
+            info.projectionAxis = 1; // Project to XZ plane
+        } else {
+            info.projectionAxis = 2; // Project to XY plane
+        }
+        
+        // Project triangle vertices to 2D
+        for (int i = 0; i < 3; ++i) {
+            glm::dvec2 projected;
+            switch (info.projectionAxis) {
+                case 0: // YZ plane
+                    projected = glm::dvec2(triangle[i].y, triangle[i].z);
+                    break;
+                case 1: // XZ plane
+                    projected = glm::dvec2(triangle[i].x, triangle[i].z);
+                    break;
+                case 2: // XY plane
+                    projected = glm::dvec2(triangle[i].x, triangle[i].y);
+                    break;
+            }
+            info.projectedCoords[i] = projected;
+            allProjectedCoords.push_back(projected);
+        }
+        
+        triangleInfos.push_back(info);
+    }
+    
+    // Calculate global bounding box for UV normalization
+    glm::dvec2 minCoords = allProjectedCoords[0];
+    glm::dvec2 maxCoords = allProjectedCoords[0];
+    
+    for (const auto& coord : allProjectedCoords) {
+        minCoords = glm::min(minCoords, coord);
+        maxCoords = glm::max(maxCoords, coord);
+    }
+    
+    glm::dvec2 uvRange = maxCoords - minCoords;
+    // Prevent division by zero
+    if (uvRange.x < 1e-9) uvRange.x = 1.0;
+    if (uvRange.y < 1e-9) uvRange.y = 1.0;
+    
+    // Second pass: Generate all vertex attributes
+    for (size_t triIdx = 0; triIdx < triangles.size(); ++triIdx) {
+        const auto& triangle = triangles[triIdx];
+        const auto& info = triangleInfos[triIdx];
+        
+        // Generate UVs for this triangle
+        std::array<glm::dvec2, 3> uvs;
+        for (int i = 0; i < 3; ++i) {
+            uvs[i] = (info.projectedCoords[i] - minCoords) / uvRange;
+        }
+        
+        // Calculate tangent vector from UV coordinates
+        glm::dvec3 edge1 = triangle[1] - triangle[0];
+        glm::dvec3 edge2 = triangle[2] - triangle[0];
+        glm::dvec2 deltaUV1 = uvs[1] - uvs[0];
+        glm::dvec2 deltaUV2 = uvs[2] - uvs[0];
+        
+        glm::dvec3 tangent;
+        double denominator = deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y;
+        
+        if (glm::abs(denominator) > 1e-9) {
+            double invDenominator = 1.0 / denominator;
+            tangent = (deltaUV2.y * edge1 - deltaUV1.y * edge2) * invDenominator;
+        } else {
+            // Degenerate UV case - generate tangent perpendicular to normal
+            if (glm::abs(info.normal.x) < 0.9) {
+                tangent = glm::cross(info.normal, glm::dvec3(1.0, 0.0, 0.0));
+            } else {
+                tangent = glm::cross(info.normal, glm::dvec3(0.0, 1.0, 0.0));
+            }
+        }
+        
+        // Orthogonalize tangent against normal and normalize
+        tangent = glm::normalize(tangent - glm::dot(tangent, info.normal) * info.normal);
+        
+        // Add vertices for this triangle
+        for (int i = 0; i < 3; ++i) {
+            meshData.positions.push_back(triangle[i]);
+            meshData.normals.push_back(info.normal);
+            meshData.tangents.push_back(tangent);
+            meshData.uvs.push_back(uvs[i]);
+        }
+    }
+    
+    return meshData;
 }

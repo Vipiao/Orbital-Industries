@@ -3,6 +3,7 @@
 
 #include "GridCell.h"
 #include <array>
+#include "../utils/PolyhedronProcessor.h"
 
 /**
  * @brief Concrete implementation of GridCell for structural blocks
@@ -10,6 +11,8 @@
  */
 class StructuralBlock : public GridCell {
 public:
+    // Use PolyhedronProcessor's MeshData type
+    using MeshData = PolyhedronProcessor::MeshData;
     // Type identifier for this block type
     static constexpr CellType TYPE = CellType::STRUCTURAL_BLOCK;
     
@@ -21,4 +24,23 @@ public:
     
     // Scaling factor for local coordinates
     int m_maxSize = 4;
+
+    /**
+     * @brief Get collision axes for current shape using PolyhedronProcessor
+     * @return AxisResult containing face and edge axes
+     */
+    PolyhedronProcessor::AxisResult getAxes() const;
+    
+    /**
+     * @brief Set new vertex configuration and validate the shape
+     * @param newVertices New 8-vertex configuration
+     * @return true if the new shape is valid and was set, false otherwise
+     */
+    bool setVertices(const std::array<glm::ivec3, 8>& newVertices);
+    
+    /**
+     * @brief Generate complete triangle mesh data with normals, tangents, and UVs
+     * @return MeshData containing all vertex attributes for rendering
+     */
+    MeshData generateTriangleMeshData() const;
 };

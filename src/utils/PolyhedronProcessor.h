@@ -19,6 +19,18 @@ struct Vec3Compare {
 
 class PolyhedronProcessor {
 public:
+    /**
+     * @brief Complete mesh data structure for rendering
+     */
+    struct MeshData {
+        std::vector<glm::dvec3> positions;
+        std::vector<glm::dvec3> normals;
+        std::vector<glm::dvec3> tangents;
+        std::vector<glm::dvec2> uvs;
+        
+        bool isEmpty() const { return positions.empty(); }
+    };
+
     struct AxisResult {
         std::set<glm::dvec3, Vec3Compare> faceAxis;
         std::set<glm::dvec3, Vec3Compare> edgeAxis;
@@ -58,6 +70,13 @@ public:
      */
     static bool validatePolyhedron(const std::vector<glm::ivec3>& vertices, int maxSize, 
                                    double normalThreshold = -0.9, double convexityMargin = -0.1);
+ 
+    /**
+     * @brief Generate complete mesh data with normals, tangents, and UVs from triangle data
+     * @param triangles Vector of triangles (each triangle is 3 vertices)
+     * @return MeshData containing all vertex attributes for rendering
+     */
+    static MeshData generateMeshData(const std::vector<std::array<glm::dvec3, 3>>& triangles);
 
 private:
     // Face definitions for cube (indices into vertex array)  
