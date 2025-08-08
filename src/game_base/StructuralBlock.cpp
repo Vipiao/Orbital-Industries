@@ -30,13 +30,26 @@ bool StructuralBlock::setVertices(const std::array<glm::ivec3, 8>& newVertices) 
     std::vector<glm::ivec3> verticesVec(newVertices.begin(), newVertices.end());
     
     // Validate the new shape
-    if (!PolyhedronProcessor::validatePolyhedron(verticesVec, m_maxSize)) {
+    if (!validateVertices(newVertices, m_maxSize)) {
         return false; // Invalid shape, don't update
     }
     
     // Shape is valid, update vertices
     m_localVertices = newVertices;
     return true;
+}
+
+bool StructuralBlock::validateVertices(const std::array<glm::ivec3, 8>& vertices, int maxSize) {
+    // Convert to vector for validation
+    std::vector<glm::ivec3> verticesVec(vertices.begin(), vertices.end());
+    return PolyhedronProcessor::validatePolyhedron(verticesVec, maxSize);
+}
+
+std::vector<glm::dvec3> StructuralBlock::getVertices() const {
+    return PolyhedronProcessor::getUniqueVertices(
+        std::vector<glm::ivec3>(m_localVertices.begin(), m_localVertices.end()), 
+        m_maxSize
+    );
 }
 
 StructuralBlock::MeshData StructuralBlock::generateTriangleMeshData() const {

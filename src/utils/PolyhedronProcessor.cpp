@@ -54,8 +54,11 @@ PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<g
     }
     
     AxisResult result;
+
+    // Collect all face normals as integer vectors (reserve for max 12 triangles from 6 faces)
+    std::vector<glm::ivec3> faceAxisInts;
+    faceAxisInts.reserve(12);
     
-    // Process each face of the cube
     for (const auto& face : CUBE_FACES) {
         // Get the 4 vertices of this face (ordered counter-clockwise from outside)
         glm::ivec3 v0 = vertices[face[0]];
@@ -77,20 +80,67 @@ PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<g
             glm::ivec3 t_normal = IntegerVectorMath::cross(t_edge1, t_edge2);
             
             if (IntegerVectorMath::length2(t_normal) > 0) {
-                glm::dvec3 normalized = glm::normalize(glm::dvec3(t_normal));
-                result.faceAxis.insert(normalized);
+                faceAxisInts.push_back(t_normal);
             }
         }
     }
     
-    // Process each edge of the cube
+    // Remove duplicates from face axes using cross product comparison
+    std::vector<glm::ivec3> uniqueFaceAxisInts;
+    uniqueFaceAxisInts.reserve(faceAxisInts.size());
+    for (const auto& axis : faceAxisInts) {
+        bool isDuplicate = false;
+        for (const auto& existingAxis : uniqueFaceAxisInts) {
+            glm::ivec3 crossProduct = IntegerVectorMath::cross(axis, existingAxis);
+            if (crossProduct == glm::ivec3(0, 0, 0)) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (!isDuplicate) {
+            uniqueFaceAxisInts.push_back(axis);
+        }
+    }
+    
+    // Normalize face axes and add to result
+    result.faceAxis.reserve(uniqueFaceAxisInts.size());
+    for (const auto& axis : uniqueFaceAxisInts) {
+        result.faceAxis.push_back(glm::normalize(glm::dvec3(axis)));
+    }
+    
+    // Collect all edge directions as integer vectors (reserve for 12 edges max)
+    std::vector<glm::ivec3> edgeAxisInts;
+    edgeAxisInts.reserve(12);
+
     for (const auto& edge : CUBE_EDGES) {
         glm::ivec3 edgeVec = vertices[edge[1]] - vertices[edge[0]];
         
         if (IntegerVectorMath::length2(edgeVec) > 0) {
-            glm::dvec3 normalized = glm::normalize(glm::dvec3(edgeVec));
-            result.edgeAxis.insert(normalized);
+            edgeAxisInts.push_back(edgeVec);
         }
+    }
+    
+    // Remove duplicates from edge axes using cross product comparison
+    std::vector<glm::ivec3> uniqueEdgeAxisInts;
+    uniqueEdgeAxisInts.reserve(edgeAxisInts.size());
+    for (const auto& axis : edgeAxisInts) {
+        bool isDuplicate = false;
+        for (const auto& existingAxis : uniqueEdgeAxisInts) {
+            glm::ivec3 crossProduct = IntegerVectorMath::cross(axis, existingAxis);
+            if (crossProduct == glm::ivec3(0, 0, 0)) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (!isDuplicate) {
+            uniqueEdgeAxisInts.push_back(axis);
+        }
+    }
+    
+    // Normalize edge axes and add to result
+    result.edgeAxis.reserve(uniqueEdgeAxisInts.size());
+    for (const auto& axis : uniqueEdgeAxisInts) {
+        result.edgeAxis.push_back(glm::normalize(glm::dvec3(axis)));
     }
     
     return result;

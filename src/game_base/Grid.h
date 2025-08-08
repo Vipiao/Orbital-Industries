@@ -38,6 +38,22 @@ public:
     bool hasCell(const glm::ivec3& coord) const;
     bool isEmpty() const;
 
+    /**
+     * @brief Check if a cell can be modified with new vertices
+     * @param coord Grid coordinate of the cell
+     * @param newVertices New 8-vertex configuration
+     * @return true if modification would be valid, false otherwise
+     */
+    bool canModifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices) const;
+    
+    /**
+     * @brief Modify an existing structural block's shape
+     * @param coord Grid coordinate of the cell to modify
+     * @param newVertices New 8-vertex configuration
+     * @return true if modification was successful, false otherwise
+     */
+    bool modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices);
+
     // Structural analysis visualization (analysis runs automatically as background job)
     void visualizeStructuralIntegrity();
     

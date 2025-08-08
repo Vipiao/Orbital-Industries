@@ -32,8 +32,8 @@ public:
     };
 
     struct AxisResult {
-        std::set<glm::dvec3, Vec3Compare> faceAxis;
-        std::set<glm::dvec3, Vec3Compare> edgeAxis;
+        std::vector<glm::dvec3> faceAxis;
+        std::vector<glm::dvec3> edgeAxis;
     };
 
     /**

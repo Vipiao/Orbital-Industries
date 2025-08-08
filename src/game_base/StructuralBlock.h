@@ -39,6 +39,20 @@ public:
     bool setVertices(const std::array<glm::ivec3, 8>& newVertices);
     
     /**
+     * @brief Validate if vertices would create a valid polyhedron shape
+     * @param vertices 8-vertex configuration to validate
+     * @param maxSize Maximum coordinate value for normalization
+     * @return true if the vertices form a valid polyhedron, false otherwise
+     */
+    static bool validateVertices(const std::array<glm::ivec3, 8>& vertices, int maxSize = 4);
+    
+    /**
+     * @brief Get normalized vertices in local coordinates
+     * @return Vector of vertices in local coordinates (normalized by m_maxSize)
+     */
+    std::vector<glm::dvec3> getVertices() const;
+    
+    /**
      * @brief Generate complete triangle mesh data with normals, tangents, and UVs
      * @return MeshData containing all vertex attributes for rendering
      */

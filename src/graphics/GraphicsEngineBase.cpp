@@ -66,7 +66,7 @@ GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& f
    glfwSetWindowPosCallback(m_window, windowPosCallback);
 
    //
-   //glfwSetWindowPos(m_window, 1500, 700);
+   glfwSetWindowPos(m_window, 1500, 700);
 
    // glad: load all OpenGL function pointers
    // ---------------------------------------

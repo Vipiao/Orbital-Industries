@@ -141,6 +141,63 @@ void Grid::removeCell(const glm::ivec3& coord) {
     scheduleStructuralAnalysis();
 }
 
+bool Grid::canModifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices) const {
+    // Check if cell exists
+    if (!hasCell(coord)) {
+        return false;
+    }
+    
+    // Validate the vertices using static validation function
+    return StructuralBlock::validateVertices(newVertices);
+}
+
+bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices) {
+    // Validate first
+    if (!canModifyCell(coord, newVertices)) {
+        return false;
+    }
+    
+    // Cancel existing analysis to prevent accessing modified cells
+    cancelStructuralAnalysis();
+    
+    // Get the existing structural block
+    auto it = m_cells.find(coord);
+    StructuralBlock& block = it->second;
+    
+    // Update the block's vertices
+    bool success = block.setVertices(newVertices);
+    if (!success) {
+        // This should never happen since we validated, but if it does it's a serious error
+        throw std::runtime_error("Grid::modifyCell: setVertices failed after validation passed");
+    }
+    
+    // Get new collision axes and vertices
+    auto axes = block.getAxes();
+    auto vertices = block.getVertices();
+    
+    // Remove old cell from collider and add new one
+    m_collider->removeCell(coord);
+    
+    auto newCollider = std::make_unique<PolyhedronCollider>(
+        glm::dvec3(0.0),           // position
+        glm::dquat(1.0, 0.0, 0.0, 0.0), // orientation  
+        vertices,                  // local vertices
+        axes.faceAxis,             // face axes
+        axes.edgeAxis              // edge axes
+    );
+    m_collider->addCell(coord, std::move(newCollider));
+    
+    // Generate new mesh data and update graphics
+    auto meshData = block.generateTriangleMeshData();
+    m_gridGraphics->removeCell(coord);
+    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData);
+    
+    // Schedule structural analysis
+    scheduleStructuralAnalysis();
+    
+    return true;
+}
+
 void Grid::trackJob(std::weak_ptr<Job> jobHandle) {
     // Clean up expired handles periodically to prevent unbounded growth
     if (m_pendingJobs.size() % 50 == 0) {
