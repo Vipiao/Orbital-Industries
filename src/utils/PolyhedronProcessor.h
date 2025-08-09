@@ -69,7 +69,7 @@ public:
      * @return true if the polyhedron is valid, false otherwise
      */
     static bool validatePolyhedron(const std::vector<glm::ivec3>& vertices, int maxSize, 
-                                   double normalThreshold = -0.9, double convexityMargin = -0.1);
+                                   double normalThreshold = -0.98, double convexityMargin = -0.01);
  
     /**
      * @brief Generate complete mesh data with normals, tangents, and UVs from triangle data

@@ -228,7 +228,7 @@ void Creative::applyDragForces() {
 }
 
 void Creative::handleConfigureMode(bool blockFound, std::weak_ptr<Grid> targetGridWeak, const glm::ivec3& hitPos) {
-    if (!blockFound) {
+    if (!blockFound && !m_cursorNearMarker) {
         // No block found, unselect current block if any
         if (m_hasSelectedBlock) {
             m_hasSelectedBlock = false;
@@ -360,8 +360,8 @@ void Creative::updateMarkerPositions() {
         m_cursorNearMarker = true;
         m_nearestMarkerIndex = selectorResult.closestIndex;
 
-        m_selectedMarkerCoordinate = glm::ivec3(cornerIndexData[m_nearestMarkerIndex], 0, 0); // Store corner index in x component
-        m_selectedMarkerDirection = directionData[m_nearestMarkerIndex];
+        //m_selectedMarkerCoordinate = glm::ivec3(cornerIndexData[m_nearestMarkerIndex], 0, 0); // Store corner index in x component
+        //m_selectedMarkerDirection = directionData[m_nearestMarkerIndex];
         
         // Print the selected corner coordinate with index
         glm::dvec3 selectedCorner = cornerPositions[m_nearestMarkerIndex];

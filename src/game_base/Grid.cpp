@@ -152,13 +152,6 @@ bool Grid::canModifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8
 }
 
 bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices) {
-    // Validate first
-    if (!canModifyCell(coord, newVertices)) {
-        return false;
-    }
-    
-    // Cancel existing analysis to prevent accessing modified cells
-    cancelStructuralAnalysis();
     
     // Get the existing structural block
     auto it = m_cells.find(coord);
@@ -168,8 +161,11 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     bool success = block.setVertices(newVertices);
     if (!success) {
         // This should never happen since we validated, but if it does it's a serious error
-        throw std::runtime_error("Grid::modifyCell: setVertices failed after validation passed");
+        return false;
     }
+    
+    // Cancel existing analysis to prevent accessing modified cells
+    cancelStructuralAnalysis();
     
     // Get new collision axes and vertices
     auto axes = block.getAxes();
