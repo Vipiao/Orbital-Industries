@@ -15,6 +15,12 @@ public:
     using MeshData = PolyhedronProcessor::MeshData;
     // Type identifier for this block type
     static constexpr CellType TYPE = CellType::STRUCTURAL_BLOCK;
+
+    // Standard cube vertices in PolyhedronProcessor vertex order
+    static const std::array<glm::ivec3, 8> DEFAULT_VERTICES;
+    
+    // Scaling factor for local coordinates
+    static constexpr int MAX_SIZE = 4;
     
     StructuralBlock(const glm::ivec3& coords);
     virtual ~StructuralBlock() = default;
@@ -22,9 +28,6 @@ public:
     // Shape definition - 8 corner vertices in local integer coordinates
     std::array<glm::ivec3, 8> m_localVertices;
     
-    // Scaling factor for local coordinates
-    int m_maxSize = 4;
-
     /**
      * @brief Get collision axes for current shape using PolyhedronProcessor
      * @return AxisResult containing face and edge axes

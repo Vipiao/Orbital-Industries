@@ -255,35 +255,31 @@ bool PolyhedronProcessor::validatePolyhedron(const std::vector<glm::ivec3>& vert
             int sharedVertices = countSharedVertices(triangleA, triangleB);
             
             // Only check triangles that share 1 or 2 vertices
-            if (sharedVertices == 1 || sharedVertices == 2) {
-                // Calculate normals
-                glm::dvec3 normalA = getTriangleNormal(triangleA);
-                glm::dvec3 normalB = getTriangleNormal(triangleB);
-                
-                // Check if normals are degenerate
-                if (glm::length(normalA) < Vec3Compare::eps || glm::length(normalB) < Vec3Compare::eps) {
-                    return false; // Degenerate triangle
-                }
-                
-                // Check for nearly opposite normals
-                double normalDot = glm::dot(normalA, normalB);
-                if (normalDot < normalThreshold) {
-                    return false; // Nearly opposite normals
-                }
+            if (sharedVertices == 0) {
+                continue;
             }
-            
-            // Convexity check: vector from center of A to center of B should point outward from A
-            glm::dvec3 centerA = getTriangleCenter(triangleA);
-            glm::dvec3 centerB = getTriangleCenter(triangleB);
+
+            // Calculate normals
             glm::dvec3 normalA = getTriangleNormal(triangleA);
+            glm::dvec3 normalB = getTriangleNormal(triangleB);
             
-            // Check if normal is degenerate
-            if (glm::length(normalA) < Vec3Compare::eps) {
+            // Check if normals are degenerate
+            if (glm::length2(normalA) < Vec3Compare::eps || glm::length2(normalB) < Vec3Compare::eps) {
                 return false; // Degenerate triangle
             }
             
+            // Check for nearly opposite normals
+            double normalDot = glm::dot(normalA, normalB);
+            if (normalDot < normalThreshold) {
+                return false; // Nearly opposite normals
+            }
+        
+            // Convexity check: vector from center of A to center of B should point outward from A
+            glm::dvec3 centerA = getTriangleCenter(triangleA);
+            glm::dvec3 centerB = getTriangleCenter(triangleB);
+            
             glm::dvec3 centerToCenter = glm::normalize(centerB - centerA);
-            double convexityDot = glm::dot(normalA, centerToCenter);
+            double convexityDot = glm::dot(-normalA, centerToCenter);
             
             // If dot product is significantly negative, triangle A is facing inward relative to B (concave)
             if (convexityDot < convexityMargin) {

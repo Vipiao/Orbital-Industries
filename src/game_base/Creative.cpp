@@ -8,6 +8,7 @@
 #include "../debug/DebugGlobals.h"
 #include "../utils/PositionSelector.h"
 #include <iostream>
+#include "StructuralBlock.h"
 #include <float.h>
 
 Creative::Creative(GameBase* gameBase, MeshManager2D* meshManager) 
@@ -31,7 +32,7 @@ void Creative::physics() {
     // Apply drag forces to all grids before physics update
     applyDragForces();
     
-    if (doCreate || doRemove || doForce || doTrackSpeed || doConfigure) {
+    if (doCreate || doRemove || doForce || doTrackSpeed || doConfigure || doModifyCell) {
         // Perform unified grid traversal for all actions
         std::weak_ptr<Grid> targetGridWeak;
         glm::ivec3 targetPos;
@@ -172,6 +173,17 @@ void Creative::physics() {
                 //std::cout << "No block found to remove" << std::endl;
             }
         }
+        if (doModifyCell) {
+            auto modGrid = m_modificationGrid.lock();
+            if (modGrid && modGrid->canModifyCell(m_modificationCoord, m_modificationVertices)) {
+                if (modGrid->modifyCell(m_modificationCoord, m_modificationVertices)) {
+                    std::cout << "Successfully modified cell at (" << m_modificationCoord.x 
+                              << ", " << m_modificationCoord.y << ", " << m_modificationCoord.z << ")" << std::endl;
+                } else {
+                    std::cout << "Failed to modify cell" << std::endl;
+                }
+            }
+        }
     }
 
     // Reset flags
@@ -180,6 +192,7 @@ void Creative::physics() {
     doConfigure = false;
     doForce = false;
     doTrackSpeed = false;
+    doModifyCell = false;
 }
 
 void Creative::addGridBlock(Grid* grid, int x, int y, int z) {
@@ -295,29 +308,31 @@ void Creative::updateMarkerPositions() {
         return;
     }
     
-    // Calculate corner positions in world space (3 per corner = 24 total)
+    // Calculate corner positions using static default vertices (3 per corner = 24 total)
     std::vector<glm::dvec3> cornerPositions;
-    std::vector<glm::ivec3> coordinateData;
-    std::vector<glm::dvec3> directionData;
+    std::vector<int> cornerIndexData;
+    std::vector<glm::ivec3> directionData;
     
     const double offset = 0.3;
-    for (int x = 0; x <= 1; ++x) {
-        for (int y = 0; y <= 1; ++y) {
-            for (int z = 0; z <= 1; ++z) {
-                // Calculate inward-pointing directions for this corner
-                glm::dvec3 directions[3] = {
-                    glm::dvec3((1 - 2*x) * offset, 0, 0),
-                    glm::dvec3(0, (1 - 2*y) * offset, 0),
-                    glm::dvec3(0, 0, (1 - 2*z) * offset)
-                };
-                // Generate 3 positions per corner
-                for (int i = 0; i < 3; ++i) {
-                    glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(x, y, z) + directions[i];
-                    cornerPositions.push_back(selectedGrid->gridToWorld(corner));
-                    coordinateData.push_back(glm::ivec3(x, y, z));
-                    directionData.push_back(directions[i]);
-                }
-            }
+    // Iterate through the 8 default vertices
+    for (int cornerIndex = 0; cornerIndex < 8; ++cornerIndex) {
+        glm::ivec3 defaultVertex = StructuralBlock::DEFAULT_VERTICES[cornerIndex];
+        glm::dvec3 normalizedVertex = glm::dvec3(defaultVertex) / double(StructuralBlock::MAX_SIZE);
+        
+        // Calculate inward-pointing unit directions for this corner
+        glm::ivec3 unitDirections[3] = {
+            glm::ivec3(1 - 2 * (defaultVertex.x / StructuralBlock::MAX_SIZE), 0, 0),  // X direction
+            glm::ivec3(0, 1 - 2 * (defaultVertex.y / StructuralBlock::MAX_SIZE), 0),  // Y direction
+            glm::ivec3(0, 0, 1 - 2 * (defaultVertex.z / StructuralBlock::MAX_SIZE))   // Z direction
+        };
+        
+        // Generate 3 positions per corner
+        for (int i = 0; i < 3; ++i) {
+            glm::dvec3 scaledDirection = glm::dvec3(unitDirections[i]) * offset;
+            glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + normalizedVertex + scaledDirection;
+            cornerPositions.push_back(selectedGrid->gridToWorld(corner));
+            cornerIndexData.push_back(cornerIndex);
+            directionData.push_back(unitDirections[i]);
         }
     }
     
@@ -345,13 +360,37 @@ void Creative::updateMarkerPositions() {
         m_cursorNearMarker = true;
         m_nearestMarkerIndex = selectorResult.closestIndex;
 
-        m_selectedMarkerCoordinate = coordinateData[m_nearestMarkerIndex];
+        m_selectedMarkerCoordinate = glm::ivec3(cornerIndexData[m_nearestMarkerIndex], 0, 0); // Store corner index in x component
         m_selectedMarkerDirection = directionData[m_nearestMarkerIndex];
         
         // Print the selected corner coordinate with index
         glm::dvec3 selectedCorner = cornerPositions[m_nearestMarkerIndex];
         std::cout << "Near corner " << m_nearestMarkerIndex << ": (" << selectedCorner.x << ", " 
                  << selectedCorner.y << ", " << selectedCorner.z << ")" << std::endl;
+        // Check if R key is pressed to initiate modification
+        KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
+        if (keyboard->m_r.justPressed()) {
+            int cornerIndex = cornerIndexData[m_nearestMarkerIndex];
+            glm::ivec3 direction = directionData[m_nearestMarkerIndex];
+            
+            // Get current vertices from the selected block
+            auto selectedGrid = m_selectedGrid.lock();
+            if (selectedGrid && selectedGrid->hasCell(m_selectedBlockCoord)) {
+                // Get the structural block to access its vertices
+                const auto& cells = selectedGrid->getCells();
+                auto cellIt = cells.find(m_selectedBlockCoord);
+                if (cellIt != cells.end()) {
+                    std::array<glm::ivec3, 8> newVertices = cellIt->second.m_localVertices;
+                    newVertices[cornerIndex] += direction;
+                    
+                    // Store modification data for physics execution
+                    m_modificationGrid = selectedGrid;
+                    m_modificationCoord = m_selectedBlockCoord;
+                    m_modificationVertices = newVertices;
+                    doModifyCell = true;
+                }
+            }
+        }
     }
     
     // Calculate data only for visible markers

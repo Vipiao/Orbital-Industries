@@ -240,9 +240,6 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     //    std::string vertB = DebugGlobals::getDebugRenderer()->generateGeogebraCommands(verticesB);
     //    std::cout << vertB << std::endl;
     //}
-
-    //std::string geogebraCommands = m_deb->generateGeogebraCommands(verticesA);
-    //std::cout << geogebraCommands << std::endl;
     
     // Get axes for both cubes
     auto [faceAxesA, edgeAxesA, filterNormalsA] = polyA->getCollisionAxes(currentTimestep);

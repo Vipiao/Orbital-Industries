@@ -3,6 +3,7 @@
 
 #include "Mode.h"
 #include <glm/glm.hpp>
+#include <array>
 #include "../graphics/MeshManager2D.h"
 #include "../graphics/GeometryInstance.h"
 
@@ -25,6 +26,7 @@ private:
     bool doConfigure = false;
     bool doForce = false;
     bool doTrackSpeed = false;
+    bool doModifyCell = false;
     double forceMultiplier = 1.0;
     double m_moveSpeed = 0.05;
     
@@ -49,4 +51,9 @@ private:
     // Selected marker coordinate and direction data
     glm::ivec3 m_selectedMarkerCoordinate;
     glm::dvec3 m_selectedMarkerDirection;
+
+    // Cell modification data
+    std::weak_ptr<class Grid> m_modificationGrid;
+    glm::ivec3 m_modificationCoord;
+    std::array<glm::ivec3, 8> m_modificationVertices;
 };

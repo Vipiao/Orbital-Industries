@@ -340,6 +340,8 @@ glm::dvec3 GridCollider::worldToGrid(const glm::dvec3& worldCoord) const {
 }
 
 void GridCollider::updateFilterNormalsForCell(const glm::ivec3& coord) {
+    return; // Temporarily disable filters.
+
     // Standard grid directions (6-connectivity)
     static const glm::dvec3 directions[6] = {
         { 1.0,  0.0,  0.0},  // +X
@@ -513,6 +515,10 @@ bool GridCollider::processClassificationQueue(std::chrono::time_point<std::chron
 }
 
 CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& coord) {
+    
+    // Temorary fix as all cells are not cubes anymore.
+    return CellMetadata::CellClassification::CORNER;
+    
     // Standard 6-directional neighbors
     static const glm::ivec3 directions[6] = {
         {1, 0, 0}, {-1, 0, 0},   // +X, -X

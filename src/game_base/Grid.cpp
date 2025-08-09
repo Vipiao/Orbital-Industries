@@ -173,7 +173,12 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     
     // Get new collision axes and vertices
     auto axes = block.getAxes();
-    auto vertices = block.getVertices();
+    // Convert integer vertices to normalized collision vertices
+    std::vector<glm::dvec3> vertices;
+    vertices.reserve(8);
+    for (const auto& vertex : block.m_localVertices) {
+        vertices.push_back(glm::dvec3(vertex) / double(StructuralBlock::MAX_SIZE) - glm::dvec3(0.5));
+    }
     
     // Remove old cell from collider and add new one
     m_collider->removeCell(coord);

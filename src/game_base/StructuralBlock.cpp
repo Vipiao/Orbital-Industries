@@ -1,27 +1,29 @@
 // StructuralBlock.cpp
 #include "StructuralBlock.h"
 
+// Define static default vertices
+const std::array<glm::ivec3, 8> StructuralBlock::DEFAULT_VERTICES = {{
+    {0, 0, 0},           // 0: bottom-back-left
+    {MAX_SIZE, 0, 0},    // 1: bottom-back-right
+    {MAX_SIZE, MAX_SIZE, 0}, // 2: bottom-front-right
+    {0, MAX_SIZE, 0},    // 3: bottom-front-left
+    {0, 0, MAX_SIZE},    // 4: top-back-left
+    {MAX_SIZE, 0, MAX_SIZE},    // 5: top-back-right
+    {MAX_SIZE, MAX_SIZE, MAX_SIZE}, // 6: top-front-right
+    {0, MAX_SIZE, MAX_SIZE}     // 7: top-front-left
+}};
+
 StructuralBlock::StructuralBlock(const glm::ivec3& coords)
     : GridCell(coords, TYPE) 
 {
-    // Initialize as standard cube in PolyhedronProcessor vertex order
-    // Coordinates from (0,0,0) to (maxSize,maxSize,maxSize)
-    m_localVertices = {{
-        {0, 0, 0},           // 0: bottom-back-left
-        {m_maxSize, 0, 0},   // 1: bottom-back-right
-        {m_maxSize, m_maxSize, 0}, // 2: bottom-front-right
-        {0, m_maxSize, 0},   // 3: bottom-front-left
-        {0, 0, m_maxSize},   // 4: top-back-left
-        {m_maxSize, 0, m_maxSize},   // 5: top-back-right
-        {m_maxSize, m_maxSize, m_maxSize}, // 6: top-front-right
-        {0, m_maxSize, m_maxSize}    // 7: top-front-left
-    }};
+    // Copy from static default vertices
+    m_localVertices = DEFAULT_VERTICES;
 }
 
 PolyhedronProcessor::AxisResult StructuralBlock::getAxes() const {
     return PolyhedronProcessor::getAxis(
         std::vector<glm::ivec3>(m_localVertices.begin(), m_localVertices.end()), 
-        m_maxSize
+        MAX_SIZE
     );
 }
 
@@ -30,7 +32,7 @@ bool StructuralBlock::setVertices(const std::array<glm::ivec3, 8>& newVertices) 
     std::vector<glm::ivec3> verticesVec(newVertices.begin(), newVertices.end());
     
     // Validate the new shape
-    if (!validateVertices(newVertices, m_maxSize)) {
+    if (!PolyhedronProcessor::validatePolyhedron(verticesVec, MAX_SIZE)) {
         return false; // Invalid shape, don't update
     }
     
@@ -48,14 +50,14 @@ bool StructuralBlock::validateVertices(const std::array<glm::ivec3, 8>& vertices
 std::vector<glm::dvec3> StructuralBlock::getVertices() const {
     return PolyhedronProcessor::getUniqueVertices(
         std::vector<glm::ivec3>(m_localVertices.begin(), m_localVertices.end()), 
-        m_maxSize
+        MAX_SIZE
     );
 }
 
 StructuralBlock::MeshData StructuralBlock::generateTriangleMeshData() const {
     // Get triangles from PolyhedronProcessor
     std::vector<glm::ivec3> verticesVec(m_localVertices.begin(), m_localVertices.end());
-    auto triangles = PolyhedronProcessor::getTriangles(verticesVec, m_maxSize);
+    auto triangles = PolyhedronProcessor::getTriangles(verticesVec, MAX_SIZE);
     
     // Generate complete mesh data using PolyhedronProcessor
     return PolyhedronProcessor::generateMeshData(triangles);
