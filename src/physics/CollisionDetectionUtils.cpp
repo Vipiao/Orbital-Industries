@@ -314,7 +314,18 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     
     // If we reach here, there's a collision
     // Ensure normal points from A toward B
-    glm::dvec3 centerToCenter = polyB->m_position - polyA->m_position;
+    // Calculate geometric centers by averaging vertex positions
+    glm::dvec3 centerA(0.0);
+    glm::dvec3 centerB(0.0);
+    for (const glm::dvec3& vertex : verticesA) {
+        centerA += vertex;
+    }
+    for (const glm::dvec3& vertex : verticesB) {
+        centerB += vertex;
+    }
+    centerA /= static_cast<double>(verticesA.size());
+    centerB /= static_cast<double>(verticesB.size());
+    glm::dvec3 centerToCenter = centerB - centerA;
     if (glm::dot(separatingAxis, centerToCenter) < 0.0) {
         separatingAxis = -separatingAxis;
     }
