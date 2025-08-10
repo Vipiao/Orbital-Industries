@@ -18,8 +18,10 @@ GraphicsEngine::GraphicsEngine(
     if (!windowTitle.empty()) {
         glfwSetWindowTitle(m_window, windowTitle.c_str());
     }
-    
-    m_meshHandler = std::make_unique<MeshHandler>(maxTriangles, maxMeshes);
+
+    // Create SSBO manager and pass to mesh handler
+    m_ssboManager = std::make_unique<SSBOManager>(maxMeshes);
+    m_meshHandler = std::make_unique<MeshHandler>(maxTriangles, m_ssboManager.get());
 }
 
 GraphicsEngine::~GraphicsEngine() {

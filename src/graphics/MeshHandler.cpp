@@ -12,8 +12,8 @@
 #include <cstdlib>
 #include <ctime>
 
-MeshHandler::MeshHandler(size_t maxTriangles, size_t maxMeshes)
-   : m_maxTriangles(maxTriangles), m_maxMeshes(maxMeshes) {
+MeshHandler::MeshHandler(size_t maxTriangles, SSBOManager* ssboManager)
+   : m_maxTriangles(maxTriangles), m_ssboManager(ssboManager) {
 
    m_shaderProgram.loadVertexShaderFromPath("../src/graphics/vertex_shader.vert");
    m_shaderProgram.loadFragmentShaderFromPath("../src/graphics/fragment_shader.frag");
@@ -60,18 +60,11 @@ MeshHandler::MeshHandler(size_t maxTriangles, size_t maxMeshes)
 
    glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
-
-   // Initialize SSBO
-   glGenBuffers(1, &m_meshDataBuffer);
-   glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_meshDataBuffer);
-   glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(MeshData) * m_maxMeshes, nullptr, GL_DYNAMIC_DRAW);
-   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, m_meshDataBuffer);
 }
 
 MeshHandler::~MeshHandler() {
    glDeleteBuffers(1, &m_vertexBuffer);
    glDeleteVertexArrays(1, &m_vao);
-   glDeleteBuffers(1, &m_meshDataBuffer);
    
    for (size_t ii = 0; ii < m_textures.size(); ii++) {
       glDeleteTextures(1, &m_textures[ii].m_texture);
@@ -79,12 +72,7 @@ MeshHandler::~MeshHandler() {
 }
 
 int MeshHandler::addMesh() {
-   // Check if adding this mesh would exceed the maximum allowed meshes.
-   if (m_meshIndexToMeshInfo.size() + 1 > m_maxMeshes) {
-      throw std::runtime_error("Exceeded the maximum number of meshes.");
-   }
-
-   unsigned int meshIndex = getNextMeshIndex(); // Assuming this method returns a unique mesh index.
+   int meshIndex = m_ssboManager->allocateIndex();
 
    // Initialize MeshInfo for this mesh.
    MeshInfo info;
@@ -444,7 +432,7 @@ void MeshHandler::removeMesh(int meshIndex) {
 
    if (info.numTriangles == 0) {
       m_meshIndexToMeshInfo.erase(meshIndex);
-      m_availableMeshIndices.push_back(meshIndex);
+      m_ssboManager->deallocateIndex(meshIndex);
       return;
    }
 
@@ -524,7 +512,7 @@ void MeshHandler::removeMesh(int meshIndex) {
    m_vertexData.resize(m_vertexData.size() - numVerticesToRemove);
    m_totalTriangles -= info.numTriangles;
    m_meshIndexToMeshInfo.erase(meshIndex);
-   m_availableMeshIndices.push_back(meshIndex);
+   m_ssboManager->deallocateIndex(meshIndex);
 }
 
 void MeshHandler::render(
@@ -608,15 +596,6 @@ void MeshHandler::render(
    glBindVertexArray(0);
 }
 
-int MeshHandler::getNextMeshIndex() {
-   if (!m_availableMeshIndices.empty()) {
-      int index = static_cast<int>(m_availableMeshIndices.back());
-      m_availableMeshIndices.pop_back();
-      return index;
-   }
-   return static_cast<int>(m_meshIndexToMeshInfo.size());
-}
-
 void MeshHandler::updateMeshData(
    int meshIndex, const glm::dvec3* position, const glm::dvec3* velocity, glm::dquat orientation,
    glm::dvec3 angVelAxis, double angVel, glm::dvec3 centerOfRotation,
@@ -648,8 +627,7 @@ void MeshHandler::updateMeshData(
    data.colorTextureUnit = colorTextureUnit;
    data.normalTextureUnit = normalTextureUnit;
 
-   glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_meshDataBuffer);
-   glBufferSubData(GL_SHADER_STORAGE_BUFFER, sizeof(MeshData) * meshIndex, sizeof(MeshData), &data);
+   m_ssboManager->updateData(meshIndex, data);
 }
 
 MeshHandler::Texture MeshHandler::createTexture(std::string texturePath) {

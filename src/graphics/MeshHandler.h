@@ -81,6 +81,7 @@
  */
 
 #include "ShaderProgram.h"
+#include "SSBOManager.h"
 
 #include <glm/glm.hpp>
 #include <vector>
@@ -100,19 +101,6 @@ struct Vertex {
    uint32_t meshIndex;
    uint32_t triangleId;
 };
-struct MeshData {
-  glm::vec4 positionHigh{};        // Offset= 0, size=16 bytes. High part of Dekker position
-  glm::vec4 positionLow{};         // Offset=16, size=16 bytes. Low part of Dekker position
-   glm::vec4 velocity{};            // Offset=32, size=16 bytes.
-   glm::vec4 orientation{};         // Offset=48, size=16 bytes. Quaternion
-   glm::vec4 angVel{};              // Offset=64, size=16 bytes. Unit axis (xyz)
-   glm::vec4 centerOfRotation{};    // Offset=80, size=16 bytes.
-   glm::vec4 scale{};               // Offset=96, size=16 bytes. (xyz = scale, w = padding)
-   uint32_t time{};                 // Offset=112, size= 4 bytes.
-   int32_t colorTextureUnit{};      // Offset=116, size= 4 bytes. (-1 means no textures)
-   int32_t normalTextureUnit{};     // Offset=120, size= 4 bytes. (-1 means no textures)
-   uint32_t padding2{};             // Offset=124, size= 4 bytes. (padding)
-}; // Make sure to pad so size is divisible by 16 because you have a vec4.
 #pragma pack(pop)
 
 struct MeshInfo {
@@ -135,7 +123,7 @@ public:
       unsigned int m_textureUnit{};
    };
 
-   explicit MeshHandler(size_t maxTriangles, size_t maxMeshes);
+   explicit MeshHandler(size_t maxTriangles, SSBOManager* ssboManager);
    ~MeshHandler();
 
    int addMesh();
@@ -176,15 +164,12 @@ protected:
 
    std::vector<Texture> m_textures{};
    unsigned int m_vertexBuffer{};
-   GLuint m_meshDataBuffer{};
    unsigned int m_vao{};
    int m_totalTriangles{ 0 };
    size_t m_maxTriangles{};
-   size_t m_maxMeshes{};
    size_t m_maxTextures{ 16 };
    std::vector<Vertex> m_vertexData;
-   std::vector<int> m_availableMeshIndices;
    std::map<int64_t, MeshInfo> m_meshIndexToMeshInfo;
+   SSBOManager* m_ssboManager;
 
-   int getNextMeshIndex();
 };

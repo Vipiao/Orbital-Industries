@@ -4,6 +4,7 @@
 #include "GraphicsEngineBase.h"
 #include "MeshHandler.h"
 #include "AssimpLoader.h"
+#include "SSBOManager.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -58,6 +59,7 @@ public:
         bool ignoreTextureCoordinates = false
     );
     
+    std::unique_ptr<SSBOManager> m_ssboManager;
     std::unique_ptr<MeshHandler> m_meshHandler;
     uint64_t currentTime{0};
 };
