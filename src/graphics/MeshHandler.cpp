@@ -444,6 +444,7 @@ void MeshHandler::removeMesh(int meshIndex) {
 
    if (info.numTriangles == 0) {
       m_meshIndexToMeshInfo.erase(meshIndex);
+      m_availableMeshIndices.push_back(meshIndex);
       return;
    }
 
@@ -523,6 +524,7 @@ void MeshHandler::removeMesh(int meshIndex) {
    m_vertexData.resize(m_vertexData.size() - numVerticesToRemove);
    m_totalTriangles -= info.numTriangles;
    m_meshIndexToMeshInfo.erase(meshIndex);
+   m_availableMeshIndices.push_back(meshIndex);
 }
 
 void MeshHandler::render(
@@ -607,7 +609,12 @@ void MeshHandler::render(
 }
 
 int MeshHandler::getNextMeshIndex() {
-   return m_nextMeshId++;
+   if (!m_availableMeshIndices.empty()) {
+      int index = static_cast<int>(m_availableMeshIndices.back());
+      m_availableMeshIndices.pop_back();
+      return index;
+   }
+   return static_cast<int>(m_meshIndexToMeshInfo.size());
 }
 
 void MeshHandler::updateMeshData(

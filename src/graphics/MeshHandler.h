@@ -183,7 +183,7 @@ protected:
    size_t m_maxMeshes{};
    size_t m_maxTextures{ 16 };
    std::vector<Vertex> m_vertexData;
-   int m_nextMeshId{ 0 };
+   std::vector<int> m_availableMeshIndices;
    std::map<int64_t, MeshInfo> m_meshIndexToMeshInfo;
 
    int getNextMeshIndex();
