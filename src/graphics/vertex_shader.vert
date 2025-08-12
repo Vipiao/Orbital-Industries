@@ -105,7 +105,7 @@ vec3 dekkerSubtract(vec3 aHigh, vec3 aLow, vec3 bHigh, vec3 bLow) {
 }
 
 void main() {
-   vert_normal = normalize(normal);
+   //vert_normal = normalize(normal);
    vert_occlusionFactor = occlusionFactor;
 
    MeshData meshData = meshDataBuffer[meshIndex];
@@ -121,6 +121,7 @@ void main() {
        meshData.positionHigh.xyz, meshData.positionLow.xyz,
        u_cameraPositionHigh, u_cameraPositionLow
    );
+   
    // Add velocity in camera-relative space (velocity is already small relative to camera distance)
    vec3 velocityDelta = meshData.velocity.xyz * deltaTimeFloat;
    meshPositionL += velocityDelta;
