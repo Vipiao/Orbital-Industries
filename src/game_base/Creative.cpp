@@ -372,6 +372,15 @@ void Creative::updateMarkerPositions() {
         m_currentSelectedGridMeshId = gridMeshId;
     }
     
+    // Get current vertices from the selected block for bounds checking
+    std::array<glm::ivec3, 8> currentVertices;
+    const auto& cells = selectedGrid->getCells();
+    auto cellIt = cells.find(m_selectedBlockCoord);
+    if (cellIt == cells.end()) {
+        clearMarkers();
+        return;
+    }
+    currentVertices = cellIt->second.m_localVertices;
     const double offset = 0.3;
     // Iterate through the 8 default vertices
     for (int cornerIndex = 0; cornerIndex < 8; ++cornerIndex) {
@@ -390,11 +399,20 @@ void Creative::updateMarkerPositions() {
         
         // Generate 6 positions per corner
         for (int i = 0; i < 6; ++i) {
-            glm::dvec3 scaledDirection = glm::dvec3(unitDirections[i]) * offset;
-            glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + normalizedVertex + scaledDirection;
-            cornerPositions.push_back(selectedGrid->gridToWorld(corner));
-            cornerIndexData.push_back(cornerIndex);
-            directionData.push_back(unitDirections[i]);
+            // Check if moving this vertex in this direction would be within bounds
+            glm::ivec3 currentVertex = currentVertices[cornerIndex];
+            glm::ivec3 newVertex = currentVertex + unitDirections[i];
+            
+            // Only create marker if the movement would be valid
+            if (newVertex.x >= 0 && newVertex.x <= StructuralBlock::MAX_SIZE &&
+                newVertex.y >= 0 && newVertex.y <= StructuralBlock::MAX_SIZE &&
+                newVertex.z >= 0 && newVertex.z <= StructuralBlock::MAX_SIZE) {
+                glm::dvec3 scaledDirection = glm::dvec3(unitDirections[i]) * offset;
+                glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + normalizedVertex + scaledDirection;
+                cornerPositions.push_back(selectedGrid->gridToWorld(corner));
+                cornerIndexData.push_back(cornerIndex);
+                directionData.push_back(unitDirections[i]);
+            }
         }
     }
 
@@ -444,33 +462,15 @@ void Creative::updateMarkerPositions() {
             int cornerIndex = cornerIndexData[m_nearestMarkerIndex];
             glm::ivec3 direction = directionData[m_nearestMarkerIndex];
             
-            // Get current vertices from the selected block
-            auto selectedGrid = m_selectedGrid.lock();
-            if (selectedGrid && selectedGrid->hasCell(m_selectedBlockCoord)) {
-                // Get the structural block to access its vertices
-                const auto& cells = selectedGrid->getCells();
-                auto cellIt = cells.find(m_selectedBlockCoord);
-                if (cellIt != cells.end()) {
-                    std::array<glm::ivec3, 8> newVertices = cellIt->second.m_localVertices;
-                    glm::ivec3 newVertex = newVertices[cornerIndex] + direction;
-                    
-                    // Apply bounds checking to prevent going outside [0, MAX_SIZE]
-                    newVertex.x = glm::clamp(newVertex.x, 0, StructuralBlock::MAX_SIZE);
-                    newVertex.y = glm::clamp(newVertex.y, 0, StructuralBlock::MAX_SIZE);
-                    newVertex.z = glm::clamp(newVertex.z, 0, StructuralBlock::MAX_SIZE);
-                    
-                    // Only apply change if the vertex actually moved (wasn't clamped)
-                    if (newVertex != newVertices[cornerIndex]) {
-                        newVertices[cornerIndex] = newVertex;
-                        
-                        // Store modification data for physics execution
-                        m_modificationGrid = selectedGrid;
-                        m_modificationCoord = m_selectedBlockCoord;
-                        m_modificationVertices = newVertices;
-                        doModifyCell = true;
-                    }
-                }
-            }
+            // Since we only create markers for valid movements, we can directly apply the change
+            std::array<glm::ivec3, 8> newVertices = currentVertices;
+            newVertices[cornerIndex] += direction;
+            
+            // Store modification data for physics execution
+            m_modificationGrid = selectedGrid;
+            m_modificationCoord = m_selectedBlockCoord;
+            m_modificationVertices = newVertices;
+            doModifyCell = true;
         }
     }
     
