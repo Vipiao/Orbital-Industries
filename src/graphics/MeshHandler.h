@@ -149,13 +149,6 @@ public:
    void render(
       const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
       double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos);
-   void updateMeshData(
-      int meshIndex, const glm::dvec3* position, const glm::dvec3* velocity, glm::dquat orientation,
-      glm::dvec3 angVelAxis, double angVel, glm::dvec3 centerOfRotation,
-      glm::dvec3 scale,
-      int32_t colorTextureUnit,
-      int32_t normalTextureUnit,
-      uint64_t time);
    Texture createTexture(std::string texturePath);
    void unitTest();
    ShaderProgram m_shaderProgram{};

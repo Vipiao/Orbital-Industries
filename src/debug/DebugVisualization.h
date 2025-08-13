@@ -2,6 +2,7 @@
 #pragma once
 
 #include "../graphics/MeshHandler.h"
+#include "../graphics/SSBOManager.h"
 #include "../graphics/AssimpLoader.h"
 #include "../debug/DebugRenderer.h"
 #include <vector>
@@ -11,7 +12,7 @@
 
 class DebugVisualization : public DebugRenderer {
 public:
-    DebugVisualization(MeshHandler* meshHandler);
+    DebugVisualization(MeshHandler* meshHandler, SSBOManager* ssboManager);
     ~DebugVisualization();
     
     // Override DebugRenderer interface methods
@@ -47,6 +48,7 @@ public:
     
 private:
     MeshHandler* m_meshHandler;
+    SSBOManager* m_ssboManager;
     std::vector<AssetMeshData> s_sphereMeshData;
     bool m_sphereMeshLoaded;
     int m_redTextureUnit;

@@ -5,14 +5,19 @@
 #include <iomanip>
 #include <algorithm>
 
-DebugVisualization::DebugVisualization(MeshHandler* meshHandler)
+DebugVisualization::DebugVisualization(MeshHandler* meshHandler, SSBOManager* ssboManager) 
     : m_meshHandler(meshHandler)
+    , m_ssboManager(ssboManager)
     , m_sphereMeshLoaded(false)
     , m_redTextureUnit(-1)
     , m_redTextureLoaded(false)
 {
     if (!m_meshHandler) {
         throw std::runtime_error("MeshHandler pointer cannot be null");
+    }
+
+    if (!m_ssboManager) {
+        throw std::runtime_error("SSBOManager cannot be null");
     }
     
     loadSphereMeshData();
@@ -122,10 +127,10 @@ int DebugVisualization::createSphere(const glm::dvec3& position, double radius) 
     glm::dvec3 centerOfRotation(0.0);
     glm::dvec3 scale(radius, radius, radius);  // Scale the sphere by radius
     
-    m_meshHandler->updateMeshData(
+    m_ssboManager->updateMeshTransform(
         meshId,
-        &position,
-        &velocity,
+        position,
+        velocity,
         orientation,
         angVelAxis,
         angVel,
@@ -274,10 +279,10 @@ void DebugVisualization::updateMeshTransform(int id) {
         double angVel = 0.0;
         glm::dvec3 centerOfRotation(0.0);
         
-        m_meshHandler->updateMeshData(
+        m_ssboManager->updateMeshTransform(
             id,
-            &props.position,
-            &velocity,
+            props.position,
+            velocity,
             props.orientation,
             angVelAxis,
             angVel,

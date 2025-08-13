@@ -45,10 +45,10 @@ void GraphicsEngine::updateMeshTransform(
     int32_t normalTextureUnit,
     uint64_t physicsTimeStep)
 {
-    m_meshHandler->updateMeshData(
+    m_ssboManager->updateMeshTransform(
         meshId,
-        &position,
-        &velocity,
+        position,
+        velocity,
         orientation,
         angVelAxis,
         angVel,

@@ -3,6 +3,7 @@
 
 #include <glm/glm.hpp>
 #include <glad/glad.h>
+#include <glm/gtc/quaternion.hpp>
 #include <vector>
 #include <cstdint>
 
@@ -59,6 +60,22 @@ public:
      * @param data New MeshData to store
      */
     void updateData(int index, const MeshData& data);
+
+    /**
+     * @brief Update mesh transform data at specified index using transform parameters
+     */
+    void updateMeshTransform(
+        int index,
+        const glm::dvec3& position,
+        const glm::dvec3& velocity,
+        const glm::dquat& orientation,
+        const glm::dvec3& angVelAxis,
+        double angVel,
+        const glm::dvec3& centerOfRotation,
+        const glm::dvec3& scale,
+        int32_t colorTextureUnit,
+        int32_t normalTextureUnit,
+        uint64_t time);
     
 private:
     GLuint m_ssbo;

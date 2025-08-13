@@ -596,40 +596,6 @@ void MeshHandler::render(
    glBindVertexArray(0);
 }
 
-void MeshHandler::updateMeshData(
-   int meshIndex, const glm::dvec3* position, const glm::dvec3* velocity, glm::dquat orientation,
-   glm::dvec3 angVelAxis, double angVel, glm::dvec3 centerOfRotation,
-   glm::dvec3 scale,
-   int32_t colorTextureUnit,
-   int32_t normalTextureUnit,
-   uint64_t time
-) {
-   // "orientation" is a quaternion describing the orientation.
-   // "angularVelocity" describes the angular velocity with x,y,z components as a unit vector,
-   // and w being the angular velocity.
-   MeshData data{};
-
-   // Convert position to Dekker number
-   using DekkerFloat = DekkerArithmetic<float>;
-   DekkerFloat::DekkerNumber posX(position->x);
-   DekkerFloat::DekkerNumber posY(position->y); 
-   DekkerFloat::DekkerNumber posZ(position->z);
-   data.positionHigh = glm::vec4(posX.main, posY.main, posZ.main, 0.0f);
-   data.positionLow = glm::vec4(posX.error, posY.error, posZ.error, 0.0f);
-
-   data.velocity = glm::vec4(*velocity, 0.);
-   glm::dvec4 orientationVector{ orientation.x, orientation.y, orientation.z, orientation.w };
-   data.orientation = orientationVector;
-   data.angVel = glm::vec4{ angVelAxis, angVel };
-   data.centerOfRotation = glm::vec4{ centerOfRotation, 0 };
-   data.scale = glm::vec4{ scale, 0.0 };
-   data.time = static_cast<uint32_t>(time);
-   data.colorTextureUnit = colorTextureUnit;
-   data.normalTextureUnit = normalTextureUnit;
-
-   m_ssboManager->updateData(meshIndex, data);
-}
-
 MeshHandler::Texture MeshHandler::createTexture(std::string texturePath) {
    if (m_textures.size() >= m_maxTextures) {
       throw std::runtime_error("Exceeded the maximum number of textures.");
@@ -644,6 +610,7 @@ MeshHandler::Texture MeshHandler::createTexture(std::string texturePath) {
    // set texture filtering parameters
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
    // load image, create texture and generate mipmaps
 
    int width, height, nrChannels;

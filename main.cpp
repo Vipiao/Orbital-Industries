@@ -164,7 +164,8 @@ public:
 
     // Helper method for setting up debug visualization
     void setupDebugVisualization() {
-        m_debugViz = std::make_unique<DebugVisualization>(m_gameBase->m_graphicsEngine->m_meshHandler.get());
+        m_debugViz = std::make_unique<DebugVisualization>(
+            m_gameBase->m_graphicsEngine->m_meshHandler.get(), m_gameBase->m_graphicsEngine->m_ssboManager.get());
         m_gameBase->setDebugRenderer(m_debugViz.get());
     }
 

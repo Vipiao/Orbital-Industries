@@ -2,6 +2,7 @@
 #include "SSBOManager.h"
 #include <stdexcept>
 #include <iostream>
+#include "../math/DekkerArithmetic.h"
 
 SSBOManager::SSBOManager(size_t maxEntries) 
     : m_maxEntries(maxEntries), m_nextNewIndex(0) {
@@ -65,4 +66,40 @@ void SSBOManager::updateData(int index, const MeshData& data) {
     
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_ssbo);
     glBufferSubData(GL_SHADER_STORAGE_BUFFER, sizeof(MeshData) * index, sizeof(MeshData), &data);
+}
+
+void SSBOManager::updateMeshTransform(
+    int index,
+    const glm::dvec3& position,
+    const glm::dvec3& velocity,
+    const glm::dquat& orientation,
+    const glm::dvec3& angVelAxis,
+    double angVel,
+    const glm::dvec3& centerOfRotation,
+    const glm::dvec3& scale,
+    int32_t colorTextureUnit,
+    int32_t normalTextureUnit,
+    uint64_t time) {
+    
+    MeshData data{};
+
+    // Convert position to Dekker number
+    using DekkerFloat = DekkerArithmetic<float>;
+    DekkerFloat::DekkerNumber posX(position.x);
+    DekkerFloat::DekkerNumber posY(position.y); 
+    DekkerFloat::DekkerNumber posZ(position.z);
+    data.positionHigh = glm::vec4(posX.main, posY.main, posZ.main, 0.0f);
+    data.positionLow = glm::vec4(posX.error, posY.error, posZ.error, 0.0f);
+
+    data.velocity = glm::vec4(velocity, 0.0);
+    glm::dvec4 orientationVector{ orientation.x, orientation.y, orientation.z, orientation.w };
+    data.orientation = orientationVector;
+    data.angVel = glm::vec4{ angVelAxis, angVel };
+    data.centerOfRotation = glm::vec4{ centerOfRotation, 0 };
+    data.scale = glm::vec4{ scale, 0.0 };
+    data.time = static_cast<uint32_t>(time);
+    data.colorTextureUnit = colorTextureUnit;
+    data.normalTextureUnit = normalTextureUnit;
+
+    updateData(index, data);
 }
