@@ -62,6 +62,9 @@ public:
     
     RigidBody* getRigidBody() const { return m_rigidBody; }
 
+    // Get graphics mesh ID for instance rendering
+    int getGraphicsMeshId() const;
+
     // Convert world coordinates to grid-local coordinates
     glm::dvec3 worldToGrid(const glm::dvec3& worldPos) const;
     

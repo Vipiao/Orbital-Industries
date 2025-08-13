@@ -59,6 +59,9 @@ public:
     // Cell access for other systems
     bool hasGraphicsCell(const glm::ivec3& coord) const;
     GraphicsCell* getGraphicsCell(const glm::ivec3& coord);
+
+    // Access to mesh ID for instance rendering
+    int getMeshId() const { return m_meshId; }
     
 private:
     // Graphics cell storage

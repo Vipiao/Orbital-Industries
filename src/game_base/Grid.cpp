@@ -497,6 +497,11 @@ double Grid::getApproximateRadius() const {
     return 1.0;
 }
 
+int Grid::getGraphicsMeshId() const {
+    // Delegate to graphics subsystem to get mesh ID
+    return m_gridGraphics ? m_gridGraphics->getMeshId() : -1;
+}
+
 // Updated - Update mesh transform based on physics state
 void Grid::updateGraphics(const glm::dvec3& cameraPos) {
     if (!m_rigidBody) {

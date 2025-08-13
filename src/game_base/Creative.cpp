@@ -11,7 +11,9 @@
 #include "../graphics/MeshManager2D.h"
 #include "../graphics/GeometryInstance.h"
 #include "StructuralBlock.h"
+#include "../graphics/InstanceHandler.h"
 #include <float.h>
+#include <map>
 
 Creative::Creative(GameBase* gameBase) 
     : Mode(gameBase), m_hasSelectedBlock(false), m_cursorNearMarker(false), m_nearestMarkerIndex(-1) {
@@ -19,6 +21,11 @@ Creative::Creative(GameBase* gameBase)
     // Load marker geometry using graphics engine's 2D mesh manager
     m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/01_marker.png", -1, true);
     std::cout << "Loaded marker geometry for configuration mode" << std::endl;
+
+    // Load 3D arrow geometry and texture
+    m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
+    m_arrowTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/debug_red.png");
+    std::cout << "Loaded 3D arrow geometry and texture for configuration mode" << std::endl;
 }
 
 void Creative::processInputs() {
@@ -265,6 +272,26 @@ void Creative::handleConfigureMode(bool blockFound, std::weak_ptr<Grid> targetGr
     // If cursor is near marker, the coordinate printing is handled in updateMarkerPositions
 }
 
+ glm::quat Creative::getArrowOrientation(const glm::ivec3& direction) {
+    // Default arrow points in +X direction, calculate rotation to target direction
+    // Use simple if-else chain for direction mapping
+    if (direction == glm::ivec3(1, 0, 0)) {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // +X: identity
+    } else if (direction == glm::ivec3(-1, 0, 0)) {
+        return glm::angleAxis(glm::pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)); // -X: 180° around Z
+    } else if (direction == glm::ivec3(0, 1, 0)) {
+        return glm::angleAxis(glm::half_pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)); // +Y: 90° around Z
+    } else if (direction == glm::ivec3(0, -1, 0)) {
+        return glm::angleAxis(-glm::half_pi<float>(), glm::vec3(0.0f, 0.0f, 1.0f)); // -Y: -90° around Z
+    } else if (direction == glm::ivec3(0, 0, 1)) {
+        return glm::angleAxis(-glm::half_pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f)); // +Z: -90° around Y
+    } else if (direction == glm::ivec3(0, 0, -1)) {
+        return glm::angleAxis(glm::half_pi<float>(), glm::vec3(0.0f, 1.0f, 0.0f)); // -Z: 90° around Y
+    } else {
+        return glm::quat(1.0f, 0.0f, 0.0f, 0.0f); // Fallback: identity
+     }
+}
+
 void Creative::updateMarkerPositions() {
     // Reset cursor proximity state
     m_cursorNearMarker = false;
@@ -272,6 +299,16 @@ void Creative::updateMarkerPositions() {
     
     // Helper lambda to clear markers
     auto clearMarkers = [this]() {
+        // Clear 3D arrow instances
+        if (auto geometry = m_arrowGeometry.lock()) {
+            for (auto& instance : m_arrowInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst);
+                }
+            }
+        }
+        m_arrowInstances.clear();
+
         if (auto geometry = m_marker.lock()) {
             for (auto& instance : m_markerInstances) {
                 if (auto inst = instance.lock()) {
@@ -280,6 +317,7 @@ void Creative::updateMarkerPositions() {
             }
         }
         m_markerInstances.clear();
+        m_currentSelectedGridMeshId = -1;
     };
     
     if (!m_hasSelectedBlock) {
@@ -309,6 +347,23 @@ void Creative::updateMarkerPositions() {
     std::vector<glm::dvec3> cornerPositions;
     std::vector<int> cornerIndexData;
     std::vector<glm::ivec3> directionData;
+
+    // Check if grid mesh ID changed and recreate arrow instances if needed
+    int gridMeshId = -1;
+    gridMeshId = selectedGrid->getGraphicsMeshId();
+    
+    if (gridMeshId != m_currentSelectedGridMeshId) {
+        // Clear existing arrow instances since mesh ID changed
+        if (auto geometry = m_arrowGeometry.lock()) {
+            for (auto& instance : m_arrowInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst);
+                }
+            }
+        }
+        m_arrowInstances.clear();
+        m_currentSelectedGridMeshId = gridMeshId;
+    }
     
     const double offset = 0.3;
     // Iterate through the 8 default vertices
@@ -331,6 +386,15 @@ void Creative::updateMarkerPositions() {
             cornerIndexData.push_back(cornerIndex);
             directionData.push_back(unitDirections[i]);
         }
+    }
+
+    // Calculate 3D arrow positions in grid local space
+    std::vector<glm::vec3> arrowLocalPositions;
+    std::vector<glm::quat> arrowOrientations;
+    for (size_t i = 0; i < cornerPositions.size(); ++i) {
+        glm::dvec3 localPos = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(StructuralBlock::DEFAULT_VERTICES[cornerIndexData[i]]) / double(StructuralBlock::MAX_SIZE);
+        arrowLocalPositions.push_back(glm::vec3(localPos));
+        arrowOrientations.push_back(getArrowOrientation(directionData[i]));
     }
     
     // Get positions and scales of all markers
@@ -408,6 +472,42 @@ void Creative::updateMarkerPositions() {
         }
     }
     
+    // Manage 3D arrow instances (always show all 24)
+    size_t neededArrows = arrowLocalPositions.size();
+    
+    // Remove excess arrow instances
+    while (m_arrowInstances.size() > neededArrows) {
+        auto instance = m_arrowInstances.back();
+        if (auto inst = instance.lock()) {
+            if (auto geometry = m_arrowGeometry.lock()) {
+                geometry->removeInstance(inst);
+            }
+        }
+        m_arrowInstances.pop_back();
+    }
+    
+    // Add missing arrow instances
+    while (m_arrowInstances.size() < neededArrows) {
+        if (auto geometry = m_arrowGeometry.lock()) {
+            auto newInstance = geometry->addInstance(gridMeshId, m_arrowTextureIndex, -1);
+            m_arrowInstances.push_back(newInstance);
+        }
+    }
+    
+    // Update arrow positions and orientations
+    for (size_t i = 0; i < m_arrowInstances.size() && i < arrowLocalPositions.size(); ++i) {
+        if (auto inst = m_arrowInstances[i].lock()) {
+            inst->m_localPosition = arrowLocalPositions[i];
+            inst->m_localOrientation = arrowOrientations[i];
+            inst->m_localScale = glm::vec3(0.1f); // Small arrow scale
+            
+            // Update the instance buffer
+            if (auto geometry = m_arrowGeometry.lock()) {
+                geometry->updateInstanceInBuffer(inst.get());
+            }
+        }
+    }
+
     // Adjust instance count to match needed markers
     size_t needed = markerData.size();
     

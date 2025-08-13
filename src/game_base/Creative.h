@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 class GeometryData;
+class Geometry;
+class Instance;
 class GeometryInstance;
 
 /**
@@ -38,6 +40,9 @@ private:
     void processInputLogic();
     void handleConfigureMode(bool blockFound, std::weak_ptr<class Grid> targetGridWeak, const glm::ivec3& hitPos);
     void updateMarkerPositions();
+
+    // Helper for arrow orientation calculation
+    static glm::quat getArrowOrientation(const glm::ivec3& direction);
     
     // Configuration mode state
     std::weak_ptr<class Grid> m_selectedGrid;
@@ -51,6 +56,12 @@ private:
     // Selected marker coordinate and direction data
     glm::ivec3 m_selectedMarkerCoordinate;
     glm::dvec3 m_selectedMarkerDirection;
+
+    // 3D arrow markers
+    std::weak_ptr<Geometry> m_arrowGeometry;
+    int m_arrowTextureIndex = -1;
+    std::vector<std::weak_ptr<Instance>> m_arrowInstances;
+    int m_currentSelectedGridMeshId = -1;
 
     // Cell modification data
     std::weak_ptr<class Grid> m_modificationGrid;
