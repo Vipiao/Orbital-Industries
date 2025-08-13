@@ -15,7 +15,7 @@
 #include <float.h>
 #include <map>
 
-Creative::Creative(GameBase* gameBase) 
+Creative::Creative(GameBase* gameBase)
     : Mode(gameBase), m_hasSelectedBlock(false), m_cursorNearMarker(false), m_nearestMarkerIndex(-1) {
     
     // Load marker geometry using graphics engine's 2D mesh manager
@@ -350,7 +350,7 @@ void Creative::updateMarkerPositions() {
         return;
     }
     
-    // Calculate corner positions using static default vertices (3 per corner = 24 total)
+    // Calculate corner positions using static default vertices (6 per corner = 48 total)
     std::vector<glm::dvec3> cornerPositions;
     std::vector<int> cornerIndexData;
     std::vector<glm::ivec3> directionData;
@@ -378,15 +378,18 @@ void Creative::updateMarkerPositions() {
         glm::ivec3 defaultVertex = StructuralBlock::DEFAULT_VERTICES[cornerIndex];
         glm::dvec3 normalizedVertex = glm::dvec3(defaultVertex) / double(StructuralBlock::MAX_SIZE);
         
-        // Calculate inward-pointing unit directions for this corner
-        glm::ivec3 unitDirections[3] = {
-            glm::ivec3(1 - 2 * (defaultVertex.x / StructuralBlock::MAX_SIZE), 0, 0),  // X direction
-            glm::ivec3(0, 1 - 2 * (defaultVertex.y / StructuralBlock::MAX_SIZE), 0),  // Y direction
-            glm::ivec3(0, 0, 1 - 2 * (defaultVertex.z / StructuralBlock::MAX_SIZE))   // Z direction
+        // Generate all 6 cardinal directions for this corner
+        glm::ivec3 unitDirections[6] = {
+            glm::ivec3(1, 0, 0),   // +X
+            glm::ivec3(-1, 0, 0),  // -X
+            glm::ivec3(0, 1, 0),   // +Y
+            glm::ivec3(0, -1, 0),  // -Y
+            glm::ivec3(0, 0, 1),   // +Z
+            glm::ivec3(0, 0, -1)   // -Z
         };
         
-        // Generate 3 positions per corner
-        for (int i = 0; i < 3; ++i) {
+        // Generate 6 positions per corner
+        for (int i = 0; i < 6; ++i) {
             glm::dvec3 scaledDirection = glm::dvec3(unitDirections[i]) * offset;
             glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + normalizedVertex + scaledDirection;
             cornerPositions.push_back(selectedGrid->gridToWorld(corner));
@@ -404,7 +407,7 @@ void Creative::updateMarkerPositions() {
         arrowOrientations.push_back(getArrowOrientation(directionData[i]));
     }
     
-    // Get positions and scales of all markers
+    // Get positions and scales of all markers (now 48 total)
     auto selectorResult = PositionSelector::selectFromPositions(
         cornerPositions,
         0.004, // Small projected radius. (How far is minimum distance)
@@ -449,13 +452,23 @@ void Creative::updateMarkerPositions() {
                 auto cellIt = cells.find(m_selectedBlockCoord);
                 if (cellIt != cells.end()) {
                     std::array<glm::ivec3, 8> newVertices = cellIt->second.m_localVertices;
-                    newVertices[cornerIndex] += direction;
+                    glm::ivec3 newVertex = newVertices[cornerIndex] + direction;
                     
-                    // Store modification data for physics execution
-                    m_modificationGrid = selectedGrid;
-                    m_modificationCoord = m_selectedBlockCoord;
-                    m_modificationVertices = newVertices;
-                    doModifyCell = true;
+                    // Apply bounds checking to prevent going outside [0, MAX_SIZE]
+                    newVertex.x = glm::clamp(newVertex.x, 0, StructuralBlock::MAX_SIZE);
+                    newVertex.y = glm::clamp(newVertex.y, 0, StructuralBlock::MAX_SIZE);
+                    newVertex.z = glm::clamp(newVertex.z, 0, StructuralBlock::MAX_SIZE);
+                    
+                    // Only apply change if the vertex actually moved (wasn't clamped)
+                    if (newVertex != newVertices[cornerIndex]) {
+                        newVertices[cornerIndex] = newVertex;
+                        
+                        // Store modification data for physics execution
+                        m_modificationGrid = selectedGrid;
+                        m_modificationCoord = m_selectedBlockCoord;
+                        m_modificationVertices = newVertices;
+                        doModifyCell = true;
+                    }
                 }
             }
         }
@@ -479,7 +492,7 @@ void Creative::updateMarkerPositions() {
         }
     }
     
-    // Manage 3D arrow instances (always show all 24)
+    // Manage 3D arrow instances (always show all 48)
     size_t neededArrows = arrowLocalPositions.size();
     
     // Remove excess arrow instances
