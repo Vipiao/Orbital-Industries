@@ -7,7 +7,6 @@
 #include "src/debug/DebugRenderer.h"
 #include "src/debug/DebugGlobals.h"
 #include "src/graphics/MeshManager2D.h"
-#include "src/graphics/GraphicsCallbacks.h"
 #include "src/graphics/CallbackManager.h"
 #include <iostream>
 #include <glm/glm.hpp>
@@ -26,7 +25,6 @@ private:
     std::unique_ptr<DebugVisualization> m_debugViz;
     std::unique_ptr<Mode> m_mode;
     DebugRendererGuard m_debugGuard;
-    std::unique_ptr<MeshManager2D> m_meshManager;
 
 public:
 
@@ -36,13 +34,13 @@ public:
         // Create the game base instance
         m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
 
-        //
-        m_meshManager = std::make_unique<MeshManager2D>(1000);
-        auto geometryData = m_meshManager->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
+        // Create crosshair using 2D mesh manager from graphics engine
+        auto geometryData = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
         auto crossHair = geometryData.lock() ? geometryData.lock()->createInstance() : std::weak_ptr<GeometryInstance>();
-        auto pp = crossHair.lock();
-        pp->setPosition(glm::vec2(.0f, .0f));
-        pp->setScale(glm::vec2(0.05f, 0.05f));
+        if (auto instance = crossHair.lock()) {
+            instance->setPosition(glm::vec2(0.0f, 0.0f));
+            instance->setScale(glm::vec2(0.05f, 0.05f));
+        }
 
         // Register ourselves with GameBase
         m_gameBase->addCallback(this);  // Graphics callback registration
@@ -60,7 +58,7 @@ public:
         DebugGlobals::g_gameBase = m_gameBase.get();
  
         // Create creative mode
-        m_mode = std::make_unique<Creative>(m_gameBase.get(), m_meshManager.get());
+        m_mode = std::make_unique<Creative>(m_gameBase.get());
 
         // Set up initial camera position and orientation
         m_gameBase->m_graphicsEngine->getCamPos() = glm::dvec3(0, 0, 0);
@@ -76,57 +74,58 @@ public:
         RigidBody* bb = initialGrid->getRigidBody();
         bb->m_position = {0,0,0};
         //bb->m_velocity = {0.0,0.0,-0.01};
-        //addGridBlock(initialGrid, 0, 0, 0);
+        initialGrid->addCell(glm::ivec3(0,0,0));
+        //initialGrid->addCell(glm::ivec3(0,0,0));
         //addGridBlock(initialGrid, 1, 0, 0);
         //addGridBlock(initialGrid, 2, 0, 0);
         //addGridBlock(initialGrid, 3, 0, 0);
         
-        for (int ll = 0; ll < 2; ll++) {
-            for (int ii = -3; ii < 4; ii++)
-            {
-                for (int jj = -3; jj < 4; jj++)
-                {
-                    
-                    for (int kk = -3; kk < 4; kk++)
-                    {
-                        initialGrid->addCell(glm::ivec3(ii + ll*10, jj, kk));
-                    }
-                }
-            }
-            for (int ii = -2; ii < 3; ii++)
-            {
-                for (int jj = -2; jj < 3; jj++)
-                {
-                    
-                    for (int kk = -2; kk < 3; kk++)
-                    {
-                        initialGrid->removeCell(glm::ivec3(ii + ll*10, jj, kk));
-                    }
-                }
-            }
-        }
-        for (int ii = 4; ii < 7; ii++)
-        {
-            for (int jj = -1; jj < 2; jj++)
-            {
-                
-                for (int kk = -2; kk < 2; kk++)
-                {
-                    initialGrid->addCell(glm::ivec3(ii, jj, kk));
-                }
-            }
-        }
-        for (int ii = 4-1; ii < 7+1; ii++)
-        {
-            for (int jj = -1+1; jj < 2-1; jj++)
-            {
-                
-                for (int kk = -2+1; kk < 2-1; kk++)
-                {
-                    initialGrid->removeCell(glm::ivec3(ii, jj, kk));
-                }
-            }
-        }
+        //for (int ll = 0; ll < 2; ll++) {
+        //    for (int ii = -3; ii < 4; ii++)
+        //    {
+        //        for (int jj = -3; jj < 4; jj++)
+        //        {
+        //            
+        //            for (int kk = -3; kk < 4; kk++)
+        //            {
+        //                initialGrid->addCell(glm::ivec3(ii + ll*10, jj, kk));
+        //            }
+        //        }
+        //    }
+        //    for (int ii = -2; ii < 3; ii++)
+        //    {
+        //        for (int jj = -2; jj < 3; jj++)
+        //        {
+        //            
+        //            for (int kk = -2; kk < 3; kk++)
+        //            {
+        //                initialGrid->removeCell(glm::ivec3(ii + ll*10, jj, kk));
+        //            }
+        //        }
+        //    }
+        //}
+        //for (int ii = 4; ii < 7; ii++)
+        //{
+        //    for (int jj = -1; jj < 2; jj++)
+        //    {
+        //        
+        //        for (int kk = -2; kk < 2; kk++)
+        //        {
+        //            initialGrid->addCell(glm::ivec3(ii, jj, kk));
+        //        }
+        //    }
+        //}
+        //for (int ii = 4-1; ii < 7+1; ii++)
+        //{
+        //    for (int jj = -1+1; jj < 2-1; jj++)
+        //    {
+        //        
+        //        for (int kk = -2+1; kk < 2-1; kk++)
+        //        {
+        //            initialGrid->removeCell(glm::ivec3(ii, jj, kk));
+        //        }
+        //    }
+        //}
         // Ground.
         //int size{ 70 };
         //for (int ii = -size; ii < size; ii++)
@@ -187,10 +186,6 @@ public:
         callRenderCallbacks(viewMatrix, projectionMatrix);
         
         // Game's own render logic
-        float aspectRatio = m_gameBase->m_graphicsEngine->getScreenWidth() /
-            (float)m_gameBase->m_graphicsEngine->getScreenHeight();
-        glm::mat4 projection = glm::ortho(-1.0f, 1.0f, -1.0f/aspectRatio, 1.0f/aspectRatio);
-        m_meshManager->render(projection);
     }
 
     virtual void framebufferSizeCallback(int width, int height) override {
