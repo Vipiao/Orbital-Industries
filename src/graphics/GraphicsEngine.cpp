@@ -30,6 +30,9 @@ GraphicsEngine::GraphicsEngine(
     m_ssboManager = std::make_unique<SSBOManager>(maxMeshes);
     m_meshHandler = std::make_unique<MeshHandler>(maxTriangles, m_ssboManager.get());
 
+    // Create instance handler
+    m_instanceHandler = std::make_unique<InstanceHandler>(m_ssboManager.get(), 32);
+
     // Create 2D mesh manager
     m_meshManager2D = std::make_unique<MeshManager2D>(1000);
 }
@@ -64,6 +67,16 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     // Render using MeshHandler's single-pass render method
     m_meshHandler->render(
         view, projection, 
+        getFrameNum(),                    // frame number
+        m_currentPhysicsTimeStep,         // physics time step
+        m_physicsTimeRemainder,           // time remainder (fractional part)
+        {4.0, 4.0, 4.0},                  // hardcoded light position
+        getCamPos()                       // camera position
+    );
+
+    // Render instanced geometry
+    m_instanceHandler->render(
+        view, projection,
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
         m_physicsTimeRemainder,           // time remainder (fractional part)

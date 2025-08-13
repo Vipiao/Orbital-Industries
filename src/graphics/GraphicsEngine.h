@@ -8,6 +8,7 @@
 #include "MeshHandler.h"
 #include "AssimpLoader.h"
 #include "MeshManager2D.h"
+#include "InstanceHandler.h"
 #include "SSBOManager.h"
 #include <memory>
 #include <string>
@@ -90,6 +91,9 @@ public:
     // 2D mesh manager access
     MeshManager2D* getMeshManager2D() { return m_meshManager2D.get(); }
 
+    // Instance handler access
+    InstanceHandler* getInstanceHandler() { return m_instanceHandler.get(); }
+
     // Render parameter setting
     void setRenderParameters(uint64_t physicsTimeStep, double timeRemainder);
     
@@ -101,6 +105,7 @@ private:
     std::shared_ptr<GraphicsEngineBase> m_graphicsEngineBase;
 
     std::unique_ptr<MeshManager2D> m_meshManager2D;
+    std::unique_ptr<InstanceHandler> m_instanceHandler;
     // Render parameters
     uint64_t m_currentPhysicsTimeStep = 0;
     double m_physicsTimeRemainder = 0.0;
