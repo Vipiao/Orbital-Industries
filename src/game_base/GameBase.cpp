@@ -31,14 +31,14 @@ GameBase::GameBase(
         throw std::runtime_error("TimeHandler cannot be null");
     }
     
-    m_graphicsEngine->addCallbackObject(this);
+    m_graphicsEngine->addCallback(this);
     
     m_lastFrameTime = m_timeHandler->now();
     m_nextPhysicsTime = m_lastFrameTime + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(m_physicsTimeStep));
     
-    int refreshRate = m_graphicsEngine->m_frameRate;
+    int refreshRate = m_graphicsEngine->getFrameRate();
     
     m_physicsTimeStep = 1.0 / static_cast<double>(64);
     
@@ -57,7 +57,7 @@ GameBase::~GameBase() {
     m_grids.clear();
     
     if (m_graphicsEngine) {
-        m_graphicsEngine->removeCallbackObject(this);
+        m_graphicsEngine->removeCallback(this);
     }
 }
 
@@ -317,7 +317,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     std::cout << "Created " << newGrids.size() << " new grids from split" << std::endl;
 }
 
-void GameBase::addCallback(Callback* callback) {
+void GameBase::addPhysicsCallback(Callback* callback) {
     m_callbacks.push_back(callback);
 }
 
@@ -328,6 +328,10 @@ void GameBase::run() {
 int hit_count = 0;
 
 void GameBase::preRenderCallback(uint64_t frameNum) {
+    // Call registered callbacks first
+    callPreRenderCallbacks(frameNum);
+    
+    // GameBase's own preRender logic
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
@@ -354,7 +358,7 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     update(deltaTime);
 
     // Process jobs with remaining frame time
-    double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->m_frameRate);
+    double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->getFrameRate());
     auto targetFrameEnd = currentTime  + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(targetFrameDuration));
@@ -371,6 +375,10 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
 }
 
 void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
+    // Call registered callbacks first
+    callRenderCallbacks(viewMatrix, projectionMatrix);
+    
+    // GameBase's own render logic
     // Convert double precision matrices to float precision
     glm::mat4 view = glm::mat4(viewMatrix);
     glm::mat4 projection = glm::mat4(projectionMatrix);
@@ -390,19 +398,27 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     // Render using MeshHandler's single-pass render method
     m_graphicsEngine->m_meshHandler->render(
         view, projection, 
-        m_graphicsEngine->m_frameNum,     // frame number
+        m_graphicsEngine->getFrameNum(),     // frame number
         m_physicsEngine->getCurrentPhysicsTimeStep(),  // time in milliseconds
         physicsTimeRemainder,  // time remainder (fractional part)
         glm::dvec3(4.0, 4.0, 4.0),      // light position (fixed value or you can make this a member)
-        m_graphicsEngine->m_camPos        // camera position
+        m_graphicsEngine->getCamPos()        // camera position
     );
 }
 
 void GameBase::framebufferSizeCallback(int width, int height) {
+    // Call registered callbacks first
+    callFramebufferSizeCallbacks(width, height);
+    
+    // GameBase's own framebuffer logic (none needed currently)
     // Nothing specific needed
 }
 
 void GameBase::windowPosCallback(int xpos, int ypos) {
+    // Call registered callbacks first
+    callWindowPosCallbacks(xpos, ypos);
+    
+    // GameBase's own window position logic (none needed currently)
     // Nothing specific needed
 }
 
@@ -431,7 +447,7 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
     
     // Update graphics only when physics step is complete
     for (auto& grid : m_grids) {
-        grid->updateGraphics(m_graphicsEngine->m_camPos);
+        grid->updateGraphics(m_graphicsEngine->getCamPos());
     }
 
     // Call physics update callbacks

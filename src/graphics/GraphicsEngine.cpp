@@ -1,5 +1,6 @@
 // GraphicsEngine.cpp
 #include "GraphicsEngine.h"
+#include "GraphicsEngineBase.h"
 #include <iostream>
 #include <filesystem>
 
@@ -9,14 +10,20 @@ GraphicsEngine::GraphicsEngine(
     const std::string& windowTitle,
     size_t maxTriangles,
     size_t maxMeshes,
-    Mode mode)
-    : GraphicsEngineBase(mode)
+    GraphicsEngineBase::Mode mode)
 {
-    m_screen_width = screenWidth;
-    m_screen_height = screenHeight;
+    // Create GraphicsEngineBase
+    m_graphicsEngineBase = std::make_shared<GraphicsEngineBase>(mode);
+    
+    // Register self as callback with GraphicsEngineBase
+    m_graphicsEngineBase->addCallback(this);
+    
+    // Configure window
+    m_graphicsEngineBase->m_screen_width = screenWidth;
+    m_graphicsEngineBase->m_screen_height = screenHeight;
     
     if (!windowTitle.empty()) {
-        glfwSetWindowTitle(m_window, windowTitle.c_str());
+        glfwSetWindowTitle(m_graphicsEngineBase->m_window, windowTitle.c_str());
     }
 
     // Create SSBO manager and pass to mesh handler
@@ -25,7 +32,54 @@ GraphicsEngine::GraphicsEngine(
 }
 
 GraphicsEngine::~GraphicsEngine() {
-    // Unique_ptr will handle cleanup
+    // Unregister from GraphicsEngineBase
+    if (auto base = m_graphicsEngineBase.get()) {
+        base->removeCallback(this);
+    }
+}
+
+GraphicsEngineBase* GraphicsEngine::getGraphicsEngineBase() const {
+    return m_graphicsEngineBase.get();
+}
+
+void GraphicsEngine::preRenderCallback(uint64_t frameNum) {
+    // Call registered callbacks first
+    callPreRenderCallbacks(frameNum);
+    
+    // No additional logic needed here for GraphicsEngine itself
+}
+
+void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
+    // Call registered callbacks first
+    callRenderCallbacks(viewMatrix, projectionMatrix);
+    
+    // No additional logic needed here for GraphicsEngine itself
+}
+
+void GraphicsEngine::framebufferSizeCallback(int width, int height) {
+    // Call registered callbacks first
+    callFramebufferSizeCallbacks(width, height);
+    
+    // No additional logic needed here for GraphicsEngine itself
+}
+
+void GraphicsEngine::windowPosCallback(int xpos, int ypos) {
+    // Call registered callbacks first  
+    callWindowPosCallbacks(xpos, ypos);
+    
+    // No additional logic needed here for GraphicsEngine itself
+}
+
+void GraphicsEngine::startRenderLoop() {
+    m_graphicsEngineBase->startRenderLoop();
+}
+
+void GraphicsEngine::setTriangleRenderMode(bool useTriangles) {
+    m_graphicsEngineBase->setTriangleRenderMode(useTriangles);
+}
+
+bool GraphicsEngine::getTriangleRenderMode() {
+    return m_graphicsEngineBase->getTriangleRenderMode();
 }
 
 int GraphicsEngine::createMesh() {

@@ -41,8 +41,8 @@ void Creative::physics() {
         double shortestSquaredDistance = DBL_MAX;
         
         // Camera position and direction
-        glm::dvec3 startPos = m_gameBase->m_graphicsEngine->m_camPos;
-        glm::dvec3 forward = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
+        glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
         
         // Check all grids for ray intersections
@@ -112,7 +112,7 @@ void Creative::physics() {
                     glm::dvec3 force = forward * forceStrength;
                     
                     // Apply the force at the camera position
-                    glm::dvec3 applicationPoint = m_gameBase->m_graphicsEngine->m_camPos;
+                    glm::dvec3 applicationPoint = m_gameBase->m_graphicsEngine->getCamPos();
                     
                     // Apply force at the point
                     m_gameBase->m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
@@ -299,7 +299,7 @@ void Creative::updateMarkerPositions() {
 
     // Check if camera is too far from the selected block (5m threshold)
     glm::dvec3 blockWorldPos = selectedGrid->gridToWorld(glm::dvec3(m_selectedBlockCoord) + glm::dvec3(0.5, 0.5, 0.5));
-    glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->m_camPos;
+    glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
     double distanceToBlock = glm::length(blockWorldPos - cameraPos);
 
     if (distanceToBlock > 10.0) {
@@ -340,11 +340,11 @@ void Creative::updateMarkerPositions() {
     auto selectorResult = PositionSelector::selectFromPositions(
         cornerPositions,
         0.004, // Small projected radius. (How far is minimum distance)
-        m_gameBase->m_graphicsEngine->m_camPos,
-        m_gameBase->m_graphicsEngine->m_camOri,
-        m_gameBase->m_graphicsEngine->m_fieldOfView,
-        static_cast<double>(m_gameBase->m_graphicsEngine->m_screen_width) / 
-        static_cast<double>(m_gameBase->m_graphicsEngine->m_screen_height),
+        m_gameBase->m_graphicsEngine->getCamPos(),
+        m_gameBase->m_graphicsEngine->getCamOri(),
+        m_gameBase->m_graphicsEngine->getFieldOfView(),
+        static_cast<double>(m_gameBase->m_graphicsEngine->getScreenWidth()) / 
+        static_cast<double>(m_gameBase->m_graphicsEngine->getScreenHeight()),
         glm::dvec2(0.0, 0.0), // Screen center as cursor position
         5 // Seperation iterations
     );
@@ -368,7 +368,7 @@ void Creative::updateMarkerPositions() {
         std::cout << "Near corner " << m_nearestMarkerIndex << ": (" << selectedCorner.x << ", " 
                  << selectedCorner.y << ", " << selectedCorner.z << ")" << std::endl;
         // Check if R key is pressed to initiate modification
-        KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
+        KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
         if (keyboard->m_r.justPressed()) {
             int cornerIndex = cornerIndexData[m_nearestMarkerIndex];
             glm::ivec3 direction = directionData[m_nearestMarkerIndex];
@@ -444,16 +444,16 @@ void Creative::updateMarkerPositions() {
 }
 
 void Creative::processInputLogic() {
-    MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->m_mouseHandler;
-    KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->m_keyboardHandler;
+    MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->getMouseHandler();
+    KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
     
     // Camera movement speed
     const double mouseSensitivity = 0.0014;
     
     // Calculate movement vectors based on camera orientation
-    glm::dvec3 right = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(1.0, 0.0, 0.0);
-    glm::dvec3 forward = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 1.0, 0.0);
-    glm::dvec3 up = m_gameBase->m_graphicsEngine->m_camOri * glm::dvec3(0.0, 0.0, 1.0);
+    glm::dvec3 right = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(1.0, 0.0, 0.0);
+    glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+    glm::dvec3 up = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 0.0, 1.0);
 
     // Update marker positions every frame for smooth 2D positioning
     updateMarkerPositions();
@@ -526,8 +526,8 @@ void Creative::processInputLogic() {
         glm::dquat rollQuat = glm::angleAxis(rollAngle, glm::dvec3(0.0, 1.0, 0.0));
         
         // Apply rotations to camera orientation
-        m_gameBase->m_graphicsEngine->m_camOri = m_gameBase->m_graphicsEngine->m_camOri * yawQuat * pitchQuat * rollQuat;
-        m_gameBase->m_graphicsEngine->m_camOri = glm::normalize(m_gameBase->m_graphicsEngine->m_camOri);
+        m_gameBase->m_graphicsEngine->getCamOri() = m_gameBase->m_graphicsEngine->getCamOri() * yawQuat * pitchQuat * rollQuat;
+        m_gameBase->m_graphicsEngine->getCamOri() = glm::normalize(m_gameBase->m_graphicsEngine->getCamOri());
     }
     
     // Normalize the vectors
@@ -560,6 +560,6 @@ void Creative::processInputLogic() {
     // Apply movement if any keys were pressed
     if (glm::length(moveDirection) > 0.0) {
         moveDirection = glm::normalize(moveDirection) * m_moveSpeed;
-        m_gameBase->m_graphicsEngine->m_camPos += moveDirection;
+        m_gameBase->m_graphicsEngine->getCamPos() += moveDirection;
     }
 }

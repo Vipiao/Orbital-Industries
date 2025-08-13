@@ -13,25 +13,17 @@
 
 #include "MouseHandler.h"
 #include "KeyboardHandler.h"
+#include "CallbackManager.h"
 
-class GraphicsEngineBase {
+class GraphicsEngineBase : public CallbackManager {
 public:
    enum class Mode { NONE, RECORD, PLAY };
-   class CallBack {
-   public:
-      virtual void preRenderCallback(uint64_t frameNum) = 0;
-      virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) = 0;
-      virtual void framebufferSizeCallback(int width, int height) = 0;
-      virtual void windowPosCallback(int xpos, int ypos) = 0;
-   };
    GraphicsEngineBase(Mode mode = Mode::NONE, const std::filesystem::path& filepath = "recording_mouse_keyboard");
    ~GraphicsEngineBase();
    GraphicsEngineBase(const GraphicsEngineBase&) = delete;
    GraphicsEngineBase& operator= (const GraphicsEngineBase&) = delete;
 
    void setSwapInterval(int swapInterval);
-   void addCallbackObject(CallBack* graphicsEngineCallback);
-   void removeCallbackObject(CallBack* graphicsEngineCallback);
    void startRenderLoop();
    void setTriangleRenderMode(bool useTriangles);
    bool getTriangleRenderMode();
@@ -54,7 +46,6 @@ protected:
    static void windowPosCallback(GLFWwindow* window, int xpos, int ypos);
    int getFrameRate();
 
-   std::vector<CallBack*> m_graphicsEngineCallbacks{};
    bool m_renderTriangleMode{ false };
    bool m_windowOnTop{ false };
 

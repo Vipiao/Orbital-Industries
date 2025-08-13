@@ -1,11 +1,14 @@
 // main.cpp
 #include "src/game_base/GameBase.h"
+#include "src/graphics/GraphicsEngineBase.h"
 #include "src/utils/TimeHandler.h"
 #include "src/debug/DebugVisualization.h"
 #include "src/game_base/Creative.h"
 #include "src/debug/DebugRenderer.h"
 #include "src/debug/DebugGlobals.h"
 #include "src/graphics/MeshManager2D.h"
+#include "src/graphics/GraphicsCallbacks.h"
+#include "src/graphics/CallbackManager.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -17,7 +20,7 @@ int debug2 = 0;
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 IHashable* DebugGlobals::g_gameBase = nullptr;
 
-class Game : public GraphicsEngine::CallBack, public GameBase::Callback {
+class Game : public IGraphicsCallbacks, public CallbackManager, public GameBase::Callback {
 private:
     std::unique_ptr<GameBase> m_gameBase;
     std::unique_ptr<DebugVisualization> m_debugViz;
@@ -41,11 +44,11 @@ public:
         pp->setPosition(glm::vec2(.0f, .0f));
         pp->setScale(glm::vec2(0.05f, 0.05f));
 
-        // Set ourselves as the callback object instead of GameBase
-        m_gameBase->m_graphicsEngine->addCallbackObject(this);
+        // Register ourselves with GameBase
+        m_gameBase->addCallback(this);  // Graphics callback registration
 
         // Register physics callback
-        m_gameBase->addCallback(this);
+        m_gameBase->addPhysicsCallback(this);  // Physics callback registration
         
         // Setup debug visualization
         setupDebugVisualization();
@@ -60,12 +63,12 @@ public:
         m_mode = std::make_unique<Creative>(m_gameBase.get(), m_meshManager.get());
 
         // Set up initial camera position and orientation
-        m_gameBase->m_graphicsEngine->m_camPos = glm::dvec3(0, 0, 0);
-        m_gameBase->m_graphicsEngine->m_camOri = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
-        m_gameBase->m_graphicsEngine->m_fieldOfView = glm::radians(90.0);
+        m_gameBase->m_graphicsEngine->getCamPos() = glm::dvec3(0, 0, 0);
+        m_gameBase->m_graphicsEngine->getCamOri() = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
+        m_gameBase->m_graphicsEngine->getFieldOfView() = glm::radians(90.0);
         
         // Enable mouse lock for camera control
-        m_gameBase->m_graphicsEngine->m_mouseHandler->setMouseLock(true);
+        m_gameBase->m_graphicsEngine->getMouseHandler()->setMouseLock(true);
         
         // Create a center grid that will be our player object
         auto initialGridWeak = m_gameBase->createGrid(glm::dvec3(0, 0, 0));
@@ -169,24 +172,40 @@ public:
         m_gameBase->setDebugRenderer(m_debugViz.get());
     }
 
-    // Override GraphicsEngine::CallBack methods
+    // IGraphicsCallbacks implementation
     virtual void preRenderCallback(uint64_t frameNum) override {
+        // Call registered callbacks first
+        callPreRenderCallbacks(frameNum);
+        
+        // Game's own preRender logic
         // Process input BEFORE calling gamebase preRenderCallback
         m_mode->processInputs();
     }
 
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
-        float aspectRatio = m_gameBase->m_graphicsEngine->m_screen_width /
-            (float)m_gameBase->m_graphicsEngine->m_screen_height;
+        // Call registered callbacks first
+        callRenderCallbacks(viewMatrix, projectionMatrix);
+        
+        // Game's own render logic
+        float aspectRatio = m_gameBase->m_graphicsEngine->getScreenWidth() /
+            (float)m_gameBase->m_graphicsEngine->getScreenHeight();
         glm::mat4 projection = glm::ortho(-1.0f, 1.0f, -1.0f/aspectRatio, 1.0f/aspectRatio);
         m_meshManager->render(projection);
     }
 
     virtual void framebufferSizeCallback(int width, int height) override {
+        // Call registered callbacks first
+        callFramebufferSizeCallbacks(width, height);
+        
+        // Game's own framebuffer logic (none needed currently)
         //
     }
 
     virtual void windowPosCallback(int xpos, int ypos) override {
+        // Call registered callbacks first
+        callWindowPosCallbacks(xpos, ypos);
+        
+        // Game's own window position logic (none needed currently)
         //
     }
 

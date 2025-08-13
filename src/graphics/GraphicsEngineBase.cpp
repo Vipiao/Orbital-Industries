@@ -12,9 +12,7 @@ void GraphicsEngineBase::framebufferSizeCallback(GLFWwindow* window, int width, 
    glViewport(0, 0, width, height);
    graphicsEngine->m_screen_width = width;
    graphicsEngine->m_screen_height = height;
-   for (auto& callback : graphicsEngine->m_graphicsEngineCallbacks) {
-      callback->framebufferSizeCallback(width, height);
-   }
+   graphicsEngine->callFramebufferSizeCallbacks(width, height);
    graphicsEngine->m_frameRate = graphicsEngine->getFrameRate();
    if (graphicsEngine->m_frameRate == 0) {
       std::cout << "Warning: Failed to get framerate from monitor. Guessing it is 60 fps." << std::endl;
@@ -30,9 +28,7 @@ void GraphicsEngineBase::windowPosCallback(GLFWwindow* window, int xpos, int ypo
       std::cout << "Warning: Failed to get framerate from monitor. Guessing it is 60 fps." << std::endl;
       graphicsEngine->m_frameRate = 60;
    }
-   for (auto& callback : graphicsEngine->m_graphicsEngineCallbacks) {
-      callback->windowPosCallback(xpos, ypos);
-   }
+   graphicsEngine->callWindowPosCallbacks(xpos, ypos);
 }
 
 GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& filepath) {
@@ -123,16 +119,6 @@ void GraphicsEngineBase::setSwapInterval(int swapInterval) {
    glfwSwapInterval(swapInterval);
 }
 
-void GraphicsEngineBase::addCallbackObject(GraphicsEngineBase::CallBack* graphicsEngineCallback) {
-   m_graphicsEngineCallbacks.push_back(graphicsEngineCallback);
-}
-
-void GraphicsEngineBase::removeCallbackObject(GraphicsEngineBase::CallBack* graphicsEngineCallback) {
-   // Use the std::remove function directly - the #include <algorithm> at the top is correct
-   auto it = std::remove(m_graphicsEngineCallbacks.begin(), m_graphicsEngineCallbacks.end(), graphicsEngineCallback);
-   m_graphicsEngineCallbacks.erase(it, m_graphicsEngineCallbacks.end());
-}
-
 void GraphicsEngineBase::startRenderLoop() {
    while (!glfwWindowShouldClose(m_window)) {
       if (m_frameNum == 500) {
@@ -151,9 +137,7 @@ void GraphicsEngineBase::startRenderLoop() {
 
 
       //
-      for (auto& callback : m_graphicsEngineCallbacks) {
-         callback->preRenderCallback(m_frameNum);
-      }
+      callPreRenderCallbacks(m_frameNum);
 
       if (m_frameNum == 0) {
          m_camVel = { 0,0,0 };
@@ -179,9 +163,7 @@ void GraphicsEngineBase::startRenderLoop() {
       projectionMatrix =
          glm::perspective(fieldOfViewVertical, aspectRatio, 0.01, 1000.);
 
-      for (auto& callback : m_graphicsEngineCallbacks) {
-         callback->renderCallback(viewMatrix, projectionMatrix);
-      }
+      callRenderCallbacks(viewMatrix, projectionMatrix);
 
       // Check for OpenGL errors
       GLenum error = glGetError();
