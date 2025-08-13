@@ -388,6 +388,9 @@ void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& c
     const glm::dmat3 blockBaseInertiaTensor = glm::dmat3(blockBaseInertiaValue); // Identity * scalar
     
     glm::dvec3 oldCM = m_centerOfMass;
+
+    // Store original angular velocity to preserve it across inertia changes
+    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
     
     // Calculate incremental update directly on rigid body properties
     MassInertiaCalculator::calculateTensorInertiaIncremental(
@@ -410,6 +413,9 @@ void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& c
     glm::dmat3 orientationMatrix = glm::mat3_cast(m_rigidBody->m_orientation);
     m_rigidBody->m_velocity += glm::cross(m_rigidBody->getAngularVelocityWorld(), m_rigidBody->m_orientation * cmShift);
     updateRigidBodyInverses();
+
+    // Restore original angular velocity
+    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
 }
 
 void Grid::recalculateMassAndInertia() {
@@ -418,6 +424,9 @@ void Grid::recalculateMassAndInertia() {
     glm::dvec3 oldCM = m_centerOfMass;
     const double blockMass = 60.0;
     const double blockWidth = 1.0;
+
+    // Store original angular velocity to preserve it across inertia changes
+    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
     const double blockBaseInertiaValue = (blockMass / 6.0) * blockWidth * blockWidth; // I = (m/6)*w² for cube
     const glm::dmat3 blockBaseInertiaTensor = glm::dmat3(blockBaseInertiaValue); // Identity * scalar
     
@@ -433,6 +442,9 @@ void Grid::recalculateMassAndInertia() {
     }
     updateRigidBodyInverses();
     m_rigidBody->invalidateInertiaTensor();
+
+    // Restore original angular velocity
+    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
 }
 
 void Grid::updateRigidBodyInverses() {
