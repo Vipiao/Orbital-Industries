@@ -83,6 +83,10 @@ public:
     uint32_t m_vertexCount;
     uint32_t m_indexCount;
     bool m_hasIndices;
+
+    // Rendering options
+    float m_depthCompression = 1.0f;  // 1.0 = normal, < 1.0 = compressed depth range
+    bool m_enableAlphaBlending = false;
     
     // Instance management (kept in same order)
     GLuint m_instanceVBO;
@@ -95,6 +99,10 @@ public:
     ~Geometry();
     
     // Instance management methods
+    void setDepthCompression(float compression) { m_depthCompression = compression; }
+    void setAlphaBlending(bool enable) { m_enableAlphaBlending = enable; }
+    float getDepthCompression() const { return m_depthCompression; }
+    bool getAlphaBlending() const { return m_enableAlphaBlending; }
     std::weak_ptr<Instance> addInstance(int32_t meshIndex, int32_t colorTextureUnit = -1, int32_t normalTextureUnit = -1);
     void removeInstance(std::weak_ptr<Instance> instance);
     void updateInstanceInBuffer(Instance* instance);

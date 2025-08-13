@@ -24,7 +24,14 @@ Creative::Creative(GameBase* gameBase)
 
     // Load 3D arrow geometry and texture
     m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
-    m_arrowTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/debug_red.png");
+    m_arrowTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/debug_white_transparent.png");
+    
+    // Configure arrows for overlay rendering with transparency
+    if (auto geometry = m_arrowGeometry.lock()) {
+        geometry->setDepthCompression(0.1f);  // Compress depth range to render in front
+        geometry->setAlphaBlending(true);     // Enable transparency
+    }
+    
     std::cout << "Loaded 3D arrow geometry and texture for configuration mode" << std::endl;
 }
 

@@ -427,6 +427,22 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
     // Render each geometry with its instances
     for (const auto& geometry : m_geometries) {
         if (geometry->m_instanceData.empty()) continue;
+
+        // Save current OpenGL state
+        GLfloat savedDepthRange[2];
+        glGetFloatv(GL_DEPTH_RANGE, savedDepthRange);
+        GLboolean blendEnabled = glIsEnabled(GL_BLEND);
+        
+        // Apply geometry-specific depth compression
+        if (geometry->m_depthCompression < 1.0f) {
+            glDepthRange(0.0, geometry->m_depthCompression);
+        }
+        
+        // Apply geometry-specific alpha blending
+        if (geometry->m_enableAlphaBlending) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
         
         glBindVertexArray(geometry->m_VAO);
         
@@ -436,6 +452,15 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
         } else {
             glDrawArraysInstanced(GL_TRIANGLES, 0, geometry->m_vertexCount, 
                                 static_cast<GLsizei>(geometry->m_instanceData.size()));
+        }
+        
+        // Restore OpenGL state
+        glDepthRange(savedDepthRange[0], savedDepthRange[1]);
+        
+        if (geometry->m_enableAlphaBlending && !blendEnabled) {
+            glDisable(GL_BLEND);
+        } else if (!geometry->m_enableAlphaBlending && blendEnabled) {
+            glEnable(GL_BLEND);
         }
     }
     

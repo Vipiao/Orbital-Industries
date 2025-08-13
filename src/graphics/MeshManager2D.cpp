@@ -191,6 +191,12 @@ std::weak_ptr<GeometryData> MeshManager2D::loadMesh(const std::string& geometryP
 }
 
 void MeshManager2D::render(const glm::mat4& projection) {
+    // Save current blend state
+    GLboolean blendWasEnabled = glIsEnabled(GL_BLEND);
+    GLint srcBlend, dstBlend;
+    glGetIntegerv(GL_BLEND_SRC_ALPHA, &srcBlend);
+    glGetIntegerv(GL_BLEND_DST_ALPHA, &dstBlend);
+
     m_shaderProgram.use();
     
     // Set uniforms
@@ -198,10 +204,26 @@ void MeshManager2D::render(const glm::mat4& projection) {
     
     // Render all geometries (they handle their own texture binding)
     for (const auto& geometry : m_geometries) {
+        // Enable blending if geometry has transparency
+        if (geometry->hasTransparency()) {
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+
         m_shaderProgram.setUniformInt("uTexture", geometry->getTextureUnit());
         m_shaderProgram.setUniformBool("uHasTexture", geometry->getTextureId() != 0);
         
         geometry->render();
+
+        // Restore blend state after transparent geometry
+        if (geometry->hasTransparency() && !blendWasEnabled) {
+            glDisable(GL_BLEND);
+        }
+    }
+
+    // Restore original blend state
+    if (!blendWasEnabled) {
+        glDisable(GL_BLEND);
     }
 }
 

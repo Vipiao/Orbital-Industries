@@ -31,8 +31,11 @@ void main() {
 
    // Get object color from texture or use white as default
    vec3 objectColor;
+   float alpha = 1.0;
    if (vert_colorTextureUnit >= 0) {
-      objectColor = texture(u_textures[vert_colorTextureUnit], vert_uv).rgb;
+      vec4 textureColor = texture(u_textures[vert_colorTextureUnit], vert_uv);
+      objectColor = textureColor.rgb;
+      alpha = textureColor.a;
    } else {
       objectColor = vec3(1.0, 1.0, 1.0);
    }
@@ -71,5 +74,5 @@ void main() {
    // Combine all lighting components
    vec3 result = ambient + (diffuse + specular) * attenuation;
    
-   FragColor = vec4(result, 1.0);
+   FragColor = vec4(result, alpha);
 }
