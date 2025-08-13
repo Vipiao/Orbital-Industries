@@ -4,8 +4,10 @@
 #include "Mode.h"
 #include <glm/glm.hpp>
 #include <array>
-#include "../graphics/MeshManager2D.h"
-#include "../graphics/GeometryInstance.h"
+#include <memory>
+#include <vector>
+class GeometryData;
+class GeometryInstance;
 
 /**
  * @brief Creative mode implementation with block placement/removal and force application
@@ -13,7 +15,6 @@
 class Creative : public Mode {
 public:
     Creative(GameBase* gameBase);
-    Creative(GameBase* gameBase, MeshManager2D* meshManager);
     virtual ~Creative() = default;
     
     virtual void processInputs() override;
@@ -44,7 +45,6 @@ private:
     bool m_hasSelectedBlock = false;
     bool m_cursorNearMarker = false;
     int m_nearestMarkerIndex = -1;
-    MeshManager2D* m_meshManager;
     std::weak_ptr<GeometryData> m_marker;
     std::vector<std::weak_ptr<GeometryInstance>> m_markerInstances;
 

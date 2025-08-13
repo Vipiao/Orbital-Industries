@@ -8,19 +8,16 @@
 #include "../debug/DebugGlobals.h"
 #include "../utils/PositionSelector.h"
 #include <iostream>
+#include "../graphics/MeshManager2D.h"
+#include "../graphics/GeometryInstance.h"
 #include "StructuralBlock.h"
 #include <float.h>
 
-Creative::Creative(GameBase* gameBase, MeshManager2D* meshManager) 
-    : Mode(gameBase), m_meshManager(meshManager), m_hasSelectedBlock(false), 
-      m_cursorNearMarker(false), m_nearestMarkerIndex(-1) {
+Creative::Creative(GameBase* gameBase) 
+    : Mode(gameBase), m_hasSelectedBlock(false), m_cursorNearMarker(false), m_nearestMarkerIndex(-1) {
     
-    if (!m_meshManager) {
-        throw std::runtime_error("MeshManager2D cannot be null");
-    }
-    
-    // Load marker geometry
-    m_marker = m_meshManager->loadMesh("../media/blender/03_face.obj", "../media/01_marker.png", -1, true);
+    // Load marker geometry using graphics engine's 2D mesh manager
+    m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/01_marker.png", -1, true);
     std::cout << "Loaded marker geometry for configuration mode" << std::endl;
 }
 

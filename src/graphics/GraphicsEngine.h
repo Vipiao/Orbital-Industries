@@ -7,6 +7,7 @@
 #include "CallbackManager.h"
 #include "MeshHandler.h"
 #include "AssimpLoader.h"
+#include "MeshManager2D.h"
 #include "SSBOManager.h"
 #include <memory>
 #include <string>
@@ -85,6 +86,12 @@ public:
         const std::string& modelPath,
         bool ignoreTextureCoordinates = false
     );
+
+    // 2D mesh manager access
+    MeshManager2D* getMeshManager2D() { return m_meshManager2D.get(); }
+
+    // Render parameter setting
+    void setRenderParameters(uint64_t physicsTimeStep, double timeRemainder);
     
     std::unique_ptr<SSBOManager> m_ssboManager;
     std::unique_ptr<MeshHandler> m_meshHandler;
@@ -92,6 +99,11 @@ public:
 
 private:
     std::shared_ptr<GraphicsEngineBase> m_graphicsEngineBase;
+
+    std::unique_ptr<MeshManager2D> m_meshManager2D;
+    // Render parameters
+    uint64_t m_currentPhysicsTimeStep = 0;
+    double m_physicsTimeRemainder = 0.0;
     
     GraphicsEngineBase* getGraphicsEngineBase() const;
 };

@@ -378,12 +378,7 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     // Call registered callbacks first
     callRenderCallbacks(viewMatrix, projectionMatrix);
     
-    // GameBase's own render logic
-    // Convert double precision matrices to float precision
-    glm::mat4 view = glm::mat4(viewMatrix);
-    glm::mat4 projection = glm::mat4(projectionMatrix);
-
-    // Calculate time remainder directly here where it's needed
+    // Calculate timing parameters for graphics engine
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
@@ -391,18 +386,10 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     auto timeToNextPhysics = std::chrono::duration<double>(m_nextPhysicsTime - currentTime).count();
     double physicsTimeRemainder = 1.0 - (timeToNextPhysics / m_physicsTimeStep);
     
-    //std::cout << "physics Time step " << physicsEngine->getCurrentPhysicsTimeStep() << std::endl;
-    //std::cout << "reminder " << physicsTimeRemainder << std::endl;
-    //std::cout << std::endl;
-
-    // Render using MeshHandler's single-pass render method
-    m_graphicsEngine->m_meshHandler->render(
-        view, projection, 
-        m_graphicsEngine->getFrameNum(),     // frame number
-        m_physicsEngine->getCurrentPhysicsTimeStep(),  // time in milliseconds
-        physicsTimeRemainder,  // time remainder (fractional part)
-        glm::dvec3(4.0, 4.0, 4.0),      // light position (fixed value or you can make this a member)
-        m_graphicsEngine->getCamPos()        // camera position
+    // Set render parameters in graphics engine
+    m_graphicsEngine->setRenderParameters(
+        m_physicsEngine->getCurrentPhysicsTimeStep(),
+        physicsTimeRemainder
     );
 }
 

@@ -29,6 +29,9 @@ GraphicsEngine::GraphicsEngine(
     // Create SSBO manager and pass to mesh handler
     m_ssboManager = std::make_unique<SSBOManager>(maxMeshes);
     m_meshHandler = std::make_unique<MeshHandler>(maxTriangles, m_ssboManager.get());
+
+    // Create 2D mesh manager
+    m_meshManager2D = std::make_unique<MeshManager2D>(1000);
 }
 
 GraphicsEngine::~GraphicsEngine() {
@@ -53,7 +56,30 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     // Call registered callbacks first
     callRenderCallbacks(viewMatrix, projectionMatrix);
     
-    // No additional logic needed here for GraphicsEngine itself
+    // GraphicsEngine's own render logic
+    // Convert double precision matrices to float precision
+    glm::mat4 view = glm::mat4(viewMatrix);
+    glm::mat4 projection = glm::mat4(projectionMatrix);
+    
+    // Render using MeshHandler's single-pass render method
+    m_meshHandler->render(
+        view, projection, 
+        getFrameNum(),                    // frame number
+        m_currentPhysicsTimeStep,         // physics time step
+        m_physicsTimeRemainder,           // time remainder (fractional part)
+        {4.0, 4.0, 4.0},                  // hardcoded light position
+        getCamPos()                       // camera position
+    );
+
+    // Render 2D overlay
+    float aspectRatio = getScreenWidth() / (float)getScreenHeight();
+    glm::mat4 projection2D = glm::ortho(-1.0f, 1.0f, -1.0f/aspectRatio, 1.0f/aspectRatio);
+    m_meshManager2D->render(projection2D);
+}
+
+void GraphicsEngine::setRenderParameters(uint64_t physicsTimeStep, double timeRemainder) {
+    m_currentPhysicsTimeStep = physicsTimeStep;
+    m_physicsTimeRemainder = timeRemainder;
 }
 
 void GraphicsEngine::framebufferSizeCallback(int width, int height) {
