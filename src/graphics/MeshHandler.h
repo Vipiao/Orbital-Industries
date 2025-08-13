@@ -18,8 +18,9 @@
  * 
  * Usage example:
  * @code
- * // Create a mesh handler with capacity for 1000 triangles and 10 meshes
- * MeshHandler meshHandler(1000, 10);
+ * // Create SSBO manager and mesh handler
+ * auto ssboManager = std::make_unique<SSBOManager>(100);  // 100 mesh capacity
+ * MeshHandler meshHandler(1000, ssboManager.get());  // 1000 triangle capacity
  * 
  * // Create a new mesh
  * int meshId = meshHandler.addMesh();
@@ -55,18 +56,22 @@
  * std::vector<uint32_t> triangleIds = meshHandler.appendTrianglesToMesh(
  *     meshId, &vertices, &normals, &tangents, &uvs, &occlusionFactors);
  * 
- * // Update mesh position in world space
+ * // Update mesh transform using SSBOManager
  * glm::dvec3 position(0.0, 0.0, 0.0);
  * glm::dvec3 velocity(0.0, 0.0, 0.0);
  * glm::dquat orientation(1.0, 0.0, 0.0, 0.0);  // Identity quaternion
  * glm::dvec3 angVelAxis(0.0, 1.0, 0.0);
  * double angVel = 0.0;
  * glm::dvec3 centerOfRotation(0.0, 0.0, 0.0);
+ * glm::dvec3 scale(1.0, 1.0, 1.0);
+ * int32_t colorTextureUnit = -1;  // No texture
+ * int32_t normalTextureUnit = -1; // No texture
+ * uint64_t physicsTimeStep = 0;
  * 
- * meshHandler.updateMeshData(
- *     meshId, &position, &velocity, orientation, 
- *     angVelAxis, angVel, centerOfRotation,
- *     -1, -1, 0);  // No textures, time = 0
+ * ssboManager->updateMeshTransform(
+ *     meshId, position, velocity, orientation, 
+ *     angVelAxis, angVel, centerOfRotation, scale,
+ *     colorTextureUnit, normalTextureUnit, physicsTimeStep);
  * 
  * // In render loop:
  * glm::mat4 view = camera.getViewMatrix();
