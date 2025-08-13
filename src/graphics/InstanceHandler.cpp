@@ -136,11 +136,7 @@ InstanceHandler::InstanceHandler(SSBOManager* ssboManager, uint32_t maxTextures)
 
 InstanceHandler::~InstanceHandler() {
     // Clean up OpenGL resources
-    if (m_shaderProgram != 0) {
-        glDeleteProgram(m_shaderProgram);
-    }
-    
-    // Clean up textures
+    // Clean up textures (ShaderProgram destructor handles shader cleanup)
     for (const TextureInfo& texture : m_textures) {
         glDeleteTextures(1, &texture.textureId);
     }
@@ -148,11 +144,9 @@ InstanceHandler::~InstanceHandler() {
 
 void InstanceHandler::createShaderProgram() {
     // Use instance-specific vertex shader but reuse fragment shader
-    ShaderProgram shaderProgram;
-    shaderProgram.loadVertexShaderFromPath("../src/graphics/instance_vertex_shader.vert");
-    shaderProgram.loadFragmentShaderFromPath("../src/graphics/fragment_shader.frag");
-    shaderProgram.linkShaders();
-    m_shaderProgram = shaderProgram.getID();
+    m_shaderProgram.loadVertexShaderFromPath("../src/graphics/instance_vertex_shader.vert");
+    m_shaderProgram.loadFragmentShaderFromPath("../src/graphics/fragment_shader.frag");
+    m_shaderProgram.linkShaders();
 }
 
 int InstanceHandler::createTexture(const std::string& texturePath) {
@@ -378,17 +372,17 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
                            const glm::dvec3& lightPos, const glm::dvec3& camPos) {
     if (m_geometries.empty()) return;
     
-    glUseProgram(m_shaderProgram);
+    m_shaderProgram.use();
     
     // Set uniforms (same as MeshHandler)
-    GLint viewLoc = glGetUniformLocation(m_shaderProgram, "view");
-    GLint projectionLoc = glGetUniformLocation(m_shaderProgram, "projection");
-    GLint frameLoc = glGetUniformLocation(m_shaderProgram, "u_frame");
-    GLint timeLoc = glGetUniformLocation(m_shaderProgram, "u_time");
-    GLint timeRemainderLoc = glGetUniformLocation(m_shaderProgram, "u_timeRemainder");
-    GLint cameraPosHighLoc = glGetUniformLocation(m_shaderProgram, "u_cameraPositionHigh");
-    GLint cameraPosLowLoc = glGetUniformLocation(m_shaderProgram, "u_cameraPositionLow");
-    GLint lightPosLoc = glGetUniformLocation(m_shaderProgram, "u_lightPos");
+    GLint viewLoc = glGetUniformLocation(m_shaderProgram.getID(), "view");
+    GLint projectionLoc = glGetUniformLocation(m_shaderProgram.getID(), "projection");
+    GLint frameLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_frame");
+    GLint timeLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_time");
+    GLint timeRemainderLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_timeRemainder");
+    GLint cameraPosHighLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_cameraPositionHigh");
+    GLint cameraPosLowLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_cameraPositionLow");
+    GLint lightPosLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_lightPos");
     
     if (viewLoc != -1) glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
     if (projectionLoc != -1) glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
@@ -423,7 +417,7 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
             
             // Set texture uniform
             std::string textureName = "u_textures[" + std::to_string(texture.textureUnit) + "]";
-            GLint textureLoc = glGetUniformLocation(m_shaderProgram, textureName.c_str());
+            GLint textureLoc = glGetUniformLocation(m_shaderProgram.getID(), textureName.c_str());
             if (textureLoc != -1) {
                 glUniform1i(textureLoc, static_cast<GLint>(texture.textureUnit));
             }

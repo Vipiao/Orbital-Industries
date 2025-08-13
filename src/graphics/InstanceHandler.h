@@ -9,6 +9,7 @@
 #include <glad/glad.h>
 #include "SSBOManager.h"
 #include "AssimpLoader.h"
+#include "ShaderProgram.h"
 #include "STBImageLoader.h"
 
 // Forward declarations
@@ -140,7 +141,7 @@ private:
     
     // OpenGL resources
     SSBOManager* m_ssboManager;
-    GLuint m_shaderProgram;
+    ShaderProgram m_shaderProgram;
     
     // Configuration
     uint32_t m_maxTextures;
