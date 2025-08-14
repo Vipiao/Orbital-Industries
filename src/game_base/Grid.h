@@ -79,6 +79,9 @@ public:
     // Access to cells for partitioning
     const std::unordered_map<glm::ivec3, StructuralBlock, IVec3Hash>& getCells() const { return m_cells; }
     
+    // Public cell access for vertex data preservation
+    StructuralBlock* getCell(const glm::ivec3& coord);
+
     // IHashable interface
     virtual size_t computeHash() const override;
 
@@ -121,9 +124,6 @@ private:
     // Neighbor connection management
     void updateNeighborConnections(const glm::ivec3& coord);
     void removeNeighborConnections(const glm::ivec3& coord);
-    
-    // Internal cell access
-    StructuralBlock* getCell(const glm::ivec3& coord);
     
     // Face visibility and mesh management methods
     void updateCellMassContribution(const glm::ivec3& coord, double sign);

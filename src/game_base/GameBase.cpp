@@ -214,7 +214,6 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
     glm::dquat originalOrientation = sourceBody->m_orientation;
     
     std::vector<PartitionPhysics> partitionPhysics(result.partitions.size());
-    const double blockMass = 60.0; // Match Grid.cpp value
 
     co_yield true; // Allow time check before physics calculations
     
@@ -226,7 +225,11 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         double totalMass = 0.0;
         
         for (const glm::ivec3& coord : partition) {
-            glm::dvec3 blockPosition = sourceGrid->gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5)); // Block center in world space
+            // Get actual mass and center of mass from the block's shape
+            const StructuralBlock* block = sourceGrid->getCell(coord);
+            auto [blockMass, localCOM, inertiaTensor] = block->getMassProperties();
+
+            glm::dvec3 blockPosition = sourceGrid->gridToWorld(glm::dvec3(coord) + localCOM); // Actual center of mass in world space
             weightedSum += blockPosition * blockMass;
             totalMass += blockMass;
         }
@@ -281,11 +284,20 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         // Move cells from source grid to new grid
         size_t cellsProcessed = 0;
         for (const glm::ivec3& cellCoord : partition) {
-            // Get cell type before removing (assume ARMOR for now, could be extended)
+            // Save vertex modifications before removing
+            std::array<glm::ivec3, 8> savedVertices;
+            const StructuralBlock* existingCell = sourceGrid->getCell(cellCoord);
+            if (existingCell) {
+                savedVertices = existingCell->m_localVertices;
+            }
             
             // Remove from source grid and add to new grid
             sourceGrid->removeCell(cellCoord);
             newGrid->addCell(cellCoord);
+
+            if (existingCell) {
+                newGrid->modifyCell(cellCoord, savedVertices);
+            }
 
             // Yield every 5 cells to avoid blocking too long
             if (++cellsProcessed % 5 == 0) {
