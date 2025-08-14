@@ -66,4 +66,11 @@ public:
      * @return Tuple of (mass, local center of mass, local inertia tensor)
      */
     virtual std::tuple<double, glm::dvec3, glm::dmat3> getMassProperties() const override;
+
+private:
+    // Mass properties caching
+    mutable bool m_massPropertiesDirty = true;
+    mutable double m_cachedMass = 0.0;
+    mutable glm::dvec3 m_cachedCenterOfMass{0.0};
+    mutable glm::dmat3 m_cachedInertiaTensor{0.0};
 };

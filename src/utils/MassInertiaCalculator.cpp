@@ -160,8 +160,10 @@ MassInertiaCalculator::MassProperties MassInertiaCalculator::calculatePolyhedron
     glm::dmat3 pointMassInertia = calculatePointMassInertia(vertices, properties.mass, properties.centerOfMass, maxSize);
     
     // Apply scaling factor based on cube reference
-    double cubeWidth = 1.0; // Normalized cube width
-    double scalingFactor = calculateCubeInertiaScalingFactor(cubeWidth, properties.mass);
+    //double cubeWidth = 1.0; // Normalized cube width
+    //double scalingFactor = calculateCubeInertiaScalingFactor(cubeWidth, properties.mass);
+    // Optimization of the above.
+    constexpr double scalingFactor = 1./3.;
     
     properties.inertiaTensor = pointMassInertia * scalingFactor;
     

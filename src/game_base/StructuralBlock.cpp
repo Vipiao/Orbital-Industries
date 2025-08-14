@@ -36,6 +36,9 @@ bool StructuralBlock::setVertices(const std::array<glm::ivec3, 8>& newVertices) 
     if (!PolyhedronProcessor::validatePolyhedron(verticesVec, MAX_SIZE)) {
         return false; // Invalid shape, don't update
     }
+
+    // Mark mass properties as dirty before updating vertices
+    m_massPropertiesDirty = true;
     
     // Shape is valid, update vertices
     m_localVertices = newVertices;
@@ -65,6 +68,11 @@ StructuralBlock::MeshData StructuralBlock::generateTriangleMeshData() const {
 }
 
 std::tuple<double, glm::dvec3, glm::dmat3> StructuralBlock::getMassProperties() const {
+    // Return cached values if still valid
+    if (!m_massPropertiesDirty) {
+        return std::make_tuple(m_cachedMass, m_cachedCenterOfMass, m_cachedInertiaTensor);
+    }
+
     // Convert vertices array to vector for MassInertiaCalculator
     std::vector<glm::ivec3> verticesVec(m_localVertices.begin(), m_localVertices.end());
     
@@ -74,5 +82,11 @@ std::tuple<double, glm::dvec3, glm::dmat3> StructuralBlock::getMassProperties() 
     // Calculate mass properties using the new polyhedron calculation
     auto massProps = MassInertiaCalculator::calculatePolyhedronMassProperties(verticesVec, MAX_SIZE, density);
     
-    return std::make_tuple(massProps.mass, massProps.centerOfMass, massProps.inertiaTensor);
+    // Cache the results
+    m_cachedMass = massProps.mass;
+    m_cachedCenterOfMass = massProps.centerOfMass;
+    m_cachedInertiaTensor = massProps.inertiaTensor;
+    m_massPropertiesDirty = false;
+    
+    return std::make_tuple(m_cachedMass, m_cachedCenterOfMass, m_cachedInertiaTensor);
 }
