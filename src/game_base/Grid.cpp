@@ -4,7 +4,7 @@
 #include "Grid.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "../physics/PhysicsEngine.h"
-#include "MassInertiaCalculator.h"
+#include "../utils/MassInertiaCalculator.h"
 #include "../debug/DebugGlobals.h"
 #include "../physics/CubeCollider.h"
 #include <limits>
@@ -106,8 +106,13 @@ void Grid::addCell(const glm::ivec3& coord) {
     // Update neighbor connections after all other setup
     updateNeighborConnections(coord);
     
-    // Recalculate center of mass (will automatically choose incremental vs full)
-    recalculateMassAndInertiaIncremental({coord});
+    // Preserve angular velocity across mass change
+    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
+    
+    // Add mass contribution
+    updateCellMassContribution(coord, 1.0);
+    
+    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
 }
 
 // Remove a cell from the grid
@@ -120,9 +125,12 @@ void Grid::removeCell(const glm::ivec3& coord) {
 
     removeNeighborConnections(coord);
 
-    // Recalculate mass and inertia incrementally before removing the cell
-    glm::dvec3 originalAngularVelocity{ m_rigidBody->getAngularVelocityBody()  };
-    recalculateMassAndInertiaIncremental({coord}, true);
+    // Preserve angular velocity across mass change
+    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
+    
+    // Remove mass contribution before removing the cell
+    updateCellMassContribution(coord, -1.0);
+    
     m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
     
     // Remove from collider
@@ -157,15 +165,21 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     auto it = m_cells.find(coord);
     StructuralBlock& block = it->second;
     
+    // Cancel existing analysis to prevent accessing modified cells
+    cancelStructuralAnalysis();
+
+    // Preserve angular velocity across entire modification
+    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
+
+    // Remove old mass contribution
+    updateCellMassContribution(coord, -1.0);
+
     // Update the block's vertices
     bool success = block.setVertices(newVertices);
     if (!success) {
         // This should never happen since we validated, but if it does it's a serious error
         return false;
     }
-    
-    // Cancel existing analysis to prevent accessing modified cells
-    cancelStructuralAnalysis();
     
     // Get new collision axes and vertices
     auto axes = block.getAxes();
@@ -192,6 +206,12 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     auto meshData = block.generateTriangleMeshData();
     m_gridGraphics->removeCell(coord);
     m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData);
+
+    // Add new mass contribution
+    updateCellMassContribution(coord, 1.0);
+     
+    // Restore angular velocity after entire modification
+    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
     
     // Schedule structural analysis
     scheduleStructuralAnalysis();
@@ -370,81 +390,32 @@ bool Grid::isEmpty() const {
     return m_cells.empty();
 }
 
-void Grid::recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& cellCoords, bool isRemoval) {
+void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
     if (!m_rigidBody) return;
     
-    // If we have no existing mass or no cells to process, do full recalculation
-    if (cellCoords.empty() || m_rigidBody->m_mass < 1e-15) {
-        recalculateMassAndInertia();
-        return;
-    }
-    
-    if (cellCoords.empty()) return;
-
-    // Constants for block properties
-    const double blockMass = 60.0;
-    const double blockWidth = 1.0;
-    const double blockBaseInertiaValue = (blockMass / 6.0) * blockWidth * blockWidth; // I = (m/6)*w² for cube
-    const glm::dmat3 blockBaseInertiaTensor = glm::dmat3(blockBaseInertiaValue); // Identity * scalar
-    
     glm::dvec3 oldCM = m_centerOfMass;
-
-    // Store original angular velocity to preserve it across inertia changes
-    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
     
-    // Calculate incremental update directly on rigid body properties
-    MassInertiaCalculator::calculateTensorInertiaIncremental(
-        cellCoords,
-        [this, blockMass, blockBaseInertiaTensor, isRemoval](const glm::ivec3& coord) {
-            bool exists = m_cells.find(coord) != m_cells.end();
-            double massSign = isRemoval ? -1.0 : 1.0;
-            glm::dmat3 inertiaSign = isRemoval ? glm::dmat3(-1.0) : glm::dmat3(1.0);
-            return MassInertiaCalculator::TensorObjectData{glm::dvec3(coord) + glm::dvec3{0.5},
-                                                    exists ? blockMass * massSign : 0.0, 
-                                                    exists ? blockBaseInertiaTensor * inertiaSign : glm::dmat3(0.0)};
-        },
+    // Lambda to get cell properties with sign applied
+    auto getProperties = [this, sign](const glm::ivec3& cellCoord) -> std::tuple<double, glm::dvec3, glm::dmat3> {
+        auto cellIt = m_cells.find(cellCoord);
+        if (cellIt != m_cells.end()) {
+            auto [mass, localCOM, inertia] = cellIt->second.getMassProperties();
+            return std::make_tuple(mass * sign, localCOM, inertia * sign);
+        }
+        return std::make_tuple(0.0, glm::dvec3(0.0), glm::dmat3(0.0));
+    };
+    
+    // Update mass contribution using coordinate-based calculation
+    MassInertiaCalculator::calculateInertiaForCoords(
+        {coord}, getProperties,
         &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_inertiaTensor);
-
+    
     // Update physics body with momentum conservation
     glm::dvec3 cmShift = m_centerOfMass - oldCM;
     m_rigidBody->m_position += m_rigidBody->m_orientation * cmShift;
-
-    // Calculate angular velocity from momentum for velocity correction
-    glm::dmat3 orientationMatrix = glm::mat3_cast(m_rigidBody->m_orientation);
     m_rigidBody->m_velocity += glm::cross(m_rigidBody->getAngularVelocityWorld(), m_rigidBody->m_orientation * cmShift);
-    updateRigidBodyInverses();
-
-    // Restore original angular velocity
-    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
-}
-
-void Grid::recalculateMassAndInertia() {
-    if (m_cells.empty()) return;
-
-    glm::dvec3 oldCM = m_centerOfMass;
-    const double blockMass = 60.0;
-    const double blockWidth = 1.0;
-
-    // Store original angular velocity to preserve it across inertia changes
-    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
-    const double blockBaseInertiaValue = (blockMass / 6.0) * blockWidth * blockWidth; // I = (m/6)*w² for cube
-    const glm::dmat3 blockBaseInertiaTensor = glm::dmat3(blockBaseInertiaValue); // Identity * scalar
     
-    MassInertiaCalculator::calculateTensorInertia(
-        m_cells, 
-        [=](const auto& pair) { return MassInertiaCalculator::TensorObjectData{glm::dvec3(pair.first) + glm::dvec3{0.5}, blockMass, blockBaseInertiaTensor}; },
-        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_inertiaTensor);
-    glm::dvec3 change = m_centerOfMass - oldCM;
-    if (glm::length(change) > 0.00001) {
-        m_rigidBody->m_position += m_rigidBody->m_orientation * change;
-
-        m_rigidBody->m_velocity += glm::cross(m_rigidBody->getAngularVelocityWorld(), m_rigidBody->m_orientation * change);
-    }
     updateRigidBodyInverses();
-    m_rigidBody->invalidateInertiaTensor();
-
-    // Restore original angular velocity
-    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
 }
 
 void Grid::updateRigidBodyInverses() {

@@ -78,6 +78,29 @@ public:
      */
     static MeshData generateMeshData(const std::vector<std::array<glm::dvec3, 3>>& triangles);
 
+    /**
+     * @brief Calculate geometric center (average of vertices)
+     * @param vertices Vector of integer vertices
+     * @return Geometric center as normalized double vector
+     */
+    static glm::dvec3 getGeometricCenter(const std::vector<glm::ivec3>& vertices);
+
+    /**
+     * @brief Calculate volume of a tetrahedron
+     * @param apex Apex vertex of tetrahedron
+     * @param v1, v2, v3 Base triangle vertices
+     * @return Volume of tetrahedron
+     */
+    static double calculateTetrahedronVolume(const glm::dvec3& apex, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3);
+
+    /**
+     * @brief Calculate centroid of a tetrahedron
+     * @param apex Apex vertex of tetrahedron
+     * @param v1, v2, v3 Base triangle vertices
+     * @return Centroid of tetrahedron
+     */
+    static glm::dvec3 calculateTetrahedronCentroid(const glm::dvec3& apex, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3);
+
 private:
     // Face definitions for cube (indices into vertex array)  
     // Coordinate system: +X right, +Y forward, +Z up (right-handed)

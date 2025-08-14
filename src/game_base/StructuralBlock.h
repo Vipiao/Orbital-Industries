@@ -60,4 +60,10 @@ public:
      * @return MeshData containing all vertex attributes for rendering
      */
     MeshData generateTriangleMeshData() const;
+
+    /**
+     * @brief Get mass properties of this structural block
+     * @return Tuple of (mass, local center of mass, local inertia tensor)
+     */
+    virtual std::tuple<double, glm::dvec3, glm::dmat3> getMassProperties() const override;
 };

@@ -7,6 +7,7 @@
 #include "../utils/IHashable.h"
 #include "../utils/StochasticAnalyzer.h"
 #include "CellType.h"
+#include <tuple>
 
 /**
  * * @brief Base class for all grid cell types
@@ -33,6 +34,12 @@ public:
     // Common interface methods
     virtual void forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> callback) const override;
     
+    /**
+     * @brief Get mass properties of this cell
+     * @return Tuple of (mass, local center of mass, local inertia tensor)
+     */
+    virtual std::tuple<double, glm::dvec3, glm::dmat3> getMassProperties() const = 0;
+
     // IHashable interface
     virtual size_t computeHash() const override;
 

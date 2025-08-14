@@ -418,3 +418,31 @@ PolyhedronProcessor::MeshData PolyhedronProcessor::generateMeshData(const std::v
     
     return meshData;
 }
+
+glm::dvec3 PolyhedronProcessor::getGeometricCenter(const std::vector<glm::ivec3>& vertices) {
+    if (vertices.empty()) {
+        return glm::dvec3(0.0);
+    }
+    
+    glm::dvec3 sum(0.0);
+    for (const glm::ivec3& vertex : vertices) {
+        sum += glm::dvec3(vertex);
+    }
+    
+    return sum / static_cast<double>(vertices.size());
+}
+
+double PolyhedronProcessor::calculateTetrahedronVolume(const glm::dvec3& apex, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3) {
+    // Volume = |det(v1-apex, v2-apex, v3-apex)| / 6
+    glm::dvec3 edge1 = v1 - apex;
+    glm::dvec3 edge2 = v2 - apex;
+    glm::dvec3 edge3 = v3 - apex;
+    
+    double det = glm::dot(edge1, glm::cross(edge2, edge3));
+    return std::abs(det) / 6.0;
+}
+
+glm::dvec3 PolyhedronProcessor::calculateTetrahedronCentroid(const glm::dvec3& apex, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3) {
+    // Centroid = (apex + v1 + v2 + v3) / 4
+    return (apex + v1 + v2 + v3) * 0.25;
+}

@@ -1,5 +1,6 @@
 // StructuralBlock.cpp
 #include "StructuralBlock.h"
+#include "../utils/MassInertiaCalculator.h"
 
 // Define static default vertices
 const std::array<glm::ivec3, 8> StructuralBlock::DEFAULT_VERTICES = {{
@@ -61,4 +62,17 @@ StructuralBlock::MeshData StructuralBlock::generateTriangleMeshData() const {
     
     // Generate complete mesh data using PolyhedronProcessor
     return PolyhedronProcessor::generateMeshData(triangles);
+}
+
+std::tuple<double, glm::dvec3, glm::dmat3> StructuralBlock::getMassProperties() const {
+    // Convert vertices array to vector for MassInertiaCalculator
+    std::vector<glm::ivec3> verticesVec(m_localVertices.begin(), m_localVertices.end());
+    
+    // Use density = 1.0 for now
+    const double density = 1.0;
+    
+    // Calculate mass properties using the new polyhedron calculation
+    auto massProps = MassInertiaCalculator::calculatePolyhedronMassProperties(verticesVec, MAX_SIZE, density);
+    
+    return std::make_tuple(massProps.mass, massProps.centerOfMass, massProps.inertiaTensor);
 }

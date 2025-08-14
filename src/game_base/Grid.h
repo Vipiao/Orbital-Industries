@@ -3,7 +3,7 @@
 
 #include "../physics/RigidBody.h"
 #include "../physics/GridCollider.h"
-#include "MassInertiaCalculator.h"
+#include "../utils/MassInertiaCalculator.h"
 #include "../utils/IHashable.h"
 #include "../utils/HashFunctions.h"
 #include "../utils/StochasticAnalyzer.h"
@@ -126,8 +126,7 @@ private:
     StructuralBlock* getCell(const glm::ivec3& coord);
     
     // Face visibility and mesh management methods
-    void recalculateMassAndInertia();
-    void recalculateMassAndInertiaIncremental(const std::vector<glm::ivec3>& cellCoords, bool isRemoval = false);
+    void updateCellMassContribution(const glm::ivec3& coord, double sign);
     void updateRigidBodyInverses();
     double getApproximateRadius() const;
 };
