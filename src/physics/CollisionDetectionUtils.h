@@ -15,10 +15,9 @@ struct CollisionCacheData {
     
     // Cached collision result
     std::vector<glm::dvec3> contactPoints;
+    std::vector<ContactData> contactData;
     std::vector<glm::dvec3> contactPointsLocalA;
     std::vector<glm::dvec3> contactPointsLocalB;
-    std::vector<glm::dvec3> normals;
-    std::vector<double> penetrationDepths;
     int collisionPairCount = 0;
     
     // Cache validity tracking
@@ -89,9 +88,8 @@ private:
         PolyhedronCollider* polyhedron, 
         GridCollider* grid,
         const glm::dvec3& gridSpacePolyCenterPos,
-        std::vector<glm::dvec3>& allNormals,
+        std::vector<ContactData>& allContactData,
         std::vector<glm::dvec3>& allContactPoints,
-        std::vector<double>& allPenetrationDepths,
         int& collisionPairCount,
         bool useSimplifiedContactGeneration = false,
         uint64_t currentTimestep = 0,

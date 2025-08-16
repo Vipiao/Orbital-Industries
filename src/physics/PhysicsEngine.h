@@ -76,6 +76,12 @@ private:
     static double getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
                                   const glm::dvec3& contactPoint, const glm::dvec3& normal);
 
+    // Static helper function for compliant collision detection
+    static bool shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* bodyB, 
+                                          const glm::dvec3& contactPoint, const glm::dvec3& normal,
+                                          double compliantPenetration,
+                                          const glm::dvec3* relativeVel = nullptr);
+
     // State machine variables
     RunState m_runState = RunState::APPLY_FORCES;
     CollisionProcessState m_collisionProcessState = CollisionProcessState::DETECT;

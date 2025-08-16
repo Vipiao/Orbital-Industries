@@ -149,7 +149,8 @@ CollisionResult CollisionDetectionUtils::detectBallBall(
         // Calculate penetration depth
         double penetrationDepth = radiusSum - distance;
         
-        return CollisionResult(true, normal, contactPoint, penetrationDepth, ballA, ballB);
+        return CollisionResult(true, std::vector<ContactData>{ContactData(normal, penetrationDepth)}, 
+                              std::vector<glm::dvec3>{contactPoint}, ballA, ballB);
     }
     
     // No collision
@@ -211,7 +212,8 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
         // Penetration depth
         double penetration = ballRadius - distance;
         
-        return CollisionResult(true, worldNormal, contactPoint, penetration, ball, cube);
+        return CollisionResult(true, std::vector<ContactData>{ContactData(worldNormal, penetration)}, 
+                              std::vector<glm::dvec3>{contactPoint}, ball, cube);
     }
     
     return CollisionResult();
@@ -245,6 +247,14 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     auto [faceAxesA, edgeAxesA, filterNormalsA] = polyA->getCollisionAxes(currentTimestep);
     auto [faceAxesB, edgeAxesB, filterNormalsB] = polyB->getCollisionAxes(currentTimestep);
     
+    // Array to store all tested axes and their penetrations
+    struct AxisData {
+        glm::dvec3 axis;
+        double penetration;
+    };
+    std::array<AxisData, 300> allTestedAxes;
+    size_t axisCount = 0;
+
     double minPenetration = std::numeric_limits<double>::max();
     glm::dvec3 separatingAxis;
 
@@ -261,6 +271,9 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     
     // Test face normals of cube A
     for (const glm::dvec3& axis : faceAxesA) {
+        if (axisCount < 300) {
+            allTestedAxes[axisCount].axis = glm::normalize(axis);
+        }
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
@@ -270,11 +283,20 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
         if (result.penetration < minPenetration) {
             minPenetration = result.penetration;
             separatingAxis = result.axis;
+        }
+        
+        if (axisCount < 300) {
+            allTestedAxes[axisCount].penetration = result.penetration;
+            axisCount++;
         }
     }
     
     // Test face normals of cube B
     for (const glm::dvec3& axis : faceAxesB) {
+        if (axisCount < 300) {
+            allTestedAxes[axisCount].axis = glm::normalize(axis);
+        }
+
         SeparatingAxisResult result = testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
@@ -284,6 +306,11 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
         if (result.penetration < minPenetration) {
             minPenetration = result.penetration;
             separatingAxis = result.axis;
+        }
+        
+        if (axisCount < 300) {
+            allTestedAxes[axisCount].penetration = result.penetration;
+            axisCount++;
         }
     }
     
@@ -291,6 +318,10 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     for (const glm::dvec3& axisA : edgeAxesA) {
         for (const glm::dvec3& axisB : edgeAxesB) {
             glm::dvec3 crossProduct = glm::cross(axisA, axisB);
+
+            if (axisCount < 300) {
+                allTestedAxes[axisCount].axis = glm::normalize(crossProduct);
+            }
             
             // Skip nearly parallel edges
             double ll{ glm::length2(crossProduct) };
@@ -308,6 +339,11 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
             if (result.penetration < minPenetration) {
                 minPenetration = result.penetration;
                 separatingAxis = result.axis;
+            }
+            
+            if (axisCount < 300) {
+                allTestedAxes[axisCount].penetration = result.penetration;
+                axisCount++;
             }
         }
     }
@@ -332,34 +368,69 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     
     // Now separatingAxis is our collision normal pointing from A toward B
     glm::dvec3 collisionNormal = glm::normalize(separatingAxis);
-    
-    // Check if this collision should be filtered based on filter normals
-    const double filterTolerance = 0.7; // arccos(0.7) ~ 45.57 deg tolerance
-    
-    // Check filter normals from both cubes
-    for (const glm::dvec3& filterNormal : filterNormalsA) {
-        if (glm::dot(collisionNormal, filterNormal) > filterTolerance) {
-            return CollisionResult(polyA, polyB, true); // True means is filtered.
+
+    // Ensure all stored axes are oriented consistently with the collision normal direction
+    // (flip them the same way we flipped the collision normal)
+    for (size_t i = 0; i < axisCount; ++i) {
+        glm::dvec3& storedAxis = allTestedAxes[i].axis;
+        // Apply the same center-to-center orientation check
+        if (glm::dot(storedAxis, centerToCenter) < 0.0) {
+            storedAxis = -storedAxis;
         }
     }
     
-    for (const glm::dvec3& filterNormal : filterNormalsB) {
-        if (glm::dot(-collisionNormal, filterNormal) > filterTolerance) {
-            return CollisionResult(polyA, polyB, true); // True means is filtered.
+    // Find compliant normal: must be at least 40 degrees different from collision normal
+    // cos(40°) ≈ 0.766
+    constexpr double compliantAngleMin = glm::cos(glm::radians(40.0));   // minimum angle threshold
+    constexpr double compliantAngleMax = glm::cos(glm::radians(140.0));  // maximum angle threshold
+    
+    glm::dvec3 compliantNormal(0.0);
+    double compliantPenetration = -1.0;
+    double bestCompliantPenetration = std::numeric_limits<double>::max();
+    bool foundCompliant = false;
+    
+    for (size_t i = 0; i < axisCount; ++i) {
+        
+        glm::dvec3 testAxis = allTestedAxes[i].axis;
+        double testPenetration = allTestedAxes[i].penetration;
+        
+        // Skip if this is the collision normal (or very close to it)
+        if (glm::abs(glm::dot(collisionNormal, testAxis)) > 0.999) {
+            continue;
+        }
+        
+        // Check if between min and max angle different
+        double dotProduct = glm::dot(collisionNormal, testAxis);
+        if (dotProduct < compliantAngleMin && dotProduct > compliantAngleMax) {
+            // This axis is sufficiently different, check if it's the best so far
+            if (testPenetration < bestCompliantPenetration) {
+                bestCompliantPenetration = testPenetration;
+                compliantNormal = testAxis;
+                compliantPenetration = testPenetration;
+                foundCompliant = true;
+            }
         }
     }
 
     // Generate contact points (full complexity)
     ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration, useSimplifiedContactGeneration);
     
+    // Create ContactData with compliant information
+    size_t numContactPoints = contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints.size() : 1;
+    std::vector<ContactData> contactData;
+    contactData.reserve(numContactPoints);
+    
+    for (size_t i = 0; i < numContactPoints; ++i) {
+        if (foundCompliant) {
+            contactData.emplace_back(contactInfo.normal, contactInfo.penetration, compliantNormal, compliantPenetration);
+        } else {
+            contactData.emplace_back(contactInfo.normal, contactInfo.penetration);
+        }
+    }
+
     // Create collision result
-    CollisionResult result(true, contactInfo.contactPoints.size() > 0 ? 
-                          std::vector<glm::dvec3>(contactInfo.contactPoints.size(), contactInfo.normal) :
-                          std::vector<glm::dvec3>{contactInfo.normal},
+    CollisionResult result(true, std::move(contactData),
                           contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints : std::vector<glm::dvec3>{polyA->m_position},
-                          contactInfo.contactPoints.size() > 0 ? 
-                          std::vector<double>(contactInfo.contactPoints.size(), contactInfo.penetration) :
-                          std::vector<double>{contactInfo.penetration},
                           polyA, polyB);
     
     // Reduce contact points if there are too close
@@ -386,9 +457,8 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     // Find colliders within search area using ball radius
     std::vector<Collider*> nearbyColliders = grid->findCellsInRadius(ballPos, ballRadius);
     
-    std::vector<glm::dvec3> allNormals;
+    std::vector<ContactData> allContactData;
     std::vector<glm::dvec3> allContactPoints;
-    std::vector<double> allPenetrationDepths;
     
     // Test collision with each found collider
     for (Collider* gridCell : nearbyColliders) {
@@ -402,16 +472,14 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
-            allNormals.insert(allNormals.end(), result.m_normals.begin(), result.m_normals.end());
+            allContactData.insert(allContactData.end(), result.m_contactData.begin(), result.m_contactData.end());
             allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
-            allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
         }
     }
     
     // Return combined result
-    if (!allNormals.empty()) {
-        CollisionResult result(true, std::move(allNormals), std::move(allContactPoints), 
-                               std::move(allPenetrationDepths), ball, grid);
+    if (!allContactData.empty()) {
+        CollisionResult result(true, std::move(allContactData), std::move(allContactPoints), ball, grid);
         
         return result;
     }
@@ -423,9 +491,8 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
     PolyhedronCollider* polyhedron,
     GridCollider* grid,
     const glm::dvec3& gridSpacePolyCenterPos,
-    std::vector<glm::dvec3>& allNormals,
+    std::vector<ContactData>& allContactData,
     std::vector<glm::dvec3>& allContactPoints,
-    std::vector<double>& allPenetrationDepths,
     int& collisionPairCount,
     bool useSimplifiedContactGeneration,
     uint64_t currentTimestep,
@@ -501,17 +568,13 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
                     collisionPairCount++; // Increment by 1 per collision pair, not per contact point
                     
                     // Directly append collision data to result vectors
-                    if (normalFlip) {
-                        for (const auto& normal : result.m_normals) {
-                            allNormals.push_back(-normal);
-                        }
-                    } else {
-                        for (const auto& normal : result.m_normals) {
-                            allNormals.push_back(normal);
-                        }
+                    for (const auto& contact : result.m_contactData) {
+                        ContactData flippedContact = normalFlip ? 
+                            ContactData(-contact.normal, contact.penetration, -contact.compliantNormal, contact.compliantPenetration) :
+                            contact;
+                        allContactData.push_back(flippedContact);
                     }
                     allContactPoints.insert(allContactPoints.end(), result.m_contactPoints.begin(), result.m_contactPoints.end());
-                    allPenetrationDepths.insert(allPenetrationDepths.end(), result.m_penetrationDepths.begin(), result.m_penetrationDepths.end());
                 }
             }
         }
@@ -527,20 +590,18 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronGrid(
         return CollisionResult();
     }
     
-    std::vector<glm::dvec3> allNormals;
+    std::vector<ContactData> allContactData;
     std::vector<glm::dvec3> allContactPoints;
-    std::vector<double> allPenetrationDepths;
     int collisionPairCount = 0;
     
     // Use helper function to process collision
     glm::dvec3 gridSpacePolyCenterPos = grid->worldToGrid(polyhedron->m_position);
-    processPolyhedronGridCollision(polyhedron, grid, gridSpacePolyCenterPos, allNormals, allContactPoints, allPenetrationDepths,
+    processPolyhedronGridCollision(polyhedron, grid, gridSpacePolyCenterPos, allContactData, allContactPoints,
                            collisionPairCount, false, currentTimestep, false);
     
     // Return combined result
-    if (!allNormals.empty()) {
-        CollisionResult result(true, std::move(allNormals), std::move(allContactPoints), 
-                               std::move(allPenetrationDepths), polyhedron, grid);
+    if (!allContactData.empty()) {
+        CollisionResult result(true, std::move(allContactData), std::move(allContactPoints), polyhedron, grid);
         
         // Simple contact point reduction - remove points within 10cm of each other
         if (result.m_contactPoints.size() > 1) {
@@ -647,6 +708,9 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         //std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
         // Reuse cached collision data
         if (!cacheData->contactPoints.empty()) {
+            // Get cached contact data and rotate both normal and compliant normal
+            std::vector<ContactData> cachedContactData = cacheData->contactData;
+
             // Precalculate local-to-world transform matrices
             glm::dmat4 gridAToWorld = glm::translate(glm::dmat4(1.0), gridA->m_position) * 
                                      glm::mat4_cast(gridA->m_orientation);
@@ -656,12 +720,13 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             // Calculate how much grid A has rotated since cache was created
             glm::dquat rotationDifference = gridA->m_orientation * glm::conjugate(cacheData->prevAOrientationWorld);
             
-            // Rotate the cached normals by the rotation difference
-            std::vector<glm::dvec3> updatedNormals;
-            updatedNormals.reserve(cacheData->normals.size());
-            for (const glm::dvec3& cachedNormal : cacheData->normals) {
-                glm::dvec3 rotatedNormal = rotationDifference * cachedNormal;
-                updatedNormals.push_back(rotatedNormal);
+            // Update both normals and compliant normals with rotation
+            for (auto& contact : cachedContactData) {
+                contact.normal = rotationDifference * contact.normal;
+                // Rotate compliant normal if it's valid (non-zero and positive penetration)
+                if (contact.compliantPenetration > 0.0) {
+                    contact.compliantNormal = rotationDifference * contact.compliantNormal;
+                }
             }
 
             // Transform cached local coordinates to current world coordinates
@@ -675,8 +740,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
                 updatedContactPoints.push_back(averagedWorld);
             }
 
-            CollisionResult result(true, std::move(updatedNormals), std::move(updatedContactPoints),
-                                   std::vector<double>(cacheData->penetrationDepths), gridA, gridB,
+            CollisionResult result(true, std::move(cachedContactData), std::move(updatedContactPoints), gridA, gridB,
                                    std::vector<glm::dvec3>(cacheData->contactPointsLocalA), 
                                    std::vector<glm::dvec3>(cacheData->contactPointsLocalB));
             return result;
@@ -684,7 +748,6 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             return CollisionResult(); // No collision cached
         }
     }
-    //hasCachedData = false;
 
     // Use simplified contact generation if previous iteration had too many collision pairs
     const int CONTACT_COMPLEXITY_THRESHOLD = 6;
@@ -699,13 +762,12 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     
     std::vector<glm::dvec3> allNormals;
     std::vector<glm::dvec3> allContactPoints;
-    std::vector<double> allPenetrationDepths;
+    std::vector<ContactData> allContactData;
     int collisionPairCount = 0;
 
     // Reserve some capacity to avoid reallocations
-    allNormals.reserve(8);
+    allContactData.reserve(8);
     allContactPoints.reserve(8);
-    allPenetrationDepths.reserve(8);
 
     // Helper function to process a group of cells
     auto processGroup = [&](const auto& cellMap, const glm::dmat4& transform, GridCollider* targetGrid, bool normalFlip, auto extractCollider) {
@@ -731,8 +793,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             glm::dvec4 transformedCoord = transform * homogeneousCoord;
             glm::dvec3 gridSpacePolyCenterPos = glm::dvec3(transformedCoord);
 
-            processPolyhedronGridCollision(queryCollider, targetGrid, gridSpacePolyCenterPos, allNormals, allContactPoints,
-                                   allPenetrationDepths, collisionPairCount, 
+            processPolyhedronGridCollision(queryCollider, targetGrid, gridSpacePolyCenterPos, allContactData, allContactPoints,
+                                   collisionPairCount, 
                                    useSimplifiedContactGeneration, currentTimestep, normalFlip);
         }
     };
@@ -784,9 +846,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     }
     
     // Return combined result
-    if (!allNormals.empty()) {
-        CollisionResult result(true, std::move(allNormals), std::move(allContactPoints), 
-                               std::move(allPenetrationDepths), 
+    if (!allContactData.empty()) {
+        CollisionResult result(true, std::move(allContactData), std::move(allContactPoints),
                                gridA, gridB);
         
         // Reduce contact points if there are too many
@@ -802,8 +863,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         newCacheData.contactPoints = result.m_contactPoints;
         newCacheData.contactPointsLocalA = result.m_contactPointsLocalA;
         newCacheData.contactPointsLocalB = result.m_contactPointsLocalB;
-        newCacheData.normals = result.m_normals;
-        newCacheData.penetrationDepths = result.m_penetrationDepths;
+        newCacheData.contactData = result.m_contactData;
         newCacheData.collisionPairCount = collisionPairCount;
         newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
         newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
@@ -827,6 +887,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     newCacheData.prevBCenterInA = currentBCenterInA;
     newCacheData.prevBOrientationInA = currentBOrientationInA;
     newCacheData.prevAOrientationWorld = gridA->m_orientation;
+    newCacheData.contactData.clear(); // Empty contact data for no collision
     newCacheData.collisionPairCount = 0;
     newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
     newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
@@ -843,8 +904,9 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronBall(
     CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(polyhedron), currentTimestep);
     
     // Flip normal direction since we called ball-cube instead of cube-ball
-    for (glm::dvec3& normal : result.m_normals) {
-        normal = -normal;
+    for (auto& contact : result.m_contactData) {
+        contact.normal = -contact.normal;
+        contact.compliantNormal = -contact.compliantNormal;
     }
     
     return result;
@@ -857,8 +919,9 @@ CollisionResult CollisionDetectionUtils::detectGridBall(
     CollisionResult result = detectBallGrid(ball, grid, currentTimestep);
     
     // Flip normal direction since we called ball-grid instead of grid-ball
-    for (glm::dvec3& normal : result.m_normals) {
-        normal = -normal;
+    for (auto& contact : result.m_contactData) {
+        contact.normal = -contact.normal;
+        contact.compliantNormal = -contact.compliantNormal;
     }
     
     return result;
@@ -871,8 +934,9 @@ CollisionResult CollisionDetectionUtils::detectGridPolyhedron(
     CollisionResult result = detectPolyhedronGrid(polyhedron, grid, currentTimestep);
     
     // Flip normal direction since we called cube-grid instead of grid-cube
-    for (glm::dvec3& normal : result.m_normals) {
-        normal = -normal;
+    for (auto& contact : result.m_contactData) {
+        contact.normal = -contact.normal;
+        contact.compliantNormal = -contact.compliantNormal;
     }
     
     return result;
@@ -1360,17 +1424,16 @@ std::vector<glm::dvec3> CollisionDetectionUtils::projectToWorld(
 }
 
 void CollisionDetectionUtils::mergeCloseContactPoints(CollisionResult& collision, double mergeDistance) {
-    if (collision.m_contactPoints.size() <= 1) {
+    if (collision.m_contactData.size() <= 1) {
         return;
     }
     
-    // Remove contact points that are too close to earlier ones
-    for (size_t i = collision.m_contactPoints.size() - 1; i > 0; --i) {
+    // Remove contacts that are too close to earlier ones
+    for (size_t i = collision.m_contactData.size() - 1; i > 0; --i) {
         for (size_t j = 0; j < i; ++j) {
             if (glm::length(collision.m_contactPoints[i] - collision.m_contactPoints[j]) < mergeDistance) {
+                collision.m_contactData.erase(collision.m_contactData.begin() + i);
                 collision.m_contactPoints.erase(collision.m_contactPoints.begin() + i);
-                collision.m_normals.erase(collision.m_normals.begin() + i);
-                collision.m_penetrationDepths.erase(collision.m_penetrationDepths.begin() + i);
                 collision.m_contactPointsLocalA.erase(collision.m_contactPointsLocalA.begin() + i);
                 collision.m_contactPointsLocalB.erase(collision.m_contactPointsLocalB.begin() + i);
                 break;
@@ -1380,11 +1443,11 @@ void CollisionDetectionUtils::mergeCloseContactPoints(CollisionResult& collision
 }
 
 void CollisionDetectionUtils::reduceContactPoints(CollisionResult& collision, int maxPoints) {
-    if (collision.m_contactPoints.size() <= static_cast<size_t>(maxPoints)) {
+    if (collision.m_contactData.size() <= static_cast<size_t>(maxPoints)) {
         return; // No reduction needed
     }
     
-    size_t numPoints = collision.m_contactPoints.size();
+    size_t numPoints = collision.m_contactData.size();
     
     // Step 1: Generate 6D coordinates
     std::vector<std::array<double, 6>> coords6D(numPoints);
@@ -1406,14 +1469,14 @@ void CollisionDetectionUtils::reduceContactPoints(CollisionResult& collision, in
     // Generate normalized 6D coordinates
     for (size_t i = 0; i < numPoints; ++i) {
         const auto& point = collision.m_contactPoints[i];
-        const auto& normal = collision.m_normals[i];
+        const auto& contact = collision.m_contactData[i];
         
         // Normalize position coordinates (handle edge case where max == min)
         double normX = (maxX > minX) ? 2.0 * (point.x - minX) / (maxX - minX) - 1.0 : 0.0;
         double normY = (maxY > minY) ? 2.0 * (point.y - minY) / (maxY - minY) - 1.0 : 0.0;
         double normZ = (maxZ > minZ) ? 2.0 * (point.z - minZ) / (maxZ - minZ) - 1.0 : 0.0;
         
-        coords6D[i] = {normX, normY, normZ, normal.x, normal.y, normal.z};
+        coords6D[i] = {{normX, normY, normZ, contact.normal.x, contact.normal.y, contact.normal.z}};
     }
     
     // Step 2: Support point selection algorithm
@@ -1466,23 +1529,20 @@ void CollisionDetectionUtils::reduceContactPoints(CollisionResult& collision, in
     }
     
     // Step 3: Reconstruct collision result with selected points only
-    std::vector<glm::dvec3> newNormals;
+    std::vector<ContactData> newContactData;
     std::vector<glm::dvec3> newContactPoints;
-    std::vector<double> newPenetrationDepths;
     std::vector<glm::dvec3> newContactPointsLocalA;
     std::vector<glm::dvec3> newContactPointsLocalB;
     
     for (size_t index : selectedIndices) {
-        newNormals.push_back(collision.m_normals[index]);
+        newContactData.push_back(collision.m_contactData[index]);
         newContactPoints.push_back(collision.m_contactPoints[index]);
-        newPenetrationDepths.push_back(collision.m_penetrationDepths[index]);
         newContactPointsLocalA.push_back(collision.m_contactPointsLocalA[index]);
         newContactPointsLocalB.push_back(collision.m_contactPointsLocalB[index]);
     }
     
-    collision.m_normals = std::move(newNormals);
+    collision.m_contactData = std::move(newContactData);
     collision.m_contactPoints = std::move(newContactPoints);
-    collision.m_penetrationDepths = std::move(newPenetrationDepths);
     collision.m_contactPointsLocalA = std::move(newContactPointsLocalA);
     collision.m_contactPointsLocalB = std::move(newContactPointsLocalB);
     

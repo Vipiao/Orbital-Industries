@@ -343,17 +343,18 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
 
     // Calculate collision masses if not already done
     if (!collision.m_collisionMassesCalculated) {
-        collision.m_collisionMasses.reserve(collision.m_normals.size());
-        for (size_t i = 0; i < collision.m_normals.size(); ++i) {
-            double collisionMass = getCollisionMass(bodyA, bodyB, collision.m_contactPoints[i], collision.m_normals[i]);
+        collision.m_collisionMasses.reserve(collision.m_contactData.size());
+        for (size_t i = 0; i < collision.m_contactData.size(); ++i) {
+            double collisionMass = getCollisionMass(bodyA, bodyB, collision.m_contactPoints[i], collision.m_contactData[i].normal);
             collision.m_collisionMasses.push_back(collisionMass);
         }
         collision.m_collisionMassesCalculated = true;
     }
 
     // Process each contact point
-    for (size_t i = 0; i < collision.m_normals.size(); ++i) {
-        glm::dvec3 normal = collision.m_normals[i];
+    for (size_t i = 0; i < collision.m_contactData.size(); ++i) {
+        const ContactData& contact = collision.m_contactData[i];
+        glm::dvec3 normal = contact.normal;
         glm::dvec3 contactPoint = collision.m_contactPoints[i];
         
         // Calculate relative position vectors from center of mass to contact point
@@ -380,6 +381,23 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
 
         // Apply impulse
         glm::dvec3 impulse = normal * impulseMagnitude;
+
+        // Apply compliant collision handling for corner softness
+        //std::cout << std::endl;
+        //std::cout << "compliantOverlap: " << compliantOverlap << std::endl;
+        extern int debug1;
+        debug1++;
+        std::cout << "impulse: " << glm::length(impulse) << " " << debug1 << std::endl;
+        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantPenetration, &relativeVel)) {
+            glm::dvec3 compliantNormal = contact.compliantNormal;
+            double normalAlignment = glm::dot(normal, compliantNormal);
+            double scaleFactor = 1.;
+            if (true || normalAlignment > 0)
+            {
+                scaleFactor = normalAlignment * normalAlignment;
+            }
+            impulse *= scaleFactor;
+        }
         
         // Apply impulse only to non-static bodies
         if (!bodyA->m_isStatic) {
@@ -414,18 +432,24 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
     // Use pre-calculated collision masses
     if (!collision.m_collisionMassesCalculated) {
         // This should already be calculated in resolveCollision, but just in case
-        collision.m_collisionMasses.reserve(collision.m_normals.size());
-        for (size_t i = 0; i < collision.m_normals.size(); ++i) {
-            double collisionMass = getCollisionMass(bodyA, bodyB, collision.m_contactPoints[i], collision.m_normals[i]);
+        collision.m_collisionMasses.reserve(collision.m_contactData.size());
+        for (size_t i = 0; i < collision.m_contactData.size(); ++i) {
+            double collisionMass = getCollisionMass(bodyA, bodyB, collision.m_contactPoints[i], collision.m_contactData[i].normal);
             collision.m_collisionMasses.push_back(collisionMass);
         }
         collision.m_collisionMassesCalculated = true;
     }
 
     // Process each contact point for position correction with dynamic overlap calculation
-    for (size_t ii = 0; ii < collision.m_normals.size(); ++ii) {
-        glm::dvec3 normal = collision.m_normals[ii];
+    for (size_t ii = 0; ii < collision.m_contactData.size(); ++ii) {
+        const ContactData& contact = collision.m_contactData[ii];
+        glm::dvec3 normal = contact.normal;
         glm::dvec3 contactPoint = collision.m_contactPoints[ii];
+
+        // Skip overlap correction for contacts that would use compliant handling
+        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantPenetration)) {
+            continue; // Skip overlap correction for this contact
+        }
 
         // Calculate current overlap using dynamic contact point positions
         // Transform local contact points back to current world space using collider methods
@@ -437,7 +461,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         double separationAlongNormal = glm::dot(separation, normal);
         
         // Adjust the overlap: positive separation means objects moved apart, so reduce overlap
-        double overlap = collision.m_penetrationDepths[ii] + separationAlongNormal;
+        double overlap = contact.penetration + separationAlongNormal;
         
         // Only separate if there's positive overlap
         if (overlap <= 0) {
@@ -451,7 +475,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         double margin = 0.01;
         double correctionMagnitude = (overlap - margin) * collisionMass;
         if (correctionMagnitude < 0.) {
-            correctionMagnitude *= 0.08 / collision.m_normals.size();
+            correctionMagnitude *= 0.08 / collision.m_contactData.size();
         }
 
         // Calculate relative position vectors from center of mass to contact point
@@ -525,4 +549,30 @@ double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB,
     // Complete effective mass calculation
     double invEffectiveMass = bodyA->m_invMass + bodyB->m_invMass + rotTermA + rotTermB;
     return 1.0 / invEffectiveMass;
+}
+
+bool PhysicsEngine::shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* bodyB, 
+                                              const glm::dvec3& contactPoint, const glm::dvec3& normal,
+                                              double compliantPenetration,
+                                              const glm::dvec3* relativeVel) {
+    if (compliantPenetration <= 0.0) {
+        return false; // No compliant data available
+    }
+    
+    double relativeVelNormal;
+    
+    if (relativeVel) {
+        // Use provided relative velocity (performance optimization)
+        relativeVelNormal = glm::dot(*relativeVel, normal);
+    } else {
+        // Calculate relative velocity at contact point
+        glm::dvec3 rA = contactPoint - bodyA->m_position;
+        glm::dvec3 rB = contactPoint - bodyB->m_position;
+        glm::dvec3 velA = bodyA->m_velocity + glm::cross(bodyA->getAngularVelocityWorld(), rA);
+        glm::dvec3 velB = bodyB->m_velocity + glm::cross(bodyB->getAngularVelocityWorld(), rB);
+        glm::dvec3 computedRelativeVel = velA - velB;
+        relativeVelNormal = glm::dot(computedRelativeVel, normal);
+    }
+    
+    return glm::min(relativeVelNormal * 10.0, 0.1) > compliantPenetration;
 }
