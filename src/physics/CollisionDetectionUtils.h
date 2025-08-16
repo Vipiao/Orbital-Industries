@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
+#include "../utils/GeometryUtils.h"
 #include "CollisionResult.h"
 
 // Collision cache data structure for spatial coherence optimization
@@ -95,34 +96,12 @@ private:
         uint64_t currentTimestep = 0,
         bool normalFlip = false);
 
-    // Helper structures for cube collision detection
-    struct SeparatingAxisResult {
-        bool isSeparating;
-        double penetration;
-        glm::dvec3 axis;
-    };
-    
-    struct ProjectionResult {
-        double min;
-        double max;
-    };
-    
     struct ContactInfo {
         std::vector<glm::dvec3> contactPoints;
         glm::dvec3 normal;
         double penetration;
     };
 
-    // Cube collision detection helpers
-    static SeparatingAxisResult testSeparatingAxis(
-        const glm::dvec3& axis,
-        const std::vector<glm::dvec3>& verticesA,
-        const std::vector<glm::dvec3>& verticesB);
-    
-    static ProjectionResult projectVertices(
-        const std::vector<glm::dvec3>& vertices, 
-        const glm::dvec3& axis);
-    
     static std::vector<glm::dvec3> getCubeVertices(
         const glm::dvec3& position, 
         const glm::dquat& orientation, 
@@ -135,40 +114,9 @@ private:
         double penetration,
         bool useSimplifiedContactGeneration = false);
     
-    // Polygon clipping helpers
-    static std::vector<glm::dvec2> projectToPlane(
-        const std::vector<glm::dvec3>& points3D,
-        const glm::dmat3& transformMatrix,
-        double& averageZ);
-    
-    static std::vector<glm::dvec2> windPoints(const std::vector<glm::dvec2>& points);
-    
-    static std::vector<glm::dvec2> sutherlandHodgmanClip(
-        const std::vector<glm::dvec2>& subjectPoly,
-        const std::vector<glm::dvec2>& clipPoly);
-    
-    static std::vector<glm::dvec3> projectToWorld(
-        const std::vector<glm::dvec2>& points2D,
-        const glm::dmat3& inverseMatrix,
-        double averageZ = 0.0);
-
     // Contact point reduction for performance optimization
     static void mergeCloseContactPoints(CollisionResult& collision, double mergeDistance = 0.3);
     
     // Complex contact point reduction for grid-grid only
     static void reduceContactPoints(CollisionResult& collision, int maxPoints = CONTACT_REDUCTION_THRESHOLD);
-
-    static glm::dmat3 createPlaneTransform(const glm::dvec3& normal);
-
-    // Helper functions for contact generation
-    static std::vector<glm::dvec2> clipSegmentAgainstPolygon(
-        const std::vector<glm::dvec2>& segment, const std::vector<glm::dvec2>& polygon);
-    static bool clipSegmentAgainstEdge(glm::dvec2& p1, glm::dvec2& p2, 
-        const glm::dvec2& edgeStart, const glm::dvec2& edgeEnd);
-    
-    // General geometry utilities
-    static bool segmentIntersection(
-        const glm::dvec2& p1, const glm::dvec2& q1,
-        const glm::dvec2& p2, const glm::dvec2& q2,
-        glm::dvec2& intersection);
 };
