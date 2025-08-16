@@ -57,6 +57,7 @@ void main() {
    
    // 2. Diffuse light - varies with surface orientation to light
    float diff = max(dot(normal, lightDir), 0.0);
+   diff += max(dot(normal, -lightDir), 0.0) * 0.1;
    vec3 diffuse = diff * objectColor;
    
    // 3. Specular light - reflective highlights
