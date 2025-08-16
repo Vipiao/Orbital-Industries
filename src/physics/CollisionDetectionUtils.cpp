@@ -684,9 +684,9 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             
             canUseCachedContacts = true;
             // Position delta
-            double positionDelta = glm::length(currentBCenterInA - cacheData->prevBCenterInA);
+            double positionDeltaSqr = glm::length2(currentBCenterInA - cacheData->prevBCenterInA);
             const double POSITION_THRESHOLD = 0.08;
-            if (positionDelta > POSITION_THRESHOLD)
+            if (positionDeltaSqr > POSITION_THRESHOLD * POSITION_THRESHOLD)
             {
                 canUseCachedContacts = false;
             } else {
@@ -695,7 +695,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
                 orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
 
                 double constexpr nn = 2. * glm::sqrt(2);
-                double remainder = (POSITION_THRESHOLD - positionDelta) / (nn * approxRadiusB);
+                double remainder = (POSITION_THRESHOLD - glm::sqrt(positionDeltaSqr)) / (nn * approxRadiusB);
                 if (orientationDot < 1.0 - remainder * remainder)
                 {
                     canUseCachedContacts = false;
