@@ -46,6 +46,7 @@ out vec3 vert_normal;
 out mat3 vert_TBN;
 out vec3 vert_pos;
 out vec2 vert_uv;
+out vec4 vert_color;
 flat out int vert_colorTextureUnit;
 flat out int vert_normalTextureUnit;
 out float vert_occlusionFactor;
@@ -172,6 +173,7 @@ void main() {
     // Final world position in camera space
     vec4 worldPos = vec4(meshPositionL + worldTransformedPos, 1.0);
     vert_pos = worldPos.xyz;
+    vert_color = vec4(1.0, 1.0, 1.0, 1.0); // Default white for instances
     vert_uv = uv;
     
     // Use instance texture units (override geometry ones)

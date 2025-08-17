@@ -11,8 +11,6 @@
  */
 class StructuralBlock : public GridCell {
 public:
-    // Use PolyhedronProcessor's MeshData type
-    using MeshData = PolyhedronProcessor::MeshData;
     // Type identifier for this block type
     static constexpr CellType TYPE = CellType::STRUCTURAL_BLOCK;
 
@@ -57,9 +55,9 @@ public:
     
     /**
      * @brief Generate complete triangle mesh data with normals, tangents, and UVs
-     * @return MeshData containing all vertex attributes for rendering
+     * @return PolyhedronProcessor::MeshData containing all vertex attributes for rendering
      */
-    MeshData generateTriangleMeshData() const;
+    PolyhedronProcessor::MeshData generateTriangleMeshData() const;
 
     /**
      * @brief Get mass properties of this structural block

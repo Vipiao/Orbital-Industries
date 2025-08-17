@@ -26,6 +26,9 @@ public:
     // Structural analysis data
     double structuralWeakness = -1.0; // Running average structural weakness (-1 = no data yet)
     
+    // Color in RGBA format (used for HSV transform in shader)
+    glm::dvec4 m_color{1.0, 1.0, 1.0, 1.0}; // Default white
+
     GridCell(const glm::ivec3& coords, CellType cellType)
         : coordinates(coords), type(cellType), uniqueId(getNextId()) {}
     

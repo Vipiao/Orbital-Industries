@@ -101,7 +101,7 @@ void Grid::addCell(const glm::ivec3& coord) {
     scheduleStructuralAnalysis();
 
     // Add to graphics subsystem
-    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData);
+    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, block.m_color);
 
     // Update neighbor connections after all other setup
     updateNeighborConnections(coord);
@@ -205,7 +205,7 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     // Generate new mesh data and update graphics
     auto meshData = block.generateTriangleMeshData();
     m_gridGraphics->removeCell(coord);
-    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData);
+    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, block.m_color);
 
     // Add new mass contribution
     updateCellMassContribution(coord, 1.0);
@@ -217,6 +217,26 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     scheduleStructuralAnalysis();
     
     return true;
+}
+
+void Grid::setColor(const glm::ivec3& coord, const glm::dvec4& newColor) {
+    // Check if cell exists
+    auto it = m_cells.find(coord);
+    if (it == m_cells.end()) {
+        return; // Cell doesn't exist
+    }
+    
+    StructuralBlock& block = it->second;
+    
+    // Update the color
+    block.m_color = newColor;
+    
+    // Update only graphics (remove and re-add with new color)
+    auto meshData = block.generateTriangleMeshData();
+    m_gridGraphics->removeCell(coord);
+    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, block.m_color);
+    
+    // No need to update physics/mass since only color changed
 }
 
 void Grid::trackJob(std::weak_ptr<Job> jobHandle) {

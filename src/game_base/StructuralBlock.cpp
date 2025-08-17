@@ -58,7 +58,7 @@ std::vector<glm::dvec3> StructuralBlock::getVertices() const {
     );
 }
 
-StructuralBlock::MeshData StructuralBlock::generateTriangleMeshData() const {
+PolyhedronProcessor::MeshData StructuralBlock::generateTriangleMeshData() const {
     // Get triangles from PolyhedronProcessor
     std::vector<glm::ivec3> verticesVec(m_localVertices.begin(), m_localVertices.end());
     auto triangles = PolyhedronProcessor::getTriangles(verticesVec, MAX_SIZE);

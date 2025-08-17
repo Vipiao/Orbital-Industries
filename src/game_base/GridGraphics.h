@@ -42,7 +42,7 @@ public:
     ~GridGraphics();
     
     // Cell management
-    void addCell(const glm::ivec3& coord, CellType type, const StructuralBlock::MeshData& meshData);
+    void addCell(const glm::ivec3& coord, CellType type, const PolyhedronProcessor::MeshData& meshData, const glm::dvec4& color);
     void removeCell(const glm::ivec3& coord);
     
     // Graphics updates
@@ -100,7 +100,7 @@ private:
     
     // Job-based graphics operations
     void removeCellGraphics(const std::vector<uint32_t>& triangleIds);
-    void updateCellGraphics(const glm::ivec3& coord, const StructuralBlock::MeshData& meshData);
+    void updateCellGraphics(const glm::ivec3& coord, const PolyhedronProcessor::MeshData& meshData, const glm::dvec4& color);
 
     // Helper to track job handles
     void trackJob(std::weak_ptr<Job> jobHandle);

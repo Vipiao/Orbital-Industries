@@ -13,9 +13,73 @@ in vec3 vert_normal;
 in mat3 vert_TBN;
 in vec3 vert_pos;
 in vec2 vert_uv;
+in vec4 vert_color;
 flat in int vert_colorTextureUnit;
 flat in int vert_normalTextureUnit;
 in float vert_occlusionFactor;
+
+// Convert RGB to HSV
+vec3 rgb2hsv(vec3 rgb) {
+    float maxVal = max(max(rgb.r, rgb.g), rgb.b);
+    float minVal = min(min(rgb.r, rgb.g), rgb.b);
+    float delta = maxVal - minVal;
+    
+    vec3 hsv;
+    hsv.z = maxVal; // V (Value)
+    
+    if (maxVal > 0.0) {
+        hsv.y = delta / maxVal; // S (Saturation)
+    } else {
+        hsv.y = 0.0;
+    }
+    
+    if (delta == 0.0) {
+        hsv.x = 0.0; // H (Hue) undefined for gray
+    } else if (maxVal == rgb.r) {
+        hsv.x = 60.0 * mod((rgb.g - rgb.b) / delta, 6.0);
+    } else if (maxVal == rgb.g) {
+        hsv.x = 60.0 * (2.0 + (rgb.b - rgb.r) / delta);
+    } else {
+        hsv.x = 60.0 * (4.0 + (rgb.r - rgb.g) / delta);
+    }
+    
+    hsv.x /= 360.0; // Normalize to [0,1]
+    return hsv;
+}
+
+// Convert HSV to RGB
+vec3 hsv2rgb(vec3 hsv) {
+    float h = hsv.x * 360.0;
+    float s = hsv.y;
+    float v = hsv.z;
+    
+    float c = v * s;
+    float x = c * (1.0 - abs(mod(h / 60.0, 2.0) - 1.0));
+    float m = v - c;
+    
+    vec3 rgb;
+    if (h < 60.0) rgb = vec3(c, x, 0.0);
+    else if (h < 120.0) rgb = vec3(x, c, 0.0);
+    else if (h < 180.0) rgb = vec3(0.0, c, x);
+    else if (h < 240.0) rgb = vec3(0.0, x, c);
+    else if (h < 300.0) rgb = vec3(x, 0.0, c);
+    else rgb = vec3(c, 0.0, x);
+    
+    return rgb + m;
+}
+
+// Apply HSV transform: vertex color transforms texture color
+vec3 applyHSVTransform(vec3 vertexColor, vec3 textureColor) {
+    vec3 vertHSV = rgb2hsv(vertexColor);
+    vec3 texHSV = rgb2hsv(textureColor);
+    
+    vec3 transformedHSV;
+    transformedHSV.x = mod(vertHSV.x + texHSV.x, 1.0); // H: additive with wrap
+    transformedHSV.y = vertHSV.y * texHSV.y;           // S: multiplicative  
+    transformedHSV.z = vertHSV.z * texHSV.z;           // V: multiplicative
+    
+    return hsv2rgb(transformedHSV);
+}
 
 void main() {
    // Get normal from normal map or use vertex normal
@@ -34,10 +98,14 @@ void main() {
    float alpha = 1.0;
    if (vert_colorTextureUnit >= 0) {
       vec4 textureColor = texture(u_textures[vert_colorTextureUnit], vert_uv);
-      objectColor = textureColor.rgb;
+
+      // Apply HSV transform: vertex color transforms texture color
+      objectColor = applyHSVTransform(vert_color.rgb, textureColor.rgb);
       alpha = textureColor.a;
    } else {
-      objectColor = vec3(1.0, 1.0, 1.0);
+      // No texture: use vertex color directly
+      objectColor = vert_color.rgb;
+      alpha = vert_color.a;
    }
 
    // Calculate light and view directions (all in L-space now)

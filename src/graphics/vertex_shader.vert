@@ -23,8 +23,9 @@ layout (location = 1) in vec3 normal;
 layout (location = 2) in vec3 tangent;
 layout (location = 3) in vec2 uv;
 layout (location = 4) in float occlusionFactor;
-layout (location = 5) in uint meshIndex;
-layout (location = 6) in uint triangleIndex;
+layout (location = 5) in vec4 color;
+layout (location = 6) in uint meshIndex;
+layout (location = 7) in uint triangleIndex;
 
 uniform uint u_frame;
 uniform uint u_time;
@@ -39,6 +40,7 @@ out vec3 vert_normal;
 out mat3 vert_TBN;
 out vec3 vert_pos;
 out vec2 vert_uv;
+out vec4 vert_color;
 flat out int vert_colorTextureUnit;
 flat out int vert_normalTextureUnit;
 out float vert_occlusionFactor;
@@ -159,5 +161,6 @@ void main() {
 
    vec4 worldPos = vec4(meshPositionL + rotatedPosition, 1.0);
    vert_pos = worldPos.xyz;
+   vert_color = color;
    gl_Position = projection * view * worldPos;
 }

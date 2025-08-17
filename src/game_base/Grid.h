@@ -54,6 +54,13 @@ public:
      */
     bool modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices);
 
+    /**
+     * @brief Set color of an existing cell and update graphics
+     * @param coord Grid coordinate of the cell
+     * @param newColor New color to apply
+     */
+    void setColor(const glm::ivec3& coord, const glm::dvec4& newColor);
+
     // Structural analysis visualization (analysis runs automatically as background job)
     void visualizeStructuralIntegrity();
     

@@ -8,6 +8,7 @@
 #include "../debug/DebugGlobals.h"
 #include "../utils/PositionSelector.h"
 #include <iostream>
+#include "../utils/ColorUtils.h"
 #include "../graphics/MeshManager2D.h"
 #include "../graphics/GeometryInstance.h"
 #include "StructuralBlock.h"
@@ -43,7 +44,7 @@ void Creative::physics() {
     // Apply drag forces to all grids before physics update
     applyDragForces();
     
-    if (doCreate || doRemove || doForce || doTrackSpeed || doConfigure || doModifyCell) {
+    if (doCreate || doRemove || doForce || doTrackSpeed || doConfigure || doModifyCell || doCopy || doPaste || doUpdateColor) {
         // Perform unified grid traversal for all actions
         std::weak_ptr<Grid> targetGridWeak;
         glm::ivec3 targetPos;
@@ -89,6 +90,27 @@ void Creative::physics() {
                         blockFound = true;
                     }
                     break; // Only care about first hit in this grid
+                }
+            }
+        }
+
+        // Handle color operations with found target
+        if (blockFound && (doCopy || doPaste || doUpdateColor)) {
+            auto targetGrid = targetGridWeak.lock();
+            if (targetGrid) {
+                StructuralBlock* targetBlock = targetGrid->getCell(hitPos);
+                if (targetBlock) {
+                    if (doCopy) {
+                        copiedColor = targetBlock->m_color;
+                    }
+                    if (doPaste) {
+                        targetGrid->setColor(hitPos, copiedColor);
+                    }
+                    if (doUpdateColor) {
+                        targetGrid->setColor(hitPos, color);
+                    } else {
+                        color = targetBlock->m_color; // Sync UI state
+                    }
                 }
             }
         }
@@ -198,6 +220,10 @@ void Creative::physics() {
     }
 
     // Reset flags
+    doCopy = false;
+    doPaste = false;
+    doUpdateColor = false;
+
     doCreate = false;
     doRemove = false;
     doConfigure = false;
@@ -221,7 +247,7 @@ void Creative::applyDragForces() {
         RigidBody* body = gridShared->getRigidBody();
         if (body && !body->m_isStatic && body->m_forces == glm::dvec3{0,0,0}) {
             // Simple drag force calculation: -dragCoefficient * velocity
-            const double dragCoefficient = 0.04 * 0.4;
+            const double dragCoefficient = 0.04 * 0.4 * 2.0;
             
             // Apply drag to linear velocity
             if (glm::length(body->m_velocity) > 0.0) {
@@ -564,6 +590,8 @@ void Creative::processInputLogic() {
     MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->getMouseHandler();
     KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
     
+    handleColorInput();
+
     // Camera movement speed
     const double mouseSensitivity = 0.0014;
     
@@ -678,5 +706,64 @@ void Creative::processInputLogic() {
     if (glm::length(moveDirection) > 0.0) {
         moveDirection = glm::normalize(moveDirection) * m_moveSpeed;
         m_gameBase->m_graphicsEngine->getCamPos() += moveDirection;
+    }
+}
+
+void Creative::handleColorInput() {
+    KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
+    MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->getMouseHandler();
+    
+    // Color management input handling
+    int frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
+    double shortHoldThreshold = frameRate * 0.2; // 0.2 seconds
+    
+    // Handle T key for copy/paste operations
+    if (keyboard->m_t.timeUp() == 0) { // Just released T
+        if (keyboard->m_lCtrl.isDown() && keyboard->m_t.timeDown() < shortHoldThreshold) {
+            // Shift+T brief hold = copy
+            doCopy = true;
+        } else if (!keyboard->m_lCtrl.isDown()) {
+            // T brief press = paste
+            doPaste = true;
+        }
+    }
+    
+    // Handle Ctrl+T long hold for color adjustment
+    if (keyboard->m_t.isDown() && keyboard->m_lCtrl.isDown() &&
+        keyboard->m_t.timeDown() > shortHoldThreshold) {
+        
+        // Get mouse movement and scroll for HSV adjustment
+        glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
+        double scrollDelta = mouseHandler->getScrollMovement();
+        
+        // Convert any movement to HSV space and adjust
+        if (mouseMovement.x != 0.0 || mouseMovement.y != 0.0 || scrollDelta != 0.0) {
+            // Convert current color to HSV
+            glm::dvec3 rgb = glm::dvec3(color.r, color.g, color.b);
+            glm::dvec3 hsv = ColorUtils::rgbToHsv(rgb);
+            
+            // Adjust HSV based on mouse movement and scroll
+            // Mouse up/down = hue, left/right = saturation, scroll = value
+            double scale = 4.0;
+            double hueSpeed = 0.002 * scale;
+            double satSpeed = 0.003 * scale;
+            double valSpeed = 0.002 * scale;
+            
+            hsv.x += mouseMovement.y * hueSpeed; // Up/down for hue
+            hsv.y += mouseMovement.x * satSpeed; // Left/right for saturation
+            hsv.z += scrollDelta * valSpeed;     // Scroll for value
+            
+            // Clamp values
+            hsv.x = std::fmod(hsv.x + 1.0, 1.0); // Wrap hue around [0,1]
+            hsv.y = glm::clamp(hsv.y, 0.0, 1.0);
+            hsv.z = glm::clamp(hsv.z, 0.0, 1.0);
+            
+            // Convert back to RGB and update color
+            rgb = ColorUtils::hsvToRgb(hsv);
+            color = glm::dvec4(rgb.r, rgb.g, rgb.b, color.a);
+            
+            // Set flag to apply color
+            doUpdateColor = true;
+        }
     }
 }

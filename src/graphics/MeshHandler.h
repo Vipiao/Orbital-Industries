@@ -103,6 +103,7 @@ struct Vertex {
    glm::vec3 tangent;
    glm::vec2 uv;
    float occlusionFactor;
+   glm::vec4 color;
    uint32_t meshIndex;
    uint32_t triangleId;
 };
@@ -137,7 +138,8 @@ public:
       const std::vector<glm::dvec3>* normals,
       const std::vector<glm::dvec3>* tangents,
       const std::vector<glm::dvec2>* uvs,
-      const std::vector<double>* occlusionFactors = nullptr
+      const std::vector<double>* occlusionFactors = nullptr,
+      const std::vector<glm::dvec4>* colors = nullptr
    );
    // removeTrianglesFromMesh: "triangleIndices" are the indices of the triangles you want to delete.
    // Does not need to be ordered
@@ -148,7 +150,8 @@ public:
       const std::vector<glm::dvec3>* normals = nullptr,
       const std::vector<glm::dvec3>* tangents = nullptr,
       const std::vector<glm::dvec2>* uvs = nullptr,
-      const std::vector<double>* occlusionFactors = nullptr
+      const std::vector<double>* occlusionFactors = nullptr,
+      const std::vector<glm::dvec4>* colors = nullptr
    );
    void removeMesh(int meshIndex);
    void render(

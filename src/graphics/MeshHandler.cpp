@@ -41,6 +41,7 @@ MeshHandler::MeshHandler(size_t maxTriangles, SSBOManager* ssboManager)
        {"tangent", 3, GL_FLOAT, false, offsetof(Vertex, tangent)},
        {"uv", 2, GL_FLOAT, false, offsetof(Vertex, uv)},
        {"occlusionFactor", 1, GL_FLOAT, false, offsetof(Vertex, occlusionFactor)},
+       {"color", 4, GL_FLOAT, false, offsetof(Vertex, color)},
        {"meshIndex", 1, GL_UNSIGNED_INT, true, offsetof(Vertex, meshIndex)},
        {"triangleIndex", 1, GL_UNSIGNED_INT, true, offsetof(Vertex, triangleId)}
    };
@@ -90,7 +91,8 @@ std::vector<uint32_t> MeshHandler::appendTrianglesToMesh(
    const std::vector<glm::dvec3>* normals,
    const std::vector<glm::dvec3>* tangents,
    const std::vector<glm::dvec2>* uvs,
-   const std::vector<double>* occlusionFactors
+   const std::vector<double>* occlusionFactors,
+   const std::vector<glm::dvec4>* colors
 ) {
    // Verify the input: Ensure vertices is not a null pointer and the size is a multiple of 3
    if (vertices == nullptr || vertices->size() % 3 != 0) {
@@ -117,12 +119,18 @@ std::vector<uint32_t> MeshHandler::appendTrianglesToMesh(
       throw std::invalid_argument("Invalid occlusionFactors argument: If not null, should be a multiple of 3.");
    }
 
+   // Verify the input: Ensure colors is not a null pointer and the size is a multiple of 3
+   if (colors != nullptr && colors->size() % 3 != 0) {
+      throw std::invalid_argument("Invalid colors argument: If not null, should be a multiple of 3.");
+   }
+
    // Check if the lengths are the same.
    if (
       vertices->size() != normals->size() ||
       vertices->size() != tangents->size() ||
       vertices->size() != uvs->size() ||
-      (occlusionFactors != nullptr && vertices->size() != occlusionFactors->size())
+      (occlusionFactors != nullptr && vertices->size() != occlusionFactors->size()) ||
+      (colors != nullptr && vertices->size() != colors->size())
    ) {
       throw std::invalid_argument("The size of vertices, normals, tangents, and uvs are not the same.");
    }
@@ -162,13 +170,14 @@ std::vector<uint32_t> MeshHandler::appendTrianglesToMesh(
       }
 
       newVertexData.push_back({
-          glm::vec3((*vertices)[ii]),
-          glm::vec3((*normals)[ii]),
-          glm::vec3((*tangents)[ii]),
-          glm::vec2((*uvs)[ii]),
-          occlusionFactors != nullptr ? static_cast<float>((*occlusionFactors)[ii]) : 1.0f,
-          static_cast<uint32_t>(meshIndex),
-          newIds.back()  // Use the last index in newIndices
+         glm::vec3((*vertices)[ii]),
+         glm::vec3((*normals)[ii]),
+         glm::vec3((*tangents)[ii]),
+         glm::vec2((*uvs)[ii]),
+         occlusionFactors != nullptr ? static_cast<float>((*occlusionFactors)[ii]) : 1.0f,
+         colors != nullptr ? glm::vec4((*colors)[ii]) : glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+         static_cast<uint32_t>(meshIndex),
+         newIds.back()  // Use the last index in newIndices
       });
    }
 
@@ -320,7 +329,8 @@ void MeshHandler::updateTrianglesInformation(
    const std::vector<glm::dvec3>* normals,
    const std::vector<glm::dvec3>* tangents,
    const std::vector<glm::dvec2>* uvs,
-   const std::vector<double>* occlusionFactors
+   const std::vector<double>* occlusionFactors,
+   const std::vector<glm::dvec4>* colors
 ) {
    // Check if the mesh index exists.
    auto meshIt = m_meshIndexToMeshInfo.find(meshIndex);
@@ -338,7 +348,8 @@ void MeshHandler::updateTrianglesInformation(
    if ((normals != nullptr && normals->size() != numVertices) ||
       (tangents != nullptr && tangents->size() != numVertices) ||
       (uvs != nullptr && uvs->size() != numVertices) ||
-      (occlusionFactors != nullptr && occlusionFactors->size() != numVertices)) {
+      (occlusionFactors != nullptr && occlusionFactors->size() != numVertices) ||
+      (colors != nullptr && colors->size() != numVertices)) {
       throw std::invalid_argument("One or more attribute vectors do not match three times the size of triangleIds.");
    }
 
@@ -378,6 +389,14 @@ void MeshHandler::updateTrianglesInformation(
          for (int j = 0; j < 3; ++j) {
             double occlusionFactor = (*occlusionFactors)[i * 3 + j];
             m_vertexData[vertexDataIndex + j].occlusionFactor = static_cast<float>(occlusionFactor);
+         }
+      }
+      
+      // Update colors, if provided
+      if (colors != nullptr) {
+         for (int j = 0; j < 3; ++j) {
+            glm::dvec4 color = (*colors)[i * 3 + j];
+            m_vertexData[vertexDataIndex + j].color = glm::vec4(color);
          }
       }
    }

@@ -286,9 +286,11 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
         for (const glm::ivec3& cellCoord : partition) {
             // Save vertex modifications before removing
             std::array<glm::ivec3, 8> savedVertices;
+            glm::dvec4 savedColor{1.0, 1.0, 1.0, 1.0};
             const StructuralBlock* existingCell = sourceGrid->getCell(cellCoord);
             if (existingCell) {
                 savedVertices = existingCell->m_localVertices;
+                savedColor = existingCell->m_color;
             }
             
             // Remove from source grid and add to new grid
@@ -297,6 +299,7 @@ Generator<bool> GameBase::performGridSplitAsync(Grid* sourceGrid, const std::vec
 
             if (existingCell) {
                 newGrid->modifyCell(cellCoord, savedVertices);
+                newGrid->setColor(cellCoord, savedColor);
             }
 
             // Yield every 5 cells to avoid blocking too long

@@ -66,13 +66,13 @@ void GridGraphics::loadTextures() {
     }
 }
 
-void GridGraphics::addCell(const glm::ivec3& coord, CellType type, const StructuralBlock::MeshData& meshData) {
+void GridGraphics::addCell(const glm::ivec3& coord, CellType type, const PolyhedronProcessor::MeshData& meshData, const glm::dvec4& color) {
     // Add graphics cell to map
     m_graphicsCells.emplace(coord, GraphicsCell{});
     
     // Schedule update job for this cell
-    auto jobHandle = m_jobManager->schedule([this, coord, meshData](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
-        updateCellGraphics(coord, meshData);
+    auto jobHandle = m_jobManager->schedule([this, coord, meshData, color](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        updateCellGraphics(coord, meshData, color);
         return false; // Job complete
     }, JobPriorities::GRAPHICS_UPDATE);
     trackJob(jobHandle);
@@ -114,7 +114,7 @@ void GridGraphics::removeCellGraphics(const std::vector<uint32_t>& triangleIds) 
     }
 }
 
-void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const StructuralBlock::MeshData& meshData) {
+void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronProcessor::MeshData& meshData, const glm::dvec4& color) {
     auto it = m_graphicsCells.find(coord);
     if (it == m_graphicsCells.end()) return; // Cell doesn't exist, job is no-op
     
@@ -128,7 +128,7 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const StructuralB
 
         
     // Make a copy of mesh data for transformation
-    StructuralBlock::MeshData transformedMeshData = meshData;
+    PolyhedronProcessor::MeshData transformedMeshData = meshData;
     
     // Apply translation to position at coord + 0.5 in grid-local coordinates
     glm::dvec3 offset = glm::dvec3(coord);
@@ -144,9 +144,13 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const StructuralB
     
     // Add complete block mesh to graphics
     if (!transformedMeshData.positions.empty()) {
+        // Create color vector with same size as positions
+        std::vector<glm::dvec4> colors(transformedMeshData.positions.size(), color);
+
         cell.triangleIds = m_graphics->m_meshHandler->appendTrianglesToMesh(
             m_meshId, &transformedMeshData.positions, &transformedMeshData.normals, 
-            &transformedMeshData.tangents, &transformedMeshData.uvs);
+            &transformedMeshData.tangents, &transformedMeshData.uvs, 
+            nullptr, &colors);
     }
 }
 
