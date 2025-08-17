@@ -111,6 +111,26 @@ vec3 dekkerSubtract(vec3 aHigh, vec3 aLow, vec3 bHigh, vec3 bLow) {
     return r + error; // Convert back to single precision
 }
 
+mat3 calculatePhysicsOrientation(vec4 baseOrientation, vec4 angVel, float deltaTime) {
+    mat3 orientation = fromQuaternion(baseOrientation);
+    return rotationMatrix(angVel.w * deltaTime, angVel.xyz) * orientation;
+}
+
+vec3 applyRotationTransform(mat3 orientation, vec3 position, vec3 centerOfRotation) {
+    return orientation * (position - centerOfRotation) + centerOfRotation;
+}
+
+mat3 buildTBNMatrix(mat3 orientation, vec3 normal, vec3 tangent) {
+    vec3 N = normalize(orientation * normal);
+    vec3 T = normalize(orientation * tangent);
+    
+    // Re-orthogonalize T with respect to N using Gram-Schmidt process
+    T = normalize(T - dot(T, N) * N);
+    vec3 B = cross(N, T);
+    
+    return mat3(T, B, N);
+}
+
 void main() {
     // Get geometry world transform from SSBO using instance's meshIndex
     MeshData meshData = meshDataBuffer[meshIndex];
@@ -139,28 +159,14 @@ void main() {
     meshPositionL += velocityDelta;
     
     // Get world orientation with angular velocity
-    mat3 worldOrientation = fromQuaternion(meshData.orientation);
-    worldOrientation = rotationMatrix(
-       meshData.angVel.w * deltaTimeFloat, meshData.angVel.xyz
-    ) * worldOrientation;
-   
-    // Step 3: Apply world transform to locally transformed position
-    vec3 worldTransformedPos = worldOrientation * (
-       localTransformedPos * meshData.scale.xyz - meshData.centerOfRotation.xyz
-    ) + meshData.centerOfRotation.xyz;
-    
-    // Transform normals and tangents by world orientation
+    mat3 worldOrientation = calculatePhysicsOrientation(meshData.orientation, meshData.angVel, deltaTimeFloat);
+
+    // Apply world transform to locally transformed position
+    vec3 worldTransformedPos = applyRotationTransform(worldOrientation, localTransformedPos * meshData.scale.xyz, meshData.centerOfRotation.xyz);
+
+    // Build TBN matrix
+    vert_TBN = buildTBNMatrix(worldOrientation, localTransformedNormal, localTransformedTangent);
     vec3 N = normalize(worldOrientation * localTransformedNormal);
-    vec3 T = normalize(worldOrientation * localTransformedTangent);
-    
-    // Re-orthogonalize T with respect to N using Gram-Schmidt process
-    T = normalize(T - dot(T, N) * N);
-    
-    // Calculate bitangent B
-    vec3 B = cross(N, T);
-    
-    // Build TBN matrix for normal mapping
-    vert_TBN = mat3(T, B, N);
     vert_normal = N;
 
     // Final world position in camera space

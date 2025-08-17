@@ -104,6 +104,26 @@ vec3 dekkerSubtract(vec3 aHigh, vec3 aLow, vec3 bHigh, vec3 bLow) {
     return r + error; // Convert back to single precision
 }
 
+mat3 calculatePhysicsOrientation(vec4 baseOrientation, vec4 angVel, float deltaTime) {
+    mat3 orientation = fromQuaternion(baseOrientation);
+    return rotationMatrix(angVel.w * deltaTime, angVel.xyz) * orientation;
+}
+
+vec3 applyRotationTransform(mat3 orientation, vec3 position, vec3 centerOfRotation) {
+    return orientation * (position - centerOfRotation) + centerOfRotation;
+}
+
+mat3 buildTBNMatrix(mat3 orientation, vec3 normal, vec3 tangent) {
+    vec3 N = normalize(orientation * normal);
+    vec3 T = normalize(orientation * tangent);
+    
+    // Re-orthogonalize T with respect to N using Gram-Schmidt process
+    T = normalize(T - dot(T, N) * N);
+    vec3 B = cross(N, T);
+    
+    return mat3(T, B, N);
+}
+
 void main() {
    vert_occlusionFactor = occlusionFactor;
 
@@ -125,30 +145,16 @@ void main() {
    vec3 velocityDelta = meshData.velocity.xyz * deltaTimeFloat;
    meshPositionL += velocityDelta;
    
-   mat3 orientation = fromQuaternion(meshData.orientation);
-   orientation = rotationMatrix(
-      meshData.angVel.w * deltaTimeFloat * 1., meshData.angVel.xyz
-   ) * orientation;
+   mat3 orientation = calculatePhysicsOrientation(meshData.orientation, meshData.angVel, deltaTimeFloat);
    
    // Apply scale to the position before rotation
    vec3 scaledPosition = position * meshData.scale.xyz;
 
-   vec3 rotatedPosition = orientation * (
-      scaledPosition - meshData.centerOfRotation.xyz
-   ) + meshData.centerOfRotation.xyz;
+   vec3 rotatedPosition = applyRotationTransform(orientation, scaledPosition, meshData.centerOfRotation.xyz);
    
-   // Transform normal and tangent
+   // Build TBN matrix
+   vert_TBN = buildTBNMatrix(orientation, normal, tangent);
    vec3 N = normalize(orientation * normal);
-   vec3 T = normalize(orientation * tangent);
-   
-   // Re-orthogonalize T with respect to N using Gram-Schmidt process
-   T = normalize(T - dot(T, N) * N);
-   
-   // Calculate bitangent B
-   vec3 B = cross(N, T);
-   
-   // Build TBN matrix for normal mapping
-   vert_TBN = mat3(T, B, N);
    vert_normal = N;
 
    vec4 worldPos = vec4(meshPositionL + rotatedPosition, 1.0);
