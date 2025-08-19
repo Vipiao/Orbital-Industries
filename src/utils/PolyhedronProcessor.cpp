@@ -5,6 +5,7 @@
 #include <limits>
 #include <unordered_map>
 #include "../math/IntegerVectorMath.h"
+#include <map>
 
 bool IVec3Compare::operator()(const glm::ivec3& a, const glm::ivec3& b) const {
     if (a.x != b.x) return a.x < b.x;
@@ -445,4 +446,208 @@ double PolyhedronProcessor::calculateTetrahedronVolume(const glm::dvec3& apex, c
 glm::dvec3 PolyhedronProcessor::calculateTetrahedronCentroid(const glm::dvec3& apex, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3) {
     // Centroid = (apex + v1 + v2 + v3) / 4
     return (apex + v1 + v2 + v3) * 0.25;
+}
+
+bool PolyhedronProcessor::isPointInConvexPolygon(
+    const glm::dvec2& point,
+    const std::vector<glm::dvec2>& polygon,
+    double margin) {
+    
+    if (polygon.size() < 3) {
+        return false; // Not a valid polygon
+    }
+    
+    // For each edge of the polygon, check if point is on the "inside" side
+    for (size_t i = 0; i < polygon.size(); ++i) {
+        size_t j = (i + 1) % polygon.size();
+        
+        glm::dvec2 edgeStart = polygon[i];
+        glm::dvec2 edgeEnd = polygon[j];
+        glm::dvec2 edge = edgeEnd - edgeStart;
+        
+        // Calculate inward normal (rotate edge 90 degrees clockwise for counter-clockwise polygon)
+        glm::dvec2 inwardNormal = glm::normalize(glm::dvec2(edge.y, -edge.x));
+        
+        // Move edge inward by margin distance
+        glm::dvec2 adjustedEdgeStart = edgeStart + inwardNormal * margin;
+        glm::dvec2 adjustedEdgeEnd = edgeEnd + inwardNormal * margin;
+        glm::dvec2 adjustedEdge = adjustedEdgeEnd - adjustedEdgeStart;
+        
+        // Check which side of the adjusted edge the point is on
+        glm::dvec2 toPoint = point - adjustedEdgeStart;
+        double cross = adjustedEdge.x * toPoint.y - adjustedEdge.y * toPoint.x;
+        
+        // For counter-clockwise polygon, point should be on the left side (positive cross product)
+        if (cross < 0.0) {
+            return false; // Point is outside this edge
+        }
+    }
+    
+    return true; // Point is inside all edges
+}
+
+bool PolyhedronProcessor::areTrianglesConvex(
+    const std::vector<std::array<glm::dvec3, 3>>& triangles,
+    bool counterClockwise) {
+    
+    if (triangles.size() < 2) {
+        return true; // Single triangle is always "convex"
+    }
+    
+    // Build a map of edges to triangles for efficient lookup
+    struct Edge {
+        glm::dvec3 v1, v2;
+        
+        bool operator<(const Edge& other) const {
+            if (v1 != other.v1) return v1.x < other.v1.x || (v1.x == other.v1.x && (v1.y < other.v1.y || (v1.y == other.v1.y && v1.z < other.v1.z)));
+            return v2.x < other.v2.x || (v2.x == other.v2.x && (v2.y < other.v2.y || (v2.y == other.v2.y && v2.z < other.v2.z)));
+        }
+    };
+    
+    std::map<Edge, std::vector<size_t>> edgeToTriangles;
+    
+    // Build edge map
+    for (size_t triIdx = 0; triIdx < triangles.size(); ++triIdx) {
+        const auto& triangle = triangles[triIdx];
+        
+        // Add all three edges of this triangle
+        for (int i = 0; i < 3; ++i) {
+            int j = (i + 1) % 3;
+            glm::dvec3 v1 = triangle[i];
+            glm::dvec3 v2 = triangle[j];
+            
+            // Normalize edge direction (smaller vertex first)
+            Edge edge;
+            if (v1.x < v2.x || (v1.x == v2.x && (v1.y < v2.y || (v1.y == v2.y && v1.z < v2.z)))) {
+                edge = {v1, v2};
+            } else {
+                edge = {v2, v1};
+            }
+            
+            edgeToTriangles[edge].push_back(triIdx);
+        }
+    }
+    
+    // Check convexity for each shared edge
+    for (const auto& pair : edgeToTriangles) {
+        const std::vector<size_t>& triangleIndices = pair.second;
+        
+        // Only check edges shared by exactly 2 triangles
+        if (triangleIndices.size() != 2) {
+            continue;
+        }
+        
+        const auto& tri1 = triangles[triangleIndices[0]];
+        const auto& tri2 = triangles[triangleIndices[1]];
+        
+        // Calculate normals
+        glm::dvec3 edge1_1 = tri1[1] - tri1[0];
+        glm::dvec3 edge1_2 = tri1[2] - tri1[0];
+        glm::dvec3 normal1 = counterClockwise ? glm::cross(edge1_1, edge1_2) : glm::cross(edge1_2, edge1_1);
+        normal1 = glm::normalize(normal1);
+        
+        // Calculate centroids
+        glm::dvec3 centroid1 = (tri1[0] + tri1[1] + tri1[2]) / 3.0;
+        glm::dvec3 centroid2 = (tri2[0] + tri2[1] + tri2[2]) / 3.0;
+        
+        // Check convexity: dot product between normal and centroid difference
+        glm::dvec3 centroidDiff = centroid2 - centroid1;
+        double dot = glm::dot(normal1, centroidDiff);
+        if (dot > 0.1) { // Allow small tolerance for numerical errors
+            return false; // Concave
+        }
+    }
+    
+    return true; // All checked edges are convex
+}
+
+bool PolyhedronProcessor::areTrianglesConvexInDirection(
+    const std::vector<std::array<glm::dvec3, 3>>& triangles,
+    const glm::dvec3& direction,
+    bool counterClockwise) {
+    
+    if (triangles.size() < 2) {
+        return true; // Single triangle is always "convex"
+    }
+    
+    glm::dvec3 normalizedDirection = glm::normalize(direction);
+    
+    // Build edge map (same as in areTrianglesConvex)
+    struct Edge {
+        glm::dvec3 v1, v2;
+        bool operator<(const Edge& other) const {
+            if (v1 != other.v1) return v1.x < other.v1.x || (v1.x == other.v1.x && (v1.y < other.v1.y || (v1.y == other.v1.y && v1.z < other.v1.z)));
+            return v2.x < other.v2.x || (v2.x == other.v2.x && (v2.y < other.v2.y || (v2.y == other.v2.y && v2.z < other.v2.z)));
+        }
+    };
+    
+    std::map<Edge, std::vector<size_t>> edgeToTriangles;
+    
+    // Build edge map (same logic as before)
+    for (size_t triIdx = 0; triIdx < triangles.size(); ++triIdx) {
+        const auto& triangle = triangles[triIdx];
+        for (int i = 0; i < 3; ++i) {
+            int j = (i + 1) % 3;
+            glm::dvec3 v1 = triangle[i];
+            glm::dvec3 v2 = triangle[j];
+            
+            Edge edge;
+            if (v1.x < v2.x || (v1.x == v2.x && (v1.y < v2.y || (v1.y == v2.y && v1.z < v2.z)))) {
+                edge = {v1, v2};
+            } else {
+                edge = {v2, v1};
+            }
+            
+            edgeToTriangles[edge].push_back(triIdx);
+        }
+    }
+    
+    // Check directional convexity for each shared edge
+    for (const auto& pair : edgeToTriangles) {
+        const std::vector<size_t>& triangleIndices = pair.second;
+        
+        if (triangleIndices.size() != 2) {
+            continue;
+        }
+        
+        const auto& tri1 = triangles[triangleIndices[0]];
+        const auto& tri2 = triangles[triangleIndices[1]];
+        
+        // Calculate normals
+        glm::dvec3 edge1_1 = tri1[1] - tri1[0];
+        glm::dvec3 edge1_2 = tri1[2] - tri1[0];
+        glm::dvec3 normal1 = counterClockwise ? glm::cross(edge1_1, edge1_2) : glm::cross(edge1_2, edge1_1);
+        normal1 = glm::normalize(normal1);
+        
+        glm::dvec3 edge2_1 = tri2[1] - tri2[0];
+        glm::dvec3 edge2_2 = tri2[2] - tri2[0];
+        glm::dvec3 normal2 = counterClockwise ? glm::cross(edge2_1, edge2_2) : glm::cross(edge2_2, edge2_1);
+        normal2 = glm::normalize(normal2);
+        
+        // Project normals onto the direction
+        double proj1 = glm::dot(normal1, normalizedDirection);
+        double proj2 = glm::dot(normal2, normalizedDirection);
+        
+        // Calculate triangle centroids
+        glm::dvec3 centroid1 = (tri1[0] + tri1[1] + tri1[2]) / 3.0;
+        glm::dvec3 centroid2 = (tri2[0] + tri2[1] + tri2[2]) / 3.0;
+        
+        // Vector from centroid1 to centroid2 projected onto direction
+        glm::dvec3 centroidDiff = centroid2 - centroid1;
+        double centroidProjDiff = glm::dot(centroidDiff, normalizedDirection);
+        
+        // Check if the surface curves in the right direction
+        // If moving in positive direction, the normal component should increase (or stay same)
+        if (centroidProjDiff > 0.01) { // Moving forward in direction
+            if (proj2 < proj1 - 0.1) { // Normal is decreasing too much (concave)
+                return false;
+            }
+        } else if (centroidProjDiff < -0.01) { // Moving backward in direction
+            if (proj1 < proj2 - 0.1) { // Normal is decreasing too much (concave)
+                return false;
+            }
+        }
+    }
+    
+    return true; // All edges are convex in the given direction
 }

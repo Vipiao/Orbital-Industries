@@ -101,6 +101,40 @@ public:
      */
     static glm::dvec3 calculateTetrahedronCentroid(const glm::dvec3& apex, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3);
 
+    /**
+     * @brief Check if a 2D point is inside a convex polygon with margin
+     * @param point The 2D point to test
+     * @param polygon Vector of polygon vertices ordered counter-clockwise
+     * @param margin Inward margin to expand the "inside" region
+     * @return true if point is inside the polygon (with margin), false otherwise
+     */
+    static bool isPointInConvexPolygon(
+        const glm::dvec2& point,
+        const std::vector<glm::dvec2>& polygon,
+        double margin = 0.0);
+
+    /**
+     * @brief Check convexity of a set of triangles
+     * @param triangles Vector of triangles (each triangle is 3 vertices)
+     * @param counterClockwise Whether triangles use counter-clockwise winding for outward normals
+     * @return true if the triangles form a convex shape, false otherwise
+     */
+    static bool areTrianglesConvex(
+        const std::vector<std::array<glm::dvec3, 3>>& triangles,
+        bool counterClockwise = true);
+
+    /**
+     * @brief Check convexity of triangles in a specific direction
+     * @param triangles Vector of triangles (each triangle is 3 vertices)
+     * @param direction Direction vector to project normals onto for convexity check
+     * @param counterClockwise Whether triangles use counter-clockwise winding for outward normals
+     * @return true if the triangles are convex in the given direction, false otherwise
+     */
+    static bool areTrianglesConvexInDirection(
+        const std::vector<std::array<glm::dvec3, 3>>& triangles,
+        const glm::dvec3& direction,
+        bool counterClockwise = true);
+
 private:
     // Face definitions for cube (indices into vertex array)  
     // Coordinate system: +X right, +Y forward, +Z up (right-handed)
