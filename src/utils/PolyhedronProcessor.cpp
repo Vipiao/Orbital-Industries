@@ -173,6 +173,7 @@ std::vector<std::array<glm::dvec3, 3>> PolyhedronProcessor::getTriangles(const s
     }
     
     std::vector<std::array<glm::dvec3, 3>> triangles;
+    triangles.reserve(12); // Maximum 12 triangles (2 per face * 6 faces)
     
     // Process each face and create triangles
     for (const auto& face : CUBE_FACES) {
@@ -199,6 +200,46 @@ std::vector<std::array<glm::dvec3, 3>> PolyhedronProcessor::getTriangles(const s
                 glm::dvec3 dv1 = glm::dvec3(t_v1) / double(maxSize);
                 glm::dvec3 dv2 = glm::dvec3(t_v2) / double(maxSize);
                 triangles.push_back({dv0, dv1, dv2});
+            }
+        }
+    }
+    
+    return triangles;
+}
+
+std::vector<std::array<int, 3>> PolyhedronProcessor::getTriangleIndices(const std::vector<glm::ivec3>& vertices, int maxSize) {
+    if (vertices.size() != 8) {
+        return {}; // Invalid input
+    }
+    
+    std::vector<std::array<int, 3>> triangles;
+    triangles.reserve(12); // Maximum 12 triangles (2 per face * 6 faces)
+    
+    double halfSize = static_cast<double>(maxSize) * 0.5;
+    
+    // Process each face
+    for (const auto& face : CUBE_FACES) {
+        // Get quad vertices
+        const glm::ivec3& v0 = vertices[face[0]];
+        const glm::ivec3& v1 = vertices[face[1]];
+        const glm::ivec3& v2 = vertices[face[2]];
+        const glm::ivec3& v3 = vertices[face[3]];
+        
+        // Get triangulation for this quad
+        auto triangulation = getConvexTriangulation(v0, v1, v2, v3, face[0], face[1], face[2], face[3]);
+        
+        // Process both triangles
+        for (const auto& triangle : triangulation) {
+            glm::ivec3 t_v0 = vertices[triangle[0]];
+            glm::ivec3 t_v1 = vertices[triangle[1]];
+            glm::ivec3 t_v2 = vertices[triangle[2]];
+            
+            // Check if triangle has non-zero area
+            glm::ivec3 t_cross = IntegerVectorMath::cross(t_v1 - t_v0, t_v2 - t_v0);
+            double area = 0.5 * glm::length(glm::dvec3(t_cross));
+            
+            if (area > Vec3Compare::eps) {
+                triangles.push_back({triangle[0], triangle[1], triangle[2]});
             }
         }
     }

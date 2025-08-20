@@ -61,6 +61,14 @@ public:
     static std::vector<std::array<glm::dvec3, 3>> getTriangles(const std::vector<glm::ivec3>& vertices, int maxSize);
 
     /**
+     * Extract triangle indices with non-zero area from the cube faces
+     * @param vertices Vector of 8 cube vertices
+     * @param maxSize Maximum coordinate value for normalization
+     * @return Vector of triangle indices (each triangle is 3 indices into vertices array)
+     */
+    static std::vector<std::array<int, 3>> getTriangleIndices(const std::vector<glm::ivec3>& vertices, int maxSize);
+
+    /**
      * Validate if the polyhedron formed by the vertices is valid
      * @param vertices Vector of 8 cube vertices
      * @param maxSize Maximum coordinate value for normalization

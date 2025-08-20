@@ -599,37 +599,23 @@ PolyhedronProcessor::MeshData Grid::generateFilteredMeshData(const glm::ivec3& c
         }
     }
     
-    // 4: Generate triangles using getTriangles
+    // 4: Generate triangle indices using getTriangleIndices
     std::vector<glm::ivec3> verticesVec(block.m_localVertices.begin(), block.m_localVertices.end());
-    auto allTriangles = PolyhedronProcessor::getTriangles(verticesVec, StructuralBlock::MAX_SIZE);
+    auto allTriangleIndices = PolyhedronProcessor::getTriangleIndices(verticesVec, StructuralBlock::MAX_SIZE);
     
     // Get all triangles that are NOT completely hidden by any single neighbor
     std::vector<std::array<glm::dvec3, 3>> visibleTriangles;
-    const double tolerance = 1e-9;
     
-    for (const auto& triangle : allTriangles) {
+    for (const auto& triangleIndices : allTriangleIndices) {
         bool isTriangleHidden = false;
-        
-        // Find which cube vertices correspond to triangle vertices
-        int triangleVertexIndices[3] = {-1, -1, -1};
-        for (int triVertex = 0; triVertex < 3; ++triVertex) {
-            const glm::dvec3& triVert = triangle[triVertex];
-            
-            for (int cubeVertex = 0; cubeVertex < 8; ++cubeVertex) {
-                if (glm::distance(triVert, normalizedVertices[cubeVertex]) < tolerance) {
-                    triangleVertexIndices[triVertex] = cubeVertex;
-                    break;
-                }
-            }
-        }
         
         // Check if any single neighbor hides ALL three triangle vertices
         for (int neighborDir = 0; neighborDir < 6; ++neighborDir) {
             bool allVerticesHiddenByThisNeighbor = true;
             
             for (int triVertex = 0; triVertex < 3; ++triVertex) {
-                int cubeVertexIndex = triangleVertexIndices[triVertex];
-                if (cubeVertexIndex == -1 || !vertexHiddenByNeighbor[neighborDir][cubeVertexIndex]) {
+                int cubeVertexIndex = triangleIndices[triVertex];
+                if (!vertexHiddenByNeighbor[neighborDir][cubeVertexIndex]) {
                     allVerticesHiddenByThisNeighbor = false;
                     break;
                 }
@@ -642,6 +628,12 @@ PolyhedronProcessor::MeshData Grid::generateFilteredMeshData(const glm::ivec3& c
         }
         
         if (!isTriangleHidden) {
+            // Convert triangle indices back to actual triangle vertices
+            std::array<glm::dvec3, 3> triangle = {
+                normalizedVertices[triangleIndices[0]],
+                normalizedVertices[triangleIndices[1]], 
+                normalizedVertices[triangleIndices[2]]
+            };
             visibleTriangles.push_back(triangle);
         }
     }
