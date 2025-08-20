@@ -383,11 +383,6 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         glm::dvec3 impulse = normal * impulseMagnitude;
 
         // Apply compliant collision handling for corner softness
-        //std::cout << std::endl;
-        //std::cout << "compliantOverlap: " << compliantOverlap << std::endl;
-        extern int debug1;
-        debug1++;
-        std::cout << "impulse: " << glm::length(impulse) << " " << debug1 << std::endl;
         if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantPenetration, &relativeVel)) {
             glm::dvec3 compliantNormal = contact.compliantNormal;
             double normalAlignment = glm::dot(normal, compliantNormal);
