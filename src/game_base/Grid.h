@@ -17,6 +17,7 @@
 #include <memory>
 #include <glm/gtc/quaternion.hpp>
 #include <unordered_map>
+#include <unordered_set>
 
 // Forward declarations
 class PhysicsEngine;
@@ -113,6 +114,10 @@ private:
     std::unique_ptr<StochasticAnalyzer<StructuralBlock>> m_stochasticAnalyzer;
         
     // External system references
+    // Mesh update job system
+    std::weak_ptr<Job> m_meshUpdateJob;
+    std::unordered_set<glm::ivec3, IVec3Hash> m_pendingMeshUpdates;
+
     PhysicsEngine* m_physics;
     RigidBody* m_rigidBody{nullptr};
     std::unique_ptr<GridCollider> m_collider;
@@ -136,4 +141,9 @@ private:
     void updateCellMassContribution(const glm::ivec3& coord, double sign);
     void updateRigidBodyInverses();
     double getApproximateRadius() const;
+
+    // Mesh generation and filtering
+    PolyhedronProcessor::MeshData generateFilteredMeshData(const glm::ivec3& coord);
+    void scheduleMeshUpdatesForCell(const glm::ivec3& coord);
+    bool processPendingMeshUpdates(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 };

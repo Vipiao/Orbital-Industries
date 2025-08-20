@@ -44,6 +44,7 @@ public:
     // Cell management
     void addCell(const glm::ivec3& coord, CellType type, const PolyhedronProcessor::MeshData& meshData, const glm::dvec4& color);
     void removeCell(const glm::ivec3& coord);
+    void updateCell(const glm::ivec3& coord, const PolyhedronProcessor::MeshData& meshData, const glm::dvec4& color);
     
     // Graphics updates
     void updateGraphics(

@@ -12,6 +12,8 @@
 #include "../debug/DebugRenderer.h"
 #include "../game_base/JobPriorities.h"
 #include "../physics/PolyhedronCollider.h"
+#include "../game_base/GridGeometry.h"
+#include "../utils/PolyhedronProcessor.h"
 
 // Initialize static counter
 uint64_t Grid::s_nextUniqueId = 0;
@@ -90,18 +92,14 @@ void Grid::addCell(const glm::ivec3& coord) {
     // Cancel existing analysis to prevent accessing deleted cells
     cancelStructuralAnalysis();
     
-    // Create structural block and generate mesh data
+    // Create structural block
     StructuralBlock block(coord);
-    auto meshData = block.generateTriangleMeshData();
     
     // Move block into cells map
     m_cells.emplace(coord, std::move(block));
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();
-
-    // Add to graphics subsystem
-    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, block.m_color);
 
     // Update neighbor connections after all other setup
     updateNeighborConnections(coord);
@@ -113,6 +111,9 @@ void Grid::addCell(const glm::ivec3& coord) {
     updateCellMassContribution(coord, 1.0);
     
     m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
+
+    // Schedule mesh updates for this cell and neighbors
+    scheduleMeshUpdatesForCell(coord);
 }
 
 // Remove a cell from the grid
@@ -122,6 +123,9 @@ void Grid::removeCell(const glm::ivec3& coord) {
 
     // Cancel existing analysis to prevent accessing deleted cells
     cancelStructuralAnalysis();
+
+    // Schedule mesh updates BEFORE removing (while neighbors still exist)
+    scheduleMeshUpdatesForCell(coord);
 
     removeNeighborConnections(coord);
 
@@ -202,10 +206,8 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     );
     m_collider->addCell(coord, std::move(newCollider));
     
-    // Generate new mesh data and update graphics
-    auto meshData = block.generateTriangleMeshData();
-    m_gridGraphics->removeCell(coord);
-    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, block.m_color);
+    // Schedule mesh updates for this cell and neighbors
+    scheduleMeshUpdatesForCell(coord);
 
     // Add new mass contribution
     updateCellMassContribution(coord, 1.0);
@@ -231,10 +233,8 @@ void Grid::setColor(const glm::ivec3& coord, const glm::dvec4& newColor) {
     // Update the color
     block.m_color = newColor;
     
-    // Update only graphics (remove and re-add with new color)
-    auto meshData = block.generateTriangleMeshData();
-    m_gridGraphics->removeCell(coord);
-    m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, block.m_color);
+    // Schedule mesh update for color change
+    scheduleMeshUpdatesForCell(coord);
     
     // No need to update physics/mass since only color changed
 }
@@ -550,4 +550,149 @@ size_t Grid::computeHash() const {
     }
     
     return hash;
+}
+
+PolyhedronProcessor::MeshData Grid::generateFilteredMeshData(const glm::ivec3& coord) {
+    // 1: Get the normalized vertices at the coord
+    auto it = m_cells.find(coord);
+    if (it == m_cells.end()) {
+        return PolyhedronProcessor::MeshData{}; // Empty mesh for non-existent cell
+    }
+    
+    const StructuralBlock& block = it->second;
+    std::array<glm::dvec3, 8> normalizedVertices;
+    for (int i = 0; i < 8; ++i) {
+        normalizedVertices[i] = glm::dvec3(block.m_localVertices[i]) / double(StructuralBlock::MAX_SIZE);
+    }
+    
+    // 2 & 3: Iterate over all neighbor coords and create 2D hidden map
+    std::array<std::array<bool, 8>, 6> vertexHiddenByNeighbor;
+    for (auto& row : vertexHiddenByNeighbor) row.fill(false); // All vertices start as not hidden
+    
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0}, {-1, 0, 0},   // +X, -X
+        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
+        {0, 0, 1}, {0, 0, -1}    // +Z, -Z
+    };
+    
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = coord + directions[i];
+        auto neighborIt = m_cells.find(neighborCoord);
+        
+        if (neighborIt == m_cells.end()) {
+            continue; // No neighbor, vertices remain visible
+        }
+        
+        const StructuralBlock& neighborBlock = neighborIt->second;
+        std::array<glm::dvec3, 8> neighborVertices;
+        for (int v = 0; v < 8; ++v) {
+            neighborVertices[v] = glm::dvec3(neighborBlock.m_localVertices[v]) / double(StructuralBlock::MAX_SIZE);
+        }
+        
+        // Call checkPolyhedronBorderIntersection
+        auto hiddenFlags = GridGeometry::checkPolyhedronBorderIntersection(
+            coord, normalizedVertices, neighborCoord, neighborVertices);
+        
+        // Store which vertices are hidden by this specific neighbor
+        for (int v = 0; v < 8; ++v) {
+            vertexHiddenByNeighbor[i][v] = hiddenFlags[v];
+        }
+    }
+    
+    // 4: Generate triangles using getTriangles
+    std::vector<glm::ivec3> verticesVec(block.m_localVertices.begin(), block.m_localVertices.end());
+    auto allTriangles = PolyhedronProcessor::getTriangles(verticesVec, StructuralBlock::MAX_SIZE);
+    
+    // Get all triangles that are NOT completely hidden by any single neighbor
+    std::vector<std::array<glm::dvec3, 3>> visibleTriangles;
+    const double tolerance = 1e-9;
+    
+    for (const auto& triangle : allTriangles) {
+        bool isTriangleHidden = false;
+        
+        // Find which cube vertices correspond to triangle vertices
+        int triangleVertexIndices[3] = {-1, -1, -1};
+        for (int triVertex = 0; triVertex < 3; ++triVertex) {
+            const glm::dvec3& triVert = triangle[triVertex];
+            
+            for (int cubeVertex = 0; cubeVertex < 8; ++cubeVertex) {
+                if (glm::distance(triVert, normalizedVertices[cubeVertex]) < tolerance) {
+                    triangleVertexIndices[triVertex] = cubeVertex;
+                    break;
+                }
+            }
+        }
+        
+        // Check if any single neighbor hides ALL three triangle vertices
+        for (int neighborDir = 0; neighborDir < 6; ++neighborDir) {
+            bool allVerticesHiddenByThisNeighbor = true;
+            
+            for (int triVertex = 0; triVertex < 3; ++triVertex) {
+                int cubeVertexIndex = triangleVertexIndices[triVertex];
+                if (cubeVertexIndex == -1 || !vertexHiddenByNeighbor[neighborDir][cubeVertexIndex]) {
+                    allVerticesHiddenByThisNeighbor = false;
+                    break;
+                }
+            }
+            
+            if (allVerticesHiddenByThisNeighbor) {
+                isTriangleHidden = true;
+                break;
+            }
+        }
+        
+        if (!isTriangleHidden) {
+            visibleTriangles.push_back(triangle);
+        }
+    }
+    
+    // 5: Wrap the remaining triangles back into mesh data
+    return PolyhedronProcessor::generateMeshData(visibleTriangles);
+}
+
+void Grid::scheduleMeshUpdatesForCell(const glm::ivec3& coord) {
+    // Add this cell and its 6 neighbors to pending updates
+    m_pendingMeshUpdates.insert(coord);
+    
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
+    };
+    
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = coord + directions[i];
+        if (hasCell(neighborCoord)) {
+            m_pendingMeshUpdates.insert(neighborCoord);
+        }
+    }
+    
+    // Schedule job only if not already running
+    if (m_meshUpdateJob.expired()) {
+        m_meshUpdateJob = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
+            return processPendingMeshUpdates(endTime);
+        }, JobPriorities::GRAPHICS_UPDATE);
+        trackJob(m_meshUpdateJob);
+    }
+}
+
+bool Grid::processPendingMeshUpdates(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+    auto it = m_pendingMeshUpdates.begin();
+    while (it != m_pendingMeshUpdates.end() && m_timeHandler->now() < endTime) {
+        glm::ivec3 coord = *it;
+        
+        if (hasCell(coord)) {
+            // Generate filtered mesh and update graphics
+            auto meshData = generateFilteredMeshData(coord);
+            const auto& cell = m_cells.at(coord);
+            // Check if graphics cell exists - if not, add it; otherwise update it
+            if (m_gridGraphics->hasGraphicsCell(coord)) {
+                m_gridGraphics->updateCell(coord, meshData, cell.m_color);
+            } else {
+                m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, cell.m_color);
+            }
+        }
+        
+        it = m_pendingMeshUpdates.erase(it);
+    }
+    
+    return !m_pendingMeshUpdates.empty(); // More work if set not empty
 }

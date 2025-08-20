@@ -98,6 +98,20 @@ void GridGraphics::removeCell(const glm::ivec3& coord) {
     m_graphicsCells.erase(coord);
 }
 
+void GridGraphics::updateCell(const glm::ivec3& coord, const PolyhedronProcessor::MeshData& meshData, const glm::dvec4& color) {
+    // Check if cell exists
+    if (m_graphicsCells.find(coord) == m_graphicsCells.end()) {
+        return; // Cell doesn't exist
+    }
+    
+    // Schedule update job for this cell
+    auto jobHandle = m_jobManager->schedule([this, coord, meshData, color](std::chrono::time_point<std::chrono::high_resolution_clock> /*endTime*/) -> bool {
+        updateCellGraphics(coord, meshData, color);
+        return false; // Job complete
+    }, JobPriorities::GRAPHICS_UPDATE);
+    trackJob(jobHandle);
+}
+
 bool GridGraphics::hasGraphicsCell(const glm::ivec3& coord) const {
     return m_graphicsCells.find(coord) != m_graphicsCells.end();
 }
