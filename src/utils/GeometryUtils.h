@@ -40,6 +40,10 @@ public:
         const glm::dmat3& transformMatrix,
         double& averageZ);
     
+    static std::vector<glm::dvec2> projectToPlane(
+        const std::vector<glm::dvec3>& points3D,
+        const glm::dmat3& transformMatrix);
+    
     static std::vector<glm::dvec3> projectToWorld(
         const std::vector<glm::dvec2>& points2D,
         const glm::dmat3& inverseMatrix,

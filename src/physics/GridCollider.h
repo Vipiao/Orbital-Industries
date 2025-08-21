@@ -29,6 +29,11 @@ public:
     CellClassification classification = CellClassification::CORNER;
 };
 
+struct VisibleTrianglesResult {
+    std::vector<glm::dvec3> vertices;  // Unique vertices, no duplicates
+    std::vector<std::array<int, 3>> triangles;  // Each triangle = 3 indices into vertices
+};
+
 /**
  * @brief Pre-computed neighborhood of cells for fast spatial queries
  * Stores pointers to nearby cells within a fixed radius to avoid repeated hash lookups
@@ -146,4 +151,7 @@ private:
     void scheduleClassificationJob();
     bool processClassificationQueue(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     CellMetadata::CellClassification classifyCell(const glm::ivec3& coord);
+
+    // Visible triangle extraction for classification
+    VisibleTrianglesResult getVisibleTriangles(const glm::ivec3& coord);
 };

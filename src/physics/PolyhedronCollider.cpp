@@ -3,6 +3,7 @@
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
 #include <stdexcept>
+#include "../utils/GeometryUtils.h"
 
 PolyhedronCollider::PolyhedronCollider(const glm::dvec3& position,
                                        const glm::dquat& orientation,
@@ -102,6 +103,92 @@ std::vector<glm::dvec3> PolyhedronCollider::getVertices(uint64_t currentTimestep
         m_verticesValidUntilTime = currentTimestep;
     }
     return m_cachedVertices;
+}
+
+std::vector<glm::dvec3> PolyhedronCollider::getLocalVertices() const {
+    return m_localVertices;
+}
+
+std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() const {
+    std::vector<std::array<int, 3>> triangles;
+    
+    if (m_localVertices.size() < 4) {
+        return triangles; // Need at least 4 vertices for a polyhedron
+    }
+    
+    const double margin = 1e-6;
+    
+    // For each face axis direction
+    for (const auto& axis : m_localFaceAxes) {
+        // Project all vertices onto this axis
+        std::vector<double> projections;
+        projections.reserve(m_localVertices.size());
+        
+        for (const auto& vertex : m_localVertices) {
+            projections.push_back(glm::dot(vertex, axis));
+        }
+        
+        // Find min and max projections
+        double minProj = *std::min_element(projections.begin(), projections.end());
+        double maxProj = *std::max_element(projections.begin(), projections.end());
+        
+        double extremeProjs[2] = {minProj, maxProj};
+
+        // Check both extremes (min and max)
+        for (int extreme = 0; extreme < 2; ++extreme) {
+            double targetProj = extremeProjs[extreme];
+            
+            // Find vertices at this extreme
+            std::vector<int> extremeVertexIndices;
+            std::vector<glm::dvec3> extremeVertices;
+            
+            for (size_t i = 0; i < m_localVertices.size(); ++i) {
+                if (std::abs(projections[i] - targetProj) <= margin) {
+                    extremeVertexIndices.push_back(static_cast<int>(i));
+                    extremeVertices.push_back(m_localVertices[i]);
+                }
+            }
+            
+            // Need at least 3 vertices to form triangles
+            if (extremeVertices.size() < 3) {
+                continue;
+            }
+            
+            // Create plane transform for this face
+            glm::dvec3 planeNormal = axis;
+            glm::dvec3 planePoint = extremeVertices[0]; // Use first vertex as reference point
+            auto transform = GeometryUtils::createPlaneTransform(planeNormal);
+            
+            // Project vertices to 2D
+            std::vector<glm::dvec2> vertices2D = GeometryUtils::projectToPlane(extremeVertices, transform);
+            
+            // Wind the 2D points
+            std::vector<glm::dvec2> windedVertices2D = GeometryUtils::windPoints(vertices2D);
+            
+            // Triangulate the winded polygon (fan triangulation from first vertex)
+            for (size_t i = 1; i < windedVertices2D.size() - 1; ++i) {
+                // Find original vertex indices for the winded vertices
+                int idx0 = extremeVertexIndices[0]; // First vertex
+                int idx1 = -1, idx2 = -1;
+                
+                // Find indices for vertices i and i+1 in winded order
+                for (size_t j = 0; j < vertices2D.size(); ++j) {
+                    if (glm::length(vertices2D[j] - windedVertices2D[i]) < margin) {
+                        idx1 = extremeVertexIndices[j];
+                    }
+                    if (glm::length(vertices2D[j] - windedVertices2D[i + 1]) < margin) {
+                        idx2 = extremeVertexIndices[j];
+                    }
+                }
+                
+                if (idx1 >= 0 && idx2 >= 0) {
+                    triangles.push_back({idx0, idx1, idx2});
+                }
+            }
+        }
+    }
+    
+    return triangles;
 }
 
 void PolyhedronCollider::updateCachedVertices() const {

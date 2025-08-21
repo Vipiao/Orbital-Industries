@@ -1,10 +1,12 @@
 // GridCollider.cpp
 #include "GridCollider.h"
 #include "CubeCollider.h"
+#include "PolyhedronCollider.h"
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
 #include "../utils/JobManager.h"
 #include "../utils/TimeHandler.h"
+#include "../utils/PolyhedronProcessor.h"
 #include "../game_base/JobPriorities.h"
 
 GridCollider::GridCollider(const glm::dvec3& position,
@@ -568,3 +570,138 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
     return CellMetadata::CellClassification::CORNER;
 }
 
+VisibleTrianglesResult GridCollider::getVisibleTriangles(const glm::ivec3& coord) {
+    VisibleTrianglesResult result;
+    
+    // 1: Get the cell and its vertices
+    auto it = m_cells.find(coord);
+    if (it == m_cells.end()) {
+        return result; // Empty result for non-existent cell
+    }
+    
+    // Get the polyhedron collider
+    Collider* collider = it->second.get();
+    PolyhedronCollider* polyhedron = static_cast<PolyhedronCollider*>(collider);
+    
+    // Get local vertices and convert to cell coordinate system [0,1]
+    std::vector<glm::dvec3> localVertices = polyhedron->getLocalVertices();
+    if (localVertices.size() != 8) {
+        return result; // Only works with 8-vertex polyhedrons
+    }
+    
+    std::vector<glm::dvec3> vertices;
+    vertices.reserve(8);
+    for (const auto& localVertex : localVertices) {
+        vertices.push_back(localVertex + glm::dvec3(0.5)); // Convert from [-0.5,0.5] to [0,1]
+    }
+    
+    // Convert to array for border intersection check
+    std::array<glm::dvec3, 8> normalizedVertices;
+    for (int i = 0; i < 8; ++i) {
+        normalizedVertices[i] = vertices[i];
+    }
+    
+    // 2: Check which vertices are hidden by neighbors
+    std::array<std::array<bool, 8>, 6> vertexHiddenByNeighbor;
+    for (auto& row : vertexHiddenByNeighbor) row.fill(false);
+    
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0}, {-1, 0, 0},   // +X, -X
+        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
+        {0, 0, 1}, {0, 0, -1}    // +Z, -Z
+    };
+    
+    for (int i = 0; i < 6; ++i) {
+        glm::ivec3 neighborCoord = coord + directions[i];
+        auto neighborIt = m_cells.find(neighborCoord);
+        
+        if (neighborIt == m_cells.end()) {
+            continue; // No neighbor, vertices remain visible
+        }
+        
+        PolyhedronCollider* neighborPolyhedron = static_cast<PolyhedronCollider*>(neighborIt->second.get());
+        
+        std::vector<glm::dvec3> neighborLocalVertices = neighborPolyhedron->getLocalVertices();
+        if (neighborLocalVertices.size() != 8) {
+            continue; // Only works with 8-vertex polyhedrons
+        }
+
+        std::vector<glm::dvec3> neighborVertices;
+        neighborVertices.reserve(8);
+        for (const auto& localVertex : neighborLocalVertices) {
+            neighborVertices.push_back(localVertex + glm::dvec3(0.5)); // Convert from [-0.5,0.5] to [0,1]
+        }
+        
+        std::array<glm::dvec3, 8> neighborVerticesArray;
+        for (int v = 0; v < 8; ++v) {
+            neighborVerticesArray[v] = neighborVertices[v];
+        }
+        
+        // Call checkPolyhedronBorderIntersection (now in PolyhedronProcessor)
+        auto hiddenFlags = PolyhedronProcessor::checkPolyhedronBorderIntersection(
+            coord, normalizedVertices, neighborCoord, neighborVerticesArray);
+        
+        for (int v = 0; v < 8; ++v) {
+            vertexHiddenByNeighbor[i][v] = hiddenFlags[v];
+        }
+    }
+    
+    // 3: Get triangle indices and filter visible ones (using dvec3 version)
+    auto allTriangleIndices = PolyhedronProcessor::getTriangleIndices(vertices);
+    
+    std::vector<std::array<int, 3>> visibleTriangleIndices;
+    
+    for (const auto& triangleIndices : allTriangleIndices) {
+        bool isTriangleHidden = false;
+        
+        // Check if any single neighbor hides ALL three triangle vertices
+        for (int neighborDir = 0; neighborDir < 6; ++neighborDir) {
+            bool allVerticesHiddenByThisNeighbor = true;
+            
+            for (int triVertex = 0; triVertex < 3; ++triVertex) {
+                int cubeVertexIndex = triangleIndices[triVertex];
+                if (!vertexHiddenByNeighbor[neighborDir][cubeVertexIndex]) {
+                    allVerticesHiddenByThisNeighbor = false;
+                    break;
+                }
+            }
+            
+            if (allVerticesHiddenByThisNeighbor) {
+                isTriangleHidden = true;
+                break;
+            }
+        }
+        
+        if (!isTriangleHidden) {
+            visibleTriangleIndices.push_back(triangleIndices);
+        }
+    }
+    
+    // 4: Create unique vertex list and remap triangle indices
+    std::unordered_map<glm::dvec3, int, DVec3Hash> vertexToIndex;
+    result.vertices.reserve(8); // At most 8 vertices for a cube
+    
+    for (const auto& triangleIndices : visibleTriangleIndices) {
+        std::array<int, 3> newTriangleIndices;
+        
+        for (int i = 0; i < 3; ++i) {
+            glm::dvec3 vertex = vertices[triangleIndices[i]];
+            
+            auto it = vertexToIndex.find(vertex);
+            if (it == vertexToIndex.end()) {
+                // Add new unique vertex
+                int newIndex = static_cast<int>(result.vertices.size());
+                result.vertices.push_back(vertex);
+                vertexToIndex[vertex] = newIndex;
+                newTriangleIndices[i] = newIndex;
+            } else {
+                // Use existing vertex index
+                newTriangleIndices[i] = it->second;
+            }
+        }
+        
+        result.triangles.push_back(newTriangleIndices);
+    }
+    
+    return result;
+}

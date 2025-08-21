@@ -89,6 +89,27 @@ std::vector<glm::dvec2> GeometryUtils::projectToPlane(
     return points2D;
 }
 
+std::vector<glm::dvec2> GeometryUtils::projectToPlane(
+    const std::vector<glm::dvec3>& points3D,
+    const glm::dmat3& transformMatrix) {
+
+    std::vector<glm::dvec2> points2D;
+    points2D.reserve(points3D.size());
+
+    double sumZ = 0.0;
+
+    for (const glm::dvec3& point : points3D) {
+        // Transform point to plane coordinate system
+        glm::dvec3 transformedPoint = transformMatrix * point;
+        // Take X and Y coordinates (Z is the normal direction)
+        points2D.push_back(glm::dvec2(transformedPoint.x, transformedPoint.y));
+        // Accumulate Z coordinate for average calculation
+        sumZ += transformedPoint.z;
+    }
+
+    return points2D;
+}
+
 std::vector<glm::dvec3> GeometryUtils::projectToWorld(
     const std::vector<glm::dvec2>& points2D,
     const glm::dmat3& inverseMatrix,

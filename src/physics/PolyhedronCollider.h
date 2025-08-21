@@ -24,6 +24,12 @@ public:
     
     // Polyhedron interface (public so collision detection can access)
     std::vector<glm::dvec3> getVertices(uint64_t currentTimestep = 0) const;
+    std::vector<glm::dvec3> getLocalVertices() const;
+    /**
+     * @brief Generate triangle indices for the polyhedron's surface faces
+     * @return Vector of triangle indices based on local vertices and face projections
+     */
+    std::vector<std::array<int, 3>> generateTriangleIndices() const;
     std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes(uint64_t currentTimestep = 0) const;
     
     // Filter normal management
