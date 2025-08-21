@@ -590,7 +590,7 @@ PolyhedronProcessor::MeshData Grid::generateFilteredMeshData(const glm::ivec3& c
         }
         
         // Call checkPolyhedronBorderIntersection
-        auto hiddenFlags = GridGeometry::checkPolyhedronBorderIntersection(
+        auto hiddenFlags = PolyhedronProcessor::checkPolyhedronBorderIntersection(
             coord, normalizedVertices, neighborCoord, neighborVertices);
         
         // Store which vertices are hidden by this specific neighbor

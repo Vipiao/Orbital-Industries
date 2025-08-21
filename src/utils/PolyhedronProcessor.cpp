@@ -1,4 +1,5 @@
 #include "PolyhedronProcessor.h"
+#include "GeometryUtils.h"
 #include <glm/gtx/norm.hpp>
 #include <cmath>
 #include <algorithm>
@@ -691,4 +692,91 @@ bool PolyhedronProcessor::areTrianglesConvexInDirection(
     }
     
     return true; // All edges are convex in the given direction
+}
+
+std::array<bool, 8> PolyhedronProcessor::checkPolyhedronBorderIntersection(
+    const glm::ivec3& coordA, const std::array<glm::dvec3, 8>& verticesA,
+    const glm::ivec3& coordB, const std::array<glm::dvec3, 8>& verticesB) {
+    
+    std::array<bool, 8> result;
+    result.fill(false);
+    
+    // Calculate the difference between coordinates
+    glm::ivec3 diff = coordB - coordA;
+    
+    // Check if coordinates are adjacent (Manhattan distance exactly 1)
+    if (std::abs(diff.x) + std::abs(diff.y) + std::abs(diff.z) != 1) {
+        return result; // Not adjacent cells, return all false
+    }
+    
+    // Calculate border axis and value
+    int borderAxis = std::abs(diff.y) + std::abs(diff.z) * 2;
+    double borderValue = std::max(diff.x + diff.y + diff.z, 0);
+    double borderValueB = 1.0 - borderValue;
+    
+    const double tolerance = 1e-6;
+    
+    // Arrays for processing both A and B vertices
+    const std::array<glm::dvec3, 8>* vertices[2] = {&verticesA, &verticesB};
+    double borderValues[2] = {borderValue, borderValueB};
+    glm::ivec3 coordOffsets[2] = {glm::ivec3(0), diff};
+    
+    std::vector<glm::dvec2> borderVerticesA;
+    std::vector<int> borderVertexIndicesA;
+    std::vector<glm::dvec2> borderVerticesB;
+    
+    // Collect border vertices for both polyhedra
+    for (int polyIdx = 0; polyIdx < 2; ++polyIdx) {
+        const auto& polyVertices = *vertices[polyIdx];
+        double targetBorderValue = borderValues[polyIdx];
+        glm::ivec3 coordOffset = coordOffsets[polyIdx];
+        
+        for (int i = 0; i < 8; ++i) {
+            double axisValue = polyVertices[i][borderAxis];
+            if (std::abs(axisValue - targetBorderValue) < tolerance) {
+                // This vertex lies on the border, project to 2D
+                glm::dvec2 vertex2D;
+                if (borderAxis == 0) { // YZ plane
+                    vertex2D = glm::dvec2(polyVertices[i].y + coordOffset.y, polyVertices[i].z + coordOffset.z);
+                } else if (borderAxis == 1) { // XZ plane
+                    vertex2D = glm::dvec2(polyVertices[i].x + coordOffset.x, polyVertices[i].z + coordOffset.z);
+                } else { // XY plane
+                    vertex2D = glm::dvec2(polyVertices[i].x + coordOffset.x, polyVertices[i].y + coordOffset.y);
+                }
+                
+                if (polyIdx == 0) { // Processing A
+                    borderVerticesA.push_back(vertex2D);
+                    borderVertexIndicesA.push_back(i);
+                } else { // Processing B
+                    borderVerticesB.push_back(vertex2D);
+                }
+            }
+        }
+    }
+    
+    // If either polyhedron has no vertices on the border, no intersection possible
+    if (borderVerticesA.empty() || borderVerticesB.empty()) {
+        return result;
+    }
+    
+    // Wind the B vertices to ensure proper polygon ordering
+    std::vector<glm::dvec2> windedVerticesB;
+    if (borderVerticesB.size() >= 3) {
+        windedVerticesB = GeometryUtils::windPoints(borderVerticesB);
+    } else {
+        return result; // Can't form a polygon with < 3 vertices
+    }
+    
+    // Check each border vertex of A against the polygon formed by B's border vertices
+    const double margin = 0.01; // Small margin for intersection tolerance
+    
+    for (size_t i = 0; i < borderVerticesA.size(); ++i) {
+        int vertexIndex = borderVertexIndicesA[i];
+        const glm::dvec2& vertex = borderVerticesA[i];
+        
+        bool isInside = isPointInConvexPolygon(vertex, windedVerticesB, margin);
+        result[vertexIndex] = isInside;
+    }
+    
+    return result;
 }
