@@ -569,5 +569,5 @@ bool PhysicsEngine::shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* body
         relativeVelNormal = glm::dot(computedRelativeVel, normal);
     }
     
-    return glm::min(relativeVelNormal * 5.0, 0.1) > compliantPenetration;
+    return glm::min(relativeVelNormal * 10.0, 0.1) > compliantPenetration;
 }
