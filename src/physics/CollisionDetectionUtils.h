@@ -34,7 +34,7 @@ class GridCollider;
 class PolyhedronCollider;
 
 // Contact point reduction thresholds
-static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 11;
+static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 12 + 8;
 
 class CollisionDetectionUtils {
 public:
