@@ -50,6 +50,36 @@ std::array<std::array<int, 3>, 2> PolyhedronProcessor::getConvexTriangulation(
     }
 }
 
+std::array<std::array<int, 3>, 2> PolyhedronProcessor::getConvexTriangulation(
+    const glm::dvec3& v0, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3,
+    int idx0, int idx1, int idx2, int idx3) {
+    
+    // Calculate normal of triangle (v0, v1, v2)
+    glm::dvec3 edge1 = v1 - v0;
+    glm::dvec3 edge2 = v2 - v0;
+    glm::dvec3 normal = glm::cross(edge1, edge2);
+    
+    // Calculate vector from v0 to v3
+    glm::dvec3 vec_to_v3 = v3 - v0;
+    
+    // Check if quad is convex by testing if v3 is on the same side as the normal
+    double dot_product = glm::dot(normal, vec_to_v3);
+    
+    if (dot_product > 0.0) {
+        // Quad is concave, use alternative triangulation
+        return {{
+            {idx0, idx1, idx3},
+            {idx3, idx1, idx2}
+        }};
+    } else {
+        // Quad is convex, use standard triangulation
+        return {{
+            {idx0, idx1, idx2},
+            {idx0, idx2, idx3}
+        }};
+    }
+}
+
 PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<glm::ivec3>& vertices, int maxSize) {
     if (vertices.size() != 8) {
         return {}; // Invalid input - need exactly 8 vertices for a cube
@@ -238,6 +268,44 @@ std::vector<std::array<int, 3>> PolyhedronProcessor::getTriangleIndices(const st
             // Check if triangle has non-zero area
             glm::ivec3 t_cross = IntegerVectorMath::cross(t_v1 - t_v0, t_v2 - t_v0);
             double area = 0.5 * glm::length(glm::dvec3(t_cross));
+            
+            if (area > Vec3Compare::eps) {
+                triangles.push_back({triangle[0], triangle[1], triangle[2]});
+            }
+        }
+    }
+    
+    return triangles;
+}
+
+std::vector<std::array<int, 3>> PolyhedronProcessor::getTriangleIndices(const std::vector<glm::dvec3>& vertices) {
+    if (vertices.size() != 8) {
+        return {}; // Invalid input
+    }
+    
+    std::vector<std::array<int, 3>> triangles;
+    triangles.reserve(12); // Maximum 12 triangles (2 per face * 6 faces)
+    
+    // Process each face
+    for (const auto& face : CUBE_FACES) {
+        // Get quad vertices
+        const glm::dvec3& v0 = vertices[face[0]];
+        const glm::dvec3& v1 = vertices[face[1]];
+        const glm::dvec3& v2 = vertices[face[2]];
+        const glm::dvec3& v3 = vertices[face[3]];
+        
+        // Get triangulation for this quad
+        auto triangulation = getConvexTriangulation(v0, v1, v2, v3, face[0], face[1], face[2], face[3]);
+        
+        // Process both triangles
+        for (const auto& triangle : triangulation) {
+            const glm::dvec3& t_v0 = vertices[triangle[0]];
+            const glm::dvec3& t_v1 = vertices[triangle[1]];
+            const glm::dvec3& t_v2 = vertices[triangle[2]];
+            
+            // Check if triangle has non-zero area
+            glm::dvec3 t_cross = glm::cross(t_v1 - t_v0, t_v2 - t_v0);
+            double area = 0.5 * glm::length(t_cross);
             
             if (area > Vec3Compare::eps) {
                 triangles.push_back({triangle[0], triangle[1], triangle[2]});

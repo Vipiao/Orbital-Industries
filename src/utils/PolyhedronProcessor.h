@@ -69,6 +69,13 @@ public:
     static std::vector<std::array<int, 3>> getTriangleIndices(const std::vector<glm::ivec3>& vertices, int maxSize);
 
     /**
+     * Extract triangle indices from normalized vertices
+     * @param vertices Vector of 8 normalized vertices in [0,1] space
+     * @return Vector of triangle indices (each triangle is 3 indices into vertices array)
+     */
+    static std::vector<std::array<int, 3>> getTriangleIndices(const std::vector<glm::dvec3>& vertices);
+
+    /**
      * Validate if the polyhedron formed by the vertices is valid
      * @param vertices Vector of 8 cube vertices
      * @param maxSize Maximum coordinate value for normalization
@@ -185,6 +192,15 @@ private:
      */
     static std::array<std::array<int, 3>, 2> getConvexTriangulation(
         const glm::ivec3& v0, const glm::ivec3& v1, const glm::ivec3& v2, const glm::ivec3& v3,
+        int idx0, int idx1, int idx2, int idx3);
+    
+    /**
+     * Check if a quad is convex and return appropriate triangulation (dvec3 version)
+     * @param v0, v1, v2, v3 The quad vertices in counter-clockwise order
+     * @return Array of 2 triangles: either [(v0,v1,v2),(v0,v2,v3)] or [(v0,v1,v3),(v3,v1,v2)]
+     */
+    static std::array<std::array<int, 3>, 2> getConvexTriangulation(
+        const glm::dvec3& v0, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3,
         int idx0, int idx1, int idx2, int idx3);
 
     /**
