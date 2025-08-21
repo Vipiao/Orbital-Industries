@@ -673,7 +673,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             // orientationDot >
             //     glm::cos((POSITION_THRESHOLD - positionDelta) /
             //     (approxRadiusB * 2.0))
-            // For small x, cos(x) ~ 1-1/x^2
+            // For small x, cos(x) ~ 1-x^2/2
             // nn = 2. * glm::sqrt(2)
             // remainder = (POSITION_THRESHOLD - positionDelta) /
             //     (nn * approxRadiusB);
@@ -694,9 +694,9 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
                 double orientationDot = glm::abs(glm::dot(currentBOrientationInA, cacheData->prevBOrientationInA));
                 orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
 
-                double constexpr nn = 2. * glm::sqrt(2);
+                double constexpr nn = 2.;
                 double remainder = (POSITION_THRESHOLD - glm::sqrt(positionDeltaSqr)) / (nn * approxRadiusB);
-                if (orientationDot < 1.0 - remainder * remainder)
+                if (orientationDot < 1.0 - remainder * remainder / 2.)
                 {
                     canUseCachedContacts = false;
                 }
