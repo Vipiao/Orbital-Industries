@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include "../math/IntegerVectorMath.h"
 #include <map>
+#include <queue>
+#include <utility>
 
 bool IVec3Compare::operator()(const glm::ivec3& a, const glm::ivec3& b) const {
     if (a.x != b.x) return a.x < b.x;
@@ -846,4 +848,129 @@ std::vector<bool> PolyhedronProcessor::checkPolyhedronBorderIntersection(
     }
     
     return result;
+}
+
+bool PolyhedronProcessor::areTrianglesAdjacent(const std::array<glm::dvec3, 3>& triangleA, const std::array<glm::dvec3, 3>& triangleB, double tolerance) {
+    // Find shared vertices between the triangles
+    std::vector<std::pair<int, int>> sharedVertices; // pairs of (indexA, indexB)
+    
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            if (glm::length(triangleA[i] - triangleB[j]) < tolerance) {
+                sharedVertices.push_back({i, j});
+                break; // Each vertex in A can match at most one vertex in B
+            }
+        }
+    }
+    
+    // Triangles are adjacent if they share exactly 2 vertices (an edge)
+    if (sharedVertices.size() != 2) {
+        return false;
+    }
+    
+    // Get the indices of shared vertices in both triangles
+    int idxA1 = sharedVertices[0].first;
+    int idxB1 = sharedVertices[0].second;
+    int idxA2 = sharedVertices[1].first;
+    int idxB2 = sharedVertices[1].second;
+    
+    // Check winding consistency
+    // For proper winding, the shared edge should appear in opposite directions in the two triangles
+    
+    // In triangle A, determine the direction of the shared edge
+    bool edgeA_forward = (idxA2 == (idxA1 + 1) % 3); // Is the edge v1->v2 in forward direction?
+    bool edgeA_backward = (idxA1 == (idxA2 + 1) % 3); // Is the edge v2->v1 in forward direction?
+    
+    // In triangle B, determine the direction of the shared edge
+    bool edgeB_forward = (idxB2 == (idxB1 + 1) % 3); // Is the edge v1->v2 in forward direction?
+    bool edgeB_backward = (idxB1 == (idxB2 + 1) % 3); // Is the edge v2->v1 in forward direction?
+    
+    // The shared edge must be part of both triangles' edge lists
+    if (!((edgeA_forward || edgeA_backward) && (edgeB_forward || edgeB_backward))) {
+        return false; // Shared vertices don't form a continuous edge in both triangles
+    }
+    
+    // For consistent winding, the edge directions should be opposite
+    if (edgeA_forward != edgeB_forward) {
+        return true;
+    }
+    
+    // If we reach here, the triangles share an edge but have inconsistent winding
+    // This would create a surface orientation flip, so they're not properly adjacent
+    return false;
+}
+
+std::vector<std::vector<int>> PolyhedronProcessor::groupTrianglesIntoIslands(
+    const std::vector<glm::dvec3>& vertices,
+    const std::vector<std::array<int, 3>>& triangleIndices) {
+    
+    if (triangleIndices.empty()) {
+        return {};
+    }
+    
+    // Build edge to triangle map
+    std::map<std::pair<int, int>, std::vector<int>> edgeToTriangles;
+    
+    for (int triIdx = 0; triIdx < static_cast<int>(triangleIndices.size()); ++triIdx) {
+        const auto& triangle = triangleIndices[triIdx];
+        
+        // Add all 3 edges of this triangle
+        for (int i = 0; i < 3; ++i) {
+            int v1 = triangle[i];
+            int v2 = triangle[(i + 1) % 3];
+            
+            // Create edge key with smaller vertex index first for consistency
+            std::pair<int, int> edge = (v1 < v2) ? std::make_pair(v1, v2) : std::make_pair(v2, v1);
+            
+            edgeToTriangles[edge].push_back(triIdx);
+        }
+    }
+    
+    // Initialize triangle classes (-1 = unprocessed)
+    std::vector<int> triangleClass(triangleIndices.size(), -1);
+    std::vector<std::vector<int>> islands;
+    
+    // BFS to find connected components
+    for (int triIdx = 0; triIdx < static_cast<int>(triangleIndices.size()); ++triIdx) {
+        if (triangleClass[triIdx] != -1) {
+            continue; // Already processed
+        }
+        
+        // Start new island
+        int currentIslandClass = static_cast<int>(islands.size());
+        islands.emplace_back();
+        std::queue<int> queue;
+        
+        // Add starting triangle
+        queue.push(triIdx);
+        triangleClass[triIdx] = currentIslandClass;
+        
+        // BFS expansion
+        while (!queue.empty()) {
+            int currentTriIdx = queue.front();
+            queue.pop();
+            islands[currentIslandClass].push_back(currentTriIdx);
+            
+            const auto& currentTriangle = triangleIndices[currentTriIdx];
+            
+            // Check all 3 edges for neighboring triangles
+            for (int i = 0; i < 3; ++i) {
+                int v1 = currentTriangle[i];
+                int v2 = currentTriangle[(i + 1) % 3];
+                std::pair<int, int> edge = (v1 < v2) ? std::make_pair(v1, v2) : std::make_pair(v2, v1);
+                
+                auto edgeIt = edgeToTriangles.find(edge);
+                if (edgeIt != edgeToTriangles.end()) {
+                    for (int neighborTriIdx : edgeIt->second) {
+                        if (neighborTriIdx != currentTriIdx && triangleClass[neighborTriIdx] == -1) {
+                            triangleClass[neighborTriIdx] = currentIslandClass;
+                            queue.push(neighborTriIdx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return islands;
 }

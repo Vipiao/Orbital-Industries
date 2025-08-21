@@ -162,6 +162,25 @@ public:
         const glm::ivec3& coordA, const std::vector<glm::dvec3>& verticesA,
         const glm::ivec3& coordB, const std::vector<glm::dvec3>& verticesB);
 
+    /**
+     * @brief Check if two triangles are adjacent (share an edge) with consistent winding
+     * @param triangleA First triangle (3 vertices)
+     * @param triangleB Second triangle (3 vertices)
+     * @param tolerance Tolerance for vertex comparison (default 1e-9)
+     * @return true if triangles share exactly one edge with consistent winding, false otherwise
+     */
+    static bool areTrianglesAdjacent(const std::array<glm::dvec3, 3>& triangleA, const std::array<glm::dvec3, 3>& triangleB, double tolerance = Vec3Compare::eps);
+
+    /**
+     * @brief Group triangles into connected islands based on edge sharing
+     * @param vertices Vector of 3D vertices
+     * @param triangleIndices Vector of triangles (each triangle = 3 indices into vertices)
+     * @return Vector of islands, where each island is a vector of triangle indices
+     */
+    static std::vector<std::vector<int>> groupTrianglesIntoIslands(
+        const std::vector<glm::dvec3>& vertices,
+        const std::vector<std::array<int, 3>>& triangleIndices);
+
 private:
     // Face definitions for cube (indices into vertex array)  
     // Coordinate system: +X right, +Y forward, +Z up (right-handed)
