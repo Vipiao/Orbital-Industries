@@ -762,12 +762,11 @@ bool PolyhedronProcessor::areTrianglesConvexInDirection(
     return true; // All edges are convex in the given direction
 }
 
-std::array<bool, 8> PolyhedronProcessor::checkPolyhedronBorderIntersection(
-    const glm::ivec3& coordA, const std::array<glm::dvec3, 8>& verticesA,
-    const glm::ivec3& coordB, const std::array<glm::dvec3, 8>& verticesB) {
+std::vector<bool> PolyhedronProcessor::checkPolyhedronBorderIntersection(
+    const glm::ivec3& coordA, const std::vector<glm::dvec3>& verticesA,
+    const glm::ivec3& coordB, const std::vector<glm::dvec3>& verticesB) {
     
-    std::array<bool, 8> result;
-    result.fill(false);
+    std::vector<bool> result(verticesA.size(), false);
     
     // Calculate the difference between coordinates
     glm::ivec3 diff = coordB - coordA;
@@ -785,7 +784,7 @@ std::array<bool, 8> PolyhedronProcessor::checkPolyhedronBorderIntersection(
     const double tolerance = 1e-6;
     
     // Arrays for processing both A and B vertices
-    const std::array<glm::dvec3, 8>* vertices[2] = {&verticesA, &verticesB};
+    const std::vector<glm::dvec3>* vertices[2] = {&verticesA, &verticesB};
     double borderValues[2] = {borderValue, borderValueB};
     glm::ivec3 coordOffsets[2] = {glm::ivec3(0), diff};
     
@@ -799,7 +798,7 @@ std::array<bool, 8> PolyhedronProcessor::checkPolyhedronBorderIntersection(
         double targetBorderValue = borderValues[polyIdx];
         glm::ivec3 coordOffset = coordOffsets[polyIdx];
         
-        for (int i = 0; i < 8; ++i) {
+        for (size_t i = 0; i < polyVertices.size(); ++i) {
             double axisValue = polyVertices[i][borderAxis];
             if (std::abs(axisValue - targetBorderValue) < tolerance) {
                 // This vertex lies on the border, project to 2D

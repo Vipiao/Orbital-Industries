@@ -560,7 +560,7 @@ PolyhedronProcessor::MeshData Grid::generateFilteredMeshData(const glm::ivec3& c
     }
     
     const StructuralBlock& block = it->second;
-    std::array<glm::dvec3, 8> normalizedVertices;
+    std::vector<glm::dvec3> normalizedVertices(8);
     for (int i = 0; i < 8; ++i) {
         normalizedVertices[i] = glm::dvec3(block.m_localVertices[i]) / double(StructuralBlock::MAX_SIZE);
     }
@@ -584,7 +584,7 @@ PolyhedronProcessor::MeshData Grid::generateFilteredMeshData(const glm::ivec3& c
         }
         
         const StructuralBlock& neighborBlock = neighborIt->second;
-        std::array<glm::dvec3, 8> neighborVertices;
+        std::vector<glm::dvec3> neighborVertices(8);
         for (int v = 0; v < 8; ++v) {
             neighborVertices[v] = glm::dvec3(neighborBlock.m_localVertices[v]) / double(StructuralBlock::MAX_SIZE);
         }
