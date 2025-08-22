@@ -518,7 +518,177 @@ bool GridCollider::processClassificationQueue(std::chrono::time_point<std::chron
 
 CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& coord) {
     
+
     // Temorary fix as all cells are not cubes anymore.
+    //return CellMetadata::CellClassification::CORNER;
+
+    extern int debug1;
+    debug1++;
+
+    // 1. Get visible triangles for current cell
+    auto visibleTrianglesResult = getVisibleTriangles(coord);
+    
+    if (visibleTrianglesResult.triangles.empty()) {
+        return CellMetadata::CellClassification::INNER; // No visible triangles = completely hidden
+    }
+    
+    // 2. Group triangles into islands
+    auto islands = PolyhedronProcessor::groupTrianglesIntoIslands(
+        visibleTrianglesResult.vertices, 
+        visibleTrianglesResult.triangles);
+    
+    if (islands.empty()) {
+        return CellMetadata::CellClassification::INNER; // No islands = inner
+    }
+    
+    // 3. Collect all foreign triangles from 18 neighbors (6 face + 12 edge)
+    static const glm::ivec3 neighborDirections[18] = {
+        // Face neighbors (6)
+        {1, 0, 0}, {-1, 0, 0},   // +X, -X
+        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
+        {0, 0, 1}, {0, 0, -1},   // +Z, -Z
+        // Edge neighbors (12)
+        {1, 1, 0}, {1, -1, 0}, {-1, 1, 0}, {-1, -1, 0},   // XY edges
+        {1, 0, 1}, {1, 0, -1}, {-1, 0, 1}, {-1, 0, -1},   // XZ edges
+        {0, 1, 1}, {0, 1, -1}, {0, -1, 1}, {0, -1, -1}    // YZ edges
+    };
+    
+    std::vector<std::array<glm::dvec3, 3>> allForeignTriangles;
+    
+    for (int i = 0; i < 18; ++i) {
+        glm::ivec3 neighborCoord = coord + neighborDirections[i];
+        auto neighborIt = m_cells.find(neighborCoord);
+        
+        if (neighborIt == m_cells.end()) {
+            continue; // Neighbor doesn't exist
+        }
+        
+        // Get neighbor's visible triangles
+        auto neighborVisibleResult = getVisibleTriangles(neighborCoord);
+        
+        // Transform neighbor triangles to current cell's coordinate system and add to collection
+        glm::dvec3 offset = glm::dvec3(neighborDirections[i]);
+        
+        for (const auto& triangleIndices : neighborVisibleResult.triangles) {
+            std::array<glm::dvec3, 3> transformedTriangle;
+            for (int v = 0; v < 3; ++v) {
+                // Transform from neighbor's local space to current cell's local space
+                transformedTriangle[v] = neighborVisibleResult.vertices[triangleIndices[v]] + offset;
+            }
+            allForeignTriangles.push_back(transformedTriangle);
+        }
+    }
+    
+    // 4. For each island, find adjacent foreign triangles and build combined triangle list
+    std::vector<std::vector<std::array<glm::dvec3, 3>>> islandTriangleSets;
+    islandTriangleSets.reserve(islands.size());
+    
+    for (const auto& island : islands) {
+        std::vector<std::array<glm::dvec3, 3>> islandTriangles;
+        
+        // Add my triangles from this island
+        for (int triangleIdx : island) {
+            std::array<glm::dvec3, 3> triangle;
+            for (int v = 0; v < 3; ++v) {
+                triangle[v] = visibleTrianglesResult.vertices[visibleTrianglesResult.triangles[triangleIdx][v]];
+            }
+            islandTriangles.push_back(triangle);
+        }
+        
+        // Find adjacent foreign triangles
+        for (const auto& foreignTriangle : allForeignTriangles) {
+            // Check if this foreign triangle is adjacent to any triangle in current island
+            bool isAdjacent = false;
+            for (int triangleIdx : island) {
+                std::array<glm::dvec3, 3> myTriangle;
+                for (int v = 0; v < 3; ++v) {
+                    myTriangle[v] = visibleTrianglesResult.vertices[visibleTrianglesResult.triangles[triangleIdx][v]];
+                }
+                
+                if (PolyhedronProcessor::areTrianglesAdjacent(myTriangle, foreignTriangle)) {
+                    isAdjacent = true;
+                    break;
+                }
+            }
+            
+            if (isAdjacent) {
+                islandTriangles.push_back(foreignTriangle);
+            }
+        }
+        
+        islandTriangleSets.push_back(islandTriangles);
+    }
+    
+    // 5. Classification logic
+    // Check if all islands are concave (strictly concave)
+    bool allIslandsConcave = true;
+    for (const auto& islandTriangles : islandTriangleSets) {
+        if (!PolyhedronProcessor::areTrianglesConvex(islandTriangles, false)) { // Check for flat or concave
+            allIslandsConcave = false;
+            break;
+        }
+    }
+    
+    if (allIslandsConcave) {
+        return CellMetadata::CellClassification::FACE;
+    }
+    
+    // Check directional concavity for non-concave islands
+    bool allIslandsDirectionallyConcave = true;
+    
+    for (const auto& islandTriangles : islandTriangleSets) {
+        // Compute triangle normals
+        std::vector<glm::dvec3> normals;
+        normals.reserve(islandTriangles.size());
+        
+        for (const auto& triangle : islandTriangles) {
+            glm::dvec3 normal = PolyhedronProcessor::getTriangleNormal(triangle);
+            if (glm::length(normal) > Vec3Compare::eps) {
+                normals.push_back(normal);
+            }
+        }
+        
+        if (normals.size() < 2) {
+            continue; // Can't compute direction with < 2 normals, assume directionally convex
+        }
+        
+        // Compute cross products with flipping optimization
+        glm::dvec3 sum(0.0);
+        
+        for (size_t i = 0; i < normals.size(); ++i) {
+            for (size_t j = i + 1; j < normals.size(); ++j) {
+                glm::dvec3 crossProduct = glm::cross(normals[i], normals[j]);
+                
+                if (glm::length(crossProduct) < Vec3Compare::eps) {
+                    continue; // Skip degenerate cross products
+                }
+                
+                // Flip cross product to maximize sum length using dot product
+                if (glm::dot(sum, crossProduct) < 0.0) {
+                    crossProduct = -crossProduct;
+                }
+                
+                sum += crossProduct;
+            }
+        }
+        
+        // If sum is too small, assume directionally convex (normals are similar)
+        if (glm::length(sum) < Vec3Compare::eps) {
+            continue;
+        }
+        
+        // Test directional concavity
+        glm::dvec3 direction = glm::normalize(sum);
+        if (!PolyhedronProcessor::areTrianglesConvexInDirection(islandTriangles, direction, false)) { // Check for directionally flat or concave
+            allIslandsDirectionallyConcave = false;
+            break;
+        }
+    }
+    
+    if (allIslandsDirectionallyConcave) {
+        return CellMetadata::CellClassification::EDGE;
+    }
+    
     return CellMetadata::CellClassification::CORNER;
     
     // Standard 6-directional neighbors

@@ -133,6 +133,7 @@ std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() co
         double maxProj = *std::max_element(projections.begin(), projections.end());
         
         double extremeProjs[2] = {minProj, maxProj};
+        glm::dvec3 extremeNormals[2] = {-axis, axis}; // Flip normal for MIN to ensure correct winding
 
         // Check both extremes (min and max)
         for (int extreme = 0; extreme < 2; ++extreme) {
@@ -155,7 +156,7 @@ std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() co
             }
             
             // Create plane transform for this face
-            glm::dvec3 planeNormal = axis;
+            glm::dvec3 planeNormal = extremeNormals[extreme];
             glm::dvec3 planePoint = extremeVertices[0]; // Use first vertex as reference point
             auto transform = GeometryUtils::createPlaneTransform(planeNormal);
             
@@ -165,10 +166,17 @@ std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() co
             // Wind the 2D points
             std::vector<glm::dvec2> windedVertices2D = GeometryUtils::windPoints(vertices2D);
             
+            // Find index for fan center vertex (windedVertices2D[0]) once
+            int idx0 = -1;
+            for (size_t j = 0; j < vertices2D.size(); ++j) {
+                if (glm::length(vertices2D[j] - windedVertices2D[0]) < margin) {
+                    idx0 = extremeVertexIndices[j];
+                    break;
+                }
+            }
+
             // Triangulate the winded polygon (fan triangulation from first vertex)
             for (size_t i = 1; i < windedVertices2D.size() - 1; ++i) {
-                // Find original vertex indices for the winded vertices
-                int idx0 = extremeVertexIndices[0]; // First vertex
                 int idx1 = -1, idx2 = -1;
                 
                 // Find indices for vertices i and i+1 in winded order
@@ -181,7 +189,7 @@ std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() co
                     }
                 }
                 
-                if (idx1 >= 0 && idx2 >= 0) {
+                if (idx0 >= 0 && idx1 >= 0 && idx2 >= 0) {
                     triangles.push_back({idx0, idx1, idx2});
                 }
             }

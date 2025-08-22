@@ -181,6 +181,13 @@ public:
         const std::vector<glm::dvec3>& vertices,
         const std::vector<std::array<int, 3>>& triangleIndices);
 
+    /**
+     * Calculate the normal of a triangle
+     * @param triangle Triangle vertices
+     * @return Normalized normal vector
+     */
+    static glm::dvec3 getTriangleNormal(const std::array<glm::dvec3, 3>& triangle);
+
 private:
     // Face definitions for cube (indices into vertex array)  
     // Coordinate system: +X right, +Y forward, +Z up (right-handed)
@@ -228,13 +235,6 @@ private:
      * @return Center point of the triangle
      */
     static glm::dvec3 getTriangleCenter(const std::array<glm::dvec3, 3>& triangle);
-
-    /**
-     * Calculate the normal of a triangle
-     * @param triangle Triangle vertices
-     * @return Normalized normal vector
-     */
-    static glm::dvec3 getTriangleNormal(const std::array<glm::dvec3, 3>& triangle);
 
     /**
      * Count shared vertices between two triangles

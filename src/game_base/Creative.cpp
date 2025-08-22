@@ -589,6 +589,50 @@ void Creative::updateMarkerPositions() {
 void Creative::processInputLogic() {
     MouseHandler* mouseHandler = m_gameBase->m_graphicsEngine->getMouseHandler();
     KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
+
+    // TEST START
+    //CellMetadata* metadata = collider->get_pointer<CellMetadata>();
+    for (size_t ii = 0; ii < m_gameBase->m_grids.size(); ii++) {
+        auto cells = m_gameBase->m_grids[ii]->getCells();
+        GridCollider* gridCollider = static_cast<GridCollider*>(m_gameBase->m_grids[ii]->getRigidBody()->m_collider);
+        
+        for (auto cell: cells) {
+            glm::ivec3 coord = cell.first;
+            
+            // Get the collider for this cell
+            Collider* cellCollider = gridCollider->getCell(coord);
+            if (!cellCollider) continue;
+            
+            // Get the classification metadata
+            CellMetadata* metadata = cellCollider->get_pointer<CellMetadata>();
+            if (!metadata) continue;
+            
+            // Set color based on classification
+            glm::dvec4 color;
+            switch (metadata->classification) {
+                case CellMetadata::CellClassification::INNER:
+                    color = {1.0, 0.0, 0.0, 1.0}; // Red
+                    break;
+                case CellMetadata::CellClassification::FACE:
+                    color = {0.0, 1.0, 0.0, 1.0}; // Green
+                    break;
+                case CellMetadata::CellClassification::EDGE:
+                    color = {0.0, 0.0, 1.0, 1.0}; // Blue
+                    break;
+                case CellMetadata::CellClassification::CORNER:
+                    color = {1.0, 1.0, 0.0, 1.0}; // Yellow
+                    break;
+                default:
+                    color = {1.0, 1.0, 1.0, 1.0}; // White (fallback)
+                    break;
+            }
+            
+            m_gameBase->m_grids[ii]->setColor(coord, color);
+        }
+    }
+    
+
+    // TEST END
     
     handleColorInput();
 
