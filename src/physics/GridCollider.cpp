@@ -690,54 +690,6 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
     }
     
     return CellMetadata::CellClassification::CORNER;
-    
-    // Standard 6-directional neighbors
-    static const glm::ivec3 directions[6] = {
-        {1, 0, 0}, {-1, 0, 0},   // +X, -X
-        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
-        {0, 0, 1}, {0, 0, -1}    // +Z, -Z
-    };
-    
-    std::array<bool, 6> hasNeighbor;
-    int occupiedCount = 0;
-    
-    // Check each neighbor using hash lookup
-    for (int i = 0; i < 6; ++i) {
-        glm::ivec3 neighborCoord = coord + directions[i];
-        hasNeighbor[i] = hasCell(neighborCoord);
-        if (hasNeighbor[i]) {
-            occupiedCount++;
-        }
-    }
-    
-    // Apply classification rules
-    if (occupiedCount == 6) {
-        return CellMetadata::CellClassification::INNER;
-    }
-
-    if (occupiedCount == 5) {
-        return CellMetadata::CellClassification::FACE;
-    }
-    
-    if (occupiedCount == 4) {
-        // Check if the 2 empty directions are opposite pairs
-        for (int i = 0; i < 6; i += 2) {
-            if (!hasNeighbor[i] && !hasNeighbor[i + 1]) {
-                return CellMetadata::CellClassification::FACE;
-            }
-        }
-    }
-    
-    if (occupiedCount >= 2) {
-        // Check if there's at least one opposite pair
-        for (int i = 0; i < 6; i += 2) {
-            if (hasNeighbor[i] && hasNeighbor[i + 1]) {
-                return CellMetadata::CellClassification::EDGE;
-            }
-        }
-    }
-    
-    return CellMetadata::CellClassification::CORNER;
 }
 
 VisibleTrianglesResult GridCollider::getVisibleTriangles(const glm::ivec3& coord) {
