@@ -139,6 +139,28 @@ public:
         bool counterClockwise = true);
 
     /**
+     * @brief Check convexity of a set of triangles using vertex indices
+     * @param vertices Vector of vertices
+     * @param triangleIndices Vector of triangles (each triangle is 3 indices into vertices)
+     * @param counterClockwise Whether triangles use counter-clockwise winding for outward normals
+     * @return true if the triangles form a convex shape, false otherwise
+     */
+    static bool areTrianglesConvex(
+        const std::vector<glm::dvec3>& vertices,
+        const std::vector<std::array<int, 3>>& triangleIndices,
+        bool counterClockwise = true);
+    
+    /**
+     * @brief Check if the triangulated surface has at least one convex vertex
+     * @param vertices Vector of vertices
+     * @param triangleIndices Vector of triangles (each triangle is 3 indices into vertices)
+     * @return true if at least one vertex is convex, false otherwise
+     */
+    static bool hasAtLeastOneConvexVertex(
+        const std::vector<glm::dvec3>& vertices,
+        const std::vector<std::array<int, 3>>& triangleIndices);
+
+    /**
      * @brief Check convexity of triangles in a specific direction
      * @param triangles Vector of triangles (each triangle is 3 vertices)
      * @param direction Direction vector to project normals onto for convexity check
@@ -188,6 +210,14 @@ public:
      */
     static glm::dvec3 getTriangleNormal(const std::array<glm::dvec3, 3>& triangle);
 
+    /**
+     * Count shared vertices between two triangles
+     * @param t1, t2 Triangle vertices to compare
+     * @param tolerance Tolerance for vertex comparison
+     * @return Number of shared vertices (0, 1, 2, or 3)
+     */
+    static int countSharedVertices(const std::array<glm::dvec3, 3>& t1, const std::array<glm::dvec3, 3>& t2, double tolerance = Vec3Compare::eps);
+
 private:
     // Face definitions for cube (indices into vertex array)  
     // Coordinate system: +X right, +Y forward, +Z up (right-handed)
@@ -235,12 +265,4 @@ private:
      * @return Center point of the triangle
      */
     static glm::dvec3 getTriangleCenter(const std::array<glm::dvec3, 3>& triangle);
-
-    /**
-     * Count shared vertices between two triangles
-     * @param t1, t2 Triangle vertices to compare
-     * @param tolerance Tolerance for vertex comparison
-     * @return Number of shared vertices (0, 1, 2, or 3)
-     */
-    static int countSharedVertices(const std::array<glm::dvec3, 3>& t1, const std::array<glm::dvec3, 3>& t2, double tolerance = Vec3Compare::eps);
 };

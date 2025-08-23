@@ -9,6 +9,7 @@
 #include <map>
 #include <queue>
 #include <utility>
+#include <iostream>
 
 bool IVec3Compare::operator()(const glm::ivec3& a, const glm::ivec3& b) const {
     if (a.x != b.x) return a.x < b.x;
@@ -671,6 +672,322 @@ bool PolyhedronProcessor::areTrianglesConvex(
     }
     
     return true; // All checked edges are convex
+}
+
+bool PolyhedronProcessor::areTrianglesConvex(
+    const std::vector<glm::dvec3>& vertices,
+    const std::vector<std::array<int, 3>>& triangleIndices,
+    bool counterClockwise) {
+    
+    if (triangleIndices.size() < 2) {
+        return true; // Single triangle is always "convex"
+    }
+
+    // Build a map of edges to triangles for efficient lookup
+    struct Edge {
+        int v1, v2;
+        
+        bool operator<(const Edge& other) const {
+            if (v1 != other.v1) return v1 < other.v1;
+            return v2 < other.v2;
+        }
+    };
+    
+    std::map<Edge, std::vector<size_t>> edgeToTriangles;
+    
+    // Build edge map
+    for (size_t triIdx = 0; triIdx < triangleIndices.size(); ++triIdx) {
+        const auto& triangle = triangleIndices[triIdx];
+        
+        // Add all three edges of this triangle
+        for (int i = 0; i < 3; ++i) {
+            int j = (i + 1) % 3;
+            int v1 = triangle[i];
+            int v2 = triangle[j];
+            
+            // Normalize edge direction (smaller index first)
+            Edge edge;
+            if (v1 < v2) {
+                edge = {v1, v2};
+            } else {
+                edge = {v2, v1};
+            }
+            
+            edgeToTriangles[edge].push_back(triIdx);
+        }
+    }
+    
+    // Check convexity for each shared edge
+    for (const auto& pair : edgeToTriangles) {
+        const std::vector<size_t>& triangleIdxList = pair.second;
+        
+        // Only check edges shared by exactly 2 triangles
+        if (triangleIdxList.size() != 2) {
+            continue;
+        }
+        
+        const auto& tri1 = triangleIndices[triangleIdxList[0]];
+        const auto& tri2 = triangleIndices[triangleIdxList[1]];
+        
+        // Get triangle vertices
+        glm::dvec3 tri1_v0 = vertices[tri1[0]];
+        glm::dvec3 tri1_v1 = vertices[tri1[1]];
+        glm::dvec3 tri1_v2 = vertices[tri1[2]];
+        
+        // Calculate normal for first triangle
+        glm::dvec3 edge1_1 = tri1_v1 - tri1_v0;
+        glm::dvec3 edge1_2 = tri1_v2 - tri1_v0;
+        glm::dvec3 normal1 = counterClockwise ? glm::cross(edge1_1, edge1_2) : glm::cross(edge1_2, edge1_1);
+        normal1 = glm::normalize(normal1);
+        
+        // Calculate centroids
+        glm::dvec3 centroid1 = (tri1_v0 + tri1_v1 + tri1_v2) / 3.0;
+        glm::dvec3 centroid2 = (vertices[tri2[0]] + vertices[tri2[1]] + vertices[tri2[2]]) / 3.0;
+        
+        // Check convexity: dot product between normal and centroid difference
+        glm::dvec3 centroidDiff = centroid2 - centroid1;
+        double dot = glm::dot(normal1, centroidDiff);
+        if (dot > 0.1) { // Allow small tolerance for numerical errors
+            return false; // Concave
+        }
+    }
+    
+    return true; // All checked edges are convex
+}
+
+bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
+    const std::vector<glm::dvec3>& vertices,
+    const std::vector<std::array<int, 3>>& triangleIndices) {
+    
+    extern int debug1;
+    debug1++;
+
+    // Debug output for GeoGebra
+    std::cout << "Vertices for convexity analysis:" << std::endl;
+    for (size_t i = 0; i < vertices.size(); ++i) {
+        std::cout << "V" << i << "=(" << vertices[i].x << "," << vertices[i].y << "," << vertices[i].z << ")" << std::endl;
+    }
+
+    std::cout << "Triangles:" << std::endl;
+    for (size_t i = 0; i < triangleIndices.size(); ++i) {
+        const auto& tri = triangleIndices[i];
+        std::cout << "Polygon(V" << tri[0] << ", V" << tri[1] << ", V" << tri[2] << ")" << std::endl;
+    }
+
+    // Early returns for invalid inputs
+    if (triangleIndices.size() < 3 || vertices.size() < 4) {
+        return false;
+    }
+    
+    // Build edge-to-triangle mapping
+    struct Edge {
+        int v1, v2;
+        bool operator<(const Edge& other) const {
+            if (v1 != other.v1) return v1 < other.v1;
+            return v2 < other.v2;
+        }
+    };
+    
+    std::map<Edge, std::vector<size_t>> edgeToTriangles;
+    
+    for (size_t triIdx = 0; triIdx < triangleIndices.size(); ++triIdx) {
+        const auto& triangle = triangleIndices[triIdx];
+        
+        for (int i = 0; i < 3; ++i) {
+            int j = (i + 1) % 3;
+            int v1 = triangle[i];
+            int v2 = triangle[j];
+            
+            Edge edge;
+            if (v1 < v2) {
+                edge = {v1, v2};
+            } else {
+                edge = {v2, v1};
+            }
+            
+            edgeToTriangles[edge].push_back(triIdx);
+        }
+    }
+    
+    // Build vertex-to-edges mapping
+    std::unordered_map<int, std::vector<Edge>> vertexToEdges;
+    for (const auto& pair : edgeToTriangles) {
+        const Edge& edge = pair.first;
+        vertexToEdges[edge.v1].push_back(edge);
+        vertexToEdges[edge.v2].push_back(edge);
+    }
+    
+    // Build vertex-to-normals mapping
+    std::unordered_map<int, std::vector<glm::dvec3>> vertexToNormals;
+    for (size_t triIdx = 0; triIdx < triangleIndices.size(); ++triIdx) {
+        const auto& triangle = triangleIndices[triIdx];
+        
+        // Calculate triangle normal
+        glm::dvec3 v0 = vertices[triangle[0]];
+        glm::dvec3 v1 = vertices[triangle[1]];
+        glm::dvec3 v2 = vertices[triangle[2]];
+        
+        glm::dvec3 edge1 = v1 - v0;
+        glm::dvec3 edge2 = v2 - v0;
+        glm::dvec3 normal = glm::cross(edge1, edge2);
+        
+        if (glm::length2(normal) > Vec3Compare::eps * Vec3Compare::eps) {
+            normal = glm::normalize(normal);
+            
+            // Add normal to all three vertices
+            for (int i = 0; i < 3; ++i) {
+                vertexToNormals[triangle[i]].push_back(normal);
+            }
+        }
+    }
+    
+    // Test each vertex for convexity
+    for (const auto& pair : vertexToEdges) {
+        int vertexIdx = pair.first;
+        const std::vector<Edge>& connectedEdges = pair.second;
+        
+        auto normalIt = vertexToNormals.find(vertexIdx);
+        if (normalIt == vertexToNormals.end() || normalIt->second.empty()) {
+            continue; // No normals for this vertex
+        }
+
+        // Skip vertices that are on boundary edges (edges with only 1 triangle)
+        bool isOnBoundary = false;
+        for (const Edge& edge : connectedEdges) {
+            auto edgeTrianglesIt = edgeToTriangles.find(edge);
+            if (edgeTrianglesIt != edgeToTriangles.end() && edgeTrianglesIt->second.size() < 2) {
+                isOnBoundary = true;
+                break;
+            }
+        }
+        if (isOnBoundary) {
+            continue; // Skip boundary vertices
+        }
+        
+        const std::vector<glm::dvec3>& normals = normalIt->second;
+        glm::dvec3 cornerPos = vertices[vertexIdx];
+        
+        // Test this vertex for convexity against each of its normals
+        bool isVertexConvex = false;
+        
+        for (const glm::dvec3& normal : normals) {
+            // Collect vertices to project: corner vertex + other ends of connected edges
+            std::vector<int> verticesToProject;
+            verticesToProject.push_back(vertexIdx); // Corner vertex
+            
+            for (const Edge& edge : connectedEdges) {
+                int otherVertexIdx = (edge.v1 == vertexIdx) ? edge.v2 : edge.v1;
+                verticesToProject.push_back(otherVertexIdx);
+            }
+            
+            // Project all vertices onto the normal
+            std::vector<std::pair<double, int>> projections;
+            for (int vIdx : verticesToProject) {
+                double projection = glm::dot(vertices[vIdx], normal);
+                projections.push_back({projection, vIdx});
+            }
+            
+            // Find maximum projection value
+            double maxProjection = projections[0].first;
+            for (const auto& proj : projections) {
+                maxProjection = std::max(maxProjection, proj.first);
+            }
+            
+            // Collect vertices at positive extreme (within tolerance)
+            const double tolerance = 1e-9;
+            std::vector<int> extremeVertices;
+            for (const auto& proj : projections) {
+                if (proj.first >= maxProjection - tolerance) {
+                    extremeVertices.push_back(proj.second);
+                }
+            }
+            
+            // Check if corner vertex is at positive extreme
+            bool cornerAtExtreme = std::find(extremeVertices.begin(), extremeVertices.end(), vertexIdx) != extremeVertices.end();
+            if (!cornerAtExtreme) {
+                continue; // Not convex for this normal, try next normal
+            }
+            
+            // If exactly 3 vertices at extreme (including corner), corner is convex
+            if (extremeVertices.size() == 3) {
+                isVertexConvex = true;
+                break; // Found convexity, no need to check other normals
+            }
+            
+            // If more than 3 vertices at extreme, do 2D analysis
+            if (extremeVertices.size() > 3) {
+                // Create plane transform for this normal
+                glm::dmat3 planeTransform = GeometryUtils::createPlaneTransform(normal);
+                
+                // Project extreme vertices to 2D
+                std::vector<glm::dvec3> extremeVertices3D;
+                for (int vIdx : extremeVertices) {
+                    extremeVertices3D.push_back(vertices[vIdx]);
+                }
+                
+                std::vector<glm::dvec2> extremeVertices2D = GeometryUtils::projectToPlane(extremeVertices3D, planeTransform);
+                
+                // Find corner vertex in 2D
+                int cornerIdx2D = -1;
+                for (size_t i = 0; i < extremeVertices.size(); ++i) {
+                    if (extremeVertices[i] == vertexIdx) {
+                        cornerIdx2D = static_cast<int>(i);
+                        break;
+                    }
+                }
+                
+                if (cornerIdx2D == -1) continue; // Shouldn't happen, but safety check
+                
+                glm::dvec2 cornerPos2D = extremeVertices2D[cornerIdx2D];
+                
+                // Get relative positions of other extreme vertices
+                std::vector<glm::dvec2> otherVertices2D;
+                for (size_t i = 0; i < extremeVertices2D.size(); ++i) {
+                    if (static_cast<int>(i) != cornerIdx2D) {
+                        otherVertices2D.push_back(extremeVertices2D[i] - cornerPos2D);
+                    }
+                }
+                
+                if (otherVertices2D.size() < 3) {
+                    // Less than 3 other vertices, automatically convex
+                    isVertexConvex = true;
+                    break;
+                }
+                
+                // Wind the other vertices
+                std::vector<glm::dvec2> windedVertices2D = GeometryUtils::windPointsAroundOrigin(otherVertices2D);
+                
+                // Test if corner (origin) is outside the fan
+                bool isInsideFan = true;
+                for (size_t i = 0; i < windedVertices2D.size(); ++i) {
+                    size_t nextIdx = (i + 1) % windedVertices2D.size();
+                    
+                    glm::dvec2 edge = windedVertices2D[nextIdx] - windedVertices2D[i];
+                    glm::dvec2 toCorner = glm::dvec2(0.0) - windedVertices2D[i]; // Corner is at origin
+                    
+                    // Cross product to determine which side of edge the corner is on
+                    double cross = edge.x * toCorner.y - edge.y * toCorner.x;
+                    
+                    // For counter-clockwise winding, corner is outside if on right side  
+                    if (cross < 0.0) {
+                        isInsideFan = false;
+                        break;
+                    }
+                }
+                
+                if (!isInsideFan) {
+                    isVertexConvex = true;
+                    break; // Found convexity, no need to check other normals
+                }
+            }
+        }
+        
+        if (isVertexConvex) {
+            return true; // Found at least one convex vertex
+        }
+    }
+    
+    return false; // No convex vertices found
 }
 
 bool PolyhedronProcessor::areTrianglesConvexInDirection(
