@@ -53,6 +53,9 @@ public:
     static std::vector<glm::dvec2> windPoints(const std::vector<glm::dvec2>& points);
     
     // Polygon clipping operations
+    static std::vector<glm::dvec2> windPointsAroundOrigin(const std::vector<glm::dvec2>& points);
+    
+    // Polygon clipping operations
     static std::vector<glm::dvec2> sutherlandHodgmanClip(
         const std::vector<glm::dvec2>& subjectPoly,
         const std::vector<glm::dvec2>& clipPoly);

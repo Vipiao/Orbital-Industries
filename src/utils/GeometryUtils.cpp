@@ -164,6 +164,33 @@ std::vector<glm::dvec2> GeometryUtils::windPoints(const std::vector<glm::dvec2>&
     return sortedPoints;
 }
 
+std::vector<glm::dvec2> GeometryUtils::windPointsAroundOrigin(const std::vector<glm::dvec2>& points) {
+    if (points.size() < 3) {
+        return points;
+    }
+    
+    // Sort points by angle from origin
+    std::vector<std::pair<double, size_t>> anglePoints;
+    anglePoints.reserve(points.size());
+    
+    for (size_t i = 0; i < points.size(); ++i) {
+        const glm::dvec2& point = points[i];
+        double angle = std::atan2(point.y, point.x);
+        anglePoints.push_back({angle, i});
+    }
+    
+    std::sort(anglePoints.begin(), anglePoints.end());
+    
+    std::vector<glm::dvec2> sortedPoints;
+    sortedPoints.reserve(points.size());
+    
+    for (const auto& pair : anglePoints) {
+        sortedPoints.push_back(points[pair.second]);
+    }
+    
+    return sortedPoints;
+}
+
 std::vector<glm::dvec2> GeometryUtils::sutherlandHodgmanClip(
     const std::vector<glm::dvec2>& subjectPoly,
     const std::vector<glm::dvec2>& clipPoly) {
