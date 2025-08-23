@@ -517,28 +517,12 @@ bool GridCollider::processClassificationQueue(std::chrono::time_point<std::chron
 }
 
 CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& coord) {
-    
-
-    // Temorary fix as all cells are not cubes anymore.
-    //return CellMetadata::CellClassification::CORNER;
-
-    extern int debug1;
-    debug1++;
 
     // 1. Get visible triangles for current cell
     auto visibleTrianglesResult = getVisibleTriangles(coord);
     
     if (visibleTrianglesResult.triangles.empty()) {
         return CellMetadata::CellClassification::INNER; // No visible triangles = completely hidden
-    }
-    
-    // 2. Group triangles into islands
-    auto islands = PolyhedronProcessor::groupTrianglesIntoIslands(
-        visibleTrianglesResult.vertices, 
-        visibleTrianglesResult.triangles);
-    
-    if (islands.empty()) {
-        return CellMetadata::CellClassification::INNER; // No islands = inner
     }
     
     // 3. Collect all foreign triangles from 18 neighbors (6 face + 12 edge)
@@ -553,8 +537,15 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
         {0, 1, 1}, {0, 1, -1}, {0, -1, 1}, {0, -1, -1}    // YZ edges
     };
     
-    std::vector<std::array<glm::dvec3, 3>> allForeignTriangles;
+    // 4. Merge local and adjacent foreign triangles using indices
+    const double vertexTolerance = 1e-6;
     
+    // Start with local vertices and triangles
+    std::vector<glm::dvec3> mergedVertices = visibleTrianglesResult.vertices;
+    std::vector<std::array<int, 3>> mergedTriangles = visibleTrianglesResult.triangles;
+     
+    // Phase 1: Identify relevant foreign triangles that share at least 1 vertex with locals
+    std::vector<std::array<glm::dvec3, 3>> candidateForeignTriangles;
     for (int i = 0; i < 18; ++i) {
         glm::ivec3 neighborCoord = coord + neighborDirections[i];
         auto neighborIt = m_cells.find(neighborCoord);
@@ -566,129 +557,72 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
         // Get neighbor's visible triangles
         auto neighborVisibleResult = getVisibleTriangles(neighborCoord);
         
-        // Transform neighbor triangles to current cell's coordinate system and add to collection
+        // Transform neighbor triangles to current cell's coordinate system
         glm::dvec3 offset = glm::dvec3(neighborDirections[i]);
         
-        for (const auto& triangleIndices : neighborVisibleResult.triangles) {
-            std::array<glm::dvec3, 3> transformedTriangle;
+        for (const auto& foreignTriangleIndices : neighborVisibleResult.triangles) {
+            // Convert foreign triangle to dvec3
+            std::array<glm::dvec3, 3> foreignTriangle;
             for (int v = 0; v < 3; ++v) {
-                // Transform from neighbor's local space to current cell's local space
-                transformedTriangle[v] = neighborVisibleResult.vertices[triangleIndices[v]] + offset;
+                foreignTriangle[v] = neighborVisibleResult.vertices[foreignTriangleIndices[v]] + offset;
             }
-            allForeignTriangles.push_back(transformedTriangle);
-        }
-    }
-    
-    // 4. For each island, find adjacent foreign triangles and build combined triangle list
-    std::vector<std::vector<std::array<glm::dvec3, 3>>> islandTriangleSets;
-    islandTriangleSets.reserve(islands.size());
-    
-    for (const auto& island : islands) {
-        std::vector<std::array<glm::dvec3, 3>> islandTriangles;
-        
-        // Add my triangles from this island
-        for (int triangleIdx : island) {
-            std::array<glm::dvec3, 3> triangle;
-            for (int v = 0; v < 3; ++v) {
-                triangle[v] = visibleTrianglesResult.vertices[visibleTrianglesResult.triangles[triangleIdx][v]];
-            }
-            islandTriangles.push_back(triangle);
-        }
-        
-        // Find adjacent foreign triangles
-        for (const auto& foreignTriangle : allForeignTriangles) {
-            // Check if this foreign triangle is adjacent to any triangle in current island
-            bool isAdjacent = false;
-            for (int triangleIdx : island) {
-                std::array<glm::dvec3, 3> myTriangle;
+            // Check if this foreign triangle shares ≥1 vertex with ANY local triangle
+            bool sharesVertex = false;
+            for (const auto& localTriangleIndices : visibleTrianglesResult.triangles) {
+                // Convert local triangle indices to dvec3
+                std::array<glm::dvec3, 3> localTriangle;
                 for (int v = 0; v < 3; ++v) {
-                    myTriangle[v] = visibleTrianglesResult.vertices[visibleTrianglesResult.triangles[triangleIdx][v]];
+                    localTriangle[v] = visibleTrianglesResult.vertices[localTriangleIndices[v]];
                 }
                 
-                if (PolyhedronProcessor::areTrianglesAdjacent(myTriangle, foreignTriangle)) {
-                    isAdjacent = true;
+                //if (PolyhedronProcessor::areTrianglesAdjacent(localTriangle, foreignTriangle)) {
+                int sharedCount = PolyhedronProcessor::countSharedVertices(localTriangle, foreignTriangle);
+                if (sharedCount > 0) {
+                    sharesVertex = true;
+                    break; // Found shared vertex, no need to check other locals
+                }
+            }
+            if (sharesVertex) {
+                candidateForeignTriangles.push_back(foreignTriangle);
+            }
+        }
+    }
+
+    // Phase 2: Merge all candidate foreign triangles using comprehensive vertex mapping
+    for (const auto& foreignTriangle : candidateForeignTriangles) {
+        std::array<int, 3> newTriangleIndices;
+        
+        for (int v = 0; v < 3; ++v) {
+            // Check if foreign vertex matches ANY local vertex (not just specific triangle)
+            bool foundMatch = false;
+            for (size_t idx = 0; idx < mergedVertices.size(); ++idx) {
+                if (glm::length(mergedVertices[idx] - foreignTriangle[v]) < vertexTolerance) {
+                    newTriangleIndices[v] = static_cast<int>(idx);
+                    foundMatch = true;
                     break;
                 }
             }
             
-            if (isAdjacent) {
-                islandTriangles.push_back(foreignTriangle);
+            if (!foundMatch) {
+                // This is a new vertex - add it to merged vertices
+                newTriangleIndices[v] = static_cast<int>(mergedVertices.size());
+                mergedVertices.push_back(foreignTriangle[v]);
             }
         }
         
-        islandTriangleSets.push_back(islandTriangles);
+        mergedTriangles.push_back(newTriangleIndices);
     }
     
-    // 5. Classification logic
-    // Check if all islands are concave (strictly concave)
-    bool allIslandsConcave = true;
-    for (const auto& islandTriangles : islandTriangleSets) {
-        if (!PolyhedronProcessor::areTrianglesConvex(islandTriangles, false)) { // Check for flat or concave
-            allIslandsConcave = false;
-            break;
-        }
-    }
-    
-    if (allIslandsConcave) {
+    // 5. Classification using new index-based functions
+    // Check if surface is completely flat/concave (FACE classification)
+    if (PolyhedronProcessor::areTrianglesConvex(mergedVertices, mergedTriangles, false)) {
         return CellMetadata::CellClassification::FACE;
     }
     
-    // Check directional concavity for non-concave islands
-    bool allIslandsDirectionallyConcave = true;
-    
-    for (const auto& islandTriangles : islandTriangleSets) {
-        // Compute triangle normals
-        std::vector<glm::dvec3> normals;
-        normals.reserve(islandTriangles.size());
-        
-        for (const auto& triangle : islandTriangles) {
-            glm::dvec3 normal = PolyhedronProcessor::getTriangleNormal(triangle);
-            if (glm::length(normal) > Vec3Compare::eps) {
-                normals.push_back(normal);
-            }
-        }
-        
-        if (normals.size() < 2) {
-            continue; // Can't compute direction with < 2 normals, assume directionally convex
-        }
-        
-        // Compute cross products with flipping optimization
-        glm::dvec3 sum(0.0);
-        
-        for (size_t i = 0; i < normals.size(); ++i) {
-            for (size_t j = i + 1; j < normals.size(); ++j) {
-                glm::dvec3 crossProduct = glm::cross(normals[i], normals[j]);
-                
-                if (glm::length(crossProduct) < Vec3Compare::eps) {
-                    continue; // Skip degenerate cross products
-                }
-                
-                // Flip cross product to maximize sum length using dot product
-                if (glm::dot(sum, crossProduct) < 0.0) {
-                    crossProduct = -crossProduct;
-                }
-                
-                sum += crossProduct;
-            }
-        }
-        
-        // If sum is too small, assume directionally convex (normals are similar)
-        if (glm::length(sum) < Vec3Compare::eps) {
-            continue;
-        }
-        
-        // Test directional concavity
-        glm::dvec3 direction = glm::normalize(sum);
-        if (!PolyhedronProcessor::areTrianglesConvexInDirection(islandTriangles, direction, false)) { // Check for directionally flat or concave
-            allIslandsDirectionallyConcave = false;
-            break;
-        }
-    }
-    
-    if (allIslandsDirectionallyConcave) {
+    // Check if surface has at least one convex vertex (CORNER vs EDGE classification)
+    if (!PolyhedronProcessor::hasAtLeastOneConvexVertex(mergedVertices, mergedTriangles)) {
         return CellMetadata::CellClassification::EDGE;
     }
-    
     return CellMetadata::CellClassification::CORNER;
 }
 
