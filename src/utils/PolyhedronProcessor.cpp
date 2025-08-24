@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <limits>
 #include <unordered_map>
+#include <numeric>
 #include "../math/IntegerVectorMath.h"
+#include <unordered_set>
 #include <map>
 #include <queue>
 #include <utility>
@@ -677,7 +679,12 @@ bool PolyhedronProcessor::areTrianglesConvex(
 bool PolyhedronProcessor::areTrianglesConvex(
     const std::vector<glm::dvec3>& vertices,
     const std::vector<std::array<int, 3>>& triangleIndices,
+    const std::vector<bool>& triangleMask,
     bool counterClockwise) {
+
+    if (triangleIndices.size() != triangleMask.size()) {
+        return false; // Mismatched sizes
+    }
     
     if (triangleIndices.size() < 2) {
         return true; // Single triangle is always "convex"
@@ -725,6 +732,11 @@ bool PolyhedronProcessor::areTrianglesConvex(
         if (triangleIdxList.size() != 2) {
             continue;
         }
+
+        // Only check convexity if at least one triangle is included in the mask
+        if (!triangleMask[triangleIdxList[0]] && !triangleMask[triangleIdxList[1]]) {
+            continue;
+        }
         
         const auto& tri1 = triangleIndices[triangleIdxList[0]];
         const auto& tri2 = triangleIndices[triangleIdxList[1]];
@@ -757,57 +769,38 @@ bool PolyhedronProcessor::areTrianglesConvex(
 
 bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
     const std::vector<glm::dvec3>& vertices,
-    const std::vector<std::array<int, 3>>& triangleIndices) {
+    const std::vector<std::array<int, 3>>& triangleIndices,
+    const std::vector<int>& verticesToTest) {
+    
+    //extern int debug1;
+    //debug1++;
+    //
+    //// Debug output for GeoGebra
+    //std::cout << "Vertices for convexity analysis:" << std::endl;
+    //for (size_t i = 0; i < vertices.size(); ++i) {
+    //    std::cout << "V" << i << "=(" << vertices[i].x << "," << vertices[i].y << "," << vertices[i].z << ")" << std::endl;
+    //}
+    //
+    //std::cout << "Triangles:" << std::endl;
+    //for (size_t i = 0; i < triangleIndices.size(); ++i) {
+    //    const auto& tri = triangleIndices[i];
+    //    std::cout << "Polygon(V" << tri[0] << ", V" << tri[1] << ", V" << tri[2] << ")" << std::endl;
+    //}
 
     // Early returns for invalid inputs
-    if (triangleIndices.size() < 3 || vertices.size() < 4) {
+    if (triangleIndices.size() < 3 || vertices.size() < 4 || verticesToTest.empty()) {
         return false;
     }
-    
-    // Build edge-to-triangle mapping
-    struct Edge {
-        int v1, v2;
-        bool operator<(const Edge& other) const {
-            if (v1 != other.v1) return v1 < other.v1;
-            return v2 < other.v2;
-        }
-    };
-    
-    std::map<Edge, std::vector<size_t>> edgeToTriangles;
+
+    const double distanceMargin = 1e-6;
+
+    // Pre-calculate all triangle normals once
+    std::vector<glm::dvec3> triangleNormals;
+    triangleNormals.reserve(triangleIndices.size());
     
     for (size_t triIdx = 0; triIdx < triangleIndices.size(); ++triIdx) {
         const auto& triangle = triangleIndices[triIdx];
         
-        for (int i = 0; i < 3; ++i) {
-            int j = (i + 1) % 3;
-            int v1 = triangle[i];
-            int v2 = triangle[j];
-            
-            Edge edge;
-            if (v1 < v2) {
-                edge = {v1, v2};
-            } else {
-                edge = {v2, v1};
-            }
-            
-            edgeToTriangles[edge].push_back(triIdx);
-        }
-    }
-    
-    // Build vertex-to-edges mapping
-    std::unordered_map<int, std::vector<Edge>> vertexToEdges;
-    for (const auto& pair : edgeToTriangles) {
-        const Edge& edge = pair.first;
-        vertexToEdges[edge.v1].push_back(edge);
-        vertexToEdges[edge.v2].push_back(edge);
-    }
-    
-    // Build vertex-to-normals mapping
-    std::unordered_map<int, std::vector<glm::dvec3>> vertexToNormals;
-    for (size_t triIdx = 0; triIdx < triangleIndices.size(); ++triIdx) {
-        const auto& triangle = triangleIndices[triIdx];
-        
-        // Calculate triangle normal
         glm::dvec3 v0 = vertices[triangle[0]];
         glm::dvec3 v1 = vertices[triangle[1]];
         glm::dvec3 v2 = vertices[triangle[2]];
@@ -818,55 +811,60 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
         
         if (glm::length2(normal) > Vec3Compare::eps * Vec3Compare::eps) {
             normal = glm::normalize(normal);
-            
-            // Add normal to all three vertices
-            for (int i = 0; i < 3; ++i) {
-                vertexToNormals[triangle[i]].push_back(normal);
-            }
+        } else {
+            normal = glm::dvec3(0.0); // Invalid normal for degenerate triangle
         }
+        
+        triangleNormals.push_back(normal);
     }
     
     // Test each vertex for convexity
-    for (const auto& pair : vertexToEdges) {
-        int vertexIdx = pair.first;
-        const std::vector<Edge>& connectedEdges = pair.second;
-        
-        auto normalIt = vertexToNormals.find(vertexIdx);
-        if (normalIt == vertexToNormals.end() || normalIt->second.empty()) {
-            continue; // No normals for this vertex
+    for (int vertexIdx : verticesToTest) {
+        if (vertexIdx < 0 || vertexIdx >= static_cast<int>(vertices.size())) {
+            continue; // Skip invalid vertex indices
         }
 
-        // Skip vertices that are on boundary edges (edges with only 1 triangle)
-        bool isOnBoundary = false;
-        for (const Edge& edge : connectedEdges) {
-            auto edgeTrianglesIt = edgeToTriangles.find(edge);
-            if (edgeTrianglesIt != edgeToTriangles.end() && edgeTrianglesIt->second.size() < 2) {
-                isOnBoundary = true;
-                break;
+        // Find all triangles within distance margin of this vertex
+        std::vector<glm::dvec3> neighboringNormals;
+        std::unordered_set<int> neighboringVertexIndices;
+        
+        for (size_t triIdx = 0; triIdx < triangleIndices.size(); ++triIdx) {
+            const auto& triangle = triangleIndices[triIdx];
+            
+            // Calculate distance from vertex to triangle
+            double distance = GeometryUtils::pointToTriangleDistance(
+                vertices[vertexIdx],
+                vertices[triangle[0]],
+                vertices[triangle[1]],
+                vertices[triangle[2]]);
+            
+            if (distance <= distanceMargin) {
+                // Use pre-calculated normal
+                if (glm::length2(triangleNormals[triIdx]) > Vec3Compare::eps * Vec3Compare::eps) {
+                    neighboringNormals.push_back(triangleNormals[triIdx]);
+                    
+                    // Collect all vertex indices from this triangle
+                    neighboringVertexIndices.insert(triangle[0]);
+                    neighboringVertexIndices.insert(triangle[1]);
+                    neighboringVertexIndices.insert(triangle[2]);
+                }
             }
         }
-        if (isOnBoundary) {
-            continue; // Skip boundary vertices
+        if (neighboringNormals.empty()) {
+            continue; // No neighboring triangles found
         }
+
+        // Convert set to vector for projection
+        std::vector<int> verticesToProject(neighboringVertexIndices.begin(), neighboringVertexIndices.end());
         
-        const std::vector<glm::dvec3>& normals = normalIt->second;
         glm::dvec3 cornerPos = vertices[vertexIdx];
         
         // Test this vertex for convexity against each of its normals
         bool isVertexConvex = false;
         
-        for (const glm::dvec3& normal : normals) {
-            // Collect vertices to project: corner vertex + other ends of connected edges
-            std::vector<int> verticesToProject;
-            verticesToProject.push_back(vertexIdx); // Corner vertex
-            
-            for (const Edge& edge : connectedEdges) {
-                int otherVertexIdx = (edge.v1 == vertexIdx) ? edge.v2 : edge.v1;
-                verticesToProject.push_back(otherVertexIdx);
-            }
-            
+        for (const glm::dvec3& normal : neighboringNormals) {
             // Project all vertices onto the normal
-            std::vector<std::pair<double, int>> projections;
+            std::vector<std::pair<double, int>> projections; 
             for (int vIdx : verticesToProject) {
                 double projection = glm::dot(vertices[vIdx], normal);
                 projections.push_back({projection, vIdx});

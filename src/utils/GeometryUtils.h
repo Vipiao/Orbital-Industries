@@ -74,6 +74,28 @@ public:
         const glm::dvec2& p2, const glm::dvec2& q2,
         glm::dvec2& intersection);
 
+    /**
+     * @brief Calculate the minimum distance from a point to a triangle
+     * @param point The query point
+     * @param v0, v1, v2 Triangle vertices
+     * @return Minimum distance from point to triangle (always >= 0)
+     */
+    static double pointToTriangleDistance(
+        const glm::dvec3& point,
+        const glm::dvec3& v0, const glm::dvec3& v1, const glm::dvec3& v2);
+
+    /**
+     * @brief Calculate the closest point on a line segment to a given point
+     * @param point The query point
+     * @param segmentStart Start of line segment
+     * @param segmentEnd End of line segment
+     * @return Closest point on segment to the query point
+     */
+    static glm::dvec3 closestPointOnSegment(
+        const glm::dvec3& point,
+        const glm::dvec3& segmentStart,
+        const glm::dvec3& segmentEnd);
+
 private:
     // Private constructor to prevent instantiation
     GeometryUtils() = delete;

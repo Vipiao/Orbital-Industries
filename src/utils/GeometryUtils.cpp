@@ -337,3 +337,85 @@ bool GeometryUtils::segmentIntersection(
     
     return false; // No intersection within segments
 }
+
+double GeometryUtils::pointToTriangleDistance(
+    const glm::dvec3& point,
+    const glm::dvec3& v0, const glm::dvec3& v1, const glm::dvec3& v2) {
+    
+    // Compute triangle edges and normal
+    glm::dvec3 edge1 = v1 - v0;
+    glm::dvec3 edge2 = v2 - v0;
+    glm::dvec3 normal = glm::cross(edge1, edge2);
+    
+    // Handle degenerate triangle
+    double normalLengthSq = glm::dot(normal, normal);
+    if (normalLengthSq < 1e-15) {
+        // Degenerate triangle, treat as point or line segment
+        double dist01 = glm::length(closestPointOnSegment(point, v0, v1) - point);
+        double dist02 = glm::length(closestPointOnSegment(point, v0, v2) - point);
+        double dist12 = glm::length(closestPointOnSegment(point, v1, v2) - point);
+        return std::min({dist01, dist02, dist12});
+    }
+    
+    normal = glm::normalize(normal);
+    
+    // Project point onto triangle plane
+    glm::dvec3 v0ToPoint = point - v0;
+    double distanceToPlane = glm::dot(v0ToPoint, normal);
+    glm::dvec3 projectedPoint = point - distanceToPlane * normal;
+    
+    // Check if projected point is inside triangle using barycentric coordinates
+    glm::dvec3 v0ToProjected = projectedPoint - v0;
+    
+    // Compute barycentric coordinates
+    double dot00 = glm::dot(edge2, edge2);
+    double dot01 = glm::dot(edge2, edge1);
+    double dot02 = glm::dot(edge2, v0ToProjected);
+    double dot11 = glm::dot(edge1, edge1);
+    double dot12 = glm::dot(edge1, v0ToProjected);
+    
+    double invDenom = 1.0 / (dot00 * dot11 - dot01 * dot01);
+    double u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+    double v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+    
+    // Check if point is inside triangle
+    if (u >= 0 && v >= 0 && u + v <= 1) {
+        // Point projects inside triangle
+        return std::abs(distanceToPlane);
+    }
+    
+    // Point projects outside triangle, find closest point on boundary
+    glm::dvec3 closestOnEdge0 = closestPointOnSegment(point, v0, v1);
+    glm::dvec3 closestOnEdge1 = closestPointOnSegment(point, v1, v2);
+    glm::dvec3 closestOnEdge2 = closestPointOnSegment(point, v2, v0);
+    
+    double distToEdge0 = glm::length(point - closestOnEdge0);
+    double distToEdge1 = glm::length(point - closestOnEdge1);
+    double distToEdge2 = glm::length(point - closestOnEdge2);
+    
+    return std::min({distToEdge0, distToEdge1, distToEdge2});
+}
+
+glm::dvec3 GeometryUtils::closestPointOnSegment(
+    const glm::dvec3& point,
+    const glm::dvec3& segmentStart,
+    const glm::dvec3& segmentEnd) {
+    
+    glm::dvec3 segment = segmentEnd - segmentStart;
+    glm::dvec3 startToPoint = point - segmentStart;
+    
+    double segmentLengthSq = glm::dot(segment, segment);
+    
+    // Handle degenerate segment (point)
+    if (segmentLengthSq < 1e-15) {
+        return segmentStart;
+    }
+    
+    // Project point onto line containing segment
+    double t = glm::dot(startToPoint, segment) / segmentLengthSq;
+    
+    // Clamp to segment bounds
+    t = std::max(0.0, std::min(1.0, t));
+    
+    return segmentStart + t * segment;
+}

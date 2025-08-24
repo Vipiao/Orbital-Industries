@@ -8,6 +8,7 @@
 #include "../utils/TimeHandler.h"
 #include "../utils/PolyhedronProcessor.h"
 #include "../game_base/JobPriorities.h"
+#include "../utils/GeometryUtils.h"
 
 GridCollider::GridCollider(const glm::dvec3& position,
                           const glm::dquat& orientation,
@@ -146,15 +147,20 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     // Increment shape change timestamp to invalidate collision cache
     m_shapeChangeTimestamp++;
 
-    // Queue this coordinate and its 6 neighbors for classification update
-    static const glm::ivec3 directions[6] = {
+    // Queue this coordinate and its face + edge neighbors for classification update
+    static const glm::ivec3 directions[18] = {
+        // Face neighbors (6)
         {1, 0, 0}, {-1, 0, 0},   // +X, -X
         {0, 1, 0}, {0, -1, 0},   // +Y, -Y
-        {0, 0, 1}, {0, 0, -1}    // +Z, -Z
+        {0, 0, 1}, {0, 0, -1},   // +Z, -Z
+        // Edge neighbors (12)
+        {1, 1, 0}, {1, -1, 0}, {-1, 1, 0}, {-1, -1, 0},   // XY edges
+        {1, 0, 1}, {1, 0, -1}, {-1, 0, 1}, {-1, 0, -1},   // XZ edges
+        {0, 1, 1}, {0, 1, -1}, {0, -1, 1}, {0, -1, -1}    // YZ edges
     };
-    
-    queueCoordinateForClassification(coord);
-    for (int i = 0; i < 6; ++i) {
+     
+     queueCoordinateForClassification(coord);
+    for (int i = 0; i < 18; ++i) {
         queueCoordinateForClassification(coord + directions[i]);
     }
 
@@ -250,14 +256,19 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
         m_cornerCells.erase(coord);
         m_edgeCells.erase(coord);
 
-        // Queue this coordinate and its 6 neighbors for classification update
-        static const glm::ivec3 directions[6] = {
+        // Queue this coordinate and its face + edge neighbors for classification update
+        static const glm::ivec3 directions[18] = {
+            // Face neighbors (6)
             {1, 0, 0}, {-1, 0, 0},   // +X, -X
             {0, 1, 0}, {0, -1, 0},   // +Y, -Y
-            {0, 0, 1}, {0, 0, -1}    // +Z, -Z
+            {0, 0, 1}, {0, 0, -1},   // +Z, -Z
+            // Edge neighbors (12)
+            {1, 1, 0}, {1, -1, 0}, {-1, 1, 0}, {-1, -1, 0},   // XY edges
+            {1, 0, 1}, {1, 0, -1}, {-1, 0, 1}, {-1, 0, -1},   // XZ edges
+            {0, 1, 1}, {0, 1, -1}, {0, -1, 1}, {0, -1, -1}    // YZ edges
         };
         
-        for (int i = 0; i < 6; ++i) {
+        for (int i = 0; i < 18; ++i) {
             queueCoordinateForClassification(coord + directions[i]);
         }
 
@@ -575,9 +586,20 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
                     localTriangle[v] = visibleTrianglesResult.vertices[localTriangleIndices[v]];
                 }
                 
-                //if (PolyhedronProcessor::areTrianglesAdjacent(localTriangle, foreignTriangle)) {
-                int sharedCount = PolyhedronProcessor::countSharedVertices(localTriangle, foreignTriangle);
-                if (sharedCount > 0) {
+                // Check if any vertex of local triangle is close to foreign triangle
+                bool isTouching = false;
+                const double touchingThreshold = 1e-6;
+                
+                for (int v = 0; v < 3; ++v) {
+                    double distance = GeometryUtils::pointToTriangleDistance(
+                        localTriangle[v], foreignTriangle[0], foreignTriangle[1], foreignTriangle[2]);
+                    if (distance <= touchingThreshold) {
+                        isTouching = true;
+                        break;
+                    }
+                }
+                
+                if (isTouching) {
                     sharesVertex = true;
                     break; // Found shared vertex, no need to check other locals
                 }
@@ -615,12 +637,24 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
     
     // 5. Classification using new index-based functions
     // Check if surface is completely flat/concave (FACE classification)
-    if (PolyhedronProcessor::areTrianglesConvex(mergedVertices, mergedTriangles, false)) {
+    std::vector<bool> triangleMask(mergedTriangles.size(), false);
+    // Set local triangles to true (first N triangles are local)
+    for (size_t i = 0; i < visibleTrianglesResult.triangles.size(); ++i) {
+        triangleMask[i] = true;
+    }
+    
+    if (PolyhedronProcessor::areTrianglesConvex(mergedVertices, mergedTriangles, triangleMask, false)) {
         return CellMetadata::CellClassification::FACE;
+    }
+
+    // Create indices for local vertices only (foreign vertices are just context)
+    std::vector<int> localVertexIndices;
+    for (int i = 0; i < static_cast<int>(visibleTrianglesResult.vertices.size()); ++i) {
+        localVertexIndices.push_back(i);
     }
     
     // Check if surface has at least one convex vertex (CORNER vs EDGE classification)
-    if (!PolyhedronProcessor::hasAtLeastOneConvexVertex(mergedVertices, mergedTriangles)) {
+    if (!PolyhedronProcessor::hasAtLeastOneConvexVertex(mergedVertices, mergedTriangles, localVertexIndices)) {
         return CellMetadata::CellClassification::EDGE;
     }
     return CellMetadata::CellClassification::CORNER;

@@ -148,17 +148,20 @@ public:
     static bool areTrianglesConvex(
         const std::vector<glm::dvec3>& vertices,
         const std::vector<std::array<int, 3>>& triangleIndices,
+        const std::vector<bool>& triangleMask,
         bool counterClockwise = true);
     
     /**
      * @brief Check if the triangulated surface has at least one convex vertex
      * @param vertices Vector of vertices
      * @param triangleIndices Vector of triangles (each triangle is 3 indices into vertices)
+     * @param verticesToTest Indices of vertices to test for convexity (for performance)
      * @return true if at least one vertex is convex, false otherwise
      */
     static bool hasAtLeastOneConvexVertex(
         const std::vector<glm::dvec3>& vertices,
-        const std::vector<std::array<int, 3>>& triangleIndices);
+        const std::vector<std::array<int, 3>>& triangleIndices,
+        const std::vector<int>& verticesToTest);
 
     /**
      * @brief Check convexity of triangles in a specific direction
