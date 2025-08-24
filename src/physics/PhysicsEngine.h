@@ -79,6 +79,7 @@ private:
     // Static helper function for compliant collision detection
     static bool shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* bodyB, 
                                           const glm::dvec3& contactPoint, const glm::dvec3& normal,
+                                          const glm::dvec3& compliantNormal,
                                           double compliantPenetration,
                                           const glm::dvec3* relativeVel = nullptr);
 

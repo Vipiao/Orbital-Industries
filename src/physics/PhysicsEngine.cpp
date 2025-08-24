@@ -383,7 +383,8 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
         glm::dvec3 impulse = normal * impulseMagnitude;
 
         // Apply compliant collision handling for corner softness
-        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantPenetration, &relativeVel)) {
+        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantNormal, 
+                                      contact.compliantPenetration, &relativeVel)) {
             glm::dvec3 compliantNormal = contact.compliantNormal;
             double normalAlignment = glm::dot(normal, compliantNormal);
             double scaleFactor = 1.;
@@ -442,7 +443,8 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         glm::dvec3 contactPoint = collision.m_contactPoints[ii];
 
         // Skip overlap correction for contacts that would use compliant handling
-        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantPenetration)) {
+        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantNormal,
+                                      contact.compliantPenetration)) {
             continue; // Skip overlap correction for this contact
         }
 
@@ -548,6 +550,7 @@ double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB,
 
 bool PhysicsEngine::shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* bodyB, 
                                               const glm::dvec3& contactPoint, const glm::dvec3& normal,
+                                              const glm::dvec3& compliantNormal,
                                               double compliantPenetration,
                                               const glm::dvec3* relativeVel) {
     if (compliantPenetration <= 0.0) {
@@ -555,10 +558,12 @@ bool PhysicsEngine::shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* body
     }
     
     double relativeVelNormal;
+    double relativeVelCompliant;
     
     if (relativeVel) {
         // Use provided relative velocity (performance optimization)
         relativeVelNormal = glm::dot(*relativeVel, normal);
+        relativeVelCompliant = glm::dot(*relativeVel, compliantNormal);
     } else {
         // Calculate relative velocity at contact point
         glm::dvec3 rA = contactPoint - bodyA->m_position;
@@ -567,7 +572,14 @@ bool PhysicsEngine::shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* body
         glm::dvec3 velB = bodyB->m_velocity + glm::cross(bodyB->getAngularVelocityWorld(), rB);
         glm::dvec3 computedRelativeVel = velA - velB;
         relativeVelNormal = glm::dot(computedRelativeVel, normal);
+        relativeVelCompliant = glm::dot(computedRelativeVel, compliantNormal);
     }
     
-    return glm::min(relativeVelNormal * 10.0, 0.1) > compliantPenetration;
+    // Check existing condition
+    bool basicCondition = glm::min(relativeVelNormal * 10.0, 0.1) > compliantPenetration;
+    
+    // Check new condition: compliant relative velocity must be smaller than normal relative velocity
+    bool velocityCondition = std::abs(relativeVelCompliant) < std::abs(relativeVelNormal);
+    
+    return basicCondition && velocityCondition;
 }
