@@ -12,10 +12,63 @@ PolyhedronCollider::PolyhedronCollider(const glm::dvec3& position,
                                        const std::vector<glm::dvec3>& localEdgeAxes,
                                        ColliderReference* reference)
     : Collider(position, orientation, reference)
-    , m_localVertices(localVertices)
-    , m_localFaceAxes(localFaceAxes)
-    , m_localEdgeAxes(localEdgeAxes)
 {
+    // Filter duplicate vertices
+    const double vertexTolerance = 1e-9;
+    m_localVertices.reserve(localVertices.size());
+    for (const auto& vertex : localVertices) {
+        bool isDuplicate = false;
+        for (const auto& existing : m_localVertices) {
+            if (glm::length(vertex - existing) < vertexTolerance) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (!isDuplicate) {
+            m_localVertices.push_back(vertex);
+        }
+    }
+    
+    // Filter duplicate face axes
+    const double axisTolerance = 1e-9;
+    m_localFaceAxes.reserve(localFaceAxes.size());
+    for (const auto& axis : localFaceAxes) {
+        if (glm::length(axis) < axisTolerance) continue; // Skip zero-length axes
+        
+        glm::dvec3 normalizedAxis = glm::normalize(axis);
+        bool isDuplicate = false;
+        for (const auto& existing : m_localFaceAxes) {
+            glm::dvec3 normalizedExisting = glm::normalize(existing);
+            // Check if parallel (same or opposite direction)
+            if (glm::abs(glm::dot(normalizedAxis, normalizedExisting)) > (1.0 - axisTolerance)) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (!isDuplicate) {
+            m_localFaceAxes.push_back(normalizedAxis);
+        }
+    }
+    
+    // Filter duplicate edge axes
+    m_localEdgeAxes.reserve(localEdgeAxes.size());
+    for (const auto& axis : localEdgeAxes) {
+        if (glm::length(axis) < axisTolerance) continue; // Skip zero-length axes
+        
+        glm::dvec3 normalizedAxis = glm::normalize(axis);
+        bool isDuplicate = false;
+        for (const auto& existing : m_localEdgeAxes) {
+            glm::dvec3 normalizedExisting = glm::normalize(existing);
+            // Check if parallel (same or opposite direction)
+            if (glm::abs(glm::dot(normalizedAxis, normalizedExisting)) > (1.0 - axisTolerance)) {
+                isDuplicate = true;
+                break;
+            }
+        }
+        if (!isDuplicate) {
+            m_localEdgeAxes.push_back(normalizedAxis);
+        }
+    }
     calculateHalfMaxWidth();
 }
 
