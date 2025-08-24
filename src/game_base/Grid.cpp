@@ -113,7 +113,7 @@ void Grid::addCell(const glm::ivec3& coord) {
     m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
 
     // Schedule mesh updates for this cell and neighbors
-    scheduleMeshUpdatesForCell(coord);
+    scheduleMeshUpdatesForCellAndNeighbors(coord);
 }
 
 // Remove a cell from the grid
@@ -125,7 +125,7 @@ void Grid::removeCell(const glm::ivec3& coord) {
     cancelStructuralAnalysis();
 
     // Schedule mesh updates BEFORE removing (while neighbors still exist)
-    scheduleMeshUpdatesForCell(coord);
+    scheduleMeshUpdatesForCellAndNeighbors(coord);
 
     removeNeighborConnections(coord);
 
@@ -207,7 +207,7 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     m_collider->addCell(coord, std::move(newCollider));
     
     // Schedule mesh updates for this cell and neighbors
-    scheduleMeshUpdatesForCell(coord);
+    scheduleMeshUpdatesForCellAndNeighbors(coord);
 
     // Add new mass contribution
     updateCellMassContribution(coord, 1.0);
@@ -234,7 +234,7 @@ void Grid::setColor(const glm::ivec3& coord, const glm::dvec4& newColor) {
     block.m_color = newColor;
     
     // Schedule mesh update for color change
-    scheduleMeshUpdatesForCell(coord);
+    scheduleMeshUpdateForCell(coord);
     
     // No need to update physics/mass since only color changed
 }
@@ -642,7 +642,20 @@ PolyhedronProcessor::MeshData Grid::generateFilteredMeshData(const glm::ivec3& c
     return PolyhedronProcessor::generateMeshData(visibleTriangles);
 }
 
-void Grid::scheduleMeshUpdatesForCell(const glm::ivec3& coord) {
+void Grid::scheduleMeshUpdateForCell(const glm::ivec3& coord) {
+    // Add only this cell to pending updates
+    m_pendingMeshUpdates.insert(coord);
+    
+    // Schedule job only if not already running
+    if (m_meshUpdateJob.expired()) {
+        m_meshUpdateJob = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
+            return processPendingMeshUpdates(endTime);
+        }, JobPriorities::GRAPHICS_UPDATE);
+        trackJob(m_meshUpdateJob);
+    }
+}
+
+void Grid::scheduleMeshUpdatesForCellAndNeighbors(const glm::ivec3& coord) {
     // Add this cell and its 6 neighbors to pending updates
     m_pendingMeshUpdates.insert(coord);
     

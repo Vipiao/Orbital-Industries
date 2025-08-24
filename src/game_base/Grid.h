@@ -144,6 +144,7 @@ private:
 
     // Mesh generation and filtering
     PolyhedronProcessor::MeshData generateFilteredMeshData(const glm::ivec3& coord);
-    void scheduleMeshUpdatesForCell(const glm::ivec3& coord);
+    void scheduleMeshUpdateForCell(const glm::ivec3& coord);
+    void scheduleMeshUpdatesForCellAndNeighbors(const glm::ivec3& coord);
     bool processPendingMeshUpdates(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 };
