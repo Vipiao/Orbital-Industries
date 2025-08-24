@@ -14,6 +14,7 @@
 #include "../physics/PolyhedronCollider.h"
 #include "../game_base/GridGeometry.h"
 #include "../utils/PolyhedronProcessor.h"
+#include "../utils/GeometryUtils.h"
 
 // Initialize static counter
 uint64_t Grid::s_nextUniqueId = 0;
@@ -214,6 +215,9 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
      
     // Restore angular velocity after entire modification
     m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
+
+    // Update neighbor connections since geometry changed
+    updateNeighborConnections(coord);
     
     // Schedule structural analysis
     scheduleStructuralAnalysis();
@@ -270,17 +274,43 @@ void Grid::updateNeighborConnections(const glm::ivec3& coord) {
     
     StructuralBlock* cell = getCell(coord);
     if (!cell) return;
+
+    // Get this cell's vertices in grid space
+    std::vector<glm::dvec3> cellVertices = cell->getVertices();
+    for (auto& vertex : cellVertices) {
+        vertex += glm::dvec3(coord);  // Transform to grid coordinates
+    }
     
     // Update this cell's neighbor pointers and update neighbors to point back
     for (int i = 0; i < 6; ++i) {
         glm::ivec3 neighborCoord = coord + directions[i];
         StructuralBlock* neighbor = getCell(neighborCoord);
         
-        cell->neighbors[i] = neighbor;
+        bool hasConnection = false;
+        
+        if (neighbor) {
+            // Get neighbor's vertices in grid space
+            std::vector<glm::dvec3> neighborVertices = neighbor->getVertices();
+            for (auto& vertex : neighborVertices) {
+                vertex += glm::dvec3(neighborCoord);  // Transform to grid coordinates
+            }
+            
+            // Use direction as face normal
+            glm::dvec3 faceNormal = glm::dvec3(directions[i]);
+            
+            // Calculate overlap area
+            double overlapArea = GeometryUtils::calculateSurfaceOverlapArea(
+                cellVertices, neighborVertices, faceNormal);
+            
+            // Set connection if area exceeds threshold
+            hasConnection = (overlapArea > 0.05);
+        }
+        
+        cell->neighbors[i] = hasConnection ? neighbor : nullptr;
         
         // If neighbor exists, make it point back to this cell
         if (neighbor) {
-            neighbor->neighbors[oppositeDir[i]] = cell;
+            neighbor->neighbors[oppositeDir[i]] = hasConnection ? cell : nullptr;
         }
     }
 }

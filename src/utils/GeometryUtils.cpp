@@ -419,3 +419,72 @@ glm::dvec3 GeometryUtils::closestPointOnSegment(
     
     return segmentStart + t * segment;
 }
+
+double GeometryUtils::calculateSurfaceOverlapArea(
+    const std::vector<glm::dvec3>& verticesA,
+    const std::vector<glm::dvec3>& verticesB,
+    const glm::dvec3& faceNormal,
+    double margin) {
+    
+    if (verticesA.size() < 3 || verticesB.size() < 3) {
+        return 0.0; // Need at least 3 vertices to form a polygon
+    }
+    
+    // Project both vertex sets onto the face normal
+    ProjectionResult projA = projectVertices(verticesA, faceNormal);
+    ProjectionResult projB = projectVertices(verticesB, faceNormal);
+    
+    // Find overlap region on the 1D projection
+    double overlapMin = std::max(projA.min, projB.min);
+    double overlapMax = std::min(projA.max, projB.max);
+    
+    // Check if there's any overlap
+    if (overlapMax < overlapMin - 2*margin) {
+        return 0.0; // No overlap
+    }
+    
+    // Filter vertices within the overlap region (with margin)
+    std::vector<glm::dvec3> relevantVerticesA, relevantVerticesB;
+    
+    for (const glm::dvec3& vertex : verticesA) {
+        double proj = glm::dot(vertex, faceNormal);
+        if (proj >= overlapMin - margin && proj <= overlapMax + margin) {
+            relevantVerticesA.push_back(vertex);
+        }
+    }
+    
+    for (const glm::dvec3& vertex : verticesB) {
+        double proj = glm::dot(vertex, faceNormal);
+        if (proj >= overlapMin - margin && proj <= overlapMax + margin) {
+            relevantVerticesB.push_back(vertex);
+        }
+    }
+    
+    // Need at least 3 vertices for each polygon
+    if (relevantVerticesA.size() < 3 || relevantVerticesB.size() < 3) {
+        return 0.0;
+    }
+    
+    // Create plane transformation and project to 2D
+    glm::dmat3 planeTransform = createPlaneTransform(faceNormal);
+    std::vector<glm::dvec2> vertices2DA = projectToPlane(relevantVerticesA, planeTransform);
+    std::vector<glm::dvec2> vertices2DB = projectToPlane(relevantVerticesB, planeTransform);
+    
+    // Wind both polygons and perform clipping
+    std::vector<glm::dvec2> windedA = windPoints(vertices2DA);
+    std::vector<glm::dvec2> windedB = windPoints(vertices2DB);
+    std::vector<glm::dvec2> clippedPolygon = sutherlandHodgmanClip(windedA, windedB);
+    
+    // Calculate area using shoelace formula
+    if (clippedPolygon.size() < 3) {
+        return 0.0;
+    }
+    
+    double area = 0.0;
+    for (size_t i = 0; i < clippedPolygon.size(); ++i) {
+        size_t j = (i + 1) % clippedPolygon.size();
+        area += clippedPolygon[i].x * clippedPolygon[j].y - clippedPolygon[j].x * clippedPolygon[i].y;
+    }
+    
+    return std::abs(area) * 0.5;
+}

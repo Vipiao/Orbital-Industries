@@ -96,6 +96,20 @@ public:
         const glm::dvec3& segmentStart,
         const glm::dvec3& segmentEnd);
 
+    /**
+     * @brief Calculate the 2D overlap area between two polyhedra on a shared face
+     * @param verticesA Vertices of first polyhedron
+     * @param verticesB Vertices of second polyhedron  
+     * @param faceNormal Normal vector of the shared face plane
+     * @param margin Additional margin to include vertices near the overlap region
+     * @return Area of 2D overlap between the projected polyhedra (0.0 if no overlap)
+     */
+    static double calculateSurfaceOverlapArea(
+        const std::vector<glm::dvec3>& verticesA,
+        const std::vector<glm::dvec3>& verticesB,
+        const glm::dvec3& faceNormal,
+        double margin = 1e-6);
+
 private:
     // Private constructor to prevent instantiation
     GeometryUtils() = delete;

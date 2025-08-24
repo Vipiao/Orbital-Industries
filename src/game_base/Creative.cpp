@@ -197,8 +197,6 @@ void Creative::physics() {
                 
                 // Schedule the grid split check for later processing
                 m_gameBase->scheduleGridSplitCheck(targetGridWeak, edgeCoords);
-                //std::cout << "Scheduled grid split check for removed block at (" 
-                //      << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
                 if (targetGrid->isEmpty()) {
                     m_gameBase->removeGrid(targetGridWeak);
                 }
@@ -210,6 +208,21 @@ void Creative::physics() {
             auto modGrid = m_modificationGrid.lock();
             if (modGrid && modGrid->canModifyCell(m_modificationCoord, m_modificationVertices)) {
                 if (modGrid->modifyCell(m_modificationCoord, m_modificationVertices)) {
+                    
+                    // Check for grid splits by testing connectivity of neighboring blocks
+                    std::vector<glm::ivec3> edgeCoords = {
+                        glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z),  // +0
+                        glm::ivec3(m_modificationCoord.x + 1, m_modificationCoord.y, m_modificationCoord.z),  // +X
+                        glm::ivec3(m_modificationCoord.x - 1, m_modificationCoord.y, m_modificationCoord.z),  // -X
+                        glm::ivec3(m_modificationCoord.x, m_modificationCoord.y + 1, m_modificationCoord.z),  // +Y
+                        glm::ivec3(m_modificationCoord.x, m_modificationCoord.y - 1, m_modificationCoord.z),  // -Y
+                        glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z + 1),  // +Z
+                        glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z - 1)   // -Z
+                    };
+                    
+                    // Schedule the grid split check for later processing
+                    m_gameBase->scheduleGridSplitCheck(modGrid, edgeCoords);
+                
                     std::cout << "Successfully modified cell at (" << m_modificationCoord.x 
                               << ", " << m_modificationCoord.y << ", " << m_modificationCoord.z << ")" << std::endl;
                 } else {
