@@ -690,6 +690,23 @@ bool PolyhedronProcessor::areTrianglesConvex(
         return true; // Single triangle is always "convex"
     }
 
+    //extern int debug1;
+    //debug1++;
+    //
+    //// Debug output for GeoGebra
+    //std::cout << "areTrianglesConvex Debug - Vertices:" << std::endl;
+    //for (size_t i = 0; i < vertices.size(); ++i) {
+    //    std::cout << "V" << i << "=(" << vertices[i].x << "," << vertices[i].y << "," << vertices[i].z << ")" << std::endl;
+    //}
+    //
+    //std::cout << "Triangles (masked only):" << std::endl;
+    //for (size_t i = 0; i < triangleIndices.size(); ++i) {
+    //    if (triangleMask[i]) {
+    //        const auto& tri = triangleIndices[i];
+    //        std::cout << "Polygon(V" << tri[0] << ", V" << tri[1] << ", V" << tri[2] << ")" << std::endl;
+    //    }
+    //}
+
     // Build a map of edges to triangles for efficient lookup
     struct Edge {
         int v1, v2;
@@ -759,7 +776,7 @@ bool PolyhedronProcessor::areTrianglesConvex(
         // Check convexity: dot product between normal and centroid difference
         glm::dvec3 centroidDiff = centroid2 - centroid1;
         double dot = glm::dot(normal1, centroidDiff);
-        if (dot > 0.1) { // Allow small tolerance for numerical errors
+        if (dot > 1.e-3) { // Allow small tolerance for numerical errors
             return false; // Concave
         }
     }
