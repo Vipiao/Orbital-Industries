@@ -63,6 +63,7 @@ public:
     virtual void updateSimpleAABB(uint64_t currentTimestep) override;
     virtual void updateAdvancedAABB(uint64_t currentTimestep) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
+    virtual RayIntersectionResult intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const override;
     
     // Grid-specific methods
     /**
@@ -76,6 +77,7 @@ public:
     
     // Get sub-collider for a specific cell
     Collider* getCell(const glm::ivec3& coord);
+    const Collider* getCell(const glm::ivec3& coord) const;
 
     // Spatial search within radius  
     std::vector<Collider*> findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const;

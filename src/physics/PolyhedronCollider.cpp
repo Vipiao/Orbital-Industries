@@ -70,6 +70,9 @@ PolyhedronCollider::PolyhedronCollider(const glm::dvec3& position,
         }
     }
     calculateHalfMaxWidth();
+
+    // Invalidate triangle indices cache on construction
+    m_triangleIndicesDirty = true;
 }
 
 void PolyhedronCollider::calculateHalfMaxWidth() {
@@ -149,6 +152,30 @@ bool PolyhedronCollider::checkAABBCollision(const Collider* other) const {
             m_AABBMax.z >= other->m_AABBMin.z);
 }
 
+RayIntersectionResult PolyhedronCollider::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
+    // Transform ray from world space to local space
+    glm::dvec3 localRayStart = glm::conjugate(m_orientation) * (rayStart - m_position);
+    glm::dvec3 localRayEnd = glm::conjugate(m_orientation) * (rayEnd - m_position);
+    
+    // Get cached triangle indices (uses caching we implemented)
+    std::vector<std::array<int, 3>> triangleIndices = generateTriangleIndices();
+    
+    // Perform intersection in local space using cached local vertices
+    RayIntersectionResult result = GeometryUtils::intersectRayPolyhedron(
+        localRayStart, 
+        localRayEnd, 
+        m_localVertices, 
+        triangleIndices, 
+        true); // Enable backface culling
+    
+    // Transform surface normal back to world space (only if hit occurred)
+    if (result.t >= 0.0) {
+        result.surfaceNormal = m_orientation * result.surfaceNormal;
+    }
+    
+    return result;
+}
+
 std::vector<glm::dvec3> PolyhedronCollider::getVertices(uint64_t currentTimestep) const {
     // Lazy calculation - only recalculate if invalid
     if (currentTimestep > m_verticesValidUntilTime) {
@@ -163,6 +190,12 @@ std::vector<glm::dvec3> PolyhedronCollider::getLocalVertices() const {
 }
 
 std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() const {
+    // Return cached indices if still valid
+    if (!m_triangleIndicesDirty) {
+        return m_cachedTriangleIndices;
+    }
+    
+    // Recalculate triangle indices
     std::vector<std::array<int, 3>> triangles;
     
     if (m_localVertices.size() < 4) {
@@ -249,7 +282,11 @@ std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() co
         }
     }
     
-    return triangles;
+    // Cache the results
+    m_cachedTriangleIndices = triangles;
+    m_triangleIndicesDirty = false;
+    
+    return m_cachedTriangleIndices;
 }
 
 void PolyhedronCollider::updateCachedVertices() const {

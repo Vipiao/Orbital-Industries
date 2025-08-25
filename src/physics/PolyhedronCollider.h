@@ -21,12 +21,14 @@ public:
     virtual void updateSimpleAABB(uint64_t currentTimestep) override;
     virtual void updateAdvancedAABB(uint64_t currentTimestep) override;
     virtual bool checkAABBCollision(const Collider* other) const override;
+    virtual RayIntersectionResult intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const override;
     
     // Polyhedron interface (public so collision detection can access)
     std::vector<glm::dvec3> getVertices(uint64_t currentTimestep = 0) const;
     std::vector<glm::dvec3> getLocalVertices() const;
     /**
      * @brief Generate triangle indices for the polyhedron's surface faces
+     * @note This method caches results and only recalculates when geometry changes
      * @return Vector of triangle indices based on local vertices and face projections
      */
     std::vector<std::array<int, 3>> generateTriangleIndices() const;
@@ -52,6 +54,10 @@ protected:
     mutable uint64_t m_collisionAxesValidUntilTime = 0;
     std::vector<glm::dvec3> m_filterNormals;
     virtual void updateCachedCollisionAxes() const;
+
+    // Cached triangle indices with dirty flag
+    mutable std::vector<std::array<int, 3>> m_cachedTriangleIndices;
+    mutable bool m_triangleIndicesDirty = true;
 
 private:
     // Cached vertices with dirty flag for lazy calculation

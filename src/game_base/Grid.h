@@ -8,7 +8,7 @@
 #include "../utils/HashFunctions.h"
 #include "../utils/StochasticAnalyzer.h"
 #include "GridGraphics.h"
-#include "GridGeometry.h"
+#include "../utils/GridGeometry.h"
 #include "CellType.h"
 #include "StructuralBlock.h"
 #include "../utils/TimeHandler.h"

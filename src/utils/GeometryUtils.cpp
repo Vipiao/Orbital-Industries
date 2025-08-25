@@ -3,6 +3,120 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <array>
+
+RayIntersectionResult GeometryUtils::intersectRayTriangle(
+    const glm::dvec3& rayStart,
+    const glm::dvec3& rayDirection,
+    const glm::dvec3& v0,
+    const glm::dvec3& v1,
+    const glm::dvec3& v2) {
+    
+    const double EPSILON = 1e-8;
+    
+    // Calculate triangle edges
+    glm::dvec3 edge1 = v1 - v0;
+    glm::dvec3 edge2 = v2 - v0;
+    
+    // Calculate determinant
+    glm::dvec3 h = glm::cross(rayDirection, edge2);
+    double a = glm::dot(edge1, h);
+    
+    // Ray is parallel to triangle
+    if (a > -EPSILON && a < EPSILON) {
+        return RayIntersectionResult(); // No intersection
+    }
+    
+    double f = 1.0 / a;
+    glm::dvec3 s = rayStart - v0;
+    double u = f * glm::dot(s, h);
+    
+    // Check if intersection point is outside triangle (u parameter)
+    if (u < 0.0 || u > 1.0) {
+        return RayIntersectionResult(); // No intersection
+    }
+    
+    glm::dvec3 q = glm::cross(s, edge1);
+    double v = f * glm::dot(rayDirection, q);
+    
+    // Check if intersection point is outside triangle (v parameter)
+    if (v < 0.0 || u + v > 1.0) {
+        return RayIntersectionResult(); // No intersection
+    }
+    
+    // Calculate intersection parameter t
+    double t = f * glm::dot(edge2, q);
+    
+    // Calculate triangle normal (counter-clockwise winding gives outward normal)
+    glm::dvec3 normal = glm::normalize(glm::cross(edge1, edge2));
+    
+    return RayIntersectionResult(t, normal);
+}
+
+RayIntersectionResult GeometryUtils::intersectRayPolyhedron(
+    const glm::dvec3& rayStart,
+    const glm::dvec3& rayEnd,
+    const std::vector<glm::dvec3>& vertices,
+    const std::vector<std::array<int, 3>>& triangleIndices,
+    bool enableBackfaceCulling) {
+    
+    // Convert ray segment to ray direction
+    glm::dvec3 rayDirection = rayEnd - rayStart;
+    double rayLength = glm::length(rayDirection);
+    
+    // Handle degenerate ray
+    if (rayLength < 1e-15) {
+        return RayIntersectionResult(); // No intersection
+    }
+    
+    rayDirection = rayDirection / rayLength; // Normalize
+    
+    RayIntersectionResult closestHit;
+    double closestT = -1.0;
+    
+    // Test intersection against each triangle
+    for (const auto& triangle : triangleIndices) {
+        // Get triangle vertices
+        if (triangle[0] >= vertices.size() || 
+            triangle[1] >= vertices.size() || 
+            triangle[2] >= vertices.size()) {
+            continue; // Skip invalid triangle indices
+        }
+        
+        const glm::dvec3& v0 = vertices[triangle[0]];
+        const glm::dvec3& v1 = vertices[triangle[1]];
+        const glm::dvec3& v2 = vertices[triangle[2]];
+        
+        // Backface culling optimization
+        if (enableBackfaceCulling) {
+            glm::dvec3 edge1 = v1 - v0;
+            glm::dvec3 edge2 = v2 - v0;
+            glm::dvec3 triangleNormal = glm::cross(edge1, edge2);
+            
+            // Skip if triangle faces away from ray (backface)
+            if (glm::dot(rayDirection, triangleNormal) >= 0.0) {
+                continue;
+            }
+        }
+        
+        // Test ray-triangle intersection
+        RayIntersectionResult hit = intersectRayTriangle(rayStart, rayDirection, v0, v1, v2);
+        
+        // Check if this is a valid hit within ray segment [0, rayLength]
+        if (hit.t >= 0.0 && hit.t <= rayLength) {
+            // Convert to [0,1] parameter space
+            double tNormalized = hit.t / rayLength;
+            
+            // Keep closest hit
+            if (closestT < 0.0 || tNormalized < closestT) {
+                closestT = tNormalized;
+                closestHit = RayIntersectionResult(tNormalized, hit.surfaceNormal);
+            }
+        }
+    }
+    
+    return closestHit;
+}
 
 GeometryUtils::SeparatingAxisResult GeometryUtils::testSeparatingAxis(
     const glm::dvec3& axis,

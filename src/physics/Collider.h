@@ -6,6 +6,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <utility>
 #include <vector>
+#include "../utils/GeometryUtils.h"
 #include "../utils/PointerStorage.h"
 
 class CoordinateSystem {
@@ -52,6 +53,9 @@ public:
 
     // Axis-aligned bounding box collision detection
     virtual bool checkAABBCollision(const Collider* other) const = 0;
+
+    // Ray intersection (world space)
+    virtual RayIntersectionResult intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const = 0;
 
     // Transform local point to world coordinates
     glm::dvec3 localToWorld(const glm::dvec3& localPoint) const {

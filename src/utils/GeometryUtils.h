@@ -4,10 +4,21 @@
 #include <glm/glm.hpp>
 #include <vector>
 
+// Ray intersection result structure
+struct RayIntersectionResult {
+    double t;                    // -1 = no hit, [0,1] = valid intersection parameter
+    glm::dvec3 surfaceNormal;    // Only valid when t >= 0
+    
+    // Default constructor initializes to "no hit" state
+    RayIntersectionResult() : t(-1.0), surfaceNormal(0.0, 0.0, 0.0) {}
+    RayIntersectionResult(double t_, const glm::dvec3& normal_) : t(t_), surfaceNormal(normal_) {}
+};
+
 /**
  * @brief Static utility class for computational geometry operations
  * Includes polygon clipping, separating axis theorem, and geometric transformations
  */
+
 class GeometryUtils {
 public:
     // Helper structures for geometric operations
@@ -21,6 +32,38 @@ public:
         double min;
         double max;
     };
+
+    // Ray-triangle intersection using Möller-Trumbore algorithm
+    /**
+     * @brief Test ray-triangle intersection using Möller-Trumbore algorithm
+     * @param rayStart Starting point of the ray
+     * @param rayDirection Direction vector of the ray (not normalized required)
+     * @param v0, v1, v2 Triangle vertices in counter-clockwise order
+     * @return Intersection result with parameter t (-1 if no intersection)
+     */
+    static RayIntersectionResult intersectRayTriangle(
+        const glm::dvec3& rayStart,
+        const glm::dvec3& rayDirection, 
+        const glm::dvec3& v0,
+        const glm::dvec3& v1,
+        const glm::dvec3& v2);
+
+    // Ray-polyhedron intersection
+    /**
+     * @brief Test ray-polyhedron intersection using triangulated faces
+     * @param rayStart Starting point of the ray segment
+     * @param rayEnd Ending point of the ray segment
+     * @param vertices Polyhedron vertices in world space
+     * @param triangleIndices Triangle connectivity (indices into vertices array)
+     * @param enableBackfaceCulling Skip triangles facing away from ray (performance optimization)
+     * @return Closest intersection result with parameter t in [0,1] range (-1 if no intersection)
+     */
+    static RayIntersectionResult intersectRayPolyhedron(
+        const glm::dvec3& rayStart,
+        const glm::dvec3& rayEnd,
+        const std::vector<glm::dvec3>& vertices,
+        const std::vector<std::array<int, 3>>& triangleIndices,
+        bool enableBackfaceCulling = true);
 
     // Separating Axis Theorem operations
     static SeparatingAxisResult testSeparatingAxis(

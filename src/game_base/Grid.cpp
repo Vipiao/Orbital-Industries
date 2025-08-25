@@ -12,7 +12,7 @@
 #include "../debug/DebugRenderer.h"
 #include "../game_base/JobPriorities.h"
 #include "../physics/PolyhedronCollider.h"
-#include "../game_base/GridGeometry.h"
+#include "../utils/GridGeometry.h"
 #include "../utils/PolyhedronProcessor.h"
 #include "../utils/GeometryUtils.h"
 

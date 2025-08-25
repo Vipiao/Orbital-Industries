@@ -9,6 +9,7 @@
 #include "../utils/PolyhedronProcessor.h"
 #include "../game_base/JobPriorities.h"
 #include "../utils/GeometryUtils.h"
+#include "../utils/GridGeometry.h"
 
 GridCollider::GridCollider(const glm::dvec3& position,
                           const glm::dquat& orientation,
@@ -95,6 +96,34 @@ bool GridCollider::checkAABBCollision(const Collider* other) const {
             m_AABBMax.y >= other->m_AABBMin.y &&
             m_AABBMin.z <= other->m_AABBMax.z && 
             m_AABBMax.z >= other->m_AABBMin.z);
+}
+
+RayIntersectionResult GridCollider::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
+    // Transform ray from world space to grid local space
+    glm::dvec3 localRayStart = worldToGrid(rayStart);
+    glm::dvec3 localRayEnd = worldToGrid(rayEnd);
+    
+    // Use grid traversal to find cells the ray passes through
+    std::vector<glm::ivec3> cellsToCheck = GridGeometry::gridTraversal(localRayStart, localRayEnd);
+    
+    // Test intersection with each cell encountered during traversal (in order)
+    for (const glm::ivec3& cellCoord : cellsToCheck) {
+        // Check if this cell has a collider
+        const Collider* cellCollider = getCell(cellCoord);
+        if (!cellCollider) {
+            continue; // No collider at this cell
+        }
+        
+        // Test ray intersection with this cell's collider (in world space)
+        RayIntersectionResult hit = cellCollider->intersectRay(rayStart, rayEnd);
+        
+        // First valid hit is closest hit (cells are in traversal order)
+        if (hit.t >= 0.0) {
+            return hit; // Early exit - first hit is closest
+        }
+    }
+    
+    return RayIntersectionResult(); // No hits found
 }
 
 void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> collider) {
@@ -317,6 +346,14 @@ bool GridCollider::hasCell(const glm::ivec3& coord) const {
 }
 
 Collider* GridCollider::getCell(const glm::ivec3& coord) {
+    auto it = m_cells.find(coord);
+    if (it != m_cells.end()) {
+        return it->second.get();
+    }
+    return nullptr;
+}
+
+const Collider* GridCollider::getCell(const glm::ivec3& coord) const {
     auto it = m_cells.find(coord);
     if (it != m_cells.end()) {
         return it->second.get();
