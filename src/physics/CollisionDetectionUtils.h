@@ -102,11 +102,6 @@ private:
         double penetration;
     };
 
-    static std::vector<glm::dvec3> getCubeVertices(
-        const glm::dvec3& position, 
-        const glm::dquat& orientation, 
-        double width);
-    
     static ContactInfo generateContactPoints(
         const std::vector<glm::dvec3>& verticesA,
         const std::vector<glm::dvec3>& verticesB,
