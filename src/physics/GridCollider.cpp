@@ -99,9 +99,9 @@ bool GridCollider::checkAABBCollision(const Collider* other) const {
 }
 
 RayIntersectionResult GridCollider::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
-    // Transform ray from world space to grid local space
-    glm::dvec3 localRayStart = worldToGrid(rayStart);
-    glm::dvec3 localRayEnd = worldToGrid(rayEnd);
+    // Assume ray is already in grid-local space
+    glm::dvec3 localRayStart = rayStart;
+    glm::dvec3 localRayEnd = rayEnd;
     
     // Use grid traversal to find cells the ray passes through
     std::vector<glm::ivec3> cellsToCheck = GridGeometry::gridTraversal(localRayStart, localRayEnd);
@@ -114,11 +114,17 @@ RayIntersectionResult GridCollider::intersectRay(const glm::dvec3& rayStart, con
             continue; // No collider at this cell
         }
         
-        // Test ray intersection with this cell's collider (in world space)
-        RayIntersectionResult hit = cellCollider->intersectRay(rayStart, rayEnd);
+        // Transform grid-local ray to cell-local space
+        glm::dvec3 cellCenter = glm::dvec3(cellCoord) + glm::dvec3(0.5, 0.5, 0.5);
+        glm::dvec3 cellLocalRayStart = localRayStart - cellCenter;
+        glm::dvec3 cellLocalRayEnd = localRayEnd - cellCenter;
+        
+        // Test ray intersection with this cell's collider (in cell-local space)
+        RayIntersectionResult hit = cellCollider->intersectRay(cellLocalRayStart, cellLocalRayEnd);
         
         // First valid hit is closest hit (cells are in traversal order)
         if (hit.t >= 0.0) {
+            // Normal is already in correct space (cell and grid have same orientation)
             return hit; // Early exit - first hit is closest
         }
     }

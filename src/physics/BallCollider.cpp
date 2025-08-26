@@ -37,8 +37,9 @@ bool BallCollider::checkAABBCollision(const Collider* other) const {
 RayIntersectionResult BallCollider::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
     RayIntersectionResult result; // Defaults to t=-1, normal=(0,0,0)
     
+    // Assume ray is in local space, so sphere is centered at origin
     glm::dvec3 d = rayEnd - rayStart;  // Ray direction * length
-    glm::dvec3 f = rayStart - m_position;  // Vector from sphere center to ray start
+    glm::dvec3 f = rayStart;  // Vector from sphere center (origin) to ray start
     
     // Solve quadratic equation: t²*(d·d) + 2*t*(f·d) + (f·f - r²) = 0
     double a = glm::dot(d, d);
@@ -68,7 +69,7 @@ RayIntersectionResult BallCollider::intersectRay(const glm::dvec3& rayStart, con
     if (t >= 0.0) {
         glm::dvec3 intersectionPoint = rayStart + t * d;
         result.t = t;
-        result.surfaceNormal = glm::normalize(intersectionPoint - m_position);
+        result.surfaceNormal = glm::normalize(intersectionPoint); // Sphere centered at origin
     }
     
     return result;

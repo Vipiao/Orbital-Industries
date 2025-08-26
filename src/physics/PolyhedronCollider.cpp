@@ -153,25 +153,17 @@ bool PolyhedronCollider::checkAABBCollision(const Collider* other) const {
 }
 
 RayIntersectionResult PolyhedronCollider::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
-    // Transform ray from world space to local space
-    glm::dvec3 localRayStart = glm::conjugate(m_orientation) * (rayStart - m_position);
-    glm::dvec3 localRayEnd = glm::conjugate(m_orientation) * (rayEnd - m_position);
-    
+    // Assume ray is already in local space
     // Get cached triangle indices (uses caching we implemented)
     std::vector<std::array<int, 3>> triangleIndices = generateTriangleIndices();
     
     // Perform intersection in local space using cached local vertices
     RayIntersectionResult result = GeometryUtils::intersectRayPolyhedron(
-        localRayStart, 
-        localRayEnd, 
+        rayStart,
+        rayEnd,
         m_localVertices, 
         triangleIndices, 
         true); // Enable backface culling
-    
-    // Transform surface normal back to world space (only if hit occurred)
-    if (result.t >= 0.0) {
-        result.surfaceNormal = m_orientation * result.surfaceNormal;
-    }
     
     return result;
 }

@@ -499,9 +499,9 @@ glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
     return GridGeometry::gridToWorld(gridPos, m_rigidBody->m_position, m_rigidBody->m_orientation, m_centerOfMass);
 }
 
-// Add your gridTraversal implementation to Grid.cpp
-std::vector<glm::ivec3> Grid::gridTraversal(glm::dvec3 startPos, glm::dvec3 endPos) {
-   return GridGeometry::gridTraversal(startPos, endPos);
+RayIntersectionResult Grid::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
+    if (!m_collider) return RayIntersectionResult();
+    return m_collider->intersectRay(rayStart, rayEnd);
 }
 
 double Grid::getApproximateRadius() const {

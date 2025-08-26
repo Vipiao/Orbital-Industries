@@ -45,52 +45,59 @@ void Creative::physics() {
     applyDragForces();
     
     if (doCreate || doRemove || doForce || doTrackSpeed || doConfigure || doModifyCell || doCopy || doPaste || doUpdateColor) {
-        // Perform unified grid traversal for all actions
+        // Perform ray casting against all grids
         std::weak_ptr<Grid> targetGridWeak;
         glm::ivec3 targetPos;
         glm::ivec3 hitPos;
         bool blockFound = false;
-        double shortestSquaredDistance = DBL_MAX;
+        double closestT = -1.0;
         
         // Camera position and direction
         glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
         
-        // Check all grids for ray intersections
+        // Find closest ray intersection across all grids
         for (const auto& gridShared : m_gameBase->m_grids) {
             if (!gridShared) continue; // Safety check
             
-            Grid* gridPtr = gridShared.get();
+            // Transform world ray to grid-local space
+            glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(startPos);
+            glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(endPos);
             
-            // Convert camera ray to grid space
-            glm::dvec3 startPosLocal = gridPtr->worldToGrid(startPos);
-            glm::dvec3 endPosLocal = gridPtr->worldToGrid(endPos);
+            // Perform ray intersection in grid-local space
+            RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
             
-            // Perform grid traversal
-            std::vector<glm::ivec3> gridCells = gridPtr->gridTraversal(startPosLocal, endPosLocal);
-            
-            // Check if ray hits any blocks in this grid
-            for (size_t i = 1; i < gridCells.size(); i++) {
-                if (gridPtr->hasCell(gridCells[i])) {
-                    // Calculate center of hit cube in world space
-                    glm::dvec3 hitCubeCenter = glm::dvec3(gridCells[i]) + glm::dvec3(0.5, 0.5, 0.5);
-                    glm::dvec3 hitCubeCenterWorld = gridPtr->gridToWorld(hitCubeCenter);
-                    
-                    // Calculate squared distance from camera to cube center
-                    glm::dvec3 distanceVec = hitCubeCenterWorld - startPos;
-                    double squaredDistance = glm::dot(distanceVec, distanceVec);
-                            
-                    // Check if this is the closest hit so far
-                    if (squaredDistance < shortestSquaredDistance) {
-                        shortestSquaredDistance = squaredDistance;
-                        targetGridWeak = gridShared;
-                        targetPos = gridCells[i-1]; // Position before the hit (for placement)
-                        hitPos = gridCells[i];      // Position of the hit block
-                        blockFound = true;
-                    }
-                    break; // Only care about first hit in this grid
+            // Check if this is a closer hit than what we have so far
+            if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
+                closestT = result.t;
+                blockFound = true;
+                targetGridWeak = gridShared;
+                
+                // Calculate intersection point with small epsilon to ensure we're inside the hit cell
+                const double epsilon = 1e-6;
+                double adjustedT = result.t + epsilon;
+                glm::dvec3 gridLocalIntersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
+                
+                // Floor to get hit cell (already in grid coordinates)
+                hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
+                
+                // Surface normal is already in grid-local space from the ray intersection
+                glm::dvec3 gridNormal = result.surfaceNormal;
+                
+                // Find dominant axis direction
+                glm::dvec3 absNormal = glm::abs(gridNormal);
+                glm::ivec3 dominantAxis;
+                if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z) {
+                    dominantAxis = glm::ivec3(gridNormal.x > 0 ? 1 : -1, 0, 0);
+                } else if (absNormal.y >= absNormal.z) {
+                    dominantAxis = glm::ivec3(0, gridNormal.y > 0 ? 1 : -1, 0);
+                } else {
+                    dominantAxis = glm::ivec3(0, 0, gridNormal.z > 0 ? 1 : -1);
                 }
+
+                // Calculate target position (one cell forward along dominant axis)
+                targetPos = hitPos + dominantAxis;
             }
         }
 
@@ -150,7 +157,7 @@ void Creative::physics() {
                     // Apply force at the point
                     m_gameBase->m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
                     
-                    //std::cout << "Applied force to grid at distance: " << std::sqrt(shortestSquaredDistance) << std::endl;
+                    //std::cout << "Applied force to grid at t: " << closestT << std::endl;
                 }
             } else {
                 //std::cout << "No target found for force application" << std::endl;

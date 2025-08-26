@@ -79,7 +79,13 @@ public:
     // Convert grid-local coordinates to world coordinates
     glm::dvec3 gridToWorld(const glm::dvec3& gridPos) const;
 
-    std::vector<glm::ivec3> gridTraversal(glm::dvec3 startPos, glm::dvec3 endPos);
+    /**
+     * @brief Perform ray intersection test against this grid
+     * @param rayStart Ray start position in world coordinates
+     * @param rayEnd Ray end position in world coordinates  
+     * @return Ray intersection result with t parameter and surface normal
+     */
+    RayIntersectionResult intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const;
     
     // Center of mass in local space. Get m_rigidBody->m_position to get the world center of mass.
     glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
