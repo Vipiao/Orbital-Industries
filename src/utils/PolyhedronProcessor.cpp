@@ -789,20 +789,6 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
     const std::vector<std::array<int, 3>>& triangleIndices,
     const std::vector<int>& verticesToTest) {
     
-    //extern int debug1;
-    //debug1++;
-    //
-    //// Debug output for GeoGebra
-    //std::cout << "Vertices for convexity analysis:" << std::endl;
-    //for (size_t i = 0; i < vertices.size(); ++i) {
-    //    std::cout << "V" << i << "=(" << vertices[i].x << "," << vertices[i].y << "," << vertices[i].z << ")" << std::endl;
-    //}
-    //
-    //std::cout << "Triangles:" << std::endl;
-    //for (size_t i = 0; i < triangleIndices.size(); ++i) {
-    //    const auto& tri = triangleIndices[i];
-    //    std::cout << "Polygon(V" << tri[0] << ", V" << tri[1] << ", V" << tri[2] << ")" << std::endl;
-    //}
 
     // Early returns for invalid inputs
     if (triangleIndices.size() < 3 || vertices.size() < 4 || verticesToTest.empty()) {
@@ -969,7 +955,8 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
                     double cross = edge.x * toCorner.y - edge.y * toCorner.x;
                     
                     // For counter-clockwise winding, corner is outside if on right side  
-                    if (cross < 0.0) {
+                    static const double fanMargin = 1.e-6;
+                    if (cross < -fanMargin) {
                         isInsideFan = false;
                         break;
                     }

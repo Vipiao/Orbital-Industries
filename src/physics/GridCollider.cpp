@@ -183,19 +183,26 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     m_shapeChangeTimestamp++;
 
     // Queue this coordinate and its face + edge neighbors for classification update
-    static const glm::ivec3 directions[18] = {
+    static const int numDirections = 26;
+    static const glm::ivec3 directions[numDirections] = {
         // Face neighbors (6)
-        {1, 0, 0}, {-1, 0, 0},   // +X, -X
-        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
-        {0, 0, 1}, {0, 0, -1},   // +Z, -Z
+        { 1, 0, 0}, {-1, 0, 0},   // ±X
+        { 0, 1, 0}, { 0,-1, 0},   // ±Y
+        { 0, 0, 1}, { 0, 0,-1},   // ±Z
+
         // Edge neighbors (12)
-        {1, 1, 0}, {1, -1, 0}, {-1, 1, 0}, {-1, -1, 0},   // XY edges
-        {1, 0, 1}, {1, 0, -1}, {-1, 0, 1}, {-1, 0, -1},   // XZ edges
-        {0, 1, 1}, {0, 1, -1}, {0, -1, 1}, {0, -1, -1}    // YZ edges
+        { 1, 1, 0}, { 1,-1, 0}, {-1, 1, 0}, {-1,-1, 0},   // XY edges
+        { 1, 0, 1}, { 1, 0,-1}, {-1, 0, 1}, {-1, 0,-1},   // XZ edges
+        { 0, 1, 1}, { 0, 1,-1}, { 0,-1, 1}, { 0,-1,-1},   // YZ edges
+
+        // Corner neighbors (8)
+        { 1, 1, 1}, { 1, 1,-1}, { 1,-1, 1}, { 1,-1,-1},
+        {-1, 1, 1}, {-1, 1,-1}, {-1,-1, 1}, {-1,-1,-1}
     };
+
      
-     queueCoordinateForClassification(coord);
-    for (int i = 0; i < 18; ++i) {
+    queueCoordinateForClassification(coord);
+    for (int i = 0; i < numDirections; ++i) {
         queueCoordinateForClassification(coord + directions[i]);
     }
 
@@ -292,18 +299,24 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
         m_edgeCells.erase(coord);
 
         // Queue this coordinate and its face + edge neighbors for classification update
-        static const glm::ivec3 directions[18] = {
+        static const int numDirections = 26;
+        static const glm::ivec3 directions[numDirections] = {
             // Face neighbors (6)
-            {1, 0, 0}, {-1, 0, 0},   // +X, -X
-            {0, 1, 0}, {0, -1, 0},   // +Y, -Y
-            {0, 0, 1}, {0, 0, -1},   // +Z, -Z
+            { 1, 0, 0}, {-1, 0, 0},   // ±X
+            { 0, 1, 0}, { 0,-1, 0},   // ±Y
+            { 0, 0, 1}, { 0, 0,-1},   // ±Z
+        
             // Edge neighbors (12)
-            {1, 1, 0}, {1, -1, 0}, {-1, 1, 0}, {-1, -1, 0},   // XY edges
-            {1, 0, 1}, {1, 0, -1}, {-1, 0, 1}, {-1, 0, -1},   // XZ edges
-            {0, 1, 1}, {0, 1, -1}, {0, -1, 1}, {0, -1, -1}    // YZ edges
+            { 1, 1, 0}, { 1,-1, 0}, {-1, 1, 0}, {-1,-1, 0},   // XY edges
+            { 1, 0, 1}, { 1, 0,-1}, {-1, 0, 1}, {-1, 0,-1},   // XZ edges
+            { 0, 1, 1}, { 0, 1,-1}, { 0,-1, 1}, { 0,-1,-1},   // YZ edges
+        
+            // Corner neighbors (8)
+            { 1, 1, 1}, { 1, 1,-1}, { 1,-1, 1}, { 1,-1,-1},
+            {-1, 1, 1}, {-1, 1,-1}, {-1,-1, 1}, {-1,-1,-1}
         };
         
-        for (int i = 0; i < 18; ++i) {
+        for (int i = 0; i < numDirections; ++i) {
             queueCoordinateForClassification(coord + directions[i]);
         }
 
@@ -399,7 +412,8 @@ void GridCollider::updateFilterNormalsForCell(const glm::ivec3& coord) {
     return; // Temporarily disable filters.
 
     // Standard grid directions (6-connectivity)
-    static const glm::dvec3 directions[6] = {
+    static const int numDirections = 6;
+    static const glm::dvec3 directions[numDirections] = {
         { 1.0,  0.0,  0.0},  // +X
         {-1.0,  0.0,  0.0},  // -X
         { 0.0,  1.0,  0.0},  // +Y
@@ -415,7 +429,7 @@ void GridCollider::updateFilterNormalsForCell(const glm::ivec3& coord) {
     currentCube->clearFilterNormals();
     
     // Check each direction for neighbors
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < numDirections; ++i) {
         glm::ivec3 neighborCoord = coord + glm::ivec3(directions[i]);
         Collider* neighborCube = getCell(neighborCoord);
         
@@ -431,7 +445,8 @@ void GridCollider::updateFilterNormalsForCell(const glm::ivec3& coord) {
 
 void GridCollider::updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoord) {
     // Standard grid directions (6-connectivity)
-    static const glm::dvec3 directions[6] = {
+    static const int numDirections = 6;
+    static const glm::dvec3 directions[numDirections] = {
         { 1.0,  0.0,  0.0},  // +X
         {-1.0,  0.0,  0.0},  // -X
         { 0.0,  1.0,  0.0},  // +Y
@@ -441,7 +456,7 @@ void GridCollider::updateFilterNormalsAfterRemoval(const glm::ivec3& removedCoor
     };
     
     // Update neighbors of the removed cell
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < numDirections; ++i) {
         glm::ivec3 neighborCoord = removedCoord + glm::ivec3(directions[i]);
         Collider* neighborCube = getCell(neighborCoord);
         
@@ -579,16 +594,22 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
         return CellMetadata::CellClassification::INNER; // No visible triangles = completely hidden
     }
     
-    // 3. Collect all foreign triangles from 18 neighbors (6 face + 12 edge)
-    static const glm::ivec3 neighborDirections[18] = {
+    // 3. Collect all foreign triangles
+    static const int numNeighbors = 26;
+    static const glm::ivec3 neighborDirections[numNeighbors] = {
         // Face neighbors (6)
-        {1, 0, 0}, {-1, 0, 0},   // +X, -X
-        {0, 1, 0}, {0, -1, 0},   // +Y, -Y
-        {0, 0, 1}, {0, 0, -1},   // +Z, -Z
+        { 1, 0, 0}, {-1, 0, 0},   // ±X
+        { 0, 1, 0}, { 0,-1, 0},   // ±Y
+        { 0, 0, 1}, { 0, 0,-1},   // ±Z
+    
         // Edge neighbors (12)
-        {1, 1, 0}, {1, -1, 0}, {-1, 1, 0}, {-1, -1, 0},   // XY edges
-        {1, 0, 1}, {1, 0, -1}, {-1, 0, 1}, {-1, 0, -1},   // XZ edges
-        {0, 1, 1}, {0, 1, -1}, {0, -1, 1}, {0, -1, -1}    // YZ edges
+        { 1, 1, 0}, { 1,-1, 0}, {-1, 1, 0}, {-1,-1, 0},   // XY edges
+        { 1, 0, 1}, { 1, 0,-1}, {-1, 0, 1}, {-1, 0,-1},   // XZ edges
+        { 0, 1, 1}, { 0, 1,-1}, { 0,-1, 1}, { 0,-1,-1},   // YZ edges
+    
+        // Corner neighbors (8)
+        { 1, 1, 1}, { 1, 1,-1}, { 1,-1, 1}, { 1,-1,-1},
+        {-1, 1, 1}, {-1, 1,-1}, {-1,-1, 1}, {-1,-1,-1}
     };
     
     // 4. Merge local and adjacent foreign triangles using indices
@@ -600,7 +621,7 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
      
     // Phase 1: Identify relevant foreign triangles that share at least 1 vertex with locals
     std::vector<std::array<glm::dvec3, 3>> candidateForeignTriangles;
-    for (int i = 0; i < 18; ++i) {
+    for (int i = 0; i < numNeighbors; ++i) {
         glm::ivec3 neighborCoord = coord + neighborDirections[i];
         auto neighborIt = m_cells.find(neighborCoord);
         
@@ -728,13 +749,14 @@ VisibleTrianglesResult GridCollider::getVisibleTriangles(const glm::ivec3& coord
     // 2: Check which vertices are hidden by neighbors
     std::vector<std::vector<bool>> vertexHiddenByNeighbor(6, std::vector<bool>(vertices.size(), false));
     
-    static const glm::ivec3 directions[6] = {
+    static const int numDirections = 6;
+    static const glm::ivec3 directions[numDirections] = {
         {1, 0, 0}, {-1, 0, 0},   // +X, -X
         {0, 1, 0}, {0, -1, 0},   // +Y, -Y
         {0, 0, 1}, {0, 0, -1}    // +Z, -Z
     };
     
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < numDirections; ++i) {
         glm::ivec3 neighborCoord = coord + directions[i];
         auto neighborIt = m_cells.find(neighborCoord);
         
@@ -770,7 +792,7 @@ VisibleTrianglesResult GridCollider::getVisibleTriangles(const glm::ivec3& coord
         bool isTriangleHidden = false;
         
         // Check if any single neighbor hides ALL three triangle vertices
-        for (int neighborDir = 0; neighborDir < 6; ++neighborDir) {
+        for (int neighborDir = 0; neighborDir < numDirections; ++neighborDir) {
             bool allVerticesHiddenByThisNeighbor = true;
             
             for (int triVertex = 0; triVertex < 3; ++triVertex) {
