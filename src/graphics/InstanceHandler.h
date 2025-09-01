@@ -24,10 +24,11 @@ struct InstanceData {
     float padding1;
     glm::vec4 localOrientation;  // Local orientation quaternion (x,y,z,w)
     glm::vec3 localScale;        // Local scale
+    float padding2;
+    glm::vec4 color;             // Instance color
     int32_t meshIndex;           // Index into SSBO for geometry world transform
     int32_t colorTextureUnit;
     int32_t normalTextureUnit;
-    uint32_t padding2;
     uint32_t padding3;
 };
 
@@ -57,12 +58,13 @@ struct TextureInfo {
 class Instance {
 public:
     uint64_t m_uniqueId;
-    glm::vec3 m_localPosition{0.0f};
-    glm::quat m_localOrientation{1.0f, 0.0f, 0.0f, 0.0f};
-    glm::vec3 m_localScale{1.0f};
-    int32_t m_meshIndex{-1};        // SSBO index for world transform
-    int32_t m_colorTextureUnit{-1};
-    int32_t m_normalTextureUnit{-1};
+    glm::dvec3 m_localPosition{0.0};
+    glm::dquat m_localOrientation{1.0, 0.0, 0.0, 0.0};
+    glm::dvec3 m_localScale{1.0};
+    glm::dvec4 m_color{1.0, 1.0, 1.0, 1.0};
+    int m_meshIndex{-1};        // SSBO index for world transform
+    int m_colorTextureUnit{-1};
+    int m_normalTextureUnit{-1};
     uint32_t m_bufferIndex; // Index in geometry's instance buffer
     
     Instance() : m_uniqueId(s_nextInstanceId++), m_bufferIndex(0) {}
@@ -85,7 +87,7 @@ public:
     bool m_hasIndices;
 
     // Rendering options
-    float m_depthCompression = 1.0f;  // 1.0 = normal, < 1.0 = compressed depth range
+    double m_depthCompression = 1.0;  // 1.0 = normal, < 1.0 = compressed depth range
     bool m_enableAlphaBlending = false;
     
     // Instance management (kept in same order)
@@ -99,11 +101,11 @@ public:
     ~Geometry();
     
     // Instance management methods
-    void setDepthCompression(float compression) { m_depthCompression = compression; }
+    void setDepthCompression(double compression) { m_depthCompression = compression; }
     void setAlphaBlending(bool enable) { m_enableAlphaBlending = enable; }
-    float getDepthCompression() const { return m_depthCompression; }
+    double getDepthCompression() const { return m_depthCompression; }
     bool getAlphaBlending() const { return m_enableAlphaBlending; }
-    std::weak_ptr<Instance> addInstance(int32_t meshIndex, int32_t colorTextureUnit = -1, int32_t normalTextureUnit = -1);
+    std::weak_ptr<Instance> addInstance(int meshIndex, int colorTextureUnit = -1, int normalTextureUnit = -1, const glm::dvec4& color = glm::dvec4(1.0, 1.0, 1.0, 1.0));
     void removeInstance(std::weak_ptr<Instance> instance);
     void updateInstanceInBuffer(Instance* instance);
     
@@ -152,7 +154,7 @@ private:
     ShaderProgram m_shaderProgram;
     
     // Configuration
-    uint32_t m_maxTextures;
+    int m_maxTextures;
     
     // Internal helpers
     void loadGeometryFromFile(Geometry* geometry, const std::string& modelPath);

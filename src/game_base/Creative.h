@@ -6,6 +6,7 @@
 #include <array>
 #include <memory>
 #include <vector>
+class RadialMenu;
 class GeometryData;
 class Geometry;
 class Instance;
@@ -17,7 +18,7 @@ class GeometryInstance;
 class Creative : public Mode {
 public:
     Creative(GameBase* gameBase);
-    virtual ~Creative() = default;
+    virtual ~Creative();
     
     virtual void processInputs() override;
     virtual void physics() override;
@@ -75,4 +76,7 @@ private:
     std::weak_ptr<class Grid> m_modificationGrid;
     glm::ivec3 m_modificationCoord;
     std::array<glm::ivec3, 8> m_modificationVertices;
+
+    // Radial menu
+    std::unique_ptr<RadialMenu> m_radialMenu;
 };

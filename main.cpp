@@ -75,10 +75,8 @@ public:
         bb->m_position = {0,0,0};
         //bb->m_velocity = {0.0,0.0,-0.01};
         initialGrid->addCell(glm::ivec3(0,0,0));
-        //initialGrid->addCell(glm::ivec3(0,0,0));
-        //addGridBlock(initialGrid, 1, 0, 0);
-        //addGridBlock(initialGrid, 2, 0, 0);
-        //addGridBlock(initialGrid, 3, 0, 0);
+        //initialGrid->addCell(glm::ivec3(1,0,0));
+        //bb->setAngularVelocityBody({0,0,0.1});
         
         //for (int ll = 0; ll < 2; ll++) {
         //    for (int ii = -3; ii < 4; ii++)
@@ -127,18 +125,18 @@ public:
         //    }
         //}
         // Ground.
-        //int size{ 70 };
-        //for (int ii = -size; ii < size; ii++)
-        //{
-        //    for (int jj = -size; jj < size; jj++)
-        //    {
-        //        for (int kk = -3; kk < -2; kk++)
-        //        {
-        //            initialGrid->addCell(glm::ivec3(ii, jj, kk));
-        //            std::cout << ii << std::endl;
-        //        }
-        //    }
-        //}
+        int size{ 0 };
+        for (int ii = -size; ii < size; ii++)
+        {
+            for (int jj = -size; jj < size; jj++)
+            {
+                for (int kk = -3; kk < -2; kk++)
+                {
+                    initialGrid->addCell(glm::ivec3(ii, jj, kk));
+                    std::cout << ii << std::endl;
+                }
+            }
+        }
         
         // Print instructions
         std::cout << "3D Grid Block Demo" << std::endl;

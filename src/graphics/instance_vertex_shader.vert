@@ -32,6 +32,7 @@ layout (location = 6) in vec3 localScale;
 layout (location = 7) in int meshIndex;
 layout (location = 8) in int instanceColorTextureUnit;
 layout (location = 9) in int instanceNormalTextureUnit;
+layout (location = 10) in vec4 instanceColor;
 
 uniform uint u_frame;
 uniform uint u_time;
@@ -173,7 +174,7 @@ void main() {
     // Final world position in camera space
     vec4 worldPos = vec4(meshPositionL + worldTransformedPos, 1.0);
     vert_pos = worldPos.xyz;
-    vert_color = vec4(1.0, 1.0, 1.0, 1.0); // Default white for instances
+    vert_color = instanceColor;
     vert_uv = uv;
     
     // Use instance texture units (override geometry ones)

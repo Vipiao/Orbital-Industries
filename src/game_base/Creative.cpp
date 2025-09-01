@@ -13,6 +13,7 @@
 #include "../graphics/GeometryInstance.h"
 #include "StructuralBlock.h"
 #include "../graphics/InstanceHandler.h"
+#include "../graphics/RadialMenu.h"
 #include <float.h>
 #include <map>
 
@@ -34,6 +35,17 @@ Creative::Creative(GameBase* gameBase)
     }
     
     std::cout << "Loaded 3D arrow geometry and texture for configuration mode" << std::endl;
+
+    // Create radial menu
+    m_radialMenu = std::make_unique<RadialMenu>(m_gameBase->m_graphicsEngine.get());
+    m_radialMenu->setPosition(glm::dvec3(2.0, 2.0, 2.0)); // Test position
+    m_radialMenu->createNode(); // Create a test node
+    m_radialMenu->setVisible(false);
+    std::cout << "Created radial menu with test node" << std::endl;
+}
+
+Creative::~Creative() {
+    // Destructor defined here where RadialMenu is complete type
 }
 
 void Creative::processInputs() {
@@ -704,6 +716,13 @@ void Creative::processInputLogic() {
         bool isLocked = mouseHandler->getMouseLock();
         mouseHandler->setMouseLock(!isLocked);
         std::cout << "Mouse " << (isLocked ? "unlocked" : "locked") << std::endl;
+    }
+
+    // Toggle radial menu visibility with B key
+    if (keyboard->m_b.justPressed()) {
+        bool visible = m_radialMenu->isVisible();
+        m_radialMenu->setVisible(!visible);
+        std::cout << "Radial menu " << (visible ? "hidden" : "shown") << std::endl;
     }
 
     // Accelerate

@@ -17,11 +17,12 @@ Geometry::~Geometry() {
     if (m_instanceVBO != 0) glDeleteBuffers(1, &m_instanceVBO);
 }
 
-std::weak_ptr<Instance> Geometry::addInstance(int32_t meshIndex, int32_t colorTextureUnit, int32_t normalTextureUnit) {
+std::weak_ptr<Instance> Geometry::addInstance(int meshIndex, int colorTextureUnit, int normalTextureUnit, const glm::dvec4& color) {
     auto instance = std::make_shared<Instance>();
     instance->m_meshIndex = meshIndex;
     instance->m_colorTextureUnit = colorTextureUnit;
     instance->m_normalTextureUnit = normalTextureUnit;
+    instance->m_color = color;
     
     // Set buffer index to end of current data
     instance->m_bufferIndex = static_cast<uint32_t>(m_instances.size());
@@ -107,15 +108,18 @@ void Geometry::updateInstanceInBuffer(Instance* instance) {
 InstanceData Geometry::createInstanceData(Instance* instance) {
     InstanceData data;
     
-    data.localPosition = instance->m_localPosition;
+    data.localPosition = glm::vec3(instance->m_localPosition);
     data.padding1 = 0.0f;
-    data.localOrientation = glm::vec4(instance->m_localOrientation.x, instance->m_localOrientation.y, 
-                                    instance->m_localOrientation.z, instance->m_localOrientation.w);
-    data.localScale = instance->m_localScale;
+    data.localOrientation = glm::vec4(static_cast<float>(instance->m_localOrientation.x), 
+                                    static_cast<float>(instance->m_localOrientation.y),
+                                    static_cast<float>(instance->m_localOrientation.z), 
+                                    static_cast<float>(instance->m_localOrientation.w));
+    data.localScale = glm::vec3(instance->m_localScale);
+    data.padding2 = 0.0f;
+    data.color = glm::vec4(instance->m_color);
     data.meshIndex = instance->m_meshIndex;
     data.colorTextureUnit = instance->m_colorTextureUnit;
     data.normalTextureUnit = instance->m_normalTextureUnit;
-    data.padding2 = 0;
     data.padding3 = 0;
     
     return data;
@@ -341,6 +345,11 @@ void InstanceHandler::setupGeometryOpenGL(Geometry* geometry,
     glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, localScale));
     glEnableVertexAttribArray(6);
     glVertexAttribDivisor(6, 1);
+
+    // Instance color
+    glVertexAttribPointer(10, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, color));
+    glEnableVertexAttribArray(10);
+    glVertexAttribDivisor(10, 1);
     
     // Mesh index for SSBO lookup
     glVertexAttribIPointer(7, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, meshIndex));
@@ -434,8 +443,8 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
         GLboolean blendEnabled = glIsEnabled(GL_BLEND);
         
         // Apply geometry-specific depth compression
-        if (geometry->m_depthCompression < 1.0f) {
-            glDepthRange(0.0, geometry->m_depthCompression);
+        if (geometry->m_depthCompression < 1.0) {
+            glDepthRange(0.0, static_cast<GLdouble>(geometry->m_depthCompression));
         }
         
         // Apply geometry-specific alpha blending
@@ -469,16 +478,16 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
 
 int InstanceHandler::findAvailableTextureUnit() {
     // Simple linear search for available unit
-    for (uint32_t unit = 0; unit < m_maxTextures; ++unit) {
+    for (int unit = 0; unit < m_maxTextures; ++unit) {
         bool unitUsed = false;
         for (const TextureInfo& texture : m_textures) {
-            if (texture.textureId != 0 && texture.textureUnit == unit) {
+            if (texture.textureId != 0 && texture.textureUnit == static_cast<uint32_t>(unit)) {
                 unitUsed = true;
                 break;
             }
         }
         if (!unitUsed) {
-            return static_cast<int>(unit);
+            return unit;
         }
     }
     return -1; // No available units
