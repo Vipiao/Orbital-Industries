@@ -48,12 +48,20 @@ public:
     bool isVisible() const { return m_visible; }
 
     // Interaction
-    void run(const glm::dvec2& screenPosition, bool doSelect);
+    void run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect);
+    
+    // Navigation
+    void navigateToParent();
+    
+    glm::dvec3 worldToLocal(const glm::dvec3& worldPos) const;
     
 private:
     GraphicsEngine* m_graphics;
     glm::dvec3 m_position{0.0, 0.0, 0.0};
     glm::dquat m_orientation{1.0, 0.0, 0.0, 0.0};
+
+    const glm::dvec4 m_primaryColor{0.0, 0.0, 1.0, 1.0};
+    const glm::dvec4 m_secondaryColor{0.2, 0.1, 0.8, 1.0};
     
     std::weak_ptr<Geometry> m_geometry;
     int m_meshId{-1};

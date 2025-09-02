@@ -134,10 +134,122 @@ void RadialMenu::setVisible(bool visible) {
     }
 }
 
-void RadialMenu::run(const glm::dvec2& screenPosition, bool doSelect) {
-    // TODO: Implement interaction logic
-    (void)screenPosition;
-    (void)doSelect;
+glm::dvec3 RadialMenu::worldToLocal(const glm::dvec3& worldPos) const {
+    // Transform from world space to local space
+    // local = inverse_orientation * (world - position)
+    glm::dvec3 translated = worldPos - m_position;
+    return glm::conjugate(m_orientation) * translated;
+}
+
+void RadialMenu::navigateToParent() {
+    auto currentNodeIt = m_nodes.find(m_currentNodeId);
+    if (currentNodeIt == m_nodes.end()) return;
+    
+    int64_t parentId = currentNodeIt->second.m_parentId;
+    if (parentId == -1) return; // Already at root
+    
+    auto parentIt = m_nodes.find(parentId);
+    if (parentIt == m_nodes.end()) return;
+    
+    m_currentNodeId = parentId;
+    updateRendering();
+    
+    std::cout << "Navigated to parent node " << parentId << std::endl;
+}
+
+void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect) {
+    if (!m_visible) return;
+
+    // Get current node info
+    auto currentNodeIt = m_nodes.find(m_currentNodeId);
+    if (currentNodeIt == m_nodes.end()) return;
+    
+    const RadialMenuNode& currentNode = currentNodeIt->second;
+    size_t childCount = currentNode.m_childIds.size();
+    
+    if (childCount == 0) return;
+    
+    // Intersect ray with Z=0 plane
+    glm::dvec3 rayDir = localRayEnd - localRayStart;
+    int selectedIndex = -1;
+    
+    if (glm::abs(rayDir.z) >= 1e-6) { // Ray not parallel to plane
+        double t = -localRayStart.z / rayDir.z;
+        if (t >= 0.0 && t <= 1.0) { // Intersection within ray segment
+            glm::dvec3 intersection = localRayStart + t * rayDir;
+            glm::dvec2 pos2D(intersection.x, intersection.y);
+            // Determine selection
+            double distance = glm::length(pos2D);
+            const double centerThreshold = 0.17;
+            const double outerThreshold = 1.0;
+            
+            if (distance < centerThreshold && childCount > 0) {
+                selectedIndex = 0; // Center
+            } else if (distance <= outerThreshold && childCount > 1) {
+                // Calculate angle and map to segment
+                double angle = glm::atan(pos2D.y, pos2D.x);
+                if (angle < 0) angle += 2.0 * glm::pi<double>();
+                
+                double angleStep = 2.0 * glm::pi<double>() / static_cast<double>(childCount - 1);
+                int segmentIndex = static_cast<int>(angle / angleStep);
+                selectedIndex = segmentIndex + 1; // +1 because center is index 0
+            }
+        }
+    }
+    
+    // Handle selection
+    if (doSelect && selectedIndex >= 0) {
+        int64_t targetChildId = currentNode.m_childIds[selectedIndex];
+        
+        auto targetIt = m_nodes.find(targetChildId);
+        if (targetIt != m_nodes.end()) {
+            // Execute callback if it exists
+            if (targetIt->second.m_callback) {
+                targetIt->second.m_callback();
+            }
+            
+            // Navigate to child if it has children
+            if (!targetIt->second.m_childIds.empty()) {
+                m_currentNodeId = targetChildId;
+                updateRendering();
+            }
+        }
+    }
+    
+    // Update instance colors and scales
+    auto geometry = m_geometry.lock();
+    if (!geometry) return;
+    
+    double angleStep = (childCount > 1) ? 2.0 * glm::pi<double>() / static_cast<double>(childCount - 1) : 0.0;
+    
+    for (size_t i = 0; i < m_currentInstances.size() && i < childCount; ++i) {
+        auto inst = m_currentInstances[i].lock();
+        if (!inst) continue;
+        
+        bool isSelected = (selectedIndex >= 0 && static_cast<size_t>(selectedIndex) == i);
+        
+        inst->m_color = isSelected ? m_secondaryColor : m_primaryColor;
+        inst->m_localScale = glm::dvec3(1.0);
+        
+        // Calculate position with selection offset
+        glm::dvec3 basePosition = glm::dvec3(0.0);
+        glm::dvec3 selectionOffset = glm::dvec3(0.0);
+        
+        if (isSelected) {
+            if (i == 0) {
+                // Center button.
+                selectionOffset = glm::dvec3(0.0, 0.0, 0.0);
+                inst->m_localScale = glm::dvec3{1.1};
+            } else {
+                // Segment button: offset in angle direction + 180 degrees
+                double offsetAngle = angleStep * (static_cast<double>(i-1) + 0.5) + glm::pi<double>();
+                selectionOffset = -glm::dvec3(glm::cos(offsetAngle), glm::sin(offsetAngle), 0.0) * 0.05;
+            }
+        }
+        
+        inst->m_localPosition = basePosition + selectionOffset;
+        geometry->updateInstanceInBuffer(inst.get());
+    }
 }
 
 void RadialMenu::updateRendering() {
@@ -171,6 +283,7 @@ void RadialMenu::updateRendering() {
             inst->m_localPosition = glm::dvec3(0.0);
             inst->m_localOrientation = glm::dquat(1.0, 0.0, 0.0, 0.0);
             inst->m_localScale = glm::dvec3(1.0);
+            inst->m_color = m_primaryColor;
             geometry->updateInstanceInBuffer(inst.get());
             m_currentInstances.push_back(centerInstance);
         }
@@ -191,6 +304,7 @@ void RadialMenu::updateRendering() {
                 double angle = static_cast<double>(i - 1) * angleStep;
                 inst->m_localOrientation = glm::angleAxis(angle, glm::dvec3(0.0, 0.0, 1.0));
                 inst->m_localScale = glm::dvec3(1.0);
+                inst->m_color = m_primaryColor;
                 
                 geometry->updateInstanceInBuffer(inst.get());
                 m_currentInstances.push_back(segmentInstance);

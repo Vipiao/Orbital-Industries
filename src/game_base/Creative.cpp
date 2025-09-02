@@ -50,7 +50,10 @@ Creative::Creative(GameBase* gameBase)
     m_radialMenu->createNode(rootId);
     m_radialMenu->createNode(rootId);
     m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
+    int childId = m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(childId);
+    m_radialMenu->createNode(childId);
+    m_radialMenu->createNode(childId);
 
     m_radialMenu->setVisible(false);
 }
@@ -702,10 +705,12 @@ void Creative::processInputLogic() {
     
     // Check for input actions that require grid traversal
     // Set flags based on input (don't execute immediately)
-    if (mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32)) {
+    if (!m_radialMenu->isVisible() && 
+        (mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32))) {
         doCreate = true;
     }
-    if (mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32)) {
+    if (!m_radialMenu->isVisible() && 
+        (mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32))) {
         doRemove = true;
     }
     if (keyboard->m_f.isDown()) {
@@ -734,6 +739,30 @@ void Creative::processInputLogic() {
         bool visible = m_radialMenu->isVisible();
         m_radialMenu->setVisible(!visible);
         std::cout << "Radial menu " << (visible ? "hidden" : "shown") << std::endl;
+    }
+
+    // Handle radial menu interaction when visible
+    if (m_radialMenu->isVisible()) {
+        // Generate camera ray
+        glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
+        glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 rayStart = cameraPos;
+        glm::dvec3 rayEnd = cameraPos + forward * 5.0;
+        
+        // Convert to local space
+        glm::dvec3 localRayStart = m_radialMenu->worldToLocal(rayStart);
+        glm::dvec3 localRayEnd = m_radialMenu->worldToLocal(rayEnd);
+        
+        // Check for selection
+        bool doSelect = mouseHandler->leftClick();
+        
+        // Run radial menu interaction
+        m_radialMenu->run(localRayStart, localRayEnd, doSelect);
+        
+        // Handle right click for navigate up
+        if (mouseHandler->rightClick()) {
+            m_radialMenu->navigateToParent();
+        }
     }
 
     // Accelerate
