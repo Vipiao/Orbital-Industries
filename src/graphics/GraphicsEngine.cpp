@@ -86,7 +86,7 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
 
     // Render 2D overlay
     float aspectRatio = getScreenWidth() / (float)getScreenHeight();
-    glm::mat4 projection2D = glm::ortho(-1.0f, 1.0f, -1.0f/aspectRatio, 1.0f/aspectRatio);
+    glm::mat4 projection2D = glm::ortho(-1.0f, 1.0f, -1.0f/aspectRatio, 1.0f/aspectRatio, 0.0f, 1.0f);
     m_meshManager2D->render(projection2D);
 }
 
