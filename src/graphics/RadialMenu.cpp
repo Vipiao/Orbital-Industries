@@ -228,7 +228,7 @@ void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
         
         bool isSelected = (selectedIndex >= 0 && static_cast<size_t>(selectedIndex) == i);
         
-        inst->m_color = isSelected ? m_secondaryColor : m_primaryColor;
+        inst->m_color = isSelected ? m_selectColor : m_unSelectColor;
         inst->m_localScale = glm::dvec3(1.0);
         
         // Calculate position with selection offset
@@ -283,7 +283,7 @@ void RadialMenu::updateRendering() {
             inst->m_localPosition = glm::dvec3(0.0);
             inst->m_localOrientation = glm::dquat(1.0, 0.0, 0.0, 0.0);
             inst->m_localScale = glm::dvec3(1.0);
-            inst->m_color = m_primaryColor;
+            inst->m_color = m_unSelectColor;
             geometry->updateInstanceInBuffer(inst.get());
             m_currentInstances.push_back(centerInstance);
         }
@@ -304,7 +304,7 @@ void RadialMenu::updateRendering() {
                 double angle = static_cast<double>(i - 1) * angleStep;
                 inst->m_localOrientation = glm::angleAxis(angle, glm::dvec3(0.0, 0.0, 1.0));
                 inst->m_localScale = glm::dvec3(1.0);
-                inst->m_color = m_primaryColor;
+                inst->m_color = m_unSelectColor;
                 
                 geometry->updateInstanceInBuffer(inst.get());
                 m_currentInstances.push_back(segmentInstance);

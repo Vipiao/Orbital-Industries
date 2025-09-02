@@ -60,8 +60,8 @@ private:
     glm::dvec3 m_position{0.0, 0.0, 0.0};
     glm::dquat m_orientation{1.0, 0.0, 0.0, 0.0};
 
-    const glm::dvec4 m_primaryColor{0.0, 0.0, 1.0, 1.0};
-    const glm::dvec4 m_secondaryColor{0.2, 0.1, 0.8, 1.0};
+    const glm::dvec4 m_unSelectColor{0.2, 0.1, 0.8, 1.0};
+    const glm::dvec4 m_selectColor{0.5, 0.5, 1.0, 1.0};
     
     std::weak_ptr<Geometry> m_geometry;
     int m_meshId{-1};
