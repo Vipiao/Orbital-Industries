@@ -47,6 +47,9 @@ public:
     void setVisible(bool visible);
     bool isVisible() const { return m_visible; }
 
+    // Geometry access
+    std::weak_ptr<Geometry> getGeometry() const { return m_geometry; }
+
     // Interaction
     void run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect);
     

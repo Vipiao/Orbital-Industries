@@ -30,7 +30,7 @@ Creative::Creative(GameBase* gameBase)
     
     // Configure arrows for overlay rendering with transparency
     if (auto geometry = m_arrowGeometry.lock()) {
-        geometry->setDepthCompression(0.1f);  // Compress depth range to render in front
+        geometry->setDepthCompression(0.1);  // Compress depth range to render in front
         geometry->setAlphaBlending(true);     // Enable transparency
     }
     
@@ -38,7 +38,7 @@ Creative::Creative(GameBase* gameBase)
 
     // Create radial menu
     m_radialMenu = std::make_unique<RadialMenu>(m_gameBase->m_graphicsEngine.get());
-    m_radialMenu->setPosition(glm::dvec3(2.0, 2.0, 2.0)); // Test position
+    m_radialMenu->getGeometry().lock()->setDepthCompression(0.6);
     
     // Create root node and child nodes to test the system
     int64_t rootId = m_radialMenu->createNode(); // parentId defaults to -1 (root)
@@ -734,37 +734,6 @@ void Creative::processInputLogic() {
         std::cout << "Mouse " << (isLocked ? "unlocked" : "locked") << std::endl;
     }
 
-    // Toggle radial menu visibility with B key
-    if (keyboard->m_b.justPressed()) {
-        bool visible = m_radialMenu->isVisible();
-        m_radialMenu->setVisible(!visible);
-        std::cout << "Radial menu " << (visible ? "hidden" : "shown") << std::endl;
-    }
-
-    // Handle radial menu interaction when visible
-    if (m_radialMenu->isVisible()) {
-        // Generate camera ray
-        glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
-        glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
-        glm::dvec3 rayStart = cameraPos;
-        glm::dvec3 rayEnd = cameraPos + forward * 5.0;
-        
-        // Convert to local space
-        glm::dvec3 localRayStart = m_radialMenu->worldToLocal(rayStart);
-        glm::dvec3 localRayEnd = m_radialMenu->worldToLocal(rayEnd);
-        
-        // Check for selection
-        bool doSelect = mouseHandler->leftClick();
-        
-        // Run radial menu interaction
-        m_radialMenu->run(localRayStart, localRayEnd, doSelect);
-        
-        // Handle right click for navigate up
-        if (mouseHandler->rightClick()) {
-            m_radialMenu->navigateToParent();
-        }
-    }
-
     // Accelerate
     if (keyboard->m_c.isDown()) {
         m_moveSpeed *= 1.05;
@@ -830,6 +799,50 @@ void Creative::processInputLogic() {
     if (glm::length(moveDirection) > 0.0) {
         moveDirection = glm::normalize(moveDirection) * m_moveSpeed;
         m_gameBase->m_graphicsEngine->getCamPos() += moveDirection;
+    }
+
+    // Toggle radial menu visibility with B key
+    if (keyboard->m_b.justPressed()) {
+        bool visible = m_radialMenu->isVisible();
+        m_radialMenu->setVisible(!visible);
+        glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
+        glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+        m_radialMenuRelativePosition = forward * m_radialMenuDistance;
+        m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);
+
+        std::cout << "Radial menu " << (visible ? "hidden" : "shown") << std::endl;
+    }
+
+    // Handle radial menu interaction when visible
+    if (m_radialMenu->isVisible()) {
+        //
+        glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
+        m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);
+
+        // Make menu use camera orientation with 90 degree offset around X axis
+        glm::dquat xOffset = glm::angleAxis(glm::radians(90.0), glm::dvec3(1.0, 0.0, 0.0));
+        glm::dquat menuOrientation = m_gameBase->m_graphicsEngine->getCamOri() * xOffset;
+        m_radialMenu->setOrientation(menuOrientation);
+
+        // Generate camera ray
+        glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 rayStart = cameraPos;
+        glm::dvec3 rayEnd = cameraPos + forward * 5.0;
+        
+        // Convert to local space
+        glm::dvec3 localRayStart = m_radialMenu->worldToLocal(rayStart);
+        glm::dvec3 localRayEnd = m_radialMenu->worldToLocal(rayEnd);
+        
+        // Check for selection
+        bool doSelect = mouseHandler->leftClick();
+        
+        // Run radial menu interaction
+        m_radialMenu->run(localRayStart, localRayEnd, doSelect);
+        
+        // Handle right click for navigate up
+        if (mouseHandler->rightClick()) {
+            m_radialMenu->navigateToParent();
+        }
     }
 }
 

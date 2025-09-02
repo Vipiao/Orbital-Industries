@@ -79,4 +79,8 @@ private:
 
     // Radial menu
     std::unique_ptr<RadialMenu> m_radialMenu;
+
+    // Radial menu positioning
+    double m_radialMenuDistance = 3.0; // Distance from camera when visible
+    glm::dvec3 m_radialMenuRelativePosition = {0,0,0};
 };
