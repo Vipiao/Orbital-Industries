@@ -108,6 +108,8 @@ void main() {
       alpha = vert_color.a;
    }
 
+   if(alpha < 1./255.) discard;
+
    // Calculate light and view directions (all in L-space now)
    vec3 lightVec = u_lightPos - vert_pos;
    vec3 lightDir = normalize(lightVec);

@@ -39,9 +39,20 @@ Creative::Creative(GameBase* gameBase)
     // Create radial menu
     m_radialMenu = std::make_unique<RadialMenu>(m_gameBase->m_graphicsEngine.get());
     m_radialMenu->setPosition(glm::dvec3(2.0, 2.0, 2.0)); // Test position
-    m_radialMenu->createNode(); // Create a test node
+    
+    // Create root node and child nodes to test the system
+    int64_t rootId = m_radialMenu->createNode(); // parentId defaults to -1 (root)
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+    m_radialMenu->createNode(rootId);
+
     m_radialMenu->setVisible(false);
-    std::cout << "Created radial menu with test node" << std::endl;
 }
 
 Creative::~Creative() {
