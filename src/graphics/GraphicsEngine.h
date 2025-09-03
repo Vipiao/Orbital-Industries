@@ -7,7 +7,7 @@
 #include "CallbackManager.h"
 #include "MeshHandler.h"
 #include "AssimpLoader.h"
-#include "MeshManager2D.h"
+#include "MeshManager2D/MeshManager2D.h"
 #include "InstanceHandler.h"
 #include "SSBOManager.h"
 #include <memory>

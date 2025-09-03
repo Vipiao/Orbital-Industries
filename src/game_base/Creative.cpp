@@ -9,8 +9,8 @@
 #include "../utils/PositionSelector.h"
 #include <iostream>
 #include "../utils/ColorUtils.h"
-#include "../graphics/MeshManager2D.h"
-#include "../graphics/GeometryInstance.h"
+#include "../graphics/MeshManager2D/MeshManager2D.h"
+#include "../graphics/MeshManager2D/GeometryInstance.h"
 #include "StructuralBlock.h"
 #include "../graphics/InstanceHandler.h"
 #include "../graphics/RadialMenu.h"

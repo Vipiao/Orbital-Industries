@@ -2,12 +2,12 @@
 #pragma once
 
 #include "GeometryData.h"
-#include "ShaderProgram.h"
+#include "../ShaderProgram.h"
 #include <vector>
 #include <memory>
 #include <string>
 #include <unordered_map>
-#include "../graphics/AssimpLoader.h"
+#include "../AssimpLoader.h"
 #include <glm/glm.hpp>
 
 /**

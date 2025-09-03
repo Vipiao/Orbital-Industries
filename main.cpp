@@ -6,7 +6,7 @@
 #include "src/game_base/Creative.h"
 #include "src/debug/DebugRenderer.h"
 #include "src/debug/DebugGlobals.h"
-#include "src/graphics/MeshManager2D.h"
+#include "src/graphics/MeshManager2D/MeshManager2D.h"
 #include "src/graphics/CallbackManager.h"
 #include <iostream>
 #include <glm/glm.hpp>

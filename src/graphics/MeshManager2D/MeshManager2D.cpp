@@ -1,6 +1,6 @@
 // src/graphics/MeshManager2D.cpp
 #include "MeshManager2D.h"
-#include "STBImageLoader.h"
+#include "../STBImageLoader.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
