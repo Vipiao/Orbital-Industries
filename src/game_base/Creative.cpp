@@ -859,10 +859,12 @@ void Creative::handleColorInput() {
         if (keyboard->m_lCtrl.isDown() && keyboard->m_t.timeDown() < shortHoldThreshold) {
             // Shift+T brief hold = copy
             doCopy = true;
-        } else if (!keyboard->m_lCtrl.isDown()) {
-            // T brief press = paste
-            doPaste = true;
         }
+    }
+
+    if (!keyboard->m_lCtrl.isDown() && keyboard->m_t.justPressed()) {
+        // T brief press = paste
+        doPaste = true;
     }
     
     // Handle Ctrl+T long hold for color adjustment

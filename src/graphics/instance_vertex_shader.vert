@@ -13,6 +13,8 @@ struct MeshData {
    int colorTextureUnit;     // Offset=116, size= 4 bytes. (-1 means no textures)
    int normalTextureUnit;    // Offset=120, size= 4 bytes. (-1 means no textures)
    int materialTextureUnit;  // Offset=124, size= 4 bytes. (-1 means no textures)
+   float emissiveScalar;     // Offset=128, size= 4 bytes.
+   uint padding[3];          // Offset=132, size=12 bytes. Padding to make total size 144 (divisible by 16)
 };
 
 layout(std430, binding = 0) buffer MeshDataBuffer {
@@ -53,6 +55,7 @@ flat out int vert_colorTextureUnit;
 flat out int vert_normalTextureUnit;
 out float vert_occlusionFactor;
 flat out int vert_materialTextureUnit;
+flat out float vert_emissiveScalar;
 
 mat3 fromQuaternion(vec4 quaternion) {
     float qw = quaternion.w;
@@ -183,6 +186,7 @@ void main() {
     vert_colorTextureUnit = instanceColorTextureUnit;
     vert_normalTextureUnit = instanceNormalTextureUnit;
     vert_materialTextureUnit = instanceMaterialTextureUnit;
+    vert_emissiveScalar = meshData.emissiveScalar;
     vert_occlusionFactor = 1.0; // Default to no occlusion
     
     gl_Position = projection * view * worldPos;

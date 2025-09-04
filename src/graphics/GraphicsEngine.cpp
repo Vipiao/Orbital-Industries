@@ -137,7 +137,8 @@ void GraphicsEngine::updateMeshTransform(
     int32_t colorTextureUnit,
     int32_t normalTextureUnit,
     int32_t materialTextureUnit,
-    uint64_t physicsTimeStep)
+    uint64_t physicsTimeStep,
+    double emissiveScalar)
 {
     m_ssboManager->updateMeshTransform(
         meshId,
@@ -151,7 +152,8 @@ void GraphicsEngine::updateMeshTransform(
         colorTextureUnit,
         normalTextureUnit,
         materialTextureUnit,
-        physicsTimeStep
+        physicsTimeStep,
+        emissiveScalar
     );
 }
 
@@ -248,7 +250,9 @@ int GraphicsEngine::loadModel(
         glm::dvec3(1.0, 1.0, 1.0), // Default scale
         colorTextureUnit,
         normalTextureUnit,
-        materialTextureUnit
+        materialTextureUnit,
+        0,                          // Default physics time step
+        1.0                         // Default emissive scalar
     );
     
     return meshId;

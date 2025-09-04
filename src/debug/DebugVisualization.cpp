@@ -139,7 +139,8 @@ int DebugVisualization::createSphere(const glm::dvec3& position, double radius) 
         m_redTextureUnit,  // Red texture
         -1,                // No normal texture
         -1,                // No material texture
-        0                  // Time
+        0,                 // Time
+        1.0                // Emissive scalar (default lighting)
     );
     
     //std::cout << "Created debug sphere at (" << position.x << ", " << position.y << ", " << position.z 
@@ -292,7 +293,8 @@ void DebugVisualization::updateMeshTransform(int id) {
             m_redTextureUnit,
             -1,
             -1,
-            0
+            0,
+            1.0                // Emissive scalar (default lighting)
         );
     }
 }

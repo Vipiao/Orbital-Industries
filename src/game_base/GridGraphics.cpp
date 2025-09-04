@@ -282,7 +282,8 @@ void GridGraphics::updateGraphics(
         s_colorTextureUnit,
         s_normalTextureUnit,
         -1,                             // No material texture for grid graphics
-        currentTimeStep
+        currentTimeStep,
+        0.0                             // Grid blocks non-emissive by default
     );
 
     // Update tracking variables with current grid state

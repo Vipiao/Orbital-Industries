@@ -336,5 +336,6 @@ void RadialMenu::updateMeshTransform() {
         glm::dvec3(1.0),                              // scale
         -1, -1,                                       // no default textures
         -1,                                           // no material texture
-        0);                                           // time
+        0,                                            // time
+        1.0);                                         // emissive scalar
 }

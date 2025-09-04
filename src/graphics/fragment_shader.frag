@@ -18,6 +18,7 @@ flat in int vert_colorTextureUnit;
 flat in int vert_normalTextureUnit;
 in float vert_occlusionFactor;
 flat in int vert_materialTextureUnit;
+flat in float vert_emissiveScalar;
 
 // Convert RGB to HSV
 vec3 rgb2hsv(vec3 rgb) {
@@ -108,11 +109,21 @@ void main() {
       objectColor = vert_color.rgb;
       alpha = vert_color.a;
    }
+
+   // Continue with lighting calculations only if not fully emissive
+   if(alpha < 1./255.) discard;
    
-   // Sample material texture for emissive control
-   float emissiveStrength = 0.0;
-   if (vert_materialTextureUnit >= 0) {
-      emissiveStrength = texture(u_textures[vert_materialTextureUnit], vert_uv).r;
+   // Calculate emissive strength based on scalar and texture
+   float emissiveStrength;
+   if (vert_emissiveScalar < 0.001) {
+      emissiveStrength = 0.0;
+   } else if (vert_materialTextureUnit == -1) {
+      // No texture: use scalar directly
+      emissiveStrength = vert_emissiveScalar;
+   } else {
+      // Has texture: multiply texture by scalar
+      float textureValue = texture(u_textures[vert_materialTextureUnit], vert_uv).r;
+      emissiveStrength = textureValue * vert_emissiveScalar;
    }
 
    // Early exit for full emissive materials
@@ -120,9 +131,6 @@ void main() {
       FragColor = vec4(objectColor, alpha);
       return;
    }
-
-   // Continue with lighting calculations only if not fully emissive
-   if(alpha < 1./255.) discard;
 
    // Calculate light and view directions (all in L-space now)
    vec3 lightVec = u_lightPos - vert_pos;
