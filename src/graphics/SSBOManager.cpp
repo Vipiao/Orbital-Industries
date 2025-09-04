@@ -79,6 +79,7 @@ void SSBOManager::updateMeshTransform(
     const glm::dvec3& scale,
     int32_t colorTextureUnit,
     int32_t normalTextureUnit,
+    int32_t materialTextureUnit,
     uint64_t time) {
     
     MeshData data{};
@@ -100,6 +101,7 @@ void SSBOManager::updateMeshTransform(
     data.time = static_cast<uint32_t>(time);
     data.colorTextureUnit = colorTextureUnit;
     data.normalTextureUnit = normalTextureUnit;
+    data.materialTextureUnit = materialTextureUnit;
 
     updateData(index, data);
 }

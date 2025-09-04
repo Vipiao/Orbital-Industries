@@ -136,6 +136,7 @@ void GraphicsEngine::updateMeshTransform(
     const glm::dvec3& scale,
     int32_t colorTextureUnit,
     int32_t normalTextureUnit,
+    int32_t materialTextureUnit,
     uint64_t physicsTimeStep)
 {
     m_ssboManager->updateMeshTransform(
@@ -149,6 +150,7 @@ void GraphicsEngine::updateMeshTransform(
         scale,
         colorTextureUnit,
         normalTextureUnit,
+        materialTextureUnit,
         physicsTimeStep
     );
 }
@@ -165,9 +167,11 @@ int GraphicsEngine::loadModel(
     const std::string& modelPath,
     const std::string& colorTexturePath,
     const std::string& normalTexturePath,
+    const std::string& materialTexturePath,
     bool ignoreTextureCoordinates,
     int* outColorTextureUnit,
-    int* outNormalTextureUnit)
+    int* outNormalTextureUnit,
+    int* outMaterialTextureUnit)
 {
     int meshId = createMesh();
     if (meshId < 0) {
@@ -182,6 +186,7 @@ int GraphicsEngine::loadModel(
     
     int32_t colorTextureUnit = -1;
     int32_t normalTextureUnit = -1;
+    int32_t materialTextureUnit = -1;
     
     if (!colorTexturePath.empty()) {
         try {
@@ -210,6 +215,20 @@ int GraphicsEngine::loadModel(
             std::cerr << "Failed to load normal texture: " << e.what() << std::endl;
         }
     }
+
+    if (!materialTexturePath.empty()) {
+        try {
+            MeshHandler::Texture materialTexture = createTexture(materialTexturePath);
+            materialTextureUnit = materialTexture.m_textureUnit;
+            
+            // Store the material texture unit in the output parameter if provided
+            if (outMaterialTextureUnit != nullptr) {
+                *outMaterialTextureUnit = materialTextureUnit;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Failed to load material texture: " << e.what() << std::endl;
+        }
+    }
     
     glm::dvec3 position(0.0, 0.0, 0.0);
     glm::dvec3 velocity(0.0, 0.0, 0.0);
@@ -228,7 +247,8 @@ int GraphicsEngine::loadModel(
         centerOfRotation,
         glm::dvec3(1.0, 1.0, 1.0), // Default scale
         colorTextureUnit,
-        normalTextureUnit
+        normalTextureUnit,
+        materialTextureUnit
     );
     
     return meshId;

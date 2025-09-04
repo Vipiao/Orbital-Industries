@@ -17,11 +17,14 @@ Geometry::~Geometry() {
     if (m_instanceVBO != 0) glDeleteBuffers(1, &m_instanceVBO);
 }
 
-std::weak_ptr<Instance> Geometry::addInstance(int meshIndex, int colorTextureUnit, int normalTextureUnit, const glm::dvec4& color) {
+std::weak_ptr<Instance> Geometry::addInstance(
+    int meshIndex, int colorTextureUnit, int normalTextureUnit,
+    int materialTextureUnit, const glm::dvec4& color) {
     auto instance = std::make_shared<Instance>();
     instance->m_meshIndex = meshIndex;
     instance->m_colorTextureUnit = colorTextureUnit;
     instance->m_normalTextureUnit = normalTextureUnit;
+    instance->m_materialTextureUnit = materialTextureUnit;
     instance->m_color = color;
     
     // Set buffer index to end of current data
@@ -120,6 +123,7 @@ InstanceData Geometry::createInstanceData(Instance* instance) {
     data.meshIndex = instance->m_meshIndex;
     data.colorTextureUnit = instance->m_colorTextureUnit;
     data.normalTextureUnit = instance->m_normalTextureUnit;
+    data.materialTextureUnit = instance->m_materialTextureUnit;
     data.padding3 = 0;
     
     return data;
@@ -364,6 +368,11 @@ void InstanceHandler::setupGeometryOpenGL(Geometry* geometry,
     glVertexAttribIPointer(9, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, normalTextureUnit));
     glEnableVertexAttribArray(9);
     glVertexAttribDivisor(9, 1);
+
+    // Material texture unit
+    glVertexAttribIPointer(11, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, materialTextureUnit));
+    glEnableVertexAttribArray(11);
+    glVertexAttribDivisor(11, 1);
     
     // Generate and fill EBO if we have indices
     if (geometry->m_hasIndices) {

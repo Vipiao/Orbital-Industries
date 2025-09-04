@@ -66,6 +66,7 @@ public:
         const glm::dvec3& scale = glm::dvec3(1.0, 1.0, 1.0),
         int32_t colorTextureUnit = -1,
         int32_t normalTextureUnit = -1,
+        int32_t materialTextureUnit = -1,
         uint64_t physicsTimeStep = 0
     );
     
@@ -77,9 +78,11 @@ public:
         const std::string& modelPath,
         const std::string& colorTexturePath = "",
         const std::string& normalTexturePath = "",
+        const std::string& materialTexturePath = "",
         bool ignoreTextureCoordinates = false,
         int* outColorTextureUnit = nullptr,
-        int* outNormalTextureUnit = nullptr
+        int* outNormalTextureUnit = nullptr,
+        int* outMaterialTextureUnit = nullptr
     );
     
     std::vector<uint32_t> loadModelIntoMesh(

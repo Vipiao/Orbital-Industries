@@ -335,5 +335,6 @@ void RadialMenu::updateMeshTransform() {
         glm::dvec3(0.0),                              // center of rotation
         glm::dvec3(1.0),                              // scale
         -1, -1,                                       // no default textures
+        -1,                                           // no material texture
         0);                                           // time
 }

@@ -281,6 +281,7 @@ void GridGraphics::updateGraphics(
         glm::dvec3(1.0, 1.0, 1.0),      // Default scale
         s_colorTextureUnit,
         s_normalTextureUnit,
+        -1,                             // No material texture for grid graphics
         currentTimeStep
     );
 

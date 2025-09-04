@@ -29,6 +29,7 @@ struct InstanceData {
     int32_t meshIndex;           // Index into SSBO for geometry world transform
     int32_t colorTextureUnit;
     int32_t normalTextureUnit;
+    int32_t materialTextureUnit;
     uint32_t padding3;
 };
 
@@ -65,6 +66,7 @@ public:
     int m_meshIndex{-1};        // SSBO index for world transform
     int m_colorTextureUnit{-1};
     int m_normalTextureUnit{-1};
+    int m_materialTextureUnit{-1};
     uint32_t m_bufferIndex; // Index in geometry's instance buffer
     
     Instance() : m_uniqueId(s_nextInstanceId++), m_bufferIndex(0) {}
@@ -105,7 +107,10 @@ public:
     void setAlphaBlending(bool enable) { m_enableAlphaBlending = enable; }
     double getDepthCompression() const { return m_depthCompression; }
     bool getAlphaBlending() const { return m_enableAlphaBlending; }
-    std::weak_ptr<Instance> addInstance(int meshIndex, int colorTextureUnit = -1, int normalTextureUnit = -1, const glm::dvec4& color = glm::dvec4(1.0, 1.0, 1.0, 1.0));
+    std::weak_ptr<Instance> addInstance(
+        int meshIndex, int colorTextureUnit = -1, int normalTextureUnit = -1,
+        int materialTextureUnit = -1,
+        const glm::dvec4& color = glm::dvec4(1.0, 1.0, 1.0, 1.0));
     void removeInstance(std::weak_ptr<Instance> instance);
     void updateInstanceInBuffer(Instance* instance);
     

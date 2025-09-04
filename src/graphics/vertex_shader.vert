@@ -11,7 +11,7 @@ struct MeshData {
    uint time;                // Offset=112, size= 4 bytes.
    int colorTextureUnit;     // Offset=116, size= 4 bytes. (-1 means no textures)
    int normalTextureUnit;    // Offset=120, size= 4 bytes. (-1 means no textures)
-   uint padding2;            // Offset=124, size= 4 bytes. (padding)
+   int materialTextureUnit;  // Offset=124, size= 4 bytes. (-1 means no textures)
 }; // Make sure to pad so size is divisible by 16 because you have a vec4.
 
 layout(std430, binding = 0) buffer MeshDataBuffer {
@@ -44,6 +44,7 @@ out vec4 vert_color;
 flat out int vert_colorTextureUnit;
 flat out int vert_normalTextureUnit;
 out float vert_occlusionFactor;
+flat out int vert_materialTextureUnit;
 
 mat3 fromQuaternion(vec4 quaternion) {
     float qw = quaternion.w;
@@ -133,6 +134,7 @@ void main() {
    vert_uv = uv;
    vert_colorTextureUnit = meshData.colorTextureUnit;
    vert_normalTextureUnit = meshData.normalTextureUnit;
+   vert_materialTextureUnit = meshData.materialTextureUnit;
 
    uint deltaTime = u_time - meshData.time;
    float deltaTimeFloat = float(deltaTime) + u_timeRemainder;

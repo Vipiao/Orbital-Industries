@@ -138,6 +138,7 @@ int DebugVisualization::createSphere(const glm::dvec3& position, double radius) 
         scale,
         m_redTextureUnit,  // Red texture
         -1,                // No normal texture
+        -1,                // No material texture
         0                  // Time
     );
     
@@ -289,6 +290,7 @@ void DebugVisualization::updateMeshTransform(int id) {
             centerOfRotation,
             props.scale,
             m_redTextureUnit,
+            -1,
             -1,
             0
         );

@@ -19,7 +19,7 @@ struct MeshData {
     uint32_t time{};                 // Offset=112, size= 4 bytes.
     int32_t colorTextureUnit{};      // Offset=116, size= 4 bytes. (-1 means no textures)
     int32_t normalTextureUnit{};     // Offset=120, size= 4 bytes. (-1 means no textures)
-    uint32_t padding2{};             // Offset=124, size= 4 bytes. (padding)
+    int32_t materialTextureUnit{};   // Offset=124, size= 4 bytes. (-1 means no textures)
 }; // Make sure to pad so size is divisible by 16 because you have a vec4.
 #pragma pack(pop)
 
@@ -75,6 +75,7 @@ public:
         const glm::dvec3& scale,
         int32_t colorTextureUnit,
         int32_t normalTextureUnit,
+        int32_t materialTextureUnit,
         uint64_t time);
     
 private:
