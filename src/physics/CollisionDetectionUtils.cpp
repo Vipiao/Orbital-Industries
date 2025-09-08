@@ -416,8 +416,14 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     // Generate contact points (full complexity)
     ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration, useSimplifiedContactGeneration);
     
+    if (contactInfo.contactPoints.size() == 0)
+    {
+        return CollisionResult();
+    }
+    
+
     // Create ContactData with compliant information
-    size_t numContactPoints = contactInfo.contactPoints.size() > 0 ? contactInfo.contactPoints.size() : 1;
+    size_t numContactPoints = contactInfo.contactPoints.size();
     std::vector<ContactData> contactData;
     contactData.reserve(numContactPoints);
     
