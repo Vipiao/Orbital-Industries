@@ -5,148 +5,143 @@
 #include <iomanip>
 #include <algorithm>
 
-DebugVisualization::DebugVisualization(MeshHandler* meshHandler, SSBOManager* ssboManager) 
-    : m_meshHandler(meshHandler)
+// Static member initialization
+int DebugVisualization::s_nextDebugId = 1;
+
+DebugVisualization::DebugVisualization(InstanceHandler* instanceHandler, SSBOManager* ssboManager) 
+    : m_instanceHandler(instanceHandler)
     , m_ssboManager(ssboManager)
-    , m_sphereMeshLoaded(false)
-    , m_redTextureUnit(-1)
-    , m_redTextureLoaded(false)
+    , m_textureIndex(-1)
+    , m_resourcesLoaded(false)
 {
-    if (!m_meshHandler) {
-        throw std::runtime_error("MeshHandler pointer cannot be null");
+    if (!m_instanceHandler) {
+        throw std::runtime_error("InstanceHandler pointer cannot be null");
     }
 
     if (!m_ssboManager) {
         throw std::runtime_error("SSBOManager cannot be null");
     }
     
-    loadSphereMeshData();
-    loadRedTexture();
+    loadSharedResources();
 }
 
 DebugVisualization::~DebugVisualization() {
-    // Clean up all active debug meshes
-    for (const auto& pair : m_idToName) {
-        int meshId = pair.first;
-        m_meshHandler->removeMesh(meshId);
+    // Clean up all active debug spheres
+    for (const auto& pair : m_idToMeshIndex) {
+        int debugId = pair.first;
+        int meshIndex = pair.second;
+        
+        // Remove instance
+        auto instanceIt = m_idToInstance.find(debugId);
+        if (instanceIt != m_idToInstance.end()) {
+            if (auto geometry = m_sphereGeometry.lock()) {
+                geometry->removeInstance(instanceIt->second);
+            }
+        }
+        
+        // Deallocate mesh index
+        m_ssboManager->deallocateIndex(meshIndex);
     }
+
+    // Clean up shared resources
+    if (m_resourcesLoaded && m_textureIndex >= 0) {
+        m_instanceHandler->releaseTexture(m_textureIndex);
+    }
+    
+    if (auto geometry = m_sphereGeometry.lock()) {
+        m_instanceHandler->releaseGeometry(geometry);
+    }
+
     m_nameToId.clear();
     m_idToName.clear();
     m_meshProperties.clear();
+    m_idToInstance.clear();
+    m_idToMeshIndex.clear();
 }
 
-void DebugVisualization::loadSphereMeshData() {
-    if (m_sphereMeshLoaded) return;
+void DebugVisualization::loadSharedResources() {
+    if (m_resourcesLoaded) return;
     
     try {
-        // Load the sphere mesh using AssimpLoader
-        AssimpLoader::load("../media/blender/02_sphere.obj", &s_sphereMeshData);
-        m_sphereMeshLoaded = true;
-        std::cout << "Debug sphere mesh loaded successfully" << std::endl;
+        // Load shared sphere geometry
+        m_sphereGeometry = m_instanceHandler->createGeometry("../media/blender/02_sphere.obj");
+        
+        // Load shared texture
+        m_textureIndex = m_instanceHandler->createTexture("../media/debug_red_transparent.png");
+        
+        // Configure geometry for overlay rendering with transparency
+        if (auto geometry = m_sphereGeometry.lock()) {
+            geometry->setDepthCompression(0.1);  // Compress depth range to render in front
+            geometry->setAlphaBlending(true);     // Enable transparency
+        }
+
+        m_resourcesLoaded = true;
+        std::cout << "Debug visualization shared resources loaded successfully" << std::endl;
     } catch (const std::exception& e) {
-        std::cerr << "Failed to load debug sphere mesh: " << e.what() << std::endl;
-        // Create a simple fallback sphere data if needed
-        m_sphereMeshLoaded = false;
+        std::cerr << "Failed to load debug visualization resources: " << e.what() << std::endl;
+        m_resourcesLoaded = false;
     }
 }
 
-void DebugVisualization::loadRedTexture() {
-    if (m_redTextureLoaded) return;
-    
-    try {
-        // Load red texture - you'll need to create a simple red texture file
-        MeshHandler::Texture redTexture = m_meshHandler->createTexture("../media/debug_red.png");
-        m_redTextureUnit = redTexture.m_textureUnit;
-        m_redTextureLoaded = true;
-        std::cout << "Debug red texture loaded successfully" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Failed to load debug red texture: " << e.what() << std::endl;
-        m_redTextureUnit = -1; // Use no texture
-        m_redTextureLoaded = false;
-    }
+int DebugVisualization::getNextDebugId() {
+    return s_nextDebugId++;
 }
 
 int DebugVisualization::createSphere(const glm::dvec3& position, double radius) {
-    if (!m_sphereMeshLoaded || s_sphereMeshData.empty()) {
-        std::cerr << "Cannot create debug sphere: mesh data not loaded" << std::endl;
+    if (!m_resourcesLoaded) {
+        std::cerr << "Cannot create debug sphere: shared resources not loaded" << std::endl;
         return -1;
     }
     
-    // Create a new mesh
-    int meshId = m_meshHandler->addMesh();
-    if (meshId < 0) {
-        std::cerr << "Failed to create mesh for debug sphere" << std::endl;
+    auto geometry = m_sphereGeometry.lock();
+    if (!geometry) {
+        std::cerr << "Cannot create debug sphere: shared geometry not available" << std::endl;
         return -1;
     }
     
-    // Load sphere mesh data into the mesh
-    const AssetMeshData& sphereMesh = s_sphereMeshData[0];
-    
-    std::vector<glm::dvec3> positions;
-    std::vector<glm::dvec3> normals;
-    std::vector<glm::dvec3> tangents;
-    std::vector<glm::dvec2> uvs;
-    
-    // Scale and transform sphere vertices according to radius
-    for (size_t i = 0; i < sphereMesh.indices.size(); i++) {
-        int idx = sphereMesh.indices[i];
-        
-        // Position - scale by radius
-        const auto& pos = sphereMesh.positionsData[idx];
-        glm::dvec3 scaledPos = glm::dvec3(pos[0], pos[1], pos[2]);
-        positions.push_back(scaledPos);
-        
-        // Normal - don't scale
-        const auto& norm = sphereMesh.normalsData[idx];
-        normals.push_back(glm::dvec3(norm[0], norm[1], norm[2]));
-        
-        // Tangent
-        const auto& tang = sphereMesh.tangentsData[idx];
-        tangents.push_back(glm::dvec3(tang[0], tang[1], tang[2]));
-        
-        // UV coordinates
-        const auto& texUV = sphereMesh.uvsData[idx];
-        uvs.push_back(glm::dvec2(texUV[0], texUV[1]));
-    }
-    
-    // Add triangles to mesh
-    std::vector<uint32_t> triangleIds = m_meshHandler->appendTrianglesToMesh(
-        meshId, &positions, &normals, &tangents, &uvs);
-    
-    if (triangleIds.empty()) {
-        m_meshHandler->removeMesh(meshId);
-        std::cerr << "Failed to add triangles to debug sphere mesh" << std::endl;
+    // Allocate mesh index for SSBO
+    int meshIndex;
+    try {
+        meshIndex = m_ssboManager->allocateIndex();
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to allocate mesh index for debug sphere: " << e.what() << std::endl;
         return -1;
     }
     
-    // Set mesh transform
-    glm::dvec3 velocity(0.0);
-    glm::dquat orientation(1.0, 0.0, 0.0, 0.0);
-    glm::dvec3 angVelAxis(0.0, 1.0, 0.0);
-    double angVel = 0.0;
-    glm::dvec3 centerOfRotation(0.0);
-    glm::dvec3 scale(radius, radius, radius);  // Scale the sphere by radius
-    
+    // Create instance with identity local transforms
+    const glm::dvec4 redColor(1.0, 0.0, 0.0, 1.0);  // Red color
+    auto instanceWeak = geometry->addInstance(meshIndex, m_textureIndex, -1, -1, redColor);
+    auto instance = instanceWeak.lock();
+    if (!instance) {
+        m_ssboManager->deallocateIndex(meshIndex);
+        std::cerr << "Failed to create instance for debug sphere" << std::endl;
+        return -1;
+    }
+
+    // Set SSBO transform (world position and scale)
     m_ssboManager->updateMeshTransform(
-        meshId,
+        meshIndex,
         position,
-        velocity,
-        orientation,
-        angVelAxis,
-        angVel,
-        centerOfRotation,
-        scale,
-        m_redTextureUnit,  // Red texture
-        -1,                // No normal texture
-        -1,                // No material texture
-        0,                 // Time
-        1.0                // Emissive scalar (default lighting)
+        glm::dvec3(0.0),                      // velocity
+        glm::dquat(1.0, 0.0, 0.0, 0.0),      // orientation
+        glm::dvec3(0.0, 1.0, 0.0),           // angVelAxis
+        0.0,                                  // angVel
+        glm::dvec3(0.0),                     // centerOfRotation
+        glm::dvec3(radius),                  // scale
+        -1,                                   // colorTextureUnit (handled by instance)
+        -1,                                   // normalTextureUnit
+        -1,                                   // materialTextureUnit
+        0,                                    // time
+        1.0                                   // emissiveScalar
     );
     
-    //std::cout << "Created debug sphere at (" << position.x << ", " << position.y << ", " << position.z 
-    //          << ") with radius " << radius << std::endl;
+    // Get unique debug ID and store mappings
+    int debugId = getNextDebugId();
+    m_idToInstance[debugId] = instanceWeak;
+    m_idToMeshIndex[debugId] = meshIndex;
+    m_meshProperties[debugId] = {position, glm::dquat(1.0, 0.0, 0.0, 0.0), glm::dvec3(radius)};
     
-    return meshId;
+    return debugId;
 }
 
 int DebugVisualization::createSphere(const std::string& name, const glm::dvec3& position, double radius) {
@@ -157,18 +152,15 @@ int DebugVisualization::createSphere(const std::string& name, const glm::dvec3& 
     }
     
     // Create the sphere
-    int meshId = createSphere(position, radius);
+    int debugId = createSphere(position, radius);
     
-    if (meshId >= 0) {
+    if (debugId >= 0) {
         // Store name mapping
-        m_nameToId[name] = meshId;
-        m_idToName[meshId] = name;
-        
-        // Store initial properties
-        m_meshProperties[meshId] = {position, glm::dquat(1.0, 0.0, 0.0, 0.0), glm::dvec3(radius)};
+        m_nameToId[name] = debugId;
+        m_idToName[debugId] = name;
     }
     
-    return meshId;
+    return debugId;
 }
 
 void DebugVisualization::removeMesh(const std::string& name) {
@@ -179,8 +171,21 @@ void DebugVisualization::removeMesh(const std::string& name) {
 }
 
 void DebugVisualization::removeMesh(int id) {
-    // Remove from mesh handler
-    m_meshHandler->removeMesh(id);
+    // Remove instance
+    auto instanceIt = m_idToInstance.find(id);
+    if (instanceIt != m_idToInstance.end()) {
+        if (auto geometry = m_sphereGeometry.lock()) {
+            geometry->removeInstance(instanceIt->second);
+        }
+        m_idToInstance.erase(instanceIt);
+    }
+    
+    // Deallocate mesh index
+    auto meshIndexIt = m_idToMeshIndex.find(id);
+    if (meshIndexIt != m_idToMeshIndex.end()) {
+        m_ssboManager->deallocateIndex(meshIndexIt->second);
+        m_idToMeshIndex.erase(meshIndexIt);
+    }
     
     // Remove from name mappings
     auto idToNameIt = m_idToName.find(id);
@@ -273,28 +278,27 @@ void DebugVisualization::removeMeshesByPrefix(const std::string& prefix) {
 }
 
 void DebugVisualization::updateMeshTransform(int id) {
-    auto it = m_meshProperties.find(id);
-    if (it != m_meshProperties.end()) {
-        const auto& props = it->second;
-        glm::dvec3 velocity(0.0);
-        glm::dvec3 angVelAxis(0.0, 1.0, 0.0);
-        double angVel = 0.0;
-        glm::dvec3 centerOfRotation(0.0);
+    auto propsIt = m_meshProperties.find(id);
+    auto meshIndexIt = m_idToMeshIndex.find(id);
+    
+    if (propsIt != m_meshProperties.end() && meshIndexIt != m_idToMeshIndex.end()) {
+        const auto& props = propsIt->second;
+        int meshIndex = meshIndexIt->second;
         
         m_ssboManager->updateMeshTransform(
-            id,
+            meshIndex,
             props.position,
-            velocity,
+            glm::dvec3(0.0),                      // velocity
             props.orientation,
-            angVelAxis,
-            angVel,
-            centerOfRotation,
+            glm::dvec3(0.0, 1.0, 0.0),           // angVelAxis
+            0.0,                                  // angVel
+            glm::dvec3(0.0),                     // centerOfRotation
             props.scale,
-            m_redTextureUnit,
-            -1,
-            -1,
-            0,
-            1.0                // Emissive scalar (default lighting)
+            -1,                                   // colorTextureUnit (handled by instance)
+            -1,                                   // normalTextureUnit
+            -1,                                   // materialTextureUnit
+            0,                                    // time
+            1.0                                   // emissiveScalar
         );
     }
 }

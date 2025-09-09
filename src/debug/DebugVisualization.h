@@ -1,9 +1,8 @@
 // DebugVisualization.h
 #pragma once
 
-#include "../graphics/MeshHandler.h"
+#include "../graphics/InstanceHandler.h"
 #include "../graphics/SSBOManager.h"
-#include "../graphics/AssimpLoader.h"
 #include "../debug/DebugRenderer.h"
 #include <vector>
 #include <memory>
@@ -12,7 +11,7 @@
 
 class DebugVisualization : public DebugRenderer {
 public:
-    DebugVisualization(MeshHandler* meshHandler, SSBOManager* ssboManager);
+    DebugVisualization(InstanceHandler* instanceHandler, SSBOManager* ssboManager);
     ~DebugVisualization();
     
     // Override DebugRenderer interface methods
@@ -47,28 +46,34 @@ public:
     void update();
     
 private:
-    MeshHandler* m_meshHandler;
+    InstanceHandler* m_instanceHandler;
     SSBOManager* m_ssboManager;
-    std::vector<AssetMeshData> s_sphereMeshData;
-    bool m_sphereMeshLoaded;
-    int m_redTextureUnit;
-    bool m_redTextureLoaded;
+
+    // Shared resources
+    std::weak_ptr<Geometry> m_sphereGeometry;
+    int m_textureIndex;
+    bool m_resourcesLoaded;
     
     // Name to ID mapping
     std::unordered_map<std::string, int> m_nameToId;
     std::unordered_map<int, std::string> m_idToName;
     
-    // Mesh properties storage for updates
+    // Debug sphere data storage
     struct MeshProperties {
         glm::dvec3 position{0.0};
         glm::dquat orientation{1.0, 0.0, 0.0, 0.0};
         glm::dvec3 scale{1.0};
     };
     std::unordered_map<int, MeshProperties> m_meshProperties;
+
+    // Instance and mesh index storage
+    std::unordered_map<int, std::weak_ptr<Instance>> m_idToInstance;
+    std::unordered_map<int, int> m_idToMeshIndex; // debug ID to SSBO mesh index
     
     // Helper functions
-    void loadSphereMeshData();
-    void loadRedTexture();
+    void loadSharedResources();
+    int getNextDebugId();
+    static int s_nextDebugId;
 
     // Internal helper for updating mesh transforms
     void updateMeshTransform(int id);
