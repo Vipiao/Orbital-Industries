@@ -220,7 +220,7 @@ bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::h
                 }
                 m_separationIteration++;
                 
-                if (m_separationIteration >= 8) {
+                if (m_separationIteration >= 4) {
                     m_collisionProcessState = CollisionProcessState::DONE;
                 }
                 break;
@@ -480,7 +480,7 @@ void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
         glm::dvec3 rB = contactPoint - bodyB->m_position;
 
         // Apply position correction
-        double scale = 0.3;
+        double scale = 0.2;
         glm::dvec3 correction = normal * correctionMagnitude * scale;
 
         // Apply linear position corrections only to non-static bodies
