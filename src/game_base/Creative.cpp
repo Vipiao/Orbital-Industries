@@ -526,8 +526,8 @@ void Creative::updateMarkerPositions() {
         
         // Print the selected corner coordinate with index
         glm::dvec3 selectedCorner = cornerPositions[m_nearestMarkerIndex];
-        std::cout << "Near corner " << m_nearestMarkerIndex << ": (" << selectedCorner.x << ", " 
-                 << selectedCorner.y << ", " << selectedCorner.z << ")" << std::endl;
+        //std::cout << "Near corner " << m_nearestMarkerIndex << ": (" << selectedCorner.x << ", " 
+        //         << selectedCorner.y << ", " << selectedCorner.z << ")" << std::endl;
         // Check if R key is pressed to initiate modification
         KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
         if (keyboard->m_r.justPressed()) {
