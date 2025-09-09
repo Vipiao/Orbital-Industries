@@ -134,10 +134,10 @@ private:
             s_expirationQueue.pop();
         }
         
-        if (cleanedCount > 0) {
-            std::cout << "PairCache: Cleaned " << cleanedCount << " expired entries. Cache size: " 
-                      << s_globalCache.size() << std::endl;
-        }
+        //if (cleanedCount > 0) {
+        //    std::cout << "PairCache: Cleaned " << cleanedCount << " expired entries. Cache size: " 
+        //              << s_globalCache.size() << std::endl;
+        //}
     }
     
     // Static members per template instantiation
