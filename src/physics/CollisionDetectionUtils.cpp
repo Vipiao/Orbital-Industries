@@ -416,11 +416,26 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     // Generate contact points (full complexity)
     ContactInfo contactInfo = generateContactPoints(verticesA, verticesB, collisionNormal, minPenetration, useSimplifiedContactGeneration);
     
-    if (contactInfo.contactPoints.size() == 0)
-    {
+    if (contactInfo.contactPoints.size() == 0) {
         return CollisionResult();
     }
+
+    // Calculate corrected penetration depth for each contact point
+    std::vector<double> penetrations; // First projections, then penetrations
+    penetrations.reserve(contactInfo.contactPoints.size());
     
+    // First pass: calculate projections and find maximum
+    double maxProjection = std::numeric_limits<double>::lowest();
+    for (const glm::dvec3& contactPoint : contactInfo.contactPoints) {
+        double projection = glm::dot(contactPoint, collisionNormal);
+        penetrations.push_back(projection);
+        maxProjection = std::max(maxProjection, projection);
+    }
+    
+    // Second pass: convert projections to corrected penetration depths
+    for (double& projection : penetrations) {
+        projection = minPenetration - (maxProjection - projection);
+    }
 
     // Create ContactData with compliant information
     size_t numContactPoints = contactInfo.contactPoints.size();
@@ -429,9 +444,9 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     
     for (size_t i = 0; i < numContactPoints; ++i) {
         if (foundCompliant) {
-            contactData.emplace_back(contactInfo.normal, contactInfo.penetration, compliantNormal, compliantPenetration);
+            contactData.emplace_back(contactInfo.normal, penetrations[i], compliantNormal, compliantPenetration);
         } else {
-            contactData.emplace_back(contactInfo.normal, contactInfo.penetration);
+            contactData.emplace_back(contactInfo.normal, penetrations[i]);
         }
     }
 
@@ -693,7 +708,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             canUseCachedContacts = true;
             // Position delta
             double positionDeltaSqr = glm::length2(currentBCenterInA - cacheData->prevBCenterInA);
-            const double POSITION_THRESHOLD = 0.08;
+            const double POSITION_THRESHOLD = 0.08*0.5;
             if (positionDeltaSqr > POSITION_THRESHOLD * POSITION_THRESHOLD)
             {
                 canUseCachedContacts = false;
@@ -751,6 +766,17 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
             CollisionResult result(true, std::move(cachedContactData), std::move(updatedContactPoints), gridA, gridB,
                                    std::vector<glm::dvec3>(cacheData->contactPointsLocalA), 
                                    std::vector<glm::dvec3>(cacheData->contactPointsLocalB));
+
+            //// Debug visualization of contact points
+            //if (DebugGlobals::getDebugRenderer()) {
+            //    DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("contact_point_");
+            //    for (size_t i = 0; i < result.m_contactPoints.size(); ++i) {
+            //        std::string sphereName = "contact_point_" + std::to_string(i);
+            //        double radius = result.m_contactData[i].penetration;
+            //        DebugGlobals::getDebugRenderer()->createSphere(
+            //            sphereName, result.m_contactPoints[i], radius);
+            //    }
+            //}
             return result;
         } else {
             return CollisionResult(); // No collision cached
@@ -760,7 +786,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     // Use simplified contact generation if previous iteration had too many collision pairs
     const int CONTACT_COMPLEXITY_THRESHOLD = 6;
     bool useSimplifiedContactGeneration = cacheData && cacheData->collisionPairCount > CONTACT_COMPLEXITY_THRESHOLD;
-    
+    //if (useSimplifiedContactGeneration) std::cout << "SIMPLIFIED" << std::endl;
     // Calculate the 4 options to find optimal iteration strategy
     size_t totalCorners = gridA->m_cornerCells.size() + gridB->m_cornerCells.size();
     size_t optionA = gridA->getCells().size(); // All cells in A
@@ -883,7 +909,9 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         //    DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("contact_point_");
         //    for (size_t i = 0; i < result.m_contactPoints.size(); ++i) {
         //        std::string sphereName = "contact_point_" + std::to_string(i);
-        //        DebugGlobals::getDebugRenderer()->createSphere(sphereName, result.m_contactPoints[i], 0.1);
+        //        double radius = result.m_contactData[i].penetration;
+        //        DebugGlobals::getDebugRenderer()->createSphere(
+        //            sphereName, result.m_contactPoints[i], radius);
         //    }
         //}
         
@@ -1070,11 +1098,31 @@ CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoi
     glm::dmat3 transformMatrix = GeometryUtils::createPlaneTransform(normal);
     glm::dmat3 inverseMatrix = glm::transpose(transformMatrix); // Orthogonal matrix, so transpose = inverse
     
-    // Project vertices to 2D plane
-    double averageZA, averageZB;
-    std::vector<glm::dvec2> points2DA = GeometryUtils::projectToPlane(positiveVertices, transformMatrix, averageZA);
-    std::vector<glm::dvec2> points2DB = GeometryUtils::projectToPlane(negativeVertices, transformMatrix, averageZB);
-    double averageZ = (averageZA + averageZB) * 0.5; // Average of both sets
+    // Transform vertices to plane coordinate system (keeping full 3D)
+    std::vector<glm::dvec3> transformed3DA, transformed3DB;
+    transformed3DA.reserve(positiveVertices.size());
+    transformed3DB.reserve(negativeVertices.size());
+
+    for (const glm::dvec3& vertex : positiveVertices) {
+        transformed3DA.push_back(transformMatrix * vertex);
+    }
+
+    for (const glm::dvec3& vertex : negativeVertices) {
+        transformed3DB.push_back(transformMatrix * vertex);
+    }
+
+    // Extract 2D points for clipping (take X and Y coordinates)
+    std::vector<glm::dvec2> points2DA, points2DB;
+    points2DA.reserve(transformed3DA.size());
+    points2DB.reserve(transformed3DB.size());
+
+    for (const glm::dvec3& point3D : transformed3DA) {
+        points2DA.push_back(glm::dvec2(point3D.x, point3D.y));
+    }
+
+    for (const glm::dvec3& point3D : transformed3DB) {
+        points2DB.push_back(glm::dvec2(point3D.x, point3D.y));
+    }
 
     // Wind the points to create proper polygons
     points2DA = GeometryUtils::windPoints(points2DA);
@@ -1116,8 +1164,36 @@ CollisionDetectionUtils::ContactInfo CollisionDetectionUtils::generateContactPoi
         }
     }
 
-    // Convert back to 3D
-    std::vector<glm::dvec3> contactPoints3D = GeometryUtils::projectToWorld(clippedPoints, inverseMatrix, averageZ);
+    // Restore Z coordinates using nearest neighbor search
+    std::vector<glm::dvec3> contactPoints3D;
+    contactPoints3D.reserve(clippedPoints.size());
+
+    for (const glm::dvec2& clippedPoint2D : clippedPoints) {
+        double minDistanceSq = std::numeric_limits<double>::max();
+        double nearestZ = 0.0;
+        
+        std::vector<glm::dvec3>* transformed3DArr[2] = {&transformed3DA, &transformed3DB};
+
+        for (size_t ii = 0; ii < 2; ii++) {
+            std::vector<glm::dvec3>* transformed3D = transformed3DArr[ii];
+        
+            // Check transformed3D
+            for (const glm::dvec3& point3D : *transformed3D) {
+                double dx = clippedPoint2D.x - point3D.x;
+                double dy = clippedPoint2D.y - point3D.y;
+                double distanceSq = dx * dx + dy * dy;
+                
+                if (distanceSq < minDistanceSq) {
+                    minDistanceSq = distanceSq;
+                    nearestZ = point3D.z;
+                }
+            }
+        }
+        
+        // Reconstruct 3D point and convert back to world coordinates
+        glm::dvec3 restoredPoint3D = glm::dvec3(clippedPoint2D.x, clippedPoint2D.y, nearestZ);
+        contactPoints3D.push_back(inverseMatrix * restoredPoint3D);
+    }
 
     // Merge close contact points
     const double mergeThreshold = 0.01;
