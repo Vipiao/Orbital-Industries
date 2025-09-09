@@ -55,8 +55,8 @@ std::weak_ptr<Instance> Geometry::addInstance(
                        sizeof(InstanceData), &data);
     }
     
-    std::cout << "Geometry " << m_uniqueId << ": Added instance " << instance->m_uniqueId 
-              << " at index " << instance->m_bufferIndex << std::endl;
+    //std::cout << "Geometry " << m_uniqueId << ": Added instance " << instance->m_uniqueId 
+    //          << " at index " << instance->m_bufferIndex << std::endl;
     
     return instance;
 }
@@ -91,7 +91,7 @@ void Geometry::removeInstance(std::weak_ptr<Instance> instanceWeak) {
                        sizeof(InstanceData), &m_instanceData[index]);
     }
     
-    std::cout << "Geometry " << m_uniqueId << ": Removed instance " << instance->m_uniqueId << std::endl;
+    //std::cout << "Geometry " << m_uniqueId << ": Removed instance " << instance->m_uniqueId << std::endl;
 }
 
 void Geometry::updateInstanceInBuffer(Instance* instance) {
