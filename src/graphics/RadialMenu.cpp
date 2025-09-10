@@ -236,18 +236,14 @@ void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
         glm::dvec3 selectionOffset = glm::dvec3(0.0);
         
         if (isSelected) {
-            if (i == 0) {
+            if (i == 0 || childCount < 3) {
                 // Center button.
                 selectionOffset = glm::dvec3(0.0, 0.0, 0.0);
                 inst->m_localScale = glm::dvec3{1.1};
             } else {
                 // Segment button: offset in angle direction + 180 degrees (only if enough children)
-                if (childCount >= 3) {
-                    double offsetAngle = angleStep * (static_cast<double>(i-1) + 0.5) + glm::pi<double>();
-                    selectionOffset = -glm::dvec3(glm::cos(offsetAngle), glm::sin(offsetAngle), 0.0) * 0.05;
-                } else {
-                    selectionOffset = glm::dvec3(0.0, 0.0, 0.0);
-                }
+                double offsetAngle = angleStep * (static_cast<double>(i-1) + 0.5) + glm::pi<double>();
+                selectionOffset = -glm::dvec3(glm::cos(offsetAngle), glm::sin(offsetAngle), 0.0) * 0.05;
             }
         }
         
