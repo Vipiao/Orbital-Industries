@@ -71,16 +71,17 @@ vec3 hsv2rgb(vec3 hsv) {
 }
 
 // Apply HSV transform: vertex color transforms texture color
-vec3 applyHSVTransform(vec3 vertexColor, vec3 textureColor) {
-    vec3 vertHSV = rgb2hsv(vertexColor);
-    vec3 texHSV = rgb2hsv(textureColor);
+vec4 applyHSVTransform(vec4 vertexColor, vec4 textureColor) {
+    vec3 vertHSV = rgb2hsv(vertexColor.rgb);
+    vec3 texHSV = rgb2hsv(textureColor.rgb);
     
     vec3 transformedHSV;
     transformedHSV.x = mod(vertHSV.x + texHSV.x, 1.0); // H: additive with wrap
     transformedHSV.y = vertHSV.y * texHSV.y;           // S: multiplicative  
     transformedHSV.z = vertHSV.z * texHSV.z;           // V: multiplicative
-    
-    return hsv2rgb(transformedHSV);
+    float alpha = vertexColor.a * textureColor.a;      // A: multiplicative
+
+    return vec4(hsv2rgb(transformedHSV), alpha);
 }
 
 void main() {
@@ -102,8 +103,10 @@ void main() {
       vec4 textureColor = texture(u_textures[vert_colorTextureUnit], vert_uv);
 
       // Apply HSV transform: vertex color transforms texture color
-      objectColor = applyHSVTransform(vert_color.rgb, textureColor.rgb);
-      alpha = textureColor.a;
+      
+      vec4 result = applyHSVTransform(vert_color, textureColor);
+      objectColor = result.rgb;
+      alpha = result.a;
    } else {
       // No texture: use vertex color directly
       objectColor = vert_color.rgb;

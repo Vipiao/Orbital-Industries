@@ -13,7 +13,7 @@
 #include "../graphics/MeshManager2D/GeometryInstance.h"
 #include "StructuralBlock.h"
 #include "../graphics/InstanceHandler.h"
-#include "../graphics/RadialMenu.h"
+#include "RadialMenu.h"
 #include "ColorTool.h"
 #include "../utils/ColorUtils.h"
 #include <float.h>

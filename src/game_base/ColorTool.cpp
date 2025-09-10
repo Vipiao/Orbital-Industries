@@ -1,7 +1,7 @@
 // ColorTool.cpp
 #include "ColorTool.h"
 #include "../game_base/GameBase.h"
-#include "../graphics/RadialMenu.h"
+#include "RadialMenu.h"
 #include "../utils/ColorUtils.h"
 #include <iostream>
 
