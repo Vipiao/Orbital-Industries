@@ -83,14 +83,21 @@ void RadialMenu::loadAllTextures() {
     }
 }
 
-int64_t RadialMenu::createNode(int64_t parentId, int symbolTextureIndex, std::function<void()> callback) {
+int64_t RadialMenu::createNode(int64_t parentId, int symbolTextureIndex, std::function<void()> callback,
+                               const glm::dvec4& selectColor, const glm::dvec4& unSelectColor) {
     int64_t nodeId = s_nextNodeId++;
 
+    // Use RadialMenu's colors as defaults if not provided
+    glm::dvec4 nodeSelectColor = (selectColor.x < 0.0) ? m_selectColor : selectColor;
+    glm::dvec4 nodeUnSelectColor = (unSelectColor.x < 0.0) ? m_unSelectColor : unSelectColor;
+
     // Create node in-place to avoid default constructor requirement
-    auto& node = m_nodes.emplace(nodeId, nodeId).first->second;
+    auto& node = m_nodes.emplace(nodeId, RadialMenuNode(nodeId, nodeSelectColor, nodeUnSelectColor)).first->second;
     node.m_parentId = parentId;
     node.m_callback = callback;
     node.m_symbolTextureIndex = symbolTextureIndex;
+    node.m_selectColor = nodeSelectColor;
+    node.m_unSelectColor = nodeUnSelectColor;
 
     // If this is a root node (parentId == -1), set as current
     if (parentId == -1) {
@@ -110,6 +117,29 @@ int64_t RadialMenu::createNode(int64_t parentId, int symbolTextureIndex, std::fu
     }
     
     return nodeId;
+}
+
+void RadialMenu::removeAllChildren(int64_t nodeId) {
+    auto nodeIt = m_nodes.find(nodeId);
+    if (nodeIt == m_nodes.end()) {
+        return; // Node doesn't exist
+    }
+    
+    RadialMenuNode& node = nodeIt->second;
+    
+    // Recursively remove all children
+    for (int64_t childId : node.m_childIds) {
+        removeAllChildren(childId); // Remove children's children first
+        m_nodes.erase(childId);     // Then remove the child itself
+    }
+    
+    // Clear the children list
+    node.m_childIds.clear();
+    
+    // Clear current instances if we're removing children of the current node
+    if (nodeId == m_currentNodeId) {
+        clearCurrentInstances();
+    }
 }
 
 void RadialMenu::setPosition(const glm::dvec3& position) {
@@ -199,6 +229,9 @@ void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
     
     // Handle selection
     if (doSelect && selectedIndex >= 0) {
+        if (selectedIndex >= static_cast<int>(childCount)) {
+            return; // Safety check
+        }
         int64_t targetChildId = currentNode.m_childIds[selectedIndex];
         
         auto targetIt = m_nodes.find(targetChildId);
@@ -222,13 +255,20 @@ void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
     
     double angleStep = (childCount > 1) ? 2.0 * glm::pi<double>() / static_cast<double>(childCount - 1) : 0.0;
     
-    for (size_t i = 0; i < m_currentInstances.size() && i < childCount; ++i) {
+    for (size_t i = 0; i < m_currentInstances.size() && i < childCount && i < currentNode.m_childIds.size(); ++i) {
         auto inst = m_currentInstances[i].lock();
         if (!inst) continue;
         
+        // Get the child node to access its colors
+        int64_t childId = currentNode.m_childIds[i];
+        auto childIt = m_nodes.find(childId);
+        if (childIt == m_nodes.end()) continue;
+        
+        const RadialMenuNode& childNode = childIt->second;
+
         bool isSelected = (selectedIndex >= 0 && static_cast<size_t>(selectedIndex) == i);
         
-        inst->m_color = isSelected ? m_selectColor : m_unSelectColor;
+        inst->m_color = isSelected ? childNode.m_selectColor : childNode.m_unSelectColor;
         inst->m_localScale = glm::dvec3(1.0);
         
         // Calculate position with selection offset

@@ -35,6 +35,16 @@ void ColorTool::deactivate() {
     std::cout << "ColorTool: Deactivated" << std::endl;
 }
 
+glm::dvec4 ColorTool::getCurrentColorRGBA() const {
+    glm::dvec3 hsv = glm::dvec3(m_currentColor.x, m_currentColor.y, m_currentColor.z);
+    glm::dvec3 rgb = ColorUtils::hsvToRgb(hsv);
+    return glm::dvec4(rgb.r, rgb.g, rgb.b, m_currentColor.w);
+}
+
+glm::dvec4 ColorTool::getCurrentColorHSVA() const {
+    return m_currentColor;
+}
+
 void ColorTool::preRenderCallback() {
     // TODO: Implement input processing
 }
@@ -62,82 +72,119 @@ void ColorTool::createMenuStructure(int64_t parentNodeId) {
 }
 
 void ColorTool::createHueSubmenus() {
-    // Add fake center node that does nothing
-    m_radialMenu->createNode(m_hueNodeId);
+    // Current color is already in HSV format
+    glm::dvec3 hsv = glm::dvec3(m_currentColor.x, m_currentColor.y, m_currentColor.z);
+    
+    // Add center node with current color (non-transparent)
+    glm::dvec4 centerColor = getCurrentColorRGBA();
+    centerColor.a = 1.0;
+    m_radialMenu->createNode(m_hueNodeId, -1, nullptr, centerColor, centerColor);
 
     // Create 8 leaf nodes directly under Hue (center node unused)
     for (int value = 0; value < 8; ++value) {
+        // Calculate hue preview color
+        glm::dvec3 previewHsv = glm::dvec3(static_cast<double>(value) / 8.0, hsv.y, hsv.z);
+        glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
+        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 0.5);
+        glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
+
         auto callback = [this, value]() {
             onHueSelected(value);
         };
-        m_radialMenu->createNode(m_hueNodeId, -1, callback);
+        m_radialMenu->createNode(m_hueNodeId, -1, callback, selectColor, unSelectColor);
     }
 }
 
 void ColorTool::createSaturationValueSubmenus() {
-    // Add fake center node that does nothing
-    m_radialMenu->createNode(m_saturationValueNodeId);
+    // Current color is already in HSV format
+    glm::dvec3 hsv = glm::dvec3(m_currentColor.x, m_currentColor.y, m_currentColor.z);
+
+    // Add center node with current color (non-transparent)
+    glm::dvec4 centerColor = getCurrentColorRGBA();
+    centerColor.a = 1.0;
+    m_radialMenu->createNode(m_saturationValueNodeId, -1, nullptr, centerColor, centerColor);
 
     // Create 8 leaf nodes directly under Saturation/Value (center node unused)
     for (int value = 0; value < 8; ++value) {
+        // Calculate saturation preview color
+        glm::dvec3 previewHsv = glm::dvec3(hsv.x, static_cast<double>(value) / 7.0, hsv.z);
+        glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
+        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 0.5);
+        glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
+
         auto callback = [this, value]() {
             onSaturationValueSelected(value);
         };
-        m_radialMenu->createNode(m_saturationValueNodeId, -1, callback);
+        m_radialMenu->createNode(m_saturationValueNodeId, -1, callback, selectColor, unSelectColor);
     }
 }
 
 void ColorTool::createKeySubmenus() {
-    // Add fake center node that does nothing
-    m_radialMenu->createNode(m_keyNodeId);
+    // Current color is already in HSV format
+    glm::dvec3 hsv = glm::dvec3(m_currentColor.x, m_currentColor.y, m_currentColor.z);
+    
+    // Add center node with current color (non-transparent)
+    glm::dvec4 centerColor = getCurrentColorRGBA();
+    centerColor.a = 1.0;
+    m_radialMenu->createNode(m_keyNodeId, -1, nullptr, centerColor, centerColor);
 
     // Create 8 leaf nodes directly under Key (center node unused)
     for (int value = 0; value < 8; ++value) {
+        // Calculate key/value preview color
+        glm::dvec3 previewHsv = glm::dvec3(hsv.x, hsv.y, static_cast<double>(value) / 7.0);
+        glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
+        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 0.5);
+        glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
+
         auto callback = [this, value]() {
             onKeySelected(value);
         };
-        m_radialMenu->createNode(m_keyNodeId, -1, callback);
+        m_radialMenu->createNode(m_keyNodeId, -1, callback, selectColor, unSelectColor);
     }
 }
 
-void ColorTool::onHueSelected(int value) {
-    // Calculate hue value based on value (0-7 maps to 0.0-1.0)
-    double hue = static_cast<double>(value) / 7.0;
+void ColorTool::updateColorPreviews() {
+    // Remove all existing children from each submenu
+    m_radialMenu->removeAllChildren(m_hueNodeId);
+    m_radialMenu->removeAllChildren(m_saturationValueNodeId);
+    m_radialMenu->removeAllChildren(m_keyNodeId);
     
-    // Convert current color to HSV, modify hue, convert back
-    glm::dvec3 rgb = glm::dvec3(m_currentColor.r, m_currentColor.g, m_currentColor.b);
-    glm::dvec3 hsv = ColorUtils::rgbToHsv(rgb);
-    hsv.x = hue;
-    rgb = ColorUtils::hsvToRgb(hsv);
-    m_currentColor = glm::dvec4(rgb.r, rgb.g, rgb.b, m_currentColor.a);
+    // Recreate all submenus with updated color previews
+    createHueSubmenus();
+    createSaturationValueSubmenus();
+    createKeySubmenus();
+    m_radialMenu->updateRendering();
+}
+
+void ColorTool::onHueSelected(int value) {
+    // Update hue directly in HSV storage
+    double hue = static_cast<double>(value) / 8.0;
+    
+    m_currentColor.x = hue; // Update hue component
+
+    updateColorPreviews();
     
     std::cout << "ColorTool: Hue selected - value: " << value << std::endl;
 }
 
 void ColorTool::onSaturationValueSelected(int value) {
-    // Calculate saturation based on value (0-7 maps to 0.0-1.0)
+    // Update saturation directly in HSV storage
     double saturation = static_cast<double>(value) / 7.0;
     
-    // Convert current color to HSV, modify saturation, convert back
-    glm::dvec3 rgb = glm::dvec3(m_currentColor.r, m_currentColor.g, m_currentColor.b);
-    glm::dvec3 hsv = ColorUtils::rgbToHsv(rgb);
-    hsv.y = saturation;
-    rgb = ColorUtils::hsvToRgb(hsv);
-    m_currentColor = glm::dvec4(rgb.r, rgb.g, rgb.b, m_currentColor.a);
+    m_currentColor.y = saturation; // Update saturation component
+
+    updateColorPreviews();
     
     std::cout << "ColorTool: Saturation selected - value: " << value << std::endl;
 }
 
 void ColorTool::onKeySelected(int value) {
-    // Calculate key/brightness value based on value (0-7 maps to 0.0-1.0)
+    // Update value/brightness directly in HSV storage
     double key = static_cast<double>(value) / 7.0;
     
-    // Apply key adjustment to current color
-    glm::dvec3 rgb = glm::dvec3(m_currentColor.r, m_currentColor.g, m_currentColor.b);
-    glm::dvec3 hsv = ColorUtils::rgbToHsv(rgb);
-    hsv.z = key;
-    rgb = ColorUtils::hsvToRgb(hsv);
-    m_currentColor = glm::dvec4(rgb.r, rgb.g, rgb.b, m_currentColor.a);
+    m_currentColor.z = key; // Update value component
+
+    updateColorPreviews();
     
     std::cout << "ColorTool: Key selected - value: " << value << std::endl;
 }

@@ -18,6 +18,10 @@ public:
     void activate();
     void deactivate();
     bool isActive() const { return m_active; }
+
+    // Color getters
+    glm::dvec4 getCurrentColorRGBA() const;
+    glm::dvec4 getCurrentColorHSVA() const;
     
     // Callback hooks
     void preRenderCallback();
@@ -28,7 +32,7 @@ private:
     RadialMenu* m_radialMenu;
     
     // Internal state
-    glm::dvec4 m_currentColor{1.0, 1.0, 1.0, 1.0};
+    glm::dvec4 m_currentColor{0.0, 0.0, 1.0, 1.0}; // HSVA: hue=0, sat=0, val=1, alpha=1 (white)
     bool m_active{false};
     
     // Menu structure node IDs
@@ -42,6 +46,9 @@ private:
     void createHueSubmenus();
     void createSaturationValueSubmenus();
     void createKeySubmenus();
+
+    // Color preview updates
+    void updateColorPreviews();
     
     // Color modification callbacks
     void onHueSelected(int value);

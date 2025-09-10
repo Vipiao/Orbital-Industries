@@ -24,8 +24,12 @@ struct RadialMenuNode {
     std::function<void()> m_callback;
     int m_symbolTextureIndex = -1; // Optional symbol texture for this node
     std::weak_ptr<Instance> instance;
+    glm::dvec4 m_selectColor{0.5, 0.5, 1.0, 1.0};
+    glm::dvec4 m_unSelectColor{0.2, 0.1, 0.8, 1.0};
     
-    RadialMenuNode(int64_t nodeId) : m_id(nodeId) {}
+    RadialMenuNode(int64_t nodeId, const glm::dvec4& selectColor = glm::dvec4(0.5, 0.5, 1.0, 1.0), 
+                   const glm::dvec4& unSelectColor = glm::dvec4(0.2, 0.1, 0.8, 1.0)) 
+        : m_id(nodeId), m_selectColor(selectColor), m_unSelectColor(unSelectColor) {}
 };
 
 /**
@@ -37,8 +41,12 @@ public:
     ~RadialMenu();
     
     // Node management
-    int64_t createNode(int64_t parentId = -1, int symbolTextureIndex = -1, std::function<void()> callback = nullptr);
+    int64_t createNode(int64_t parentId = -1, int symbolTextureIndex = -1, std::function<void()> callback = nullptr,
+                       const glm::dvec4& selectColor = glm::dvec4(-1.0), const glm::dvec4& unSelectColor = glm::dvec4(-1.0));
     
+    // Node removal
+    void removeAllChildren(int64_t nodeId);
+
     // Transform control
     void setPosition(const glm::dvec3& position);
     void setOrientation(const glm::dquat& orientation);
@@ -55,6 +63,9 @@ public:
     
     // Navigation
     void navigateToParent();
+
+    // Public rendering update
+    void updateRendering();
     
     glm::dvec3 worldToLocal(const glm::dvec3& worldPos) const;
     
@@ -63,8 +74,8 @@ private:
     glm::dvec3 m_position{0.0, 0.0, 0.0};
     glm::dquat m_orientation{1.0, 0.0, 0.0, 0.0};
 
-    const glm::dvec4 m_unSelectColor{0.2, 0.1, 0.8, 1.0};
-    const glm::dvec4 m_selectColor{0.5, 0.5, 1.0, 1.0};
+    const glm::dvec4 m_unSelectColor{0.2, 0.1, 0.8, 0.5};
+    const glm::dvec4 m_selectColor{0.5, 0.5, 1.0, 0.5};
     
     std::weak_ptr<Geometry> m_geometry;
     int m_meshId{-1};
@@ -82,7 +93,6 @@ private:
      
     // Internal methods
     void loadAllTextures();
-    void updateRendering();
     void clearCurrentInstances();
     void updateMeshTransform();
     
