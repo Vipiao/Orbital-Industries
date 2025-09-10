@@ -14,6 +14,8 @@
 #include "StructuralBlock.h"
 #include "../graphics/InstanceHandler.h"
 #include "../graphics/RadialMenu.h"
+#include "ColorTool.h"
+#include "../utils/ColorUtils.h"
 #include <float.h>
 #include <map>
 
@@ -40,20 +42,14 @@ Creative::Creative(GameBase* gameBase)
     m_radialMenu = std::make_unique<RadialMenu>(m_gameBase->m_graphicsEngine.get());
     m_radialMenu->getGeometry().lock()->setDepthCompression(0.01);
     
-    // Create root node and child nodes to test the system
+    // Create root node for radial menu
     int64_t rootId = m_radialMenu->createNode(); // parentId defaults to -1 (root)
+
+    // Add fake node so color tool isn't in center
     m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(rootId);
-    int childId = m_radialMenu->createNode(rootId);
-    m_radialMenu->createNode(childId);
-    m_radialMenu->createNode(childId);
-    m_radialMenu->createNode(childId);
+
+    // Create color tool
+    m_colorTool = std::make_unique<ColorTool>(m_gameBase, m_radialMenu.get(), rootId);
 
     m_radialMenu->setVisible(false);
 }
@@ -64,6 +60,7 @@ Creative::~Creative() {
 
 void Creative::processInputs() {
     processInputLogic();
+    m_colorTool->preRenderCallback();
 }
 
 void Creative::physics() {
@@ -276,6 +273,9 @@ void Creative::physics() {
     doForce = false;
     doTrackSpeed = false;
     doModifyCell = false;
+
+    // Call color tool physics callback
+    m_colorTool->onPhysicsUpdateComplete();
 }
 
 void Creative::addGridBlock(Grid* grid, int x, int y, int z) {

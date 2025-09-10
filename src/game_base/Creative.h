@@ -11,6 +11,7 @@ class GeometryData;
 class Geometry;
 class Instance;
 class GeometryInstance;
+class ColorTool;
 
 /**
  * @brief Creative mode implementation with block placement/removal and force application
@@ -83,4 +84,7 @@ private:
     // Radial menu positioning
     double m_radialMenuDistance = 4.0; // Distance from camera when visible
     glm::dvec3 m_radialMenuRelativePosition = {0,0,0};
+
+    // Color tool
+    std::unique_ptr<ColorTool> m_colorTool;
 };
