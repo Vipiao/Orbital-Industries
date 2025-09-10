@@ -142,6 +142,14 @@ void RadialMenu::removeAllChildren(int64_t nodeId) {
     }
 }
 
+RadialMenuNode* RadialMenu::getNode(int64_t nodeId) {
+    auto nodeIt = m_nodes.find(nodeId);
+    if (nodeIt == m_nodes.end()) {
+        return nullptr;
+    }
+    return &nodeIt->second;
+}
+
 void RadialMenu::setPosition(const glm::dvec3& position) {
     m_position = position;
     updateMeshTransform();

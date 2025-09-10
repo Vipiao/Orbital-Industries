@@ -58,7 +58,10 @@ void ColorTool::createMenuStructure(int64_t parentNodeId) {
     m_colorToolParentId = m_radialMenu->createNode(parentNodeId);
     
     // Add fake center node so the 3 categories appear as segments
-    m_radialMenu->createNode(m_colorToolParentId);
+    glm::dvec4 currentColor = getCurrentColorRGBA();
+    currentColor.a = 1.0; // Ensure full opacity
+    m_centerNodeId = m_radialMenu->createNode(
+        m_colorToolParentId, -1, nullptr, currentColor, currentColor);
     
     // Level 2: Create 3 main categories
     m_hueNodeId = m_radialMenu->createNode(m_colorToolParentId);
@@ -72,8 +75,7 @@ void ColorTool::createMenuStructure(int64_t parentNodeId) {
 }
 
 void ColorTool::createHueSubmenus() {
-    // Current color is already in HSV format
-    glm::dvec3 hsv = glm::dvec3(m_currentColor.x, m_currentColor.y, m_currentColor.z);
+    // Use pure colors for hue selection (saturation = 1.0, value = 1.0)
     
     // Add center node with current color (non-transparent)
     glm::dvec4 centerColor = getCurrentColorRGBA();
@@ -83,9 +85,10 @@ void ColorTool::createHueSubmenus() {
     // Create 8 leaf nodes directly under Hue (center node unused)
     for (int value = 0; value < 8; ++value) {
         // Calculate hue preview color
-        glm::dvec3 previewHsv = glm::dvec3(static_cast<double>(value) / 8.0, hsv.y, hsv.z);
+        // Use pure colors: saturation = 1.0, value = 1.0
+        glm::dvec3 previewHsv = glm::dvec3(static_cast<double>(value) / 8.0, 1.0, 1.0);
         glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
-        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 0.5);
+        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
         glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
 
         auto callback = [this, value]() {
@@ -107,9 +110,10 @@ void ColorTool::createSaturationValueSubmenus() {
     // Create 8 leaf nodes directly under Saturation/Value (center node unused)
     for (int value = 0; value < 8; ++value) {
         // Calculate saturation preview color
-        glm::dvec3 previewHsv = glm::dvec3(hsv.x, static_cast<double>(value) / 7.0, hsv.z);
+        // Use current hue but pure value (1.0) to show saturation clearly
+        glm::dvec3 previewHsv = glm::dvec3(hsv.x, static_cast<double>(value) / 7.0, 1.0);
         glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
-        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 0.5);
+        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
         glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
 
         auto callback = [this, value]() {
@@ -131,9 +135,10 @@ void ColorTool::createKeySubmenus() {
     // Create 8 leaf nodes directly under Key (center node unused)
     for (int value = 0; value < 8; ++value) {
         // Calculate key/value preview color
-        glm::dvec3 previewHsv = glm::dvec3(hsv.x, hsv.y, static_cast<double>(value) / 7.0);
+        // Use current hue but pure saturation (1.0) to show value clearly
+        glm::dvec3 previewHsv = glm::dvec3(hsv.x, 1.0, static_cast<double>(value) / 7.0);
         glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
-        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 0.5);
+        glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
         glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
 
         auto callback = [this, value]() {
@@ -148,8 +153,16 @@ void ColorTool::updateColorPreviews() {
     m_radialMenu->removeAllChildren(m_hueNodeId);
     m_radialMenu->removeAllChildren(m_saturationValueNodeId);
     m_radialMenu->removeAllChildren(m_keyNodeId);
+
+    // Update the center node color
+    glm::dvec4 currentColor = getCurrentColorRGBA();
+    currentColor.a = 1.0;
+    RadialMenuNode* centerNode = m_radialMenu->getNode(m_centerNodeId);
+    if (centerNode) {
+        centerNode->m_selectColor = currentColor;
+        centerNode->m_unSelectColor = currentColor;
+    }
     
-    // Recreate all submenus with updated color previews
     createHueSubmenus();
     createSaturationValueSubmenus();
     createKeySubmenus();

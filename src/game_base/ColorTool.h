@@ -32,7 +32,7 @@ private:
     RadialMenu* m_radialMenu;
     
     // Internal state
-    glm::dvec4 m_currentColor{0.0, 0.0, 1.0, 1.0}; // HSVA: hue=0, sat=0, val=1, alpha=1 (white)
+    glm::dvec4 m_currentColor{1.0, 0.0, 1.0, 1.0}; // HSVA: hue=0, sat=0, val=1, alpha=1 (white)
     bool m_active{false};
     
     // Menu structure node IDs
@@ -40,6 +40,7 @@ private:
     int64_t m_hueNodeId{-1};
     int64_t m_saturationValueNodeId{-1};
     int64_t m_keyNodeId{-1};
+    int64_t m_centerNodeId{-1};
     
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);

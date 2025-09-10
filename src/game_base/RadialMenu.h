@@ -47,6 +47,9 @@ public:
     // Node removal
     void removeAllChildren(int64_t nodeId);
 
+    // Node access
+    RadialMenuNode* getNode(int64_t nodeId);
+
     // Transform control
     void setPosition(const glm::dvec3& position);
     void setOrientation(const glm::dquat& orientation);
