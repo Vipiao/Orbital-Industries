@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Color Wheel (WebGL) — Transparent Background</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  html,body { height:100%; margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial; background:#222; color:#ddd; }
+  .ui {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    background: rgba(0,0,0,0.55);
+    padding: 10px;
+    border-radius: 8px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+    z-index: 10;
+  }
+  .ui label { display:block; font-size:13px; margin-bottom:6px; color:#eee; }
+  .row { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  input[type="number"], input[type="range"], select { padding:4px; border-radius:4px; border:1px solid #444; background:#111; color:#fff; }
+  input[type="checkbox"] { transform:scale(1.1); }
+  input[type="range"] { width: 80px; }
+  button { padding:6px 10px; border-radius:6px; border:none; background:#0b84ff; color:white; cursor:pointer; }
+  button:active { transform:translateY(1px); }
+  canvas { display:block; width:100vw; height:100vh; }
+  .hint { font-size:12px; color:#aaa; margin-top:6px; }
+  .alpha-control { display: flex; align-items: center; gap: 6px; }
+  .alpha-value { font-size: 11px; color: #aaa; min-width: 30px; }
+</style>
+</head>
+<body>
+  <div class="ui" id="ui">
+    <div class="row">
+      <label style="flex:1">
+        COLOR_FREQ:
+        <input id="colorFreq" type="number" min="0.0" step="0.1" value="1.0" />
+      </label>
+    </div>
+
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input id="satCCW" type="checkbox" /> SATURATION_CCW (decrease CCW)
+      </label>
+    </div>
+
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input id="valCCW" type="checkbox" /> VALUE_CCW (decrease CCW)
+      </label>
+    </div>
+
+    <div class="row">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input id="maxSat" type="checkbox" /> MAX_SATURATION (no fade to white)
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        Radius:
+        <input id="radius" type="number" min="0.05" max="0.9" step="0.01" value="0.40" />
+      </label>
+      <label>
+        Border width:
+        <input id="borderWidth" type="number" min="0.002" max="0.2" step="0.002" value="0.01" />
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        Border transparency:
+        <div class="alpha-control">
+          <input id="borderAlpha" type="range" min="0" max="100" value="100" />
+          <span class="alpha-value" id="borderAlphaValue">100%</span>
+        </div>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        Hue segments:
+        <div class="alpha-control">
+          <input id="hueSegments" type="range" min="0" max="36" value="0" />
+          <span class="alpha-value" id="hueSegmentsValue">smooth</span>
+        </div>
+      </label>
+    </div>
+
+    <div class="row">
+      <label>
+        Export size:
+        <select id="exportSize">
+          <option value="64">64x64</option>
+          <option value="128">128x128</option>
+          <option value="256">256x256</option>
+          <option value="512" selected>512x512</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row">
+      <button id="saveBtn">Save PNG</button>
+      <button id="resetBtn" style="background:#666;margin-left:6px">Reset</button>
+    </div>
+    <div class="hint">Background is transparent. Toggle features with checkboxes. Adjust border transparency and hue segmentation with sliders.</div>
+  </div>
+
+  <canvas id="glcanvas"></canvas>
+
+<script type="text/javascript">
+(() => {
+  const canvas = document.getElementById('glcanvas');
+  const gl = canvas.getContext('webgl', {
+    alpha: true,
+    antialias: true,
+    premultipliedAlpha: false,   // keep colors separate from alpha
+    preserveDrawingBuffer: true  // needed so toDataURL sees the frame
+  });
+  if (!gl) {
+    alert('WebGL not supported');
+    return;
+  }
+
+  // Vertex shader (simple full-screen quad)
+  const vsSource = `
+  attribute vec2 a_pos;
+  varying vec2 v_uv;
+  void main() {
+    v_uv = a_pos * 0.5 + 0.5;
+    gl_Position = vec4(a_pos, 0.0, 1.0);
+  }`;
+
+  // Fragment shader adapted to WebGL with transparent background
+  const fsSource = `
+  precision highp float;
+  varying vec2 v_uv;
+  uniform vec2 u_resolution;
+  uniform float u_colorFreq;
+  uniform float u_satCCW;
+  uniform float u_valCCW;
+  uniform float u_radius;
+  uniform float u_borderWidth;
+  uniform float u_borderAlpha;
+  uniform float u_hueSegments;
+  uniform float u_maxSat;
+
+  const float PI = 3.141592653589793;
+
+  vec3 hsv2rgb(vec3 hsv) {
+    float h = hsv.x * 6.0;
+    float c = hsv.z * hsv.y;
+    float x = c * (1.0 - abs(mod(h, 2.0) - 1.0));
+    vec3 col;
+    if (h < 1.0) col = vec3(c, x, 0.0);
+    else if (h < 2.0) col = vec3(x, c, 0.0);
+    else if (h < 3.0) col = vec3(0.0, c, x);
+    else if (h < 4.0) col = vec3(0.0, x, c);
+    else if (h < 5.0) col = vec3(x, 0.0, c);
+    else col = vec3(c, 0.0, x);
+    return col + vec3(hsv.z - c);
+  }
+
+  void main() {
+    vec2 res = u_resolution;
+    float minRes = min(res.x, res.y);
+    vec2 fragCoord = v_uv * res;
+    vec2 p = (fragCoord - 0.5 * res) / minRes;
+
+    float dist = length(p);
+    float angle = atan(p.y, -p.x);
+    float hue = (2.0 * PI - angle + PI) / (2.0 * PI);
+    hue *= u_colorFreq;
+    hue = fract(hue);
+
+    // Quantize hue if segments > 0
+    if (u_hueSegments > 0.5) {
+      hue = floor(hue * u_hueSegments) / u_hueSegments;
+    }
+
+    float sat;
+    if (u_maxSat > 0.5) {
+      sat = 1.0;
+    } else {
+      sat = clamp(dist / u_radius, 0.0, 1.0);
+    }
+    float val = 1.0;
+
+    if (u_satCCW > 0.5) {
+      float t = (angle + PI) / (2.0 * PI);
+      float satFade = 1.0 - t;
+      sat *= satFade;
+    }
+
+    if (u_valCCW > 0.5) {
+      float t = (angle + PI) / (2.0 * PI);
+      float valFade = 1.0 - t;
+      val *= valFade;
+    }
+
+    vec3 rgb = hsv2rgb(vec3(hue, sat, val));
+
+    // --- HARD edges ---
+    // Inside the main circle
+    bool insideCircle = dist < u_radius;
+
+    // Border region (hard edge)
+    bool inBorder = dist >= u_radius && dist < (u_radius + u_borderWidth);
+
+    vec3 color = vec3(0.0);
+    float alpha = 0.0;
+
+    if (insideCircle) {
+      color = rgb;
+      alpha = 1.0;
+    } else if (inBorder) {
+      // pick any color you want for border – here black
+      color = vec3(0.0);
+      alpha = u_borderAlpha;
+    }
+
+    gl_FragColor = vec4(color, alpha);
+  }`;
+
+  function compileShader(src, type) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(s));
+      throw new Error('Shader compile error');
+    }
+    return s;
+  }
+
+  function createProgram(vs, fs) {
+    const p = gl.createProgram();
+    gl.attachShader(p, vs);
+    gl.attachShader(p, fs);
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(p));
+      throw new Error('Program link error');
+    }
+    return p;
+  }
+
+  const vs = compileShader(vsSource, gl.VERTEX_SHADER);
+  const fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
+  const program = createProgram(vs, fs);
+  gl.useProgram(program);
+
+  const quad = new Float32Array([
+    -1, -1,
+     1, -1,
+    -1,  1,
+    -1,  1,
+     1, -1,
+     1,  1
+  ]);
+  const vbo = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
+
+  const aPos = gl.getAttribLocation(program, 'a_pos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  // Uniform locations
+  const uResolution = gl.getUniformLocation(program, 'u_resolution');
+  const uColorFreq = gl.getUniformLocation(program, 'u_colorFreq');
+  const uSatCCW = gl.getUniformLocation(program, 'u_satCCW');
+  const uValCCW = gl.getUniformLocation(program, 'u_valCCW');
+  const uRadius = gl.getUniformLocation(program, 'u_radius');
+  const uBorderWidth = gl.getUniformLocation(program, 'u_borderWidth');
+  const uBorderAlpha = gl.getUniformLocation(program, 'u_borderAlpha');
+  const uHueSegments = gl.getUniformLocation(program, 'u_hueSegments');
+  const uMaxSat = gl.getUniformLocation(program, 'u_maxSat');
+
+  // UI elements
+  const colorFreqEl = document.getElementById('colorFreq');
+  const satEl = document.getElementById('satCCW');
+  const valEl = document.getElementById('valCCW');
+  const radiusEl = document.getElementById('radius');
+  const borderWidthEl = document.getElementById('borderWidth');
+  const borderAlphaEl = document.getElementById('borderAlpha');
+  const borderAlphaValueEl = document.getElementById('borderAlphaValue');
+  const hueSegmentsEl = document.getElementById('hueSegments');
+  const hueSegmentsValueEl = document.getElementById('hueSegmentsValue');
+  const maxSatEl = document.getElementById('maxSat');
+  const saveBtn = document.getElementById('saveBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const exportSizeEl = document.getElementById('exportSize');
+
+  // Update alpha value display
+  borderAlphaEl.addEventListener('input', () => {
+    borderAlphaValueEl.textContent = borderAlphaEl.value + '%';
+  });
+
+  // Update hue segments value display
+  hueSegmentsEl.addEventListener('input', () => {
+    const value = parseInt(hueSegmentsEl.value);
+    hueSegmentsValueEl.textContent = value === 0 ? 'smooth' : value.toString();
+  });
+
+  // resize and DPI handling
+  function resizeCanvasToDisplaySize() {
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.floor(window.innerWidth * dpr);
+    const height = Math.floor(window.innerHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+    }
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+
+  function render() {
+    resizeCanvasToDisplaySize();
+
+    gl.uniform2f(uResolution, canvas.width, canvas.height);
+    gl.uniform1f(uColorFreq, parseFloat(colorFreqEl.value) || 1.0);
+    gl.uniform1f(uSatCCW, satEl.checked ? 1.0 : 0.0);
+    gl.uniform1f(uValCCW, valEl.checked ? 1.0 : 0.0);
+    gl.uniform1f(uRadius, parseFloat(radiusEl.value) || 0.4);
+    gl.uniform1f(uBorderWidth, parseFloat(borderWidthEl.value) || 0.01);
+    gl.uniform1f(uBorderAlpha, parseFloat(borderAlphaEl.value) / 100.0);
+    gl.uniform1f(uHueSegments, parseFloat(hueSegmentsEl.value) || 0.0);
+    gl.uniform1f(uMaxSat, maxSatEl.checked ? 1.0 : 0.0);
+
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    requestAnimationFrame(render);
+  }
+  requestAnimationFrame(render);
+
+  // Save PNG (preserve transparency) at chosen resolution
+  saveBtn.addEventListener('click', () => {
+    const size = parseInt(exportSizeEl.value, 10);
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = size;
+    tempCanvas.height = size;
+    const ctx2d = tempCanvas.getContext('2d');
+
+    // crop the visible canvas to a square first
+    const srcSize = Math.min(canvas.width, canvas.height);
+    const sx = (canvas.width - srcSize) / 2;
+    const sy = (canvas.height - srcSize) / 2;
+
+    ctx2d.clearRect(0, 0, size, size);
+    ctx2d.drawImage(canvas, sx, sy, srcSize, srcSize, 0, 0, size, size);
+
+    const dataURL = tempCanvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataURL;
+    a.download = `colorwheel_${size}x${size}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  // Reset to defaults
+  resetBtn.addEventListener('click', () => {
+    colorFreqEl.value = '1.0';
+    satEl.checked = false;
+    valEl.checked = false;
+    maxSatEl.checked = false;
+    radiusEl.value = '0.40';
+    borderWidthEl.value = '0.01';
+    borderAlphaEl.value = '100';
+    borderAlphaValueEl.textContent = '100%';
+    hueSegmentsEl.value = '0';
+    hueSegmentsValueEl.textContent = 'smooth';
+    exportSizeEl.value = '512';
+  });
+
+  // handle window resize
+  window.addEventListener('resize', resizeCanvasToDisplaySize);
+})();
+</script>
+</body>
+</html>

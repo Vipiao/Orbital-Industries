@@ -41,6 +41,11 @@ private:
     int64_t m_saturationValueNodeId{-1};
     int64_t m_keyNodeId{-1};
     int64_t m_centerNodeId{-1};
+
+    // Symbol texture indices
+    int m_hueTextureIndex{-1};
+    int m_saturationTextureIndex{-1};
+    int m_valueTextureIndex{-1};
     
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);

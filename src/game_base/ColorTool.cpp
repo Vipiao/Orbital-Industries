@@ -15,6 +15,13 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     if (!m_radialMenu) {
         throw std::runtime_error("RadialMenu cannot be null");
     }
+
+    // Load symbol textures
+    m_hueTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_hue_v2.png");
+    m_saturationTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_saturation_v2.png");
+    m_valueTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_value_v2.png");
+    
+    // Create menu structure with loaded textures
     
     createMenuStructure(parentNodeId);
     
@@ -22,7 +29,16 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
 }
 
 ColorTool::~ColorTool() {
-    // Cleanup handled by RadialMenu
+    // Release symbol textures
+    if (m_hueTextureIndex >= 0) {
+        m_gameBase->m_graphicsEngine->getInstanceHandler()->releaseTexture(m_hueTextureIndex);
+    }
+    if (m_saturationTextureIndex >= 0) {
+        m_gameBase->m_graphicsEngine->getInstanceHandler()->releaseTexture(m_saturationTextureIndex);
+    }
+    if (m_valueTextureIndex >= 0) {
+        m_gameBase->m_graphicsEngine->getInstanceHandler()->releaseTexture(m_valueTextureIndex);
+    }
 }
 
 void ColorTool::activate() {
@@ -64,9 +80,15 @@ void ColorTool::createMenuStructure(int64_t parentNodeId) {
         m_colorToolParentId, -1, nullptr, currentColor, currentColor);
     
     // Level 2: Create 3 main categories
-    m_hueNodeId = m_radialMenu->createNode(m_colorToolParentId);
-    m_saturationValueNodeId = m_radialMenu->createNode(m_colorToolParentId);
-    m_keyNodeId = m_radialMenu->createNode(m_colorToolParentId);
+    glm::dvec4 graySelectColor = glm::dvec4(0.6, 0.6, 0.6, 0.5);
+    glm::dvec4 grayUnSelectColor = glm::dvec4(0.3, 0.3, 0.3, 0.5);
+    
+    m_hueNodeId = m_radialMenu->createNode(m_colorToolParentId, m_hueTextureIndex, nullptr, 
+                                          graySelectColor, grayUnSelectColor);
+    m_saturationValueNodeId = m_radialMenu->createNode(m_colorToolParentId, m_saturationTextureIndex, nullptr,
+                                                      graySelectColor, grayUnSelectColor);
+    m_keyNodeId = m_radialMenu->createNode(m_colorToolParentId, m_valueTextureIndex, nullptr,
+                                          graySelectColor, grayUnSelectColor);
 
     // Level 3: Create leaf nodes directly under each category
     createHueSubmenus();

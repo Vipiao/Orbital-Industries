@@ -359,6 +359,39 @@ void RadialMenu::updateRendering() {
             }
         }
     }
+
+    // Create symbol overlay instances for children with symbols
+    if (childCount > 1) {
+        double angleStep = 2.0 * glm::pi<double>() / static_cast<double>(childCount - 1);
+        
+        // Skip first child (that's the center button)
+        for (size_t i = 1; i < childCount; ++i) {
+            int64_t childId = currentNode.m_childIds[i];
+            auto childIt = m_nodes.find(childId);
+            if (childIt == m_nodes.end()) continue;
+            
+            const RadialMenuNode& childNode = childIt->second;
+            if (childNode.m_symbolTextureIndex >= 0) {
+                auto symbolInstance = geometry->addInstance(m_meshId, childNode.m_symbolTextureIndex, -1);
+                if (!symbolInstance.expired()) {
+                    auto inst = symbolInstance.lock();
+                    
+                    // Calculate position offset based on segment angle
+                    double angle = (static_cast<double>(i-1) + 0.5) * angleStep;
+                    double radius = 0.6; // Distance from center to place symbol
+                    glm::dvec3 offset = glm::dvec3(glm::cos(angle) * radius, glm::sin(angle) * radius, 0.01);
+                    inst->m_localPosition = offset; // Positioned on segment, slightly closer to camera
+                    
+                    inst->m_localOrientation = glm::dquat(1.0, 0.0, 0.0, 0.0); // Unit orientation (no rotation)
+                    inst->m_localScale = glm::dvec3(0.2);
+                    inst->m_color = glm::dvec4(1.0, 0.0, 0.0, 1.0); // White color for symbol
+
+                    geometry->updateInstanceInBuffer(inst.get());
+                    m_currentInstances.push_back(symbolInstance);
+                }
+            }
+        }
+    }
 }
 
 void RadialMenu::clearCurrentInstances() {
