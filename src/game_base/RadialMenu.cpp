@@ -84,6 +84,7 @@ void RadialMenu::loadAllTextures() {
 }
 
 int64_t RadialMenu::createNode(int64_t parentId, int symbolTextureIndex, std::function<void()> callback,
+                               std::function<void()> exitCallback,
                                const glm::dvec4& selectColor, const glm::dvec4& unSelectColor) {
     int64_t nodeId = s_nextNodeId++;
 
@@ -96,6 +97,7 @@ int64_t RadialMenu::createNode(int64_t parentId, int symbolTextureIndex, std::fu
     node.m_parentId = parentId;
     node.m_callback = callback;
     node.m_symbolTextureIndex = symbolTextureIndex;
+    node.m_onExitCallback = exitCallback;
     node.m_selectColor = nodeSelectColor;
     node.m_unSelectColor = nodeUnSelectColor;
 
@@ -188,28 +190,40 @@ void RadialMenu::navigateToParent() {
     
     auto parentIt = m_nodes.find(parentId);
     if (parentIt == m_nodes.end()) return;
+
+    // Call exit callback of current node before switching
+    if (currentNodeIt->second.m_onExitCallback) {
+        currentNodeIt->second.m_onExitCallback();
+    }
     
     m_currentNodeId = parentId;
+
+    // Call enter callback of parent node after switching
+    if (parentIt->second.m_callback) {
+        parentIt->second.m_callback();
+    }
+
     updateRendering();
     
     std::cout << "Navigated to parent node " << parentId << std::endl;
 }
 
-void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect) {
-    if (!m_visible) return;
+bool RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect) {
+    if (!m_visible) return false;
 
     // Get current node info
     auto currentNodeIt = m_nodes.find(m_currentNodeId);
-    if (currentNodeIt == m_nodes.end()) return;
+    if (currentNodeIt == m_nodes.end()) return false;
     
     const RadialMenuNode& currentNode = currentNodeIt->second;
     size_t childCount = currentNode.m_childIds.size();
     
-    if (childCount == 0) return;
+    if (childCount == 0) return false;
     
     // Intersect ray with Z=0 plane
     glm::dvec3 rayDir = localRayEnd - localRayStart;
     int selectedIndex = -1;
+    bool withinOuterThreshold = false;
     
     if (glm::abs(rayDir.z) >= 1e-6) { // Ray not parallel to plane
         double t = -localRayStart.z / rayDir.z;
@@ -220,6 +234,9 @@ void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
             double distance = glm::length(pos2D);
             const double centerThreshold = 0.17;
             const double outerThreshold = 1.0;
+
+            // Check if we're within the outer threshold
+            withinOuterThreshold = (distance <= outerThreshold);
             
             if (distance < centerThreshold && childCount > 0) {
                 selectedIndex = 0; // Center
@@ -238,28 +255,39 @@ void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
     // Handle selection
     if (doSelect && selectedIndex >= 0) {
         if (selectedIndex >= static_cast<int>(childCount)) {
-            return; // Safety check
+            return withinOuterThreshold; // Safety check
         }
         int64_t targetChildId = currentNode.m_childIds[selectedIndex];
         
         auto targetIt = m_nodes.find(targetChildId);
         if (targetIt != m_nodes.end()) {
-            // Execute callback if it exists
-            if (targetIt->second.m_callback) {
-                targetIt->second.m_callback();
-            }
-            
             // Navigate to child if it has children
             if (!targetIt->second.m_childIds.empty()) {
+                // Call exit callback of current node before switching
+                auto currentNodeIt = m_nodes.find(m_currentNodeId);
+                if (currentNodeIt != m_nodes.end() && currentNodeIt->second.m_onExitCallback) {
+                    currentNodeIt->second.m_onExitCallback();
+                }
+
+                // Execute enter callback of target node
+                if (targetIt->second.m_callback) {
+                    targetIt->second.m_callback();
+                }
+
                 m_currentNodeId = targetChildId;
                 updateRendering();
+            } else {
+                // Execute callback for leaf nodes (no navigation)
+                if (targetIt->second.m_callback) {
+                    targetIt->second.m_callback();
+                }
             }
         }
     }
     
     // Update instance colors and scales
     auto geometry = m_geometry.lock();
-    if (!geometry) return;
+    if (!geometry) return withinOuterThreshold;
     
     double angleStep = (childCount > 1) ? 2.0 * glm::pi<double>() / static_cast<double>(childCount - 1) : 0.0;
     
@@ -298,6 +326,8 @@ void RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
         inst->m_localPosition = basePosition + selectionOffset;
         geometry->updateInstanceInBuffer(inst.get());
     }
+
+    return withinOuterThreshold;
 }
 
 void RadialMenu::updateRendering() {

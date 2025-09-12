@@ -35,13 +35,6 @@ private:
     double forceMultiplier = 1.0;
     double m_moveSpeed = 0.05;
 
-    // Color management
-    bool doCopy = false;
-    bool doPaste = false;
-    bool doUpdateColor = false;
-    glm::dvec4 color{1.0, 1.0, 1.0, 1.0};        // UI adjustment buffer
-    glm::dvec4 copiedColor{1.0, 1.0, 1.0, 1.0};  // Copy/paste buffer
-    
     // Helper methods
     void addGridBlock(class Grid* grid, int x, int y, int z);
     void removeGridBlock(class Grid* grid, int x, int y, int z);
@@ -49,7 +42,6 @@ private:
     void processInputLogic();
     void handleConfigureMode(bool blockFound, std::weak_ptr<class Grid> targetGridWeak, const glm::ivec3& hitPos);
     void updateMarkerPositions();
-    void handleColorInput();
 
     // Helper for arrow orientation calculation
     static glm::quat getArrowOrientation(const glm::ivec3& direction);

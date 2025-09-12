@@ -22,6 +22,7 @@ struct RadialMenuNode {
     int64_t m_parentId = -1; // -1 means root (no parent)
     std::vector<int64_t> m_childIds;
     std::function<void()> m_callback;
+    std::function<void()> m_onExitCallback;
     int m_symbolTextureIndex = -1; // Optional symbol texture for this node
     std::weak_ptr<Instance> instance;
     glm::dvec4 m_selectColor{0.5, 0.5, 1.0, 1.0};
@@ -42,6 +43,7 @@ public:
     
     // Node management
     int64_t createNode(int64_t parentId = -1, int symbolTextureIndex = -1, std::function<void()> callback = nullptr,
+                       std::function<void()> exitCallback = nullptr,
                        const glm::dvec4& selectColor = glm::dvec4(-1.0), const glm::dvec4& unSelectColor = glm::dvec4(-1.0));
     
     // Node removal
@@ -62,7 +64,7 @@ public:
     std::weak_ptr<Geometry> getGeometry() const { return m_geometry; }
 
     // Interaction
-    void run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect);
+    bool run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect);
     
     // Navigation
     void navigateToParent();

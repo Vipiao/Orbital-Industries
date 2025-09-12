@@ -24,7 +24,7 @@ public:
     glm::dvec4 getCurrentColorHSVA() const;
     
     // Callback hooks
-    void preRenderCallback();
+    void preRenderCallback(bool doTryCopy, bool doTryPaste);
     void onPhysicsUpdateComplete();
     
 private:
@@ -34,6 +34,10 @@ private:
     // Internal state
     glm::dvec4 m_currentColor{0.0, 1.0, 1.0, 1.0}; // HSVA: hue=0, sat=0, val=1, alpha=1 (white)
     bool m_active{false};
+
+    // Copy/paste state
+    bool m_doCopy{false};
+    bool m_doPaste{false};
     
     // Menu structure node IDs
     int64_t m_colorToolParentId{-1};

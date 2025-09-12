@@ -2,6 +2,8 @@
 #include "ColorTool.h"
 #include "../game_base/GameBase.h"
 #include "RadialMenu.h"
+#include "../game_base/Grid.h"
+#include "StructuralBlock.h"
 #include "../utils/ColorUtils.h"
 #include <iostream>
 
@@ -61,33 +63,116 @@ glm::dvec4 ColorTool::getCurrentColorHSVA() const {
     return m_currentColor;
 }
 
-void ColorTool::preRenderCallback() {
-    // TODO: Implement input processing
+void ColorTool::preRenderCallback(bool doTryCopy, bool doTryPaste) {
+    if (!m_active) {
+        return;
+    }
+    
+    if (!doTryCopy && !doTryPaste) {
+        return;
+    }
+    
+    m_doCopy = doTryCopy;
+    m_doPaste = doTryPaste;
 }
 
 void ColorTool::onPhysicsUpdateComplete() {
-    // TODO: Implement color application to world
+    if (!m_active) {
+        return;
+    }
+    
+    if (!m_doCopy && !m_doPaste) {
+        return;
+    }
+    
+    // Perform ray casting against all grids
+    std::weak_ptr<Grid> targetGridWeak;
+    glm::ivec3 hitPos;
+    bool blockFound = false;
+    double closestT = -1.0;
+    
+    // Camera position and direction
+    glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
+    glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+    glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
+    
+    // Find closest ray intersection across all grids
+    for (const auto& gridShared : m_gameBase->m_grids) {
+        if (!gridShared) continue; // Safety check
+        
+        // Transform world ray to grid-local space
+        glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(startPos);
+        glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(endPos);
+        
+        // Perform ray intersection in grid-local space
+        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
+        
+        // Check if this is a closer hit than what we have so far
+        if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
+            closestT = result.t;
+            blockFound = true;
+            targetGridWeak = gridShared;
+            
+            // Calculate intersection point with small epsilon to ensure we're inside the hit cell
+            const double epsilon = 1e-6;
+            double adjustedT = result.t + epsilon;
+            glm::dvec3 gridLocalIntersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
+            
+            // Floor to get hit cell (already in grid coordinates)
+            hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
+        }
+    }
+    
+    // Handle copy/paste operations with found target
+    if (blockFound) {
+        auto targetGrid = targetGridWeak.lock();
+        if (targetGrid) {
+            StructuralBlock* targetBlock = targetGrid->getCell(hitPos);
+            if (targetBlock) {
+                if (m_doCopy) {
+                    // Convert RGB color to HSV and store in current color
+                    glm::dvec3 rgb = glm::dvec3(targetBlock->m_color.r, targetBlock->m_color.g, targetBlock->m_color.b);
+                    glm::dvec3 hsv = ColorUtils::rgbToHsv(rgb);
+                    m_currentColor = glm::dvec4(hsv.x, hsv.y, hsv.z, targetBlock->m_color.a);
+                    updateColorPreviews();
+                }
+                if (m_doPaste) {
+                    // Convert current HSV color to RGB and apply to block
+                    glm::dvec3 hsv = glm::dvec3(m_currentColor.x, m_currentColor.y, m_currentColor.z);
+                    glm::dvec3 rgb = ColorUtils::hsvToRgb(hsv);
+                    targetGrid->setColor(hitPos, glm::dvec4(rgb.r, rgb.g, rgb.b, m_currentColor.w));
+                }
+            }
+        }
+    }
+    
+    // Reset flags
+    m_doCopy = false;
+    m_doPaste = false;
 }
 
 void ColorTool::createMenuStructure(int64_t parentNodeId) {
     // Level 1: Create Color Tool Parent
-    m_colorToolParentId = m_radialMenu->createNode(parentNodeId);
+    auto activateCallback = [this]() { activate(); };
+    auto deactivateCallback = [this]() { deactivate(); };
+    
+    m_colorToolParentId = m_radialMenu->createNode(parentNodeId, -1, activateCallback, deactivateCallback);
     
     // Add fake center node so the 3 categories appear as segments
     glm::dvec4 currentColor = getCurrentColorRGBA();
     currentColor.a = 1.0; // Ensure full opacity
     m_centerNodeId = m_radialMenu->createNode(
-        m_colorToolParentId, -1, nullptr, currentColor, currentColor);
+        m_colorToolParentId, -1, activateCallback, deactivateCallback, currentColor, currentColor);
     
     // Level 2: Create 3 main categories
     glm::dvec4 graySelectColor = glm::dvec4(0.6, 0.6, 0.6, 0.5);
     glm::dvec4 grayUnSelectColor = glm::dvec4(0.3, 0.3, 0.3, 0.5);
     
-    m_hueNodeId = m_radialMenu->createNode(m_colorToolParentId, m_hueTextureIndex, nullptr, 
+    m_hueNodeId = m_radialMenu->createNode(m_colorToolParentId, m_hueTextureIndex, activateCallback, deactivateCallback,
                                           graySelectColor, grayUnSelectColor);
-    m_saturationValueNodeId = m_radialMenu->createNode(m_colorToolParentId, m_saturationTextureIndex, nullptr,
+    m_saturationValueNodeId = m_radialMenu->createNode(m_colorToolParentId, m_saturationTextureIndex, activateCallback, deactivateCallback,
                                                       graySelectColor, grayUnSelectColor);
-    m_keyNodeId = m_radialMenu->createNode(m_colorToolParentId, m_valueTextureIndex, nullptr,
+    m_keyNodeId = m_radialMenu->createNode(m_colorToolParentId, m_valueTextureIndex, activateCallback, deactivateCallback,
                                           graySelectColor, grayUnSelectColor);
 
     // Level 3: Create leaf nodes directly under each category
@@ -102,7 +187,7 @@ void ColorTool::createHueSubmenus() {
     // Add center node with current color (non-transparent)
     glm::dvec4 centerColor = getCurrentColorRGBA();
     centerColor.a = 1.0;
-    m_radialMenu->createNode(m_hueNodeId, -1, nullptr, centerColor, centerColor);
+    m_radialMenu->createNode(m_hueNodeId, -1, [this]() { activate(); }, [this]() { deactivate(); }, centerColor, centerColor);
 
     // Create 8 leaf nodes directly under Hue (center node unused)
     for (int value = 0; value < 8; ++value) {
@@ -116,7 +201,7 @@ void ColorTool::createHueSubmenus() {
         auto callback = [this, value]() {
             onHueSelected(value);
         };
-        m_radialMenu->createNode(m_hueNodeId, -1, callback, selectColor, unSelectColor);
+        m_radialMenu->createNode(m_hueNodeId, -1, callback, [this]() { deactivate(); }, selectColor, unSelectColor);
     }
 }
 
@@ -127,7 +212,7 @@ void ColorTool::createSaturationValueSubmenus() {
     // Add center node with current color (non-transparent)
     glm::dvec4 centerColor = getCurrentColorRGBA();
     centerColor.a = 1.0;
-    m_radialMenu->createNode(m_saturationValueNodeId, -1, nullptr, centerColor, centerColor);
+    m_radialMenu->createNode(m_saturationValueNodeId, -1, [this]() { activate(); }, [this]() { deactivate(); }, centerColor, centerColor);
 
     // Create 8 leaf nodes directly under Saturation/Value (center node unused)
     for (int value = 0; value < 8; ++value) {
@@ -141,7 +226,7 @@ void ColorTool::createSaturationValueSubmenus() {
         auto callback = [this, value]() {
             onSaturationValueSelected(value);
         };
-        m_radialMenu->createNode(m_saturationValueNodeId, -1, callback, selectColor, unSelectColor);
+        m_radialMenu->createNode(m_saturationValueNodeId, -1, callback, [this]() { deactivate(); }, selectColor, unSelectColor);
     }
 }
 
@@ -152,7 +237,7 @@ void ColorTool::createKeySubmenus() {
     // Add center node with current color (non-transparent)
     glm::dvec4 centerColor = getCurrentColorRGBA();
     centerColor.a = 1.0;
-    m_radialMenu->createNode(m_keyNodeId, -1, nullptr, centerColor, centerColor);
+    m_radialMenu->createNode(m_keyNodeId, -1, [this]() { activate(); }, [this]() { deactivate(); }, centerColor, centerColor);
 
     // Create 8 leaf nodes directly under Key (center node unused)
     for (int value = 0; value < 8; ++value) {
@@ -166,7 +251,7 @@ void ColorTool::createKeySubmenus() {
         auto callback = [this, value]() {
             onKeySelected(value);
         };
-        m_radialMenu->createNode(m_keyNodeId, -1, callback, selectColor, unSelectColor);
+        m_radialMenu->createNode(m_keyNodeId, -1, callback, [this]() { deactivate(); }, selectColor, unSelectColor);
     }
 }
 
