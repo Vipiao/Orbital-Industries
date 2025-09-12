@@ -34,14 +34,6 @@ public:
         // Create the game base instance
         m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
 
-        // Create crosshair using 2D mesh manager from graphics engine
-        auto geometryData = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
-        auto crossHair = geometryData.lock() ? geometryData.lock()->createInstance() : std::weak_ptr<GeometryInstance>();
-        if (auto instance = crossHair.lock()) {
-            instance->setPosition(glm::vec2(0.0f, 0.0f));
-            instance->setScale(glm::vec2(0.05f, 0.05f));
-        }
-
         // Register ourselves with GameBase
         m_gameBase->addCallback(this);  // Graphics callback registration
 

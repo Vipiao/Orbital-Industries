@@ -52,6 +52,14 @@ Creative::Creative(GameBase* gameBase)
     m_colorTool = std::make_unique<ColorTool>(m_gameBase, m_radialMenu.get(), rootId);
 
     m_radialMenu->setVisible(false);
+
+    // Create crosshair using 2D mesh manager from graphics engine
+    auto geometryData = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
+    auto crossHair = geometryData.lock() ? geometryData.lock()->createInstance() : std::weak_ptr<GeometryInstance>();
+    if (auto instance = crossHair.lock()) {
+        instance->setPosition(glm::vec2(0.0f, 0.0f));
+        instance->setScale(glm::vec2(0.05f, 0.05f));
+    }
 }
 
 Creative::~Creative() {
