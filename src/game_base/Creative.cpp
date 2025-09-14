@@ -785,7 +785,8 @@ void Creative::processInputLogic() {
         std::cout << "Radial menu " << (visible ? "hidden" : "shown") << std::endl;
     }
 
-    // Handle radial menu interaction when visible
+    // Handle radial menu interaction when visible.
+    bool radialMenuConsumedMouse = false;
     if (m_radialMenu->isVisible()) {
         //
         glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
@@ -809,25 +810,28 @@ void Creative::processInputLogic() {
         bool doSelect = mouseHandler->leftClick();
         
         // Run radial menu interaction and check if it consumed the input
-        bool menuConsumedInput = m_radialMenu->run(localRayStart, localRayEnd, doSelect);
+        radialMenuConsumedMouse = m_radialMenu->run(localRayStart, localRayEnd, doSelect);
         
         // Handle right click for navigate up
-        if (mouseHandler->rightClick() && menuConsumedInput) {
+        if (mouseHandler->rightClick() && radialMenuConsumedMouse) {
             m_radialMenu->navigateToParent();
         }
+    }
 
-        // Only pass mouse clicks to ColorTool if menu didn't consume them
-        if (!menuConsumedInput) {
-            bool doTryCopy = mouseHandler->rightClick();
-            bool doTryPaste = mouseHandler->getLeftDown();
-            m_colorTool->preRenderCallback(doTryCopy, doTryPaste);
-        }
-    } else { // !m_radialMenu->isVisible()
+    if (!radialMenuConsumedMouse && !m_colorTool->isActive())
+    {
         if (mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32)) {
             doCreate = true;
         }
         if (mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32)) {
             doRemove = true;
         }
+    }
+
+    // Only pass mouse clicks to ColorTool if menu didn't consume them
+    if (!radialMenuConsumedMouse) {
+        bool doTryCopy = mouseHandler->rightClick();
+        bool doTryPaste = mouseHandler->getLeftDown();
+        m_colorTool->preRenderCallback(doTryCopy, doTryPaste);
     }
 }
