@@ -192,8 +192,10 @@ void ColorTool::createHueSubmenus() {
     // Create 8 leaf nodes directly under Hue (center node unused)
     for (int value = 0; value < 8; ++value) {
         // Calculate hue preview color
-        // Use pure colors: saturation = 1.0, value = 1.0
-        glm::dvec3 previewHsv = glm::dvec3(static_cast<double>(value) / 8.0, 1.0, 1.0);
+        //// Use pure colors: saturation = 1.0, value = 1.0
+        //glm::dvec3 previewHsv = glm::dvec3(static_cast<double>(value) / 8.0, 1.0, 1.0);
+        // Use modified color
+        glm::dvec3 previewHsv = glm::dvec3(static_cast<double>(value) / 8.0, m_currentColor.y, m_currentColor.z);
         glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
         glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
         glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
@@ -217,8 +219,10 @@ void ColorTool::createSaturationValueSubmenus() {
     // Create 8 leaf nodes directly under Saturation/Value (center node unused)
     for (int value = 0; value < 8; ++value) {
         // Calculate saturation preview color
-        // Use current hue but pure value (1.0) to show saturation clearly
-        glm::dvec3 previewHsv = glm::dvec3(hsv.x, static_cast<double>(value) / 7.0, 1.0);
+        //// Use current hue but pure value (1.0) to show saturation clearly
+        //glm::dvec3 previewHsv = glm::dvec3(hsv.x, static_cast<double>(value) / 7.0, 1.0);
+        // Use modified color
+        glm::dvec3 previewHsv = glm::dvec3(hsv.x, static_cast<double>(value) / 7.0, hsv.z);
         glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
         glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
         glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
@@ -242,8 +246,10 @@ void ColorTool::createKeySubmenus() {
     // Create 8 leaf nodes directly under Key (center node unused)
     for (int value = 0; value < 8; ++value) {
         // Calculate key/value preview color
-        // Use current hue but pure saturation (1.0) to show value clearly
-        glm::dvec3 previewHsv = glm::dvec3(hsv.x, 1.0, static_cast<double>(value) / 7.0);
+        //// Use current hue but pure saturation (1.0) to show value clearly
+        //glm::dvec3 previewHsv = glm::dvec3(hsv.x, 1.0, static_cast<double>(value) / 7.0);
+        // Use modified color
+        glm::dvec3 previewHsv = glm::dvec3(hsv.x, hsv.y, static_cast<double>(value) / 7.0);
         glm::dvec3 previewRgb = ColorUtils::hsvToRgb(previewHsv);
         glm::dvec4 unSelectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
         glm::dvec4 selectColor = glm::dvec4(previewRgb.r, previewRgb.g, previewRgb.b, 1.0);
