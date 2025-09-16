@@ -99,8 +99,8 @@ void ColorTool::preRenderCallback(bool doTryCopy, bool doTryPaste) {
         return;
     }
     
-    m_doCopy = doTryCopy;
-    m_doPaste = doTryPaste;
+    if (doTryCopy) m_doCopy = doTryCopy;
+    if (doTryPaste) m_doPaste = doTryPaste;
 }
 
 void ColorTool::onPhysicsUpdateComplete() {
