@@ -34,8 +34,6 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     if (auto geometry = m_paintCrosshairGeometry.lock()) {
         // Don't create instance yet - will be created when activated
     }
-    
-    std::cout << "ColorTool: Created with menu structure" << std::endl;
 }
 
 ColorTool::~ColorTool() {
@@ -68,7 +66,6 @@ void ColorTool::activate() {
             instance->setColor(color);
         }
     }
-    std::cout << "ColorTool: Activated" << std::endl;
 }
 
 void ColorTool::deactivate() {
@@ -81,7 +78,6 @@ void ColorTool::deactivate() {
             m_paintCrosshairInstance.reset();
         }
     }
-    std::cout << "ColorTool: Deactivated" << std::endl;
 }
 
 glm::dvec4 ColorTool::getCurrentColorRGBA() const {
@@ -327,8 +323,6 @@ void ColorTool::onHueSelected(int value) {
     m_currentColor.x = hue; // Update hue component
 
     updateColorPreviews();
-    
-    std::cout << "ColorTool: Hue selected - value: " << value << std::endl;
 }
 
 void ColorTool::onSaturationValueSelected(int value) {
@@ -338,8 +332,6 @@ void ColorTool::onSaturationValueSelected(int value) {
     m_currentColor.y = saturation; // Update saturation component
 
     updateColorPreviews();
-    
-    std::cout << "ColorTool: Saturation selected - value: " << value << std::endl;
 }
 
 void ColorTool::onKeySelected(int value) {
@@ -349,6 +341,4 @@ void ColorTool::onKeySelected(int value) {
     m_currentColor.z = key; // Update value component
 
     updateColorPreviews();
-    
-    std::cout << "ColorTool: Key selected - value: " << value << std::endl;
 }

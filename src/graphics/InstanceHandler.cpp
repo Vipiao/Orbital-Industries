@@ -47,8 +47,6 @@ std::weak_ptr<Instance> Geometry::addInstance(
         // Copy only the valid data
         glBufferSubData(GL_ARRAY_BUFFER, 0, m_instanceData.size() * sizeof(InstanceData), 
                        m_instanceData.data());
-        std::cout << "Geometry " << m_uniqueId << ": Grew instance buffer to capacity " 
-                  << m_instanceBufferCapacity << std::endl;
     } else {
         // Just update the new instance data
         glBufferSubData(GL_ARRAY_BUFFER, (m_instanceData.size() - 1) * sizeof(InstanceData), 
@@ -138,8 +136,6 @@ InstanceHandler::InstanceHandler(SSBOManager* ssboManager, uint32_t maxTextures)
     
     // Create shader program (use instance-specific shaders)
     createShaderProgram();
-    
-    std::cout << "InstanceHandler: Created with max " << m_maxTextures << " textures" << std::endl;
 }
 
 InstanceHandler::~InstanceHandler() {
@@ -206,9 +202,6 @@ int InstanceHandler::createTexture(const std::string& texturePath) {
     m_textures.push_back(info);
     int textureIndex = static_cast<int>(m_textures.size() - 1);
     
-    std::cout << "InstanceHandler: Created texture " << textureIndex 
-              << " (unit " << textureUnit << ") from " << texturePath << std::endl;
-    
     return textureIndex;
 }
 
@@ -223,7 +216,6 @@ void InstanceHandler::releaseTexture(int textureIndex) {
     
     if (info.refCount == 0) {
         glDeleteTextures(1, &info.textureId);
-        std::cout << "InstanceHandler: Released texture " << textureIndex << std::endl;
         
         // Mark as deleted but don't remove from vector to keep indices stable
         info.textureId = 0;
@@ -236,9 +228,6 @@ std::weak_ptr<Geometry> InstanceHandler::createGeometry(const std::string& model
     
     loadGeometryFromFile(geometry.get(), modelPath);
     m_geometries.push_back(geometry);
-    
-    std::cout << "InstanceHandler: Created geometry " << geometry->m_uniqueId 
-              << " from " << modelPath << std::endl;
     
     return geometry;
 }
@@ -255,8 +244,6 @@ void InstanceHandler::releaseGeometry(std::weak_ptr<Geometry> geometryWeak) {
             }),
         m_geometries.end()
     );
-    
-    std::cout << "InstanceHandler: Released geometry " << geometry->m_uniqueId << std::endl;
 }
 
 void InstanceHandler::loadGeometryFromFile(Geometry* geometry, const std::string& modelPath) {

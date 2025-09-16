@@ -24,7 +24,6 @@ Creative::Creative(GameBase* gameBase)
     
     // Load marker geometry using graphics engine's 2D mesh manager
     m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/01_marker.png", -1, true);
-    std::cout << "Loaded marker geometry for configuration mode" << std::endl;
 
     // Load 3D arrow geometry and texture
     m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
@@ -35,8 +34,6 @@ Creative::Creative(GameBase* gameBase)
         geometry->setDepthCompression(0.1);  // Compress depth range to render in front
         geometry->setAlphaBlending(true);     // Enable transparency
     }
-    
-    std::cout << "Loaded 3D arrow geometry and texture for configuration mode" << std::endl;
 
     // Create radial menu
     m_radialMenu = std::make_unique<RadialMenu>(m_gameBase->m_graphicsEngine.get());
@@ -807,7 +804,6 @@ void Creative::processInputLogic() {
         m_radialMenuRelativePosition = forward * m_radialMenuDistance;
         m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);
 
-        std::cout << "Radial menu " << (visible ? "hidden" : "shown") << std::endl;
     }
 
     // Handle radial menu interaction when visible.

@@ -186,8 +186,6 @@ int MeshManager2D::createTexture(const std::string& path) {
         
         m_textures.push_back(texture);
         
-        std::cout << "MeshManager2D: Loaded texture " << path << " as unit " << texture.textureUnit << std::endl;
-        
         return texture.textureUnit;
     } else {
         glDeleteTextures(1, &textureId);
