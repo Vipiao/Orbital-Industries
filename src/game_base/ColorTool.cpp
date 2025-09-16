@@ -63,7 +63,9 @@ void ColorTool::activate() {
             glm::vec2 position(static_cast<float>(offset), static_cast<float>(-offset)); // down-right direction
             instance->setPosition(position);
             instance->setScale(scale);
-            instance->setColor(getCurrentColorRGBA());
+            glm::dvec4 color = getCurrentColorRGBA();
+            color.a = m_paintCrosshairTransparency;
+            instance->setColor(color);
         }
     }
     std::cout << "ColorTool: Activated" << std::endl;
@@ -313,7 +315,7 @@ void ColorTool::updateColorPreviews() {
     // Update paint crosshair color if it exists
     if (auto instance = m_paintCrosshairInstance.lock()) {
         glm::dvec4 currentColor = getCurrentColorRGBA();
-        currentColor.a = 1.0; // Ensure full opacity for crosshair
+        currentColor.a = m_paintCrosshairTransparency; // Ensure full opacity for crosshair
         instance->setColor(currentColor);
     }
 }
