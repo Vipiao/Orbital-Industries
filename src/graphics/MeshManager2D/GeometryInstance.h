@@ -10,11 +10,10 @@ class GeometryData;
 struct InstanceTransform {
     glm::vec2 position;
     glm::vec2 scale;
+    glm::vec4 color; // RGBA color for GPU
     float orientation; // radians
-    // Padding to align to 32 bytes for GPU.
-    // Not nessesary but slight performance boost in the input assembler
-    // on some hardware.
-    float padding[3];
+    float padding[3]; // Align to 48 bytes total (next 16-byte boundary)
+    // Total size: 48 bytes (8+8+16+4+12) - multiple of largest alignment (16)
 };
 
 class GeometryInstance {
@@ -26,10 +25,12 @@ public:
     void setPosition(const glm::vec2& pos);
     void setScale(const glm::vec2& scale);
     void setOrientation(float radians);
+    void setColor(const glm::dvec4& color);
     
     glm::vec2 getPosition() const { return m_transform.position; }
     glm::vec2 getScale() const { return m_transform.scale; }
     float getOrientation() const { return m_transform.orientation; }
+    glm::dvec4 getColor() const { return m_color; }
     
     // Direct access to transform for batch updates
     InstanceTransform& getTransform() { return m_transform; }
@@ -45,6 +46,7 @@ public:
 
 private:
     InstanceTransform m_transform;
+    glm::dvec4 m_color; // RGBA format (same as 3D version)
     size_t m_index;
     GeometryData* m_parent;
     

@@ -59,6 +59,7 @@ Creative::Creative(GameBase* gameBase)
     if (auto instance = crossHair.lock()) {
         instance->setPosition(glm::vec2(0.0f, 0.0f));
         instance->setScale(glm::vec2(0.05f, 0.05f));
+        instance->setColor(glm::dvec4(1.0, 1.0, 1.0, 0.5)); // 50% transparency
     }
 }
 
@@ -600,6 +601,8 @@ void Creative::updateMarkerPositions() {
     while (m_markerInstances.size() < needed) {
         if (auto geometry = m_marker.lock()) {
             auto newInstance = geometry->createInstance();
+            if (auto inst = newInstance.lock())  inst->setColor({1,0,0,1});
+            
             m_markerInstances.push_back(newInstance);
         }
     }

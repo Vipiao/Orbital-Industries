@@ -71,12 +71,18 @@ void GeometryData::initializeGPUBuffers() {
                          (void*)offsetof(InstanceTransform, scale));
     glEnableVertexAttribArray(3);
     glVertexAttribDivisor(3, 1);
-    
-    // Orientation (float)
-    glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(InstanceTransform),
-                         (void*)offsetof(InstanceTransform, orientation));
+
+    // Color (vec4)
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceTransform),
+                         (void*)offsetof(InstanceTransform, color));
     glEnableVertexAttribArray(4);
     glVertexAttribDivisor(4, 1);
+    
+    // Orientation (float)
+    glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(InstanceTransform),
+                         (void*)offsetof(InstanceTransform, orientation));
+    glEnableVertexAttribArray(5);
+    glVertexAttribDivisor(5, 1);
     
     glBindVertexArray(0);
 }

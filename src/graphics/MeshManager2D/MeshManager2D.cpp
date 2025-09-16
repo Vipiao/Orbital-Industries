@@ -26,11 +26,13 @@ void MeshManager2D::initializeShaders() {
         layout (location = 1) in vec2 aTexCoord;
         layout (location = 2) in vec2 aInstancePosition;
         layout (location = 3) in vec2 aInstanceScale;
-        layout (location = 4) in float aInstanceOrientation;
+        layout (location = 4) in vec4 aInstanceColor;
+        layout (location = 5) in float aInstanceOrientation;
         
         uniform mat4 uProjection;
         
         out vec2 vTexCoord;
+        out vec4 vColor;
         
         void main() {
             // Apply instance transformations
@@ -50,6 +52,7 @@ void MeshManager2D::initializeShaders() {
             
             gl_Position = uProjection * vec4(finalPos, 0.0, 1.0);
             vTexCoord = aTexCoord;
+            vColor = aInstanceColor;
         }
     )";
     
@@ -58,20 +61,92 @@ void MeshManager2D::initializeShaders() {
         #version 460 core
         
         in vec2 vTexCoord;
+        in vec4 vColor;
         out vec4 FragColor;
         
         uniform sampler2D uTexture;
         uniform bool uHasTexture;
+
+        // Convert RGB to HSV
+        vec3 rgb2hsv(vec3 rgb) {
+            float maxVal = max(max(rgb.r, rgb.g), rgb.b);
+            float minVal = min(min(rgb.r, rgb.g), rgb.b);
+            float delta = maxVal - minVal;
+            
+            vec3 hsv;
+            hsv.z = maxVal; // V (Value)
+            
+            if (maxVal > 0.0) {
+                hsv.y = delta / maxVal; // S (Saturation)
+            } else {
+                hsv.y = 0.0;
+            }
+            
+            if (delta == 0.0) {
+                hsv.x = 0.0; // H (Hue) undefined for gray
+            } else if (maxVal == rgb.r) {
+                hsv.x = 60.0 * mod((rgb.g - rgb.b) / delta, 6.0);
+            } else if (maxVal == rgb.g) {
+                hsv.x = 60.0 * (2.0 + (rgb.b - rgb.r) / delta);
+            } else {
+                hsv.x = 60.0 * (4.0 + (rgb.r - rgb.g) / delta);
+            }
+            
+            hsv.x /= 360.0; // Normalize to [0,1]
+            return hsv;
+        }
+        
+        // Convert HSV to RGB
+        vec3 hsv2rgb(vec3 hsv) {
+            float h = hsv.x * 360.0;
+            float s = hsv.y;
+            float v = hsv.z;
+            
+            float c = v * s;
+            float x = c * (1.0 - abs(mod(h / 60.0, 2.0) - 1.0));
+            float m = v - c;
+            
+            vec3 rgb;
+            if (h < 60.0) rgb = vec3(c, x, 0.0);
+            else if (h < 120.0) rgb = vec3(x, c, 0.0);
+            else if (h < 180.0) rgb = vec3(0.0, c, x);
+            else if (h < 240.0) rgb = vec3(0.0, x, c);
+            else if (h < 300.0) rgb = vec3(x, 0.0, c);
+            else rgb = vec3(c, 0.0, x);
+            
+            return rgb + m;
+        }
+        
+        // Apply HSV transform: vertex color transforms texture color
+        vec4 applyHSVTransform(vec4 vertexColor, vec4 textureColor) {
+            vec3 vertHSV = rgb2hsv(vertexColor.rgb);
+            vec3 texHSV = rgb2hsv(textureColor.rgb);
+            
+            vec3 transformedHSV;
+            transformedHSV.x = mod(vertHSV.x + texHSV.x, 1.0); // H: additive with wrap
+            transformedHSV.y = vertHSV.y * texHSV.y;           // S: multiplicative  
+            transformedHSV.z = vertHSV.z * texHSV.z;           // V: multiplicative
+            float alpha = vertexColor.a * textureColor.a;      // A: multiplicative
+
+            return vec4(hsv2rgb(transformedHSV), alpha);
+        }
         
         void main() {
             if (uHasTexture) {
                 vec4 texColor = texture(uTexture, vTexCoord);
-                if (texColor.a < 0.001) {
+                // Apply HSV transformation between vertex color and texture
+                vec4 result = applyHSVTransform(vColor, texColor);
+                
+                if (result.a < 1.0/255.0) {
                     discard;
                 }
-                FragColor = texture(uTexture, vTexCoord);
+                FragColor = result;
             } else {
-                FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+                // No texture: use vertex color directly (already in RGBA)
+                if (vColor.a < 1.0/255.0) {
+                    discard;
+                }
+                FragColor = vColor;
             }
         }
     )";
