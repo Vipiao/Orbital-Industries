@@ -6,6 +6,8 @@
 #include "StructuralBlock.h"
 #include "../utils/ColorUtils.h"
 #include <iostream>
+#include "../graphics/MeshManager2D/MeshManager2D.h"
+#include "../graphics/MeshManager2D/GeometryInstance.h"
 
 ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId)
     : m_gameBase(gameBase), m_radialMenu(radialMenu) {
@@ -26,6 +28,12 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     // Create menu structure with loaded textures
     
     createMenuStructure(parentNodeId);
+
+    // Create paint crosshair using 2D mesh manager
+    m_paintCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/03_crosshair_paint_v3.png", -1, true);
+    if (auto geometry = m_paintCrosshairGeometry.lock()) {
+        // Don't create instance yet - will be created when activated
+    }
     
     std::cout << "ColorTool: Created with menu structure" << std::endl;
 }
@@ -45,11 +53,32 @@ ColorTool::~ColorTool() {
 
 void ColorTool::activate() {
     m_active = true;
+    // Create and show paint crosshair
+    if (!m_paintCrosshairInstance.lock() && m_paintCrosshairGeometry.lock()) {
+        m_paintCrosshairInstance = m_paintCrosshairGeometry.lock()->createInstance();
+        if (auto instance = m_paintCrosshairInstance.lock()) {
+            glm::vec2 scale(0.05f, 0.05f);
+            // 11x11 pixels of a 64x64 image top right is the spray centre.
+            double offset = 2.0 * (0.5 - 11.0/64.0) * static_cast<double>(scale.x);
+            glm::vec2 position(static_cast<float>(offset), static_cast<float>(-offset)); // down-right direction
+            instance->setPosition(position);
+            instance->setScale(scale);
+            instance->setColor(getCurrentColorRGBA());
+        }
+    }
     std::cout << "ColorTool: Activated" << std::endl;
 }
 
 void ColorTool::deactivate() {
     m_active = false;
+
+    // Remove paint crosshair
+    if (auto instance = m_paintCrosshairInstance.lock()) {
+        if (auto geometry = m_paintCrosshairGeometry.lock()) {
+            geometry->removeInstance(instance.get());
+            m_paintCrosshairInstance.reset();
+        }
+    }
     std::cout << "ColorTool: Deactivated" << std::endl;
 }
 
@@ -280,6 +309,13 @@ void ColorTool::updateColorPreviews() {
     createSaturationValueSubmenus();
     createKeySubmenus();
     m_radialMenu->updateRendering();
+
+    // Update paint crosshair color if it exists
+    if (auto instance = m_paintCrosshairInstance.lock()) {
+        glm::dvec4 currentColor = getCurrentColorRGBA();
+        currentColor.a = 1.0; // Ensure full opacity for crosshair
+        instance->setColor(currentColor);
+    }
 }
 
 void ColorTool::onHueSelected(int value) {

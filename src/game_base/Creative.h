@@ -79,4 +79,8 @@ private:
 
     // Color tool
     std::unique_ptr<ColorTool> m_colorTool;
+
+    // Regular crosshair
+    std::weak_ptr<GeometryData> m_crosshairGeometry;
+    std::weak_ptr<GeometryInstance> m_crosshairInstance;
 };

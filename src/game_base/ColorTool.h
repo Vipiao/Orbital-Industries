@@ -4,10 +4,12 @@
 #include <memory>
 #include <functional>
 #include <glm/glm.hpp>
+#include "../graphics/MeshManager2D/GeometryData.h"
 
 // Forward declarations
 class GameBase;
 class RadialMenu;
+class GeometryInstance;
 
 class ColorTool {
 public:
@@ -59,6 +61,10 @@ private:
 
     // Color preview updates
     void updateColorPreviews();
+
+    // Paint crosshair
+    std::weak_ptr<GeometryData> m_paintCrosshairGeometry;
+    std::weak_ptr<GeometryInstance> m_paintCrosshairInstance;
     
     // Color modification callbacks
     void onHueSelected(int value);
