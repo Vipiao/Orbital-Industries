@@ -71,6 +71,11 @@ private:
     // Menu structure
     int64_t m_modifyToolParentId{-1};
     int64_t m_centerNodeId{-1};
+
+    // Modify crosshair
+    std::weak_ptr<GeometryData> m_modifyCrosshairGeometry;
+    std::weak_ptr<GeometryInstance> m_modifyCrosshairInstance;
+    double m_modifyCrosshairTransparency = 0.5;
     
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);

@@ -33,6 +33,9 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
         geometry->setDepthCompression(0.1);  // Compress depth range to render in front
         geometry->setAlphaBlending(true);     // Enable transparency
     }
+
+    // Create modify crosshair using 2D mesh manager
+    m_modifyCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/04_crosshair_wrench.png", -1, true);
     
     // Create menu structure
     createMenuStructure(parentNodeId);
@@ -48,6 +51,20 @@ ModifyTool::~ModifyTool() {
 void ModifyTool::activate() {
     m_active = true;
     std::cout << "ModifyTool activate" << std::endl;
+
+    // Create and show modify crosshair
+    if (!m_modifyCrosshairInstance.lock() && m_modifyCrosshairGeometry.lock()) {
+        m_modifyCrosshairInstance = m_modifyCrosshairGeometry.lock()->createInstance();
+        if (auto instance = m_modifyCrosshairInstance.lock()) {
+            glm::vec2 scale(0.05f, 0.05f);
+            // 9x12 pixels of a 64x64 image where the wrench center is located
+            double offsetX = 2.0 * (0.5 - 9.0/64.0) * static_cast<double>(scale.x);
+            double offsetY = 2.0 * (0.5 - 12.0/64.0) * static_cast<double>(scale.y);
+            instance->setPosition(glm::vec2(static_cast<float>(offsetX), static_cast<float>(-offsetY))); // down-right direction
+            instance->setScale(scale);
+            instance->setColor(glm::dvec4(1.0, 0.8, 0.2, m_modifyCrosshairTransparency)); // Orange color for modify tool
+        }
+    }
 }
 
 void ModifyTool::deactivate() {
@@ -79,6 +96,14 @@ void ModifyTool::deactivate() {
     }
     m_arrowInstances.clear();
     m_currentSelectedGridMeshId = -1;
+
+    // Remove modify crosshair
+    if (auto instance = m_modifyCrosshairInstance.lock()) {
+        if (auto geometry = m_modifyCrosshairGeometry.lock()) {
+            geometry->removeInstance(instance.get());
+            m_modifyCrosshairInstance.reset();
+        }
+    }
 
     std::cout << "ModifyTool deactivate" << std::endl;
 }

@@ -37,8 +37,15 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
 }
 
 ColorTool::~ColorTool() {
-    // Release symbol textures
+    // Remove crosshair instance if it exists
     if (m_hueTextureIndex >= 0) {
+        if (auto instance = m_paintCrosshairInstance.lock()) {
+            if (auto geometry = m_paintCrosshairGeometry.lock()) {
+                geometry->removeInstance(instance.get());
+            }
+        }
+        
+        // Release symbol textures
         m_gameBase->m_graphicsEngine->getInstanceHandler()->releaseTexture(m_hueTextureIndex);
     }
     if (m_saturationTextureIndex >= 0) {
