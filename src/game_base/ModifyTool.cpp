@@ -22,7 +22,7 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     }
     
     // Load marker geometry using graphics engine's 2D mesh manager
-    m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/01_marker.png", -1, true);
+    m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/05_marker_v2.png", -1, true);
 
     // Load 3D arrow geometry and texture
     m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
@@ -553,7 +553,7 @@ void ModifyTool::updateMarkerPositions() {
             
             // Scale up if this is the nearest marker to cursor
             bool isNearestMarker = m_cursorNearMarker && static_cast<int>(i) == m_nearestMarkerIndex;
-            double scale = isNearestMarker ? 0.035 : 0.02;
+            double scale = isNearestMarker ? 0.024 : 0.016;
             data.scale = glm::vec2(scale, scale);
             
             markerData.push_back(data);
@@ -615,7 +615,7 @@ void ModifyTool::updateMarkerPositions() {
         if (auto geometry = m_marker.lock()) {
             auto newInstance = geometry->createInstance();
             if (auto inst = newInstance.lock()) {
-                inst->setColor(glm::dvec4(1.0, 0.0, 0.0, 1.0)); // Red markers
+                inst->setColor(glm::dvec4(1.0, 0.0, 0.0, 0.5));
             }
             m_markerInstances.push_back(newInstance);
         }
