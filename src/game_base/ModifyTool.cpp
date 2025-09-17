@@ -1,0 +1,582 @@
+// ModifyTool.cpp
+#include "ModifyTool.h"
+#include "../game_base/GameBase.h"
+#include "RadialMenu.h"
+#include "../game_base/Grid.h"
+#include "StructuralBlock.h"
+#include "../graphics/MeshManager2D/MeshManager2D.h"
+#include "../graphics/MeshManager2D/GeometryInstance.h"
+#include "../graphics/InstanceHandler.h"
+#include "../utils/PositionSelector.h"
+#include <iostream>
+
+ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId)
+    : m_gameBase(gameBase), m_radialMenu(radialMenu) {
+    
+    if (!m_gameBase) {
+        throw std::runtime_error("GameBase cannot be null");
+    }
+    
+    if (!m_radialMenu) {
+        throw std::runtime_error("RadialMenu cannot be null");
+    }
+    
+    // Load marker geometry using graphics engine's 2D mesh manager
+    m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/01_marker.png", -1, true);
+
+    // Load 3D arrow geometry and texture
+    m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
+    m_arrowTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/debug_white_transparent.png");
+    
+    // Configure arrows for overlay rendering with transparency
+    if (auto geometry = m_arrowGeometry.lock()) {
+        geometry->setDepthCompression(0.1);  // Compress depth range to render in front
+        geometry->setAlphaBlending(true);     // Enable transparency
+    }
+    
+    // Create menu structure
+    createMenuStructure(parentNodeId);
+}
+
+ModifyTool::~ModifyTool() {
+    // Release arrow texture
+    if (m_arrowTextureIndex >= 0) {
+        m_gameBase->m_graphicsEngine->getInstanceHandler()->releaseTexture(m_arrowTextureIndex);
+    }
+}
+
+void ModifyTool::activate() {
+    m_active = true;
+    std::cout << "ModifyTool activate" << std::endl;
+}
+
+void ModifyTool::deactivate() {
+    m_active = false;
+    
+    // Clear selection state when deactivating
+    m_hasSelectedBlock = false;
+    m_selectedGrid.reset();
+    m_cursorNearMarker = false;
+    m_nearestMarkerIndex = -1;
+    
+    // Clear marker instances
+    if (auto geometry = m_marker.lock()) {
+        for (auto& instance : m_markerInstances) {
+            if (auto inst = instance.lock()) {
+                geometry->removeInstance(inst.get());
+            }
+        }
+    }
+    m_markerInstances.clear();
+    
+    // Clear arrow instances
+    if (auto geometry = m_arrowGeometry.lock()) {
+        for (auto& instance : m_arrowInstances) {
+            if (auto inst = instance.lock()) {
+                geometry->removeInstance(inst);
+            }
+        }
+    }
+    m_arrowInstances.clear();
+    m_currentSelectedGridMeshId = -1;
+
+    std::cout << "ModifyTool deactivate" << std::endl;
+}
+
+void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
+    if (!m_active) {
+        return;
+    }
+    
+    if (doModify) m_doModify = true;
+    if (doCancel) m_doCancel = true;
+    
+    // Handle cancel - unselect block
+    if (m_doCancel && m_hasSelectedBlock) {
+        m_hasSelectedBlock = false;
+        m_selectedGrid.reset();
+        m_cursorNearMarker = false;
+        m_nearestMarkerIndex = -1;
+        
+        // Clear marker instances
+        if (auto geometry = m_marker.lock()) {
+            for (auto& instance : m_markerInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst.get());
+                }
+            }
+        }
+        m_markerInstances.clear();
+        
+        // Clear arrow instances
+        if (auto geometry = m_arrowGeometry.lock()) {
+            for (auto& instance : m_arrowInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst);
+                }
+            }
+        }
+        m_arrowInstances.clear();
+        m_currentSelectedGridMeshId = -1;
+        return;
+    }
+    
+    // Update marker positions (same logic as Creative::updateMarkerPositions)
+    updateMarkerPositions();
+}
+
+void ModifyTool::onPhysicsUpdateComplete() {
+    if (!m_active || !m_doModify) {
+        m_doModify = false;
+        m_doCancel = false;
+        return;
+    }
+    
+    
+    // Handle configure mode logic (similar to Creative::handleConfigureMode)
+    // Perform ray casting against all grids
+    std::weak_ptr<Grid> targetGridWeak;
+    glm::ivec3 hitPos;
+    bool blockFound = false;
+    double closestT = -1.0;
+    
+    // Camera position and direction
+    glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
+    glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+    glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
+    
+    // Find closest ray intersection across all grids
+    for (const auto& gridShared : m_gameBase->m_grids) {
+        if (!gridShared) continue; // Safety check
+        
+        // Transform world ray to grid-local space
+        glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(startPos);
+        glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(endPos);
+        
+        // Perform ray intersection in grid-local space
+        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
+        
+        // Check if this is a closer hit than what we have so far
+        if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
+            closestT = result.t;
+            blockFound = true;
+            targetGridWeak = gridShared;
+            
+            // Calculate intersection point with small epsilon to ensure we're inside the hit cell
+            const double epsilon = 1e-6;
+            double adjustedT = result.t + epsilon;
+            glm::dvec3 gridLocalIntersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
+            
+            // Floor to get hit cell (already in grid coordinates)
+            hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
+        }
+    }
+    
+    if (!blockFound && !m_cursorNearMarker) {
+        // No block found and not near marker, but don't unselect unless cancelled
+        m_doModify = false;
+        m_doCancel = false;
+        return;
+    }
+    
+    auto targetGrid = targetGridWeak.lock();
+    if (!targetGrid && !m_cursorNearMarker) {
+        m_doModify = false;
+        m_doCancel = false;
+        return;
+    }
+    
+    // Check if this is the same block we already have selected
+    bool isSameBlock = m_hasSelectedBlock && 
+                      !m_selectedGrid.expired() &&
+                      m_selectedGrid.lock().get() == targetGrid.get() &&
+                      m_selectedBlockCoord == hitPos;
+    
+    if (!isSameBlock && !m_cursorNearMarker && blockFound) {
+        // New block selected
+        m_hasSelectedBlock = true;
+        m_selectedGrid = targetGridWeak;
+        m_selectedBlockCoord = hitPos;
+        m_doModify = false;
+        m_doCancel = false;
+        return;
+    }
+    
+    // Handle modification when doModify is true and cursor is near marker
+    if (m_doModify && m_cursorNearMarker && m_hasSelectedBlock) {
+        auto selectedGrid = m_selectedGrid.lock();
+        if (selectedGrid && selectedGrid->hasCell(m_selectedBlockCoord)) {
+            // Get current vertices from the selected block
+            const auto& cells = selectedGrid->getCells();
+            auto cellIt = cells.find(m_selectedBlockCoord);
+            if (cellIt != cells.end()) {
+                std::array<glm::ivec3, 8> currentVertices = cellIt->second.m_localVertices;
+                
+                // Calculate modification based on nearest marker
+                // This logic should match what was in Creative::updateMarkerPositions
+                std::vector<glm::dvec3> cornerPositions;
+                std::vector<int> cornerIndexData;
+                std::vector<glm::ivec3> directionData;
+                
+                // Generate corner positions and directions (same as Creative logic)
+                const double offset = 0.3;
+                for (int cornerIndex = 0; cornerIndex < 8; ++cornerIndex) {
+                    glm::ivec3 defaultVertex = StructuralBlock::DEFAULT_VERTICES[cornerIndex];
+                    glm::dvec3 normalizedVertex = glm::dvec3(defaultVertex) / double(StructuralBlock::MAX_SIZE);
+                    
+                    glm::ivec3 unitDirections[6] = {
+                        glm::ivec3(1, 0, 0), glm::ivec3(-1, 0, 0),
+                        glm::ivec3(0, 1, 0), glm::ivec3(0, -1, 0),
+                        glm::ivec3(0, 0, 1), glm::ivec3(0, 0, -1)
+                    };
+                    
+                    for (int i = 0; i < 6; ++i) {
+                        glm::ivec3 currentVertex = currentVertices[cornerIndex];
+                        glm::ivec3 newVertex = currentVertex + unitDirections[i];
+                        
+                        if (newVertex.x >= 0 && newVertex.x <= StructuralBlock::MAX_SIZE &&
+                            newVertex.y >= 0 && newVertex.y <= StructuralBlock::MAX_SIZE &&
+                            newVertex.z >= 0 && newVertex.z <= StructuralBlock::MAX_SIZE) {
+                            glm::dvec3 scaledDirection = glm::dvec3(unitDirections[i]) * offset;
+                            glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + normalizedVertex + scaledDirection;
+                            cornerPositions.push_back(selectedGrid->gridToWorld(corner));
+                            cornerIndexData.push_back(cornerIndex);
+                            directionData.push_back(unitDirections[i]);
+                        }
+                    }
+                }
+                
+                // Apply the modification if we have a valid nearest marker
+                if (m_nearestMarkerIndex >= 0 && m_nearestMarkerIndex < static_cast<int>(cornerIndexData.size())) {
+                    int cornerIndex = cornerIndexData[m_nearestMarkerIndex];
+                    glm::ivec3 direction = directionData[m_nearestMarkerIndex];
+                    
+                    std::array<glm::ivec3, 8> newVertices = currentVertices;
+                    newVertices[cornerIndex] += direction;
+                    
+                    // Store modification data for execution
+                    m_modificationGrid = selectedGrid;
+                    m_modificationCoord = m_selectedBlockCoord;
+                    m_modificationVertices = newVertices;
+                    
+                    // Execute modification
+                    if (selectedGrid->canModifyCell(m_modificationCoord, m_modificationVertices)) {
+                        if (selectedGrid->modifyCell(m_modificationCoord, m_modificationVertices)) {
+                            // Schedule grid split check
+                            std::vector<glm::ivec3> edgeCoords = {
+                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z),
+                                glm::ivec3(m_modificationCoord.x + 1, m_modificationCoord.y, m_modificationCoord.z),
+                                glm::ivec3(m_modificationCoord.x - 1, m_modificationCoord.y, m_modificationCoord.z),
+                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y + 1, m_modificationCoord.z),
+                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y - 1, m_modificationCoord.z),
+                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z + 1),
+                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z - 1)
+                            };
+                            
+                            m_gameBase->scheduleGridSplitCheck(selectedGrid, edgeCoords);
+                            
+                            std::cout << "Successfully modified cell at (" << m_modificationCoord.x 
+                                      << ", " << m_modificationCoord.y << ", " << m_modificationCoord.z << ")" << std::endl;
+                        } else {
+                            std::cout << "Failed to modify cell" << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    m_doModify = false;
+    m_doCancel = false;
+}
+
+void ModifyTool::createMenuStructure(int64_t parentNodeId) {
+    // Simple single node structure
+    auto activateCallback = [this]() { activate(); };
+    auto deactivateCallback = [this]() { deactivate(); };
+    
+    // Create modify tool parent node
+    glm::dvec4 selectColor = glm::dvec4(0.8, 0.4, 0.2, 0.5);    // Orange
+    glm::dvec4 unSelectColor = glm::dvec4(0.4, 0.2, 0.1, 0.5);  // Dark orange
+    
+    m_modifyToolParentId = m_radialMenu->createNode(parentNodeId, -1, activateCallback, deactivateCallback);
+    
+    // Add center node so you can navigate into the modify tool
+    // Use orange color scheme to indicate modify tool
+    glm::dvec4 centerSelectColor = glm::dvec4(0.9, 0.5, 0.3, 1.0);   // Bright orange, opaque
+    glm::dvec4 centerUnSelectColor = glm::dvec4(0.8, 0.4, 0.2, 1.0); // Orange, opaque
+    
+    m_centerNodeId = m_radialMenu->createNode(
+        m_modifyToolParentId, -1, activateCallback, deactivateCallback, 
+        centerSelectColor, centerUnSelectColor);
+}
+
+glm::dquat ModifyTool::getArrowOrientation(const glm::ivec3& direction) {
+    // Default arrow points in +X direction, calculate rotation to target direction
+    if (direction == glm::ivec3(1, 0, 0)) {
+        return glm::dquat(1.0, 0.0, 0.0, 0.0); // +X: identity
+    } else if (direction == glm::ivec3(-1, 0, 0)) {
+        return glm::angleAxis(glm::pi<double>(), glm::dvec3(0.0, 0.0, 1.0)); // -X: 180° around Z
+    } else if (direction == glm::ivec3(0, 1, 0)) {
+        return glm::angleAxis(glm::half_pi<double>(), glm::dvec3(0.0, 0.0, 1.0)); // +Y: 90° around Z
+    } else if (direction == glm::ivec3(0, -1, 0)) {
+        return glm::angleAxis(-glm::half_pi<double>(), glm::dvec3(0.0, 0.0, 1.0)); // -Y: -90° around Z
+    } else if (direction == glm::ivec3(0, 0, 1)) {
+        return glm::angleAxis(-glm::half_pi<double>(), glm::dvec3(0.0, 1.0, 0.0)); // +Z: -90° around Y
+    } else if (direction == glm::ivec3(0, 0, -1)) {
+        return glm::angleAxis(glm::half_pi<double>(), glm::dvec3(0.0, 1.0, 0.0)); // -Z: 90° around Y
+    } else {
+        return glm::dquat(1.0, 0.0, 0.0, 0.0); // Fallback: identity
+    }
+}
+
+void ModifyTool::updateMarkerPositions() {
+    // This method contains the core logic from Creative::updateMarkerPositions
+    // but adapted for the tool pattern
+    
+    // Reset cursor proximity state
+    m_cursorNearMarker = false;
+    m_nearestMarkerIndex = -1;
+    
+    // Helper lambda to clear markers
+    auto clearMarkers = [this]() {
+        // Clear 3D arrow instances
+        if (auto geometry = m_arrowGeometry.lock()) {
+            for (auto& instance : m_arrowInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst);
+                }
+            }
+        }
+        m_arrowInstances.clear();
+
+        if (auto geometry = m_marker.lock()) {
+            for (auto& instance : m_markerInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst.get());
+                }
+            }
+        }
+        m_markerInstances.clear();
+        m_currentSelectedGridMeshId = -1;
+    };
+    
+    if (!m_hasSelectedBlock) {
+        clearMarkers();
+        return;
+    }
+
+    auto selectedGrid = m_selectedGrid.lock();
+    if (!selectedGrid || !selectedGrid->hasCell(m_selectedBlockCoord)) {
+        m_hasSelectedBlock = false;
+        clearMarkers();
+        return;
+    }
+
+    // Check if camera is too far from the selected block (10m threshold)
+    glm::dvec3 blockWorldPos = selectedGrid->gridToWorld(glm::dvec3(m_selectedBlockCoord) + glm::dvec3(0.5, 0.5, 0.5));
+    glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
+    double distanceToBlock = glm::length(blockWorldPos - cameraPos);
+    if (distanceToBlock > 10.0) {
+        m_hasSelectedBlock = false;
+        clearMarkers();
+        return;
+    }
+    
+    // Calculate corner positions using static default vertices (6 per corner = 48 total)
+    std::vector<glm::dvec3> cornerPositions;
+    std::vector<int> cornerIndexData;
+    std::vector<glm::ivec3> directionData;
+
+    // Check if grid mesh ID changed and recreate arrow instances if needed
+    int gridMeshId = -1;
+    gridMeshId = selectedGrid->getGraphicsMeshId();
+    
+    if (gridMeshId != m_currentSelectedGridMeshId) {
+        // Clear existing arrow instances since mesh ID changed
+        if (auto geometry = m_arrowGeometry.lock()) {
+            for (auto& instance : m_arrowInstances) {
+                if (auto inst = instance.lock()) {
+                    geometry->removeInstance(inst);
+                }
+            }
+        }
+        m_arrowInstances.clear();
+        m_currentSelectedGridMeshId = gridMeshId;
+    }
+    
+    // Get current vertices from the selected block for bounds checking
+    std::array<glm::ivec3, 8> currentVertices;
+    const auto& cells = selectedGrid->getCells();
+    auto cellIt = cells.find(m_selectedBlockCoord);
+    if (cellIt == cells.end()) {
+        clearMarkers();
+        return;
+    }
+    currentVertices = cellIt->second.m_localVertices;
+    const double offset = 0.3;
+    
+    // Iterate through the 8 default vertices
+    for (int cornerIndex = 0; cornerIndex < 8; ++cornerIndex) {
+        glm::ivec3 defaultVertex = StructuralBlock::DEFAULT_VERTICES[cornerIndex];
+        glm::dvec3 normalizedVertex = glm::dvec3(defaultVertex) / double(StructuralBlock::MAX_SIZE);
+        
+        // Generate all 6 cardinal directions for this corner
+        glm::ivec3 unitDirections[6] = {
+            glm::ivec3(1, 0, 0),   // +X
+            glm::ivec3(-1, 0, 0),  // -X
+            glm::ivec3(0, 1, 0),   // +Y
+            glm::ivec3(0, -1, 0),  // -Y
+            glm::ivec3(0, 0, 1),   // +Z
+            glm::ivec3(0, 0, -1)   // -Z
+        };
+        
+        // Generate 6 positions per corner
+        for (int i = 0; i < 6; ++i) {
+            // Check if moving this vertex in this direction would be within bounds
+            glm::ivec3 currentVertex = currentVertices[cornerIndex];
+            glm::ivec3 newVertex = currentVertex + unitDirections[i];
+            
+            // Only create marker if the movement would be valid
+            if (newVertex.x >= 0 && newVertex.x <= StructuralBlock::MAX_SIZE &&
+                newVertex.y >= 0 && newVertex.y <= StructuralBlock::MAX_SIZE &&
+                newVertex.z >= 0 && newVertex.z <= StructuralBlock::MAX_SIZE) {
+                glm::dvec3 scaledDirection = glm::dvec3(unitDirections[i]) * offset;
+                glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + normalizedVertex + scaledDirection;
+                cornerPositions.push_back(selectedGrid->gridToWorld(corner));
+                cornerIndexData.push_back(cornerIndex);
+                directionData.push_back(unitDirections[i]);
+            }
+        }
+    }
+
+    // Calculate 3D arrow positions in grid local space
+    std::vector<glm::dvec3> arrowLocalPositions;
+    std::vector<glm::dquat> arrowOrientations;
+    for (size_t i = 0; i < cornerPositions.size(); ++i) {
+        glm::dvec3 localPos = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(StructuralBlock::DEFAULT_VERTICES[cornerIndexData[i]]) / double(StructuralBlock::MAX_SIZE);
+        arrowLocalPositions.push_back(localPos);
+        arrowOrientations.push_back(getArrowOrientation(directionData[i]));
+    }
+    
+    // Get positions and scales of all markers (now 48 total)
+    auto selectorResult = PositionSelector::selectFromPositions(
+        cornerPositions,
+        0.004, // Small projected radius. (How far is minimum distance)
+        m_gameBase->m_graphicsEngine->getCamPos(),
+        m_gameBase->m_graphicsEngine->getCamOri(),
+        m_gameBase->m_graphicsEngine->getFieldOfView(),
+        static_cast<double>(m_gameBase->m_graphicsEngine->getScreenWidth()) / 
+        static_cast<double>(m_gameBase->m_graphicsEngine->getScreenHeight()),
+        glm::dvec2(0.0, 0.0), // Screen center as cursor position
+        5 // Separation iterations
+    );
+    
+    // Check if cursor is near any marker and store calculated positions/scales
+    struct MarkerData {
+        glm::vec2 position;
+        glm::vec2 scale;
+    };
+    std::vector<MarkerData> markerData;
+    
+    if (selectorResult.closestIndex >= 0 && selectorResult.distanceToClosest < 0.04) {
+        m_cursorNearMarker = true;
+        m_nearestMarkerIndex = selectorResult.closestIndex;
+        
+        // Store selected marker data for potential modification
+        m_selectedMarkerCoordinate = glm::ivec3(cornerIndexData[m_nearestMarkerIndex], 0, 0); // Store corner index in x component
+        m_selectedMarkerDirection = glm::dvec3(directionData[m_nearestMarkerIndex]);
+        
+        // Print the selected corner coordinate with index (optional debug)
+        glm::dvec3 selectedCorner = cornerPositions[m_nearestMarkerIndex];
+        // std::cout << "Near corner " << m_nearestMarkerIndex << ": (" << selectedCorner.x << ", " 
+        //          << selectedCorner.y << ", " << selectedCorner.z << ")" << std::endl;
+    }
+    
+    // Calculate data only for visible markers
+    for (size_t i = 0; i < selectorResult.projectedPositions.size(); ++i) {
+        glm::dvec2 screenPos = selectorResult.projectedPositions[i];
+        
+        // Only add markers that are not behind camera
+        if (screenPos.x > -1.9 && screenPos.y > -1.9) {
+            MarkerData data;
+            data.position = glm::vec2(screenPos.x, screenPos.y);
+            
+            // Scale up if this is the nearest marker to cursor
+            bool isNearestMarker = m_cursorNearMarker && static_cast<int>(i) == m_nearestMarkerIndex;
+            double scale = isNearestMarker ? 0.035 : 0.02;
+            data.scale = glm::vec2(scale, scale);
+            
+            markerData.push_back(data);
+        }
+    }
+    
+    // Manage 3D arrow instances (always show all valid arrows)
+    size_t neededArrows = arrowLocalPositions.size();
+    
+    // Remove excess arrow instances
+    while (m_arrowInstances.size() > neededArrows) {
+        auto instance = m_arrowInstances.back();
+        if (auto inst = instance.lock()) {
+            if (auto geometry = m_arrowGeometry.lock()) {
+                geometry->removeInstance(inst);
+            }
+        }
+        m_arrowInstances.pop_back();
+    }
+    
+    // Add missing arrow instances
+    while (m_arrowInstances.size() < neededArrows) {
+        if (auto geometry = m_arrowGeometry.lock()) {
+            auto newInstance = geometry->addInstance(gridMeshId, m_arrowTextureIndex, -1);
+            m_arrowInstances.push_back(newInstance);
+        }
+    }
+    
+    // Update arrow positions and orientations
+    for (size_t i = 0; i < m_arrowInstances.size() && i < arrowLocalPositions.size(); ++i) {
+        if (auto inst = m_arrowInstances[i].lock()) {
+            inst->m_localPosition = arrowLocalPositions[i];
+            inst->m_localOrientation = arrowOrientations[i];
+            inst->m_localScale = glm::dvec3(0.1); // Small arrow scale
+            
+            // Update the instance buffer
+            if (auto geometry = m_arrowGeometry.lock()) {
+                geometry->updateInstanceInBuffer(inst.get());
+            }
+        }
+    }
+
+    // Adjust instance count to match needed markers
+    size_t needed = markerData.size();
+    
+    // Remove excess instances
+    while (m_markerInstances.size() > needed) {
+        auto instance = m_markerInstances.back();
+        if (auto inst = instance.lock()) {
+            if (auto geometry = m_marker.lock()) {
+                geometry->removeInstance(inst.get());
+            }
+        }
+        m_markerInstances.pop_back();
+    }
+    
+    // Add missing instances
+    while (m_markerInstances.size() < needed) {
+        if (auto geometry = m_marker.lock()) {
+            auto newInstance = geometry->createInstance();
+            if (auto inst = newInstance.lock()) {
+                inst->setColor(glm::dvec4(1.0, 0.0, 0.0, 1.0)); // Red markers
+            }
+            m_markerInstances.push_back(newInstance);
+        }
+    }
+    
+    // Update positions and scales from calculated data
+    for (size_t i = 0; i < m_markerInstances.size() && i < markerData.size(); ++i) {
+        if (auto inst = m_markerInstances[i].lock()) {
+            const MarkerData& data = markerData[i];
+            inst->setPosition(data.position);
+            inst->setScale(data.scale);
+        }
+    }
+}

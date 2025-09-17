@@ -12,6 +12,7 @@ class Geometry;
 class Instance;
 class GeometryInstance;
 class ColorTool;
+class ModifyTool;
 
 /**
  * @brief Creative mode implementation with block placement/removal and force application
@@ -28,10 +29,8 @@ private:
     // Input flags
     bool doCreate = false;
     bool doRemove = false;
-    bool doConfigure = false;
     bool doForce = false;
     bool doTrackSpeed = false;
-    bool doModifyCell = false;
     double forceMultiplier = 1.0;
     double m_moveSpeed = 0.05;
 
@@ -40,35 +39,6 @@ private:
     void removeGridBlock(class Grid* grid, int x, int y, int z);
     void applyDragForces();
     void processInputLogic();
-    void handleConfigureMode(bool blockFound, std::weak_ptr<class Grid> targetGridWeak, const glm::ivec3& hitPos);
-    void updateMarkerPositions();
-
-    // Helper for arrow orientation calculation
-    static glm::quat getArrowOrientation(const glm::ivec3& direction);
-    
-    // Configuration mode state
-    std::weak_ptr<class Grid> m_selectedGrid;
-    glm::ivec3 m_selectedBlockCoord;
-    bool m_hasSelectedBlock = false;
-    bool m_cursorNearMarker = false;
-    int m_nearestMarkerIndex = -1;
-    std::weak_ptr<GeometryData> m_marker;
-    std::vector<std::weak_ptr<GeometryInstance>> m_markerInstances;
-
-    // Selected marker coordinate and direction data
-    glm::ivec3 m_selectedMarkerCoordinate;
-    glm::dvec3 m_selectedMarkerDirection;
-
-    // 3D arrow markers
-    std::weak_ptr<Geometry> m_arrowGeometry;
-    int m_arrowTextureIndex = -1;
-    std::vector<std::weak_ptr<Instance>> m_arrowInstances;
-    int m_currentSelectedGridMeshId = -1;
-
-    // Cell modification data
-    std::weak_ptr<class Grid> m_modificationGrid;
-    glm::ivec3 m_modificationCoord;
-    std::array<glm::ivec3, 8> m_modificationVertices;
 
     // Radial menu
     std::unique_ptr<RadialMenu> m_radialMenu;
@@ -79,6 +49,9 @@ private:
 
     // Color tool
     std::unique_ptr<ColorTool> m_colorTool;
+
+    // Modify tool
+    std::unique_ptr<ModifyTool> m_modifyTool;
 
     // Regular crosshair
     std::weak_ptr<GeometryData> m_crosshairGeometry;

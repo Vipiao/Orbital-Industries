@@ -117,7 +117,7 @@ public:
         //    }
         //}
         // Ground.
-        int size{ 40 };
+        int size{ 0 };
         for (int ii = -size; ii < size; ii++)
         {
             for (int jj = -size; jj < size; jj++)
