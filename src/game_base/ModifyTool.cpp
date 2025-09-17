@@ -37,6 +37,12 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     // Create modify crosshair using 2D mesh manager
     m_modifyCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/04_crosshair_wrench.png", -1, true);
     
+    // Calculate crosshair offset and scale once in constructor
+    m_crosshairScale = glm::dvec2(0.05, 0.05);
+    // 9x12 pixels of a 64x64 image where the wrench center is located
+    m_crosshairOffset.x = 2.0 * (0.5 - 9.0/64.0) * m_crosshairScale.x;
+    m_crosshairOffset.y = 2.0 * (0.5 - 12.0/64.0) * m_crosshairScale.y;
+
     // Create menu structure
     createMenuStructure(parentNodeId);
 }
@@ -56,12 +62,8 @@ void ModifyTool::activate() {
     if (!m_modifyCrosshairInstance.lock() && m_modifyCrosshairGeometry.lock()) {
         m_modifyCrosshairInstance = m_modifyCrosshairGeometry.lock()->createInstance();
         if (auto instance = m_modifyCrosshairInstance.lock()) {
-            glm::vec2 scale(0.05f, 0.05f);
-            // 9x12 pixels of a 64x64 image where the wrench center is located
-            double offsetX = 2.0 * (0.5 - 9.0/64.0) * static_cast<double>(scale.x);
-            double offsetY = 2.0 * (0.5 - 12.0/64.0) * static_cast<double>(scale.y);
-            instance->setPosition(glm::vec2(static_cast<float>(offsetX), static_cast<float>(-offsetY))); // down-right direction
-            instance->setScale(scale);
+            instance->setPosition(glm::vec2(static_cast<float>(m_crosshairOffset.x), static_cast<float>(-m_crosshairOffset.y))); // down-right direction
+            instance->setScale(glm::vec2(static_cast<float>(m_crosshairScale.x), static_cast<float>(m_crosshairScale.y)));
             instance->setColor(glm::dvec4(1.0, 0.8, 0.2, m_modifyCrosshairTransparency)); // Orange color for modify tool
         }
     }
@@ -148,6 +150,28 @@ void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
     
     // Update marker positions (same logic as Creative::updateMarkerPositions)
     updateMarkerPositions();
+
+    // Update wrench animation angles
+    // Target angle lerps toward 0 at 2% per frame (small decay)
+    m_targetAngle = m_targetAngle * 0.95;
+    
+    // Current angle lerps toward target angle at 5% per frame (faster follow)
+    m_currentAngle = m_currentAngle + (m_targetAngle - m_currentAngle) * 0.2;
+    
+    // Update wrench crosshair rotation if active
+    if (auto instance = m_modifyCrosshairInstance.lock()) {
+        // Rotate towards current angle
+        instance->setOrientation(static_cast<float>(m_currentAngle));
+        
+        // Rotate offset vector around tip point
+        double cosAngle = glm::cos(m_currentAngle);
+        double sinAngle = glm::sin(m_currentAngle);
+        double rotatedOffsetX = m_crosshairOffset.x * cosAngle - (-m_crosshairOffset.y) * sinAngle;
+        double rotatedOffsetY = m_crosshairOffset.x * sinAngle + (-m_crosshairOffset.y) * cosAngle;
+        
+        // Apply offset (final position)
+        instance->setPosition(glm::vec2(static_cast<float>(rotatedOffsetX), static_cast<float>(rotatedOffsetY)));
+    }
 }
 
 void ModifyTool::onPhysicsUpdateComplete() {
@@ -286,6 +310,7 @@ void ModifyTool::onPhysicsUpdateComplete() {
                     
                     // Execute modification
                     if (selectedGrid->canModifyCell(m_modificationCoord, m_modificationVertices)) {
+                        m_targetAngle = glm::radians(90.);
                         if (selectedGrid->modifyCell(m_modificationCoord, m_modificationVertices)) {
                             // Schedule grid split check
                             std::vector<glm::ivec3> edgeCoords = {

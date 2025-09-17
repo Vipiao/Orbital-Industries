@@ -76,6 +76,10 @@ private:
     std::weak_ptr<GeometryData> m_modifyCrosshairGeometry;
     std::weak_ptr<GeometryInstance> m_modifyCrosshairInstance;
     double m_modifyCrosshairTransparency = 0.5;
+    double m_targetAngle = 0.0;
+    double m_currentAngle = 0.0;
+    glm::dvec2 m_crosshairOffset;
+    glm::dvec2 m_crosshairScale;
     
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);
