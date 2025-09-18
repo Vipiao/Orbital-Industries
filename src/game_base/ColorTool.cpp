@@ -24,7 +24,8 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     m_hueTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_hue_v2.png");
     m_saturationTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_saturation_v2.png");
     m_valueTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_value_v2.png");
-    
+    m_paintIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/03_crosshair_paint_v4.png");
+
     // Create menu structure with loaded textures
     
     createMenuStructure(parentNodeId);
@@ -181,7 +182,7 @@ void ColorTool::createMenuStructure(int64_t parentNodeId) {
     auto activateCallback = [this]() { activate(); };
     auto deactivateCallback = [this]() { deactivate(); };
     
-    m_colorToolParentId = m_radialMenu->createNode(parentNodeId, -1, activateCallback, deactivateCallback);
+    m_colorToolParentId = m_radialMenu->createNode(parentNodeId, m_paintIconTextureIndex, activateCallback, deactivateCallback);
     
     // Add fake center node so the 3 categories appear as segments
     glm::dvec4 currentColor = getCurrentColorRGBA();
