@@ -9,6 +9,7 @@
 #include "../graphics/InstanceHandler.h"
 #include "../utils/PositionSelector.h"
 #include <iostream>
+#include <algorithm>
 
 ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId)
     : m_gameBase(gameBase), m_radialMenu(radialMenu) {
@@ -26,7 +27,6 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
 
     // Load 3D arrow geometry and texture
     m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
-    m_arrowTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/debug_white_transparent.png");
     
     // Configure arrows for overlay rendering with transparency
     if (auto geometry = m_arrowGeometry.lock()) {
@@ -518,7 +518,35 @@ void ModifyTool::updateMarkerPositions() {
         5 // Separation iterations
     );
     
-    // Check if cursor is near any marker and store calculated positions/scales
+    // Calculate distances for dynamic transparency and track min/max
+    std::vector<double> markerDistances;
+    std::vector<double> arrowDistances;
+    double minDist = 1e9;  // Start with large value
+    double maxDist = -1e9; // Start with small value
+    
+    // Calculate distances for 2D markers (only for visible ones)
+    for (size_t i = 0; i < selectorResult.projectedPositions.size(); ++i) {
+        glm::dvec2 screenPos = selectorResult.projectedPositions[i];
+        if (screenPos.x > -1.9 && screenPos.y > -1.9) {
+            double dist = glm::length(cornerPositions[i] - cameraPos);
+            markerDistances.push_back(dist);
+            minDist = glm::min(minDist, dist);
+            maxDist = glm::max(maxDist, dist);
+        }
+    }
+    
+    // Calculate distances for 3D arrows (convert local to world space)
+    for (size_t i = 0; i < arrowLocalPositions.size(); ++i) {
+        glm::dvec3 worldPos = selectedGrid->gridToWorld(arrowLocalPositions[i]);
+        double dist = glm::length(worldPos - cameraPos);
+        arrowDistances.push_back(dist);
+        minDist = glm::min(minDist, dist);
+        maxDist = glm::max(maxDist, dist);
+    }
+    
+    // Handle edge case where all distances are the same or no elements
+    if (maxDist - minDist < 1e-6) { minDist = maxDist - 1e-6; }
+
     struct MarkerData {
         glm::vec2 position;
         glm::vec2 scale;
@@ -574,7 +602,7 @@ void ModifyTool::updateMarkerPositions() {
     // Add missing arrow instances
     while (m_arrowInstances.size() < neededArrows) {
         if (auto geometry = m_arrowGeometry.lock()) {
-            auto newInstance = geometry->addInstance(gridMeshId, m_arrowTextureIndex, -1);
+            auto newInstance = geometry->addInstance(gridMeshId, -1, -1);
             m_arrowInstances.push_back(newInstance);
         }
     }
@@ -585,6 +613,13 @@ void ModifyTool::updateMarkerPositions() {
             inst->m_localPosition = arrowLocalPositions[i];
             inst->m_localOrientation = arrowOrientations[i];
             inst->m_localScale = glm::dvec3(0.1); // Small arrow scale
+
+            // Calculate dynamic alpha for 3D arrows
+            double alpha = 0.5; // default
+            if (i < arrowDistances.size()) {
+                alpha = 0.25 + 0.5 * (maxDist - arrowDistances[i]) / (maxDist - minDist);
+            }
+            inst->m_color = glm::dvec4(1.0, 1.0, 1.0, alpha);
             
             // Update the instance buffer
             if (auto geometry = m_arrowGeometry.lock()) {
@@ -611,9 +646,6 @@ void ModifyTool::updateMarkerPositions() {
     while (m_markerInstances.size() < needed) {
         if (auto geometry = m_marker.lock()) {
             auto newInstance = geometry->createInstance();
-            if (auto inst = newInstance.lock()) {
-                inst->setColor(glm::dvec4(1.0, 0.0, 0.0, 0.5));
-            }
             m_markerInstances.push_back(newInstance);
         }
     }
@@ -624,6 +656,13 @@ void ModifyTool::updateMarkerPositions() {
             const MarkerData& data = markerData[i];
             inst->setPosition(data.position);
             inst->setScale(data.scale);
+
+            // Calculate dynamic alpha for 2D markers
+            double alpha = 0.5; // default
+            if (i < markerDistances.size()) {
+                alpha = 0.25 + 0.5 * (maxDist - markerDistances[i]) / (maxDist - minDist);
+            }
+            inst->setColor(glm::dvec4(1.0, 0.0, 0.0, alpha));
         }
     }
 }

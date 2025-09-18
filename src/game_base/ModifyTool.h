@@ -59,7 +59,6 @@ private:
     
     // 3D arrow markers
     std::weak_ptr<Geometry> m_arrowGeometry;
-    int m_arrowTextureIndex{-1};
     std::vector<std::weak_ptr<Instance>> m_arrowInstances;
     int m_currentSelectedGridMeshId{-1};
     
