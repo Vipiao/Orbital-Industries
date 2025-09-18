@@ -264,8 +264,8 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     if (cachedAxis) {
         GeometryUtils::SeparatingAxisResult result = GeometryUtils::testSeparatingAxis(*cachedAxis, verticesA, verticesB);
         if (result.isSeparating) {
-            // Cache this separating axis again (it worked!)
-            PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, *cachedAxis, currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
+            // Refresh this separating axis cache (it worked!)
+            PairCache<glm::dvec3>::refreshCachedData(polyA->m_debugId, polyB->m_debugId, currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
             return CollisionResult();
         }
     }
@@ -730,6 +730,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     if (canUseCachedContacts) {
         //std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
         // Reuse cached collision data
+        // Refresh cache expiry since we're successfully using it
+        PairCache<CollisionCacheData>::refreshCachedData(gridA->m_debugId, gridB->m_debugId, currentTimestep, COLLISION_CACHE_DURATION);
         if (!cacheData->contactPoints.empty()) {
             // Get cached contact data and rotate both normal and compliant normal
             std::vector<ContactData> cachedContactData = cacheData->contactData;
@@ -781,6 +783,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         } else {
             return CollisionResult(); // No collision cached
         }
+    } else {
+        //std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
     }
 
     // Use simplified contact generation if previous iteration had too many collision pairs

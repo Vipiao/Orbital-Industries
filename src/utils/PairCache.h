@@ -86,6 +86,32 @@ public:
     }
 
     /**
+     * @brief Refresh expiry time for existing cached data without modifying the data
+     * @param idA First object ID (used as cache key)
+     * @param idB Second object ID (used as cache key)
+     * @param currentTime Current time
+     * @param expirationDuration New expiration duration from current time
+     * @return True if cache entry existed and was refreshed, false otherwise
+     */
+    static bool refreshCachedData(int idA, int idB, uint64_t currentTime, uint64_t expirationDuration) {
+        auto cacheKey = makeCacheKey(idA, idB);
+        auto it = s_globalCache.find(cacheKey);
+        
+        if (it == s_globalCache.end()) {
+            return false; // No cached entry exists
+        }
+        
+        // Update expiry time
+        uint64_t newExpiryTime = currentTime + expirationDuration;
+        it->second.expiryTime = newExpiryTime;
+        
+        // Add new expiration to queue
+        s_expirationQueue.push(std::make_pair(newExpiryTime, cacheKey));
+        
+        return true;
+    }
+
+    /**
      * @brief Clear cached data for a specific pair of objects
      * @param idA First object ID (used as cache key)
      * @param idB Second object ID (used as cache key)
