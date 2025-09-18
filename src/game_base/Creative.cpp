@@ -60,8 +60,6 @@ void Creative::processInputs() {
 }
 
 void Creative::physics() {
-    // Apply drag forces to all grids before physics update
-    applyDragForces();
     
     if (doCreate || doRemove || doForce || doTrackSpeed) {
         // Perform ray casting against all grids
@@ -218,6 +216,9 @@ void Creative::physics() {
 
     // Call modify tool physics callback
     m_modifyTool->onPhysicsUpdateComplete();
+    
+    // Apply drag forces to all grids before physics update
+    applyDragForces();
 }
 
 void Creative::addGridBlock(Grid* grid, int x, int y, int z) {
