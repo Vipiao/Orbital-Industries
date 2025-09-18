@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glad/glad.h>
+#include "TextureManagerBase.h"
 #include "SSBOManager.h"
 #include "AssimpLoader.h"
 #include "ShaderProgram.h"
@@ -41,16 +42,6 @@ struct GeometryVertex {
     glm::vec3 normal;
     glm::vec3 tangent;
     glm::vec2 uv;
-};
-
-/**
- * @brief Texture information
- */
-struct TextureInfo {
-    GLuint textureId;
-    uint32_t textureUnit;
-    uint32_t refCount;
-    std::string path;
 };
 
 /**
@@ -127,12 +118,11 @@ private:
  */
 class InstanceHandler {
 public:
-    explicit InstanceHandler(SSBOManager* ssboManager, uint32_t maxTextures = 32);
+    explicit InstanceHandler(SSBOManager* ssboManager);
     ~InstanceHandler();
-    
+
     // Texture management
     int createTexture(const std::string& texturePath);
-    void releaseTexture(int textureIndex);
     
     // Geometry management  
     std::weak_ptr<Geometry> createGeometry(const std::string& modelPath);
@@ -150,21 +140,19 @@ public:
     );
     
 private:
+    // Texture management
+    TextureManagerBase m_textureManager;
+
     // Core data
     std::vector<std::shared_ptr<Geometry>> m_geometries;
-    std::vector<TextureInfo> m_textures;
     
     // OpenGL resources
     SSBOManager* m_ssboManager;
     ShaderProgram m_shaderProgram;
-    
-    // Configuration
-    int m_maxTextures;
     
     // Internal helpers
     void loadGeometryFromFile(Geometry* geometry, const std::string& modelPath);
     void setupGeometryOpenGL(Geometry* geometry, const std::vector<GeometryVertex>& vertices, 
                            const std::vector<uint32_t>& indices);
     void createShaderProgram();
-    int findAvailableTextureUnit();
 };

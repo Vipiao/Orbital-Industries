@@ -57,11 +57,7 @@ RadialMenu::~RadialMenu() {
     }
     
     // Release textures
-    for (int i = 0; i < 9; ++i) {
-        if (m_textures[i] >= 0) {
-            m_graphics->getInstanceHandler()->releaseTexture(m_textures[i]);
-        }
-    }
+    // Textures are automatically cleaned up by TextureManagerBase destructor
     
     // Release geometry
     if (!m_geometry.expired()) {

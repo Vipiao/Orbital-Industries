@@ -6,15 +6,11 @@
 #include <sstream>
 
 MeshManager2D::MeshManager2D(size_t maxInstancesPerGeometry)
-    : m_maxInstancesPerGeometry(maxInstancesPerGeometry), m_nextTextureUnit(0) {
+    : m_maxInstancesPerGeometry(maxInstancesPerGeometry) {
     initializeShaders();
 }
 
 MeshManager2D::~MeshManager2D() {
-    // Cleanup textures
-    for (const auto& texture : m_textures) {
-        glDeleteTextures(1, &texture.textureId);
-    }
 }
 
 void MeshManager2D::initializeShaders() {
@@ -157,41 +153,7 @@ void MeshManager2D::initializeShaders() {
 }
 
 int MeshManager2D::createTexture(const std::string& path) {
-    // Load new texture
-    GLuint textureId;
-    glGenTextures(1, &textureId);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-    
-    // Set texture parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-    // Load image data
-    int width, height, nrChannels;
-    unsigned char* data = STBImageLoader::load(true, path, &width, &height, &nrChannels);
-    
-    if (data) {
-        GLenum format = (nrChannels == 3) ? GL_RGB : GL_RGBA;
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-        STBImageLoader::free(data);
-        
-        // Store texture info
-        Texture texture;
-        texture.textureId = textureId;
-        texture.textureUnit = m_nextTextureUnit++;
-        texture.path = path;
-        
-        m_textures.push_back(texture);
-        
-        return texture.textureUnit;
-    } else {
-        glDeleteTextures(1, &textureId);
-        std::cerr << "MeshManager2D: Failed to load texture " << path << std::endl;
-        return -1;
-    }
+    return m_textureManager.createTexture(path);
 }
 
 std::weak_ptr<GeometryData> MeshManager2D::loadMesh(const std::string& geometryPath,
@@ -246,7 +208,7 @@ std::weak_ptr<GeometryData> MeshManager2D::loadMesh(const std::string& geometryP
     if (!texturePath.empty() && textureUnit == -1) {
         finalTextureUnit = createTexture(texturePath);
         if (finalTextureUnit >= 0) {
-            textureId = m_textures[finalTextureUnit].textureId;
+            textureId = m_textureManager.m_textures[finalTextureUnit].textureId;
         }
     } else if (textureUnit >= 0) {
         finalTextureUnit = textureUnit;

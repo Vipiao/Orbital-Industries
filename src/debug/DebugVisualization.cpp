@@ -43,10 +43,7 @@ DebugVisualization::~DebugVisualization() {
         m_ssboManager->deallocateIndex(meshIndex);
     }
 
-    // Clean up shared resources
-    if (m_resourcesLoaded && m_textureIndex >= 0) {
-        m_instanceHandler->releaseTexture(m_textureIndex);
-    }
+    // Textures are automatically cleaned up by TextureManagerBase destructor
     
     if (auto geometry = m_sphereGeometry.lock()) {
         m_instanceHandler->releaseGeometry(geometry);

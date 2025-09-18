@@ -31,7 +31,7 @@ GraphicsEngine::GraphicsEngine(
     m_meshHandler = std::make_unique<MeshHandler>(maxTriangles, m_ssboManager.get());
 
     // Create instance handler
-    m_instanceHandler = std::make_unique<InstanceHandler>(m_ssboManager.get(), 32);
+    m_instanceHandler = std::make_unique<InstanceHandler>(m_ssboManager.get());
 
     // Create 2D mesh manager
     m_meshManager2D = std::make_unique<MeshManager2D>(1000);

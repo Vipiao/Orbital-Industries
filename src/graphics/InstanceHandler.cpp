@@ -127,8 +127,8 @@ InstanceData Geometry::createInstanceData(Instance* instance) {
     return data;
 }
 
-InstanceHandler::InstanceHandler(SSBOManager* ssboManager, uint32_t maxTextures)
-    : m_ssboManager(ssboManager), m_maxTextures(maxTextures) {
+InstanceHandler::InstanceHandler(SSBOManager* ssboManager)
+    : m_ssboManager(ssboManager) {
     
     if (!m_ssboManager) {
         throw std::runtime_error("SSBOManager cannot be null");
@@ -139,11 +139,7 @@ InstanceHandler::InstanceHandler(SSBOManager* ssboManager, uint32_t maxTextures)
 }
 
 InstanceHandler::~InstanceHandler() {
-    // Clean up OpenGL resources
-    // Clean up textures (ShaderProgram destructor handles shader cleanup)
-    for (const TextureInfo& texture : m_textures) {
-        glDeleteTextures(1, &texture.textureId);
-    }
+    // ShaderProgram destructor handles shader cleanup
 }
 
 void InstanceHandler::createShaderProgram() {
@@ -154,73 +150,7 @@ void InstanceHandler::createShaderProgram() {
 }
 
 int InstanceHandler::createTexture(const std::string& texturePath) {
-    // Check if texture already exists
-    for (size_t i = 0; i < m_textures.size(); ++i) {
-        if (m_textures[i].path == texturePath) {
-            // Increment reference count
-            m_textures[i].refCount++;
-            return static_cast<int>(i);
-        }
-    }
-    
-    // Find available texture unit
-    int textureUnit = findAvailableTextureUnit();
-    if (textureUnit < 0) {
-        throw std::runtime_error("No available texture units");
-    }
-    
-    // Load texture
-    GLuint textureId;
-    glGenTextures(1, &textureId);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-    
-    // Set texture parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    
-    // Load image data using STB (same as MeshHandler)
-    int width, height, nrChannels;
-    unsigned char* data = STBImageLoader::load(true, texturePath, &width, &height, &nrChannels);
-    
-    if (nrChannels == 3) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-    } else {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-    }
-    glGenerateMipmap(GL_TEXTURE_2D);
-    STBImageLoader::free(data);
-    
-    // Create texture info
-    TextureInfo info;
-    info.textureId = textureId;
-    info.textureUnit = static_cast<uint32_t>(textureUnit);
-    info.refCount = 1;
-    info.path = texturePath;
-    
-    m_textures.push_back(info);
-    int textureIndex = static_cast<int>(m_textures.size() - 1);
-    
-    return textureIndex;
-}
-
-void InstanceHandler::releaseTexture(int textureIndex) {
-    if (textureIndex < 0 || textureIndex >= static_cast<int>(m_textures.size())) {
-        std::cerr << "InstanceHandler: Warning - texture index " << textureIndex << " out of range" << std::endl;
-        return;
-    }
-    
-    TextureInfo& info = m_textures[textureIndex];
-    info.refCount--;
-    
-    if (info.refCount == 0) {
-        glDeleteTextures(1, &info.textureId);
-        
-        // Mark as deleted but don't remove from vector to keep indices stable
-        info.textureId = 0;
-        info.path.clear();
-    }
+    return m_textureManager.createTexture(texturePath);
 }
 
 std::weak_ptr<Geometry> InstanceHandler::createGeometry(const std::string& modelPath) {
@@ -414,18 +344,15 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
     }
     
     // Bind all textures
-    for (size_t i = 0; i < m_textures.size(); ++i) {
-        const TextureInfo& texture = m_textures[i];
-        if (texture.textureId != 0) { // Skip deleted textures
-            glActiveTexture(GL_TEXTURE0 + texture.textureUnit);
-            glBindTexture(GL_TEXTURE_2D, texture.textureId);
-            
-            // Set texture uniform
-            std::string textureName = "u_textures[" + std::to_string(texture.textureUnit) + "]";
-            GLint textureLoc = glGetUniformLocation(m_shaderProgram.getID(), textureName.c_str());
-            if (textureLoc != -1) {
-                glUniform1i(textureLoc, static_cast<GLint>(texture.textureUnit));
-            }
+    for (const auto& texture : m_textureManager.m_textures) {
+        glActiveTexture(GL_TEXTURE0 + texture.textureUnit);
+        glBindTexture(GL_TEXTURE_2D, texture.textureId);
+        
+        // Set texture uniform
+        std::string textureName = "u_textures[" + std::to_string(texture.textureUnit) + "]";
+        GLint textureLoc = glGetUniformLocation(m_shaderProgram.getID(), textureName.c_str());
+        if (textureLoc != -1) {
+            glUniform1i(textureLoc, static_cast<GLint>(texture.textureUnit));
         }
     }
     
@@ -470,21 +397,4 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
     }
     
     glBindVertexArray(0);
-}
-
-int InstanceHandler::findAvailableTextureUnit() {
-    // Simple linear search for available unit
-    for (int unit = 0; unit < m_maxTextures; ++unit) {
-        bool unitUsed = false;
-        for (const TextureInfo& texture : m_textures) {
-            if (texture.textureId != 0 && texture.textureUnit == static_cast<uint32_t>(unit)) {
-                unitUsed = true;
-                break;
-            }
-        }
-        if (!unitUsed) {
-            return unit;
-        }
-    }
-    return -1; // No available units
 }

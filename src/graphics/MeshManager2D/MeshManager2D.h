@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include "../AssimpLoader.h"
+#include "../TextureManagerBase.h"
 #include <glm/glm.hpp>
 
 /**
@@ -46,7 +47,7 @@ class MeshManager2D {
 public:
     MeshManager2D(size_t maxInstancesPerGeometry = 1000);
     ~MeshManager2D();
-    
+
     // Texture management
     int createTexture(const std::string& path);
     
@@ -63,18 +64,13 @@ public:
     size_t getTotalInstanceCount() const;
 
 private:
-    struct Texture {
-        GLuint textureId;
-        int textureUnit;
-        std::string path;
-    };
-    
+    // Texture management
+    TextureManagerBase m_textureManager;
+
     std::vector<std::shared_ptr<GeometryData>> m_geometries;
-    std::vector<Texture> m_textures;
     
     ShaderProgram m_shaderProgram;
     size_t m_maxInstancesPerGeometry;
-    int m_nextTextureUnit;
     
     void initializeShaders();
     void bindTextures();

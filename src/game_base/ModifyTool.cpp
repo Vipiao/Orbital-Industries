@@ -48,10 +48,7 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
 }
 
 ModifyTool::~ModifyTool() {
-    // Release arrow texture
-    if (m_arrowTextureIndex >= 0) {
-        m_gameBase->m_graphicsEngine->getInstanceHandler()->releaseTexture(m_arrowTextureIndex);
-    }
+    // Textures are automatically cleaned up by TextureManagerBase destructor
 }
 
 void ModifyTool::activate() {
