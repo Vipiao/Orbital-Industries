@@ -1226,16 +1226,42 @@ void CollisionDetectionUtils::mergeCloseContactPoints(CollisionResult& collision
         return;
     }
     
-    // Remove contacts that are too close to earlier ones
-    for (size_t i = collision.m_contactData.size() - 1; i > 0; --i) {
-        for (size_t j = 0; j < i; ++j) {
-            if (glm::length(collision.m_contactPoints[i] - collision.m_contactPoints[j]) < mergeDistance) {
-                collision.m_contactData.erase(collision.m_contactData.begin() + i);
-                collision.m_contactPoints.erase(collision.m_contactPoints.begin() + i);
-                collision.m_contactPointsLocalA.erase(collision.m_contactPointsLocalA.begin() + i);
-                collision.m_contactPointsLocalB.erase(collision.m_contactPointsLocalB.begin() + i);
-                break;
+    size_t numContacts = collision.m_contactData.size();
+    std::vector<bool> markedForRemoval(numContacts, false);
+    double mergeDistanceSquared = mergeDistance * mergeDistance;
+    
+    // Phase 1: Mark contacts for removal
+    for (size_t i = 0; i < numContacts; ++i) {
+        if (markedForRemoval[i]) continue; // Skip already marked contacts
+        
+        for (size_t j = i + 1; j < numContacts; ++j) {
+            if (markedForRemoval[j]) continue; // Skip already marked contacts
+            
+            double distanceSquared = glm::length2(collision.m_contactPoints[i] - collision.m_contactPoints[j]);
+            if (distanceSquared < mergeDistanceSquared) {
+                // Mark the contact with smaller penetration depth for removal
+                double penetrationI = collision.m_contactData[i].penetration;
+                double penetrationJ = collision.m_contactData[j].penetration;
+                
+                if (penetrationI < penetrationJ) {
+                    markedForRemoval[i] = true;
+                    break; // No need to check more pairs with i since it's marked for removal
+                } else {
+                    markedForRemoval[j] = true;
+                    // Continue checking j+1, j+2, etc. since i is still valid
+                }
             }
+        }
+    }
+    
+    // Phase 2: Remove marked contacts in reverse order
+    for (size_t i = numContacts; i > 0; --i) {
+        size_t index = i - 1;
+        if (markedForRemoval[index]) {
+            collision.m_contactData.erase(collision.m_contactData.begin() + index);
+            collision.m_contactPoints.erase(collision.m_contactPoints.begin() + index);
+            collision.m_contactPointsLocalA.erase(collision.m_contactPointsLocalA.begin() + index);
+            collision.m_contactPointsLocalB.erase(collision.m_contactPointsLocalB.begin() + index);
         }
     }
 }
