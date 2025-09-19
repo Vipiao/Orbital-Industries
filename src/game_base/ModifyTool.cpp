@@ -352,16 +352,16 @@ void ModifyTool::createMenuStructure(int64_t parentNodeId) {
     
     // Add center node so you can navigate into the modify tool
     // Use orange color scheme to indicate modify tool
-    glm::dvec4 centerSelectColor = glm::dvec4(0.9, 0.5, 0.3, 1.0);   // Bright orange, opaque
-    glm::dvec4 centerUnSelectColor = glm::dvec4(0.8, 0.4, 0.2, 1.0); // Orange, opaque
+    //glm::dvec4 centerSelectColor = glm::dvec4(0.9, 0.5, 0.3, 1.0);   // Bright orange, opaque
+    //glm::dvec4 centerUnSelectColor = glm::dvec4(0.8, 0.4, 0.2, 1.0); // Orange, opaque
     
     m_centerNodeId = m_radialMenu->createNode(
-        m_modifyToolParentId, -1, activateCallback, deactivateCallback, 
-        centerSelectColor, centerUnSelectColor);
+        m_modifyToolParentId, -1, activateCallback, deactivateCallback);
+    //    centerSelectColor, centerUnSelectColor);
     
     m_radialMenu->createNode(
-        m_modifyToolParentId, m_modifyIconTextureIndex, activateCallback, deactivateCallback, 
-        centerSelectColor, centerUnSelectColor);
+        m_modifyToolParentId, m_modifyIconTextureIndex, activateCallback, deactivateCallback);
+    //    centerSelectColor, centerUnSelectColor);
 }
 
 glm::dquat ModifyTool::getArrowOrientation(const glm::ivec3& direction) {
