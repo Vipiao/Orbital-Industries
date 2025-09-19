@@ -66,7 +66,7 @@ private:
     // Paint crosshair
     std::weak_ptr<GeometryData> m_paintCrosshairGeometry;
     std::weak_ptr<GeometryInstance> m_paintCrosshairInstance;
-    double m_paintCrosshairTransparency = 0.5;
+    double m_paintCrosshairTransparency = 0.75;
     
     // Color modification callbacks
     void onHueSelected(int value);

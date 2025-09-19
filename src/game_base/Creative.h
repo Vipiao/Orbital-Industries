@@ -13,6 +13,7 @@ class Instance;
 class GeometryInstance;
 class ColorTool;
 class ModifyTool;
+class BuildTool;
 
 /**
  * @brief Creative mode implementation with block placement/removal and force application
@@ -27,16 +28,12 @@ public:
     
 private:
     // Input flags
-    bool doCreate = false;
-    bool doRemove = false;
     bool doForce = false;
     bool doTrackSpeed = false;
     double forceMultiplier = 1.0;
     double m_moveSpeed = 8.;
 
     // Helper methods
-    void addGridBlock(class Grid* grid, int x, int y, int z);
-    void removeGridBlock(class Grid* grid, int x, int y, int z);
     void applyDragForces();
     void processInputLogic();
 
@@ -52,6 +49,9 @@ private:
 
     // Modify tool
     std::unique_ptr<ModifyTool> m_modifyTool;
+
+    // Build tool
+    std::unique_ptr<BuildTool> m_buildTool;
 
     // Regular crosshair
     std::weak_ptr<GeometryData> m_crosshairGeometry;

@@ -16,6 +16,7 @@
 #include "RadialMenu.h"
 #include "ColorTool.h"
 #include "ModifyTool.h"
+#include "BuildTool.h"
 #include "../utils/ColorUtils.h"
 #include <float.h>
 #include <map>
@@ -39,6 +40,9 @@ Creative::Creative(GameBase* gameBase)
     // Create modify tool
     m_modifyTool = std::make_unique<ModifyTool>(m_gameBase, m_radialMenu.get(), rootId);
 
+    // Create build tool
+    m_buildTool = std::make_unique<BuildTool>(m_gameBase, m_radialMenu.get(), rootId);
+
     m_radialMenu->setVisible(false);
 
     // Load crosshair geometry (instance will be managed in processInputLogic)
@@ -60,11 +64,9 @@ void Creative::processInputs() {
 }
 
 void Creative::physics() {
-    
-    if (doCreate || doRemove || doForce || doTrackSpeed) {
-        // Perform ray casting against all grids
+    if (doForce || doTrackSpeed) {
+        // Perform ray casting for force and speed tracking only
         std::weak_ptr<Grid> targetGridWeak;
-        glm::ivec3 targetPos;
         glm::ivec3 hitPos;
         bool blockFound = false;
         double closestT = -1.0;
@@ -98,27 +100,9 @@ void Creative::physics() {
                 
                 // Floor to get hit cell (already in grid coordinates)
                 hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
-                
-                // Surface normal is already in grid-local space from the ray intersection
-                glm::dvec3 gridNormal = result.surfaceNormal;
-                
-                // Find dominant axis direction
-                glm::dvec3 absNormal = glm::abs(gridNormal);
-                glm::ivec3 dominantAxis;
-                if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z) {
-                    dominantAxis = glm::ivec3(gridNormal.x > 0 ? 1 : -1, 0, 0);
-                } else if (absNormal.y >= absNormal.z) {
-                    dominantAxis = glm::ivec3(0, gridNormal.y > 0 ? 1 : -1, 0);
-                } else {
-                    dominantAxis = glm::ivec3(0, 0, gridNormal.z > 0 ? 1 : -1);
-                }
-
-                // Calculate target position (one cell forward along dominant axis)
-                targetPos = hitPos + dominantAxis;
             }
         }
 
-        // Handle the different actions based on what was found
         if (doTrackSpeed) {
             if (blockFound) {
                 auto targetGrid = targetGridWeak.lock();
@@ -155,59 +139,9 @@ void Creative::physics() {
                 //std::cout << "No target found for force application" << std::endl;
             }
         }
-        
-        if (doCreate) {
-            if (blockFound) {
-                auto targetGrid = targetGridWeak.lock();
-                if (targetGrid) {
-                    // Place block at the position before the hit
-                    addGridBlock(targetGrid.get(), targetPos.x, targetPos.y, targetPos.z);
-                    //std::cout << "Added block at (" << targetPos.x << ", " << targetPos.y << ", " << targetPos.z << ")" << std::endl;
-                }
-            } else {
-                // No block found, create a new grid 2 units ahead
-                glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
-                auto newGridWeak = m_gameBase->createGrid(newGridPos);
-                Grid* newGrid = newGridWeak.lock().get();
-                addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
-                //std::cout << "Created new grid with block at world position (" 
-                //        << newGridPos.x << ", " << newGridPos.y << ", " << newGridPos.z << ")" << std::endl;
-            }
-        }
-        
-        if (doRemove) {
-            if (blockFound) {
-                auto targetGrid = targetGridWeak.lock();
-                if (targetGrid) {
-                    // Remove the hit block
-                    removeGridBlock(targetGrid.get(), hitPos.x, hitPos.y, hitPos.z);
-                    //std::cout << "Removed block at (" << hitPos.x << ", " << hitPos.y << ", " << hitPos.z << ")" << std::endl;
-                }
-
-                // Check for grid splits by testing connectivity of neighboring blocks
-                std::vector<glm::ivec3> edgeCoords = {
-                    glm::ivec3(hitPos.x + 1, hitPos.y, hitPos.z),  // +X
-                    glm::ivec3(hitPos.x - 1, hitPos.y, hitPos.z),  // -X
-                    glm::ivec3(hitPos.x, hitPos.y + 1, hitPos.z),  // +Y
-                    glm::ivec3(hitPos.x, hitPos.y - 1, hitPos.z),  // -Y
-                    glm::ivec3(hitPos.x, hitPos.y, hitPos.z + 1),  // +Z
-                    glm::ivec3(hitPos.x, hitPos.y, hitPos.z - 1)   // -Z
-                };
-                
-                // Schedule the grid split check for later processing
-                m_gameBase->scheduleGridSplitCheck(targetGridWeak, edgeCoords);
-                if (targetGrid->isEmpty()) {
-                    m_gameBase->removeGrid(targetGridWeak);
-                }
-            } else {
-                //std::cout << "No block found to remove" << std::endl;
-            }
-        }
     }
 
     // Reset flags
-    doCreate = false;
-    doRemove = false;
     doForce = false;
     doTrackSpeed = false;
 
@@ -216,17 +150,12 @@ void Creative::physics() {
 
     // Call modify tool physics callback
     m_modifyTool->onPhysicsUpdateComplete();
+
+    // Call build tool physics callback
+    m_buildTool->onPhysicsUpdateComplete();
     
     // Apply drag forces to all grids before physics update
     applyDragForces();
-}
-
-void Creative::addGridBlock(Grid* grid, int x, int y, int z) {
-    if (grid) grid->addCell(glm::ivec3(x, y, z));
-}
-
-void Creative::removeGridBlock(Grid* grid, int x, int y, int z) {
-    if (grid) grid->removeCell(glm::ivec3(x, y, z));
 }
 
 void Creative::applyDragForces() {
@@ -255,7 +184,7 @@ void Creative::applyDragForces() {
 
 void Creative::processInputLogic() {
     // Manage crosshair visibility based on color tool state
-    bool anyToolActive = m_colorTool->isActive() || m_modifyTool->isActive();
+    bool anyToolActive = m_colorTool->isActive() || m_modifyTool->isActive() || m_buildTool->isActive();
     if (anyToolActive) {
         // Hide regular crosshair when color tool is active
         if (auto instance = m_crosshairInstance.lock()) {
@@ -271,7 +200,7 @@ void Creative::processInputLogic() {
             if (auto instance = m_crosshairInstance.lock()) {
                 instance->setPosition(glm::vec2(0.0f, 0.0f));
                 instance->setScale(glm::vec2(0.05f, 0.05f));
-                instance->setColor(glm::dvec4(1.0, 1.0, 1.0, 0.5)); // 50% transparency
+                instance->setColor(glm::dvec4(1.0, 0.0, 0.0, 0.75)); // 50% transparency
             }
         }
     }
@@ -476,18 +405,9 @@ void Creative::processInputLogic() {
         }
     }
 
-    if (!radialMenuConsumedMouse && !m_colorTool->isActive() && !m_modifyTool->isActive())
-    {
-        if (mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32)) {
-            doCreate = true;
-        }
-        if (mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32)) {
-            doRemove = true;
-        }
-    }
-
     // Only pass mouse clicks to tools if menu didn't consume them
     if (!radialMenuConsumedMouse) {
+        // Color tool uses right click for copy, left click for paste
         bool doTryCopy = mouseHandler->rightClick();
         bool doTryPaste = mouseHandler->getLeftDown();
         m_colorTool->preRenderCallback(doTryCopy, doTryPaste);
@@ -496,8 +416,15 @@ void Creative::processInputLogic() {
         bool doModify = mouseHandler->leftClick();
         bool doCancel = mouseHandler->rightClick();
         m_modifyTool->preRenderCallback(doModify, doCancel);
+
+
+        // BuildTool uses the classic right click to create, left click to remove
+        bool doCreate = mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32);
+        bool doRemove = mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
+        m_buildTool->preRenderCallback(doCreate, doRemove);
     } else{
         m_colorTool->preRenderCallback(false, false);
         m_modifyTool->preRenderCallback(false, false);
+        m_buildTool->preRenderCallback(false, false);
     }
 }
