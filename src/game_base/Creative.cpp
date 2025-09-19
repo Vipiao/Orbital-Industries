@@ -326,6 +326,10 @@ void Creative::processInputLogic() {
     
     // Camera movement speed
     const double mouseSensitivity = 0.0014;
+
+    // Get framerate for framerate-independent movement
+    int frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
+    double deltaTime = 1.0 / static_cast<double>(frameRate);
     
     // Calculate movement vectors based on camera orientation
     glm::dvec3 right = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(1.0, 0.0, 0.0);
@@ -362,10 +366,11 @@ void Creative::processInputLogic() {
 
     // Accelerate
     if (keyboard->m_c.isDown()) {
-        m_moveSpeed *= 1.05;
+        //m_moveSpeed *= 1.05;
+        m_moveSpeed *= glm::exp(8. * deltaTime);
     }
     if (keyboard->m_v.isDown()) {
-        m_moveSpeed /= 1.05;
+        m_moveSpeed /= glm::exp(8. * deltaTime);
     }
     
     // Mouse look (camera rotation)
@@ -381,7 +386,7 @@ void Creative::processInputLogic() {
         glm::dquat pitchQuat = glm::angleAxis(pitchAngle, glm::dvec3(1.0, 0.0, 0.0));
 
         // Rotate around Y-axis for roll (roll right/roll left)
-        const double rollSpeed = 0.01;
+        const double rollSpeed = 1.65 * deltaTime;
         double rollAngle = keyboard->m_q.isDown()?
             (keyboard->m_e.isDown()?
                 0.: -rollSpeed):
@@ -423,7 +428,7 @@ void Creative::processInputLogic() {
     
     // Apply movement if any keys were pressed
     if (glm::length(moveDirection) > 0.0) {
-        moveDirection = glm::normalize(moveDirection) * m_moveSpeed;
+        moveDirection = glm::normalize(moveDirection) * m_moveSpeed * deltaTime;
         m_gameBase->m_graphicsEngine->getCamPos() += moveDirection;
     }
 

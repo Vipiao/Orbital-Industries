@@ -32,7 +32,7 @@ private:
     bool doForce = false;
     bool doTrackSpeed = false;
     double forceMultiplier = 1.0;
-    double m_moveSpeed = 0.05;
+    double m_moveSpeed = 8.;
 
     // Helper methods
     void addGridBlock(class Grid* grid, int x, int y, int z);

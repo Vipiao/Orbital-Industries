@@ -8,6 +8,7 @@
 #include "../graphics/MeshManager2D/GeometryInstance.h"
 #include "../graphics/InstanceHandler.h"
 #include "../utils/PositionSelector.h"
+#include <cmath>
 #include <iostream>
 #include <algorithm>
 
@@ -152,11 +153,16 @@ void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
     updateMarkerPositions();
 
     // Update wrench animation angles
+    int frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
+    double deltaTime = 1.0 / static_cast<double>(frameRate);
     // Target angle lerps toward 0 at 2% per frame (small decay)
-    m_targetAngle = m_targetAngle * 0.95;
+    //m_targetAngle = m_targetAngle * 0.95;
+    m_targetAngle = m_targetAngle * glm::exp(-8 * deltaTime);
     
     // Current angle lerps toward target angle at 5% per frame (faster follow)
-    m_currentAngle = m_currentAngle + (m_targetAngle - m_currentAngle) * 0.2;
+    //m_currentAngle = m_currentAngle + (m_targetAngle - m_currentAngle) * 0.2;
+    m_currentAngle = m_targetAngle + (m_currentAngle - m_targetAngle) *
+        glm::exp(-36 * deltaTime);
     
     // Update wrench crosshair rotation if active
     if (auto instance = m_modifyCrosshairInstance.lock()) {
