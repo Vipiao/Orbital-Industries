@@ -491,5 +491,8 @@ void Creative::processInputLogic() {
         bool doModify = mouseHandler->leftClick();
         bool doCancel = mouseHandler->rightClick();
         m_modifyTool->preRenderCallback(doModify, doCancel);
+    } else{
+        m_colorTool->preRenderCallback(false, false);
+        m_modifyTool->preRenderCallback(false, false);
     }
 }

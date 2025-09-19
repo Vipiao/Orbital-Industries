@@ -80,6 +80,9 @@ private:
     glm::dvec2 m_crosshairOffset;
     glm::dvec2 m_crosshairScale;
     
+    // Icon texture
+    int m_modifyIconTextureIndex{-1};
+
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);
     void updateMarkerPositions();

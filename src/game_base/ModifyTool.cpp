@@ -40,6 +40,9 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     // Calculate crosshair offset and scale once in constructor
     m_crosshairScale = glm::dvec2(0.05, 0.05);
     // 9x12 pixels of a 64x64 image where the wrench center is located
+
+    // Load modify icon texture
+    m_modifyIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/06_modify_icon.png");
     m_crosshairOffset.x = 2.0 * (0.5 - 9.0/64.0) * m_crosshairScale.x;
     m_crosshairOffset.y = 2.0 * (0.5 - 12.0/64.0) * m_crosshairScale.y;
 
@@ -345,7 +348,7 @@ void ModifyTool::createMenuStructure(int64_t parentNodeId) {
     glm::dvec4 selectColor = glm::dvec4(0.8, 0.4, 0.2, 0.5);    // Orange
     glm::dvec4 unSelectColor = glm::dvec4(0.4, 0.2, 0.1, 0.5);  // Dark orange
     
-    m_modifyToolParentId = m_radialMenu->createNode(parentNodeId, -1, activateCallback, deactivateCallback);
+    m_modifyToolParentId = m_radialMenu->createNode(parentNodeId, m_modifyIconTextureIndex, activateCallback, deactivateCallback);
     
     // Add center node so you can navigate into the modify tool
     // Use orange color scheme to indicate modify tool
@@ -354,6 +357,10 @@ void ModifyTool::createMenuStructure(int64_t parentNodeId) {
     
     m_centerNodeId = m_radialMenu->createNode(
         m_modifyToolParentId, -1, activateCallback, deactivateCallback, 
+        centerSelectColor, centerUnSelectColor);
+    
+    m_radialMenu->createNode(
+        m_modifyToolParentId, m_modifyIconTextureIndex, activateCallback, deactivateCallback, 
         centerSelectColor, centerUnSelectColor);
 }
 

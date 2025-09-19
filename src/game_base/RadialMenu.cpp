@@ -272,6 +272,7 @@ bool RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
 
                 m_currentNodeId = targetChildId;
                 updateRendering();
+                return withinOuterThreshold;
             } else {
                 // Execute callback for leaf nodes (no navigation)
                 if (targetIt->second.m_callback) {
@@ -287,7 +288,10 @@ bool RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRay
     
     double angleStep = (childCount > 1) ? 2.0 * glm::pi<double>() / static_cast<double>(childCount - 1) : 0.0;
     
-    for (size_t i = 0; i < m_currentInstances.size() && i < childCount && i < currentNode.m_childIds.size(); ++i) {
+    for (size_t i = 0; i < currentNode.m_childIds.size(); ++i) {
+        if (i >= m_currentInstances.size()) {
+            throw std::runtime_error("Internal error. Instances index out of bounds.");
+        }
         auto inst = m_currentInstances[i].lock();
         if (!inst) continue;
         
