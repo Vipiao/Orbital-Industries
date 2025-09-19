@@ -362,7 +362,7 @@ void Creative::processInputLogic() {
     }
 
     // Toggle radial menu visibility with B key
-    if (keyboard->m_b.justPressed()) {
+    if (keyboard->m_r.justPressed()) {
         bool visible = m_radialMenu->isVisible();
         m_radialMenu->setVisible(!visible);
         glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
@@ -401,7 +401,10 @@ void Creative::processInputLogic() {
         
         // Handle right click for navigate up
         if (mouseHandler->rightClick() && radialMenuConsumedMouse) {
-            m_radialMenu->navigateToParent();
+            if (!m_radialMenu->navigateToParent()) {
+                // Close menu if already at root
+                m_radialMenu->setVisible(false);
+            }
         }
     }
 

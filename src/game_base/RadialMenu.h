@@ -67,7 +67,7 @@ public:
     bool run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect);
     
     // Navigation
-    void navigateToParent();
+    bool navigateToParent();
 
     // Public rendering update
     void updateRendering();

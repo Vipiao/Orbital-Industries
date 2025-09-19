@@ -177,15 +177,15 @@ glm::dvec3 RadialMenu::worldToLocal(const glm::dvec3& worldPos) const {
     return glm::conjugate(m_orientation) * translated;
 }
 
-void RadialMenu::navigateToParent() {
+bool RadialMenu::navigateToParent() {
     auto currentNodeIt = m_nodes.find(m_currentNodeId);
-    if (currentNodeIt == m_nodes.end()) return;
+    if (currentNodeIt == m_nodes.end()) return false;
     
     int64_t parentId = currentNodeIt->second.m_parentId;
-    if (parentId == -1) return; // Already at root
+    if (parentId == -1) return false; // Already at root
     
     auto parentIt = m_nodes.find(parentId);
-    if (parentIt == m_nodes.end()) return;
+    if (parentIt == m_nodes.end()) return false;
 
     // Call exit callback of current node before switching
     if (currentNodeIt->second.m_onExitCallback) {
@@ -201,7 +201,9 @@ void RadialMenu::navigateToParent() {
 
     updateRendering();
     
-    std::cout << "Navigated to parent node " << parentId << std::endl;
+    //std::cout << "Navigated to parent node " << parentId << std::endl;
+
+    return true;
 }
 
 bool RadialMenu::run(const glm::dvec3& localRayStart, const glm::dvec3& localRayEnd, bool doSelect) {
