@@ -9,6 +9,7 @@ uniform sampler2D gMaterial;
 uniform vec3 u_lightPos;
 uniform mat4 u_projection;
 uniform bool u_ssaoEnabled;
+uniform float u_timeRemainder;
 uniform float u_ssaoRadius;
 uniform float u_ssaoBias;
 uniform vec3 u_ssaoSamples[64];
@@ -22,10 +23,11 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       return 1.0;
    }
    
-   // Generate random tangent vector
+   // Generate random tangent vector that rotates each frame
+   vec2 timeOffset = vec2(u_timeRemainder * 0.1, u_timeRemainder * 0.13);
    vec3 randomVec = vec3(
-      fract(sin(dot(texCoord, vec2(12.9898, 78.233))) * 43758.5453),
-      fract(sin(dot(texCoord + vec2(0.1, 0.1), vec2(12.9898, 78.233))) * 43758.5453),
+      fract(sin(dot(texCoord + timeOffset, vec2(12.9898, 78.233))) * 43758.5453),
+      fract(sin(dot(texCoord + timeOffset + vec2(0.1, 0.1), vec2(12.9898, 78.233))) * 43758.5453),
       0.0
    );
    
@@ -35,7 +37,7 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    mat3 TBN = mat3(tangent, bitangent, normal);
    
    float occlusion = 0.0;
-   int sampleCount = 64; // Match the uniform array size
+   int sampleCount = 60; // Match the uniform array size
    
    //debugColor.x = 0.;
    for (int i = 0; i < sampleCount; ++i) {
@@ -103,7 +105,7 @@ void main() {
 
    // Calculate SSAO
    float ssaoFactor = calculateSSAO(fragPos, normal);
-   ssaoFactor = pow(ssaoFactor, 1.); // TEST
+   ssaoFactor = pow(ssaoFactor, 1.5); // TEST
    
    // Calculate light and view directions (all in L-space)
    vec3 lightVec = u_lightPos - fragPos;
@@ -111,7 +113,7 @@ void main() {
    vec3 viewDir = normalize(-fragPos); // Camera is at origin in view space
    float sqrDist = dot(lightVec, lightVec);
    float attenuation = 32.0/sqrDist;
-   attenuation = 1.0 - 1.0/(1.0+attenuation); // Soft max 1.
+   //attenuation = 1.0 - 1.0/(1.0+attenuation); // Soft max 1.
    attenuation = 1.0;
    
    // Phong lighting model
@@ -121,17 +123,17 @@ void main() {
    float diff = max(dot(normal, lightDir), 0.0);
    //diff += max(dot(normal, -lightDir), 0.0) * 0.1;
 
-   vec3 diffuse = diff * albedo * mix(1.0, ssaoFactor, 0.2);
+   vec3 diffuse = diff * albedo;// * mix(1.0, ssaoFactor, 0.2);
    
    float specularStrength = 0.5;
    vec3 reflectDir = reflect(-lightDir, normal);
    float spec = pow(max(min(dot(viewDir, reflectDir) + 0.001, 1.0), 0.0), 128.0);
    vec3 specular = specularStrength * spec * vec3(1.0);
    
-   float ff = pow(smoothstep(0., 0.5, ssaoFactor), 2.); // TEST
+   //float ff = pow(smoothstep(0., 0.5, ssaoFactor), 2.); // TEST
    //float ff = mix(1.0, ssaoFactor, 1.-pow(ssaoFactor, 3.)); // TEST
    
-   vec3 result = (ambient + (diffuse + specular) * attenuation) * ff;
+   vec3 result = (ambient + (diffuse + specular) * attenuation) * mix(1.0, ssaoFactor, 0.2);
    result = mix(result, albedo, emissiveStrength);
    
    FragColor = vec4(result, 1.);

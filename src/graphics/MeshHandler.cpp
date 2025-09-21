@@ -114,7 +114,7 @@ void MeshHandler::generateSSAOKernel() {
          glm::dvec3 rand3 = Hash::pcgUnit3(static_cast<uint64_t>(seed++));
          double x = rand3.x * 2.0 - 1.0;
          double y = rand3.y * 2.0 - 1.0;
-         double z = rand3.z * 1.5 - 0.5; // Keep z positive for hemisphere
+         double z = rand3.z * 1.3 - 0.3; // Keep z positive for hemisphere
          sample = glm::vec3(x, y, z);
       } while (glm::length(sample) > 1.0);
       
@@ -855,6 +855,11 @@ void MeshHandler::renderToGBuffer(
    GLint ssaoBiasLoc = glGetUniformLocation(lightingProgramID, "u_ssaoBias");
    if (ssaoBiasLoc != -1) {
       glUniform1f(ssaoBiasLoc, static_cast<float>(m_ssaoSettings.bias));
+   }
+    
+   GLint lightingTimeRemainderLoc = glGetUniformLocation(lightingProgramID, "u_timeRemainder");
+   if (lightingTimeRemainderLoc != -1) {
+      glUniform1f(lightingTimeRemainderLoc, static_cast<float>(timeRemainder));
    }
    
    GLint projectionLightingLoc = glGetUniformLocation(lightingProgramID, "u_projection");
