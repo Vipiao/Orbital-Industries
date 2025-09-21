@@ -73,7 +73,7 @@ protected:
 
 private:
     // Deferred grid splitting
-    std::unordered_map<uint64_t, std::unordered_set<glm::ivec3, IVec3Hash>> m_pendingGridSplits;
+    std::unordered_map<uint64_t, std::unordered_set<glm::ivec3, Hash::IVec3Hash>> m_pendingGridSplits;
     bool handlePendingSplits(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     Generator<bool> handlePendingSplitsAsync();
     Generator<bool> performGridSplitAsync(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);

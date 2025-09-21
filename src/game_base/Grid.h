@@ -91,7 +91,7 @@ public:
     glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
 
     // Access to cells for partitioning
-    const std::unordered_map<glm::ivec3, StructuralBlock, IVec3Hash>& getCells() const { return m_cells; }
+    const std::unordered_map<glm::ivec3, StructuralBlock, Hash::IVec3Hash>& getCells() const { return m_cells; }
     
     // Public cell access for vertex data preservation
     StructuralBlock* getCell(const glm::ivec3& coord);
@@ -114,7 +114,7 @@ private:
     static uint64_t s_nextUniqueId;
 
     // Core data for block grid
-    std::unordered_map<glm::ivec3, StructuralBlock, IVec3Hash> m_cells;
+    std::unordered_map<glm::ivec3, StructuralBlock, Hash::IVec3Hash> m_cells;
 
     // Stochastic analysis
     std::unique_ptr<StochasticAnalyzer<StructuralBlock>> m_stochasticAnalyzer;
@@ -122,7 +122,7 @@ private:
     // External system references
     // Mesh update job system
     std::weak_ptr<Job> m_meshUpdateJob;
-    std::unordered_set<glm::ivec3, IVec3Hash> m_pendingMeshUpdates;
+    std::unordered_set<glm::ivec3, Hash::IVec3Hash> m_pendingMeshUpdates;
 
     PhysicsEngine* m_physics;
     RigidBody* m_rigidBody{nullptr};

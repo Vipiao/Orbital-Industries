@@ -59,7 +59,7 @@ public:
     template<typename NodeType>
     bool analyzeSingleNode(
         const glm::ivec3& analysisCenter,
-        const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid);
+        const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid);
     
     // Parameter accessors
     void setParams(const StructuralAnalysisParams& params) { m_params = params; }
@@ -67,8 +67,8 @@ public:
 
 private:
     struct NeighborhoodAnalysis {
-        std::unordered_set<glm::ivec3, IVec3Hash> innerRegion;     // Cells within inner cube
-        std::unordered_set<glm::ivec3, IVec3Hash> perimeterCells;  // Cells in outer shell
+        std::unordered_set<glm::ivec3, Hash::IVec3Hash> innerRegion;     // Cells within inner cube
+        std::unordered_set<glm::ivec3, Hash::IVec3Hash> perimeterCells;  // Cells in outer shell
         bool hasPerimeter = false;
     };
     
@@ -76,20 +76,20 @@ private:
     template<typename NodeType>
     NeighborhoodAnalysis findNeighborhood(
         const glm::ivec3& analysisCenter,
-        const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid);
+        const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid);
     
     template<typename NodeType>
     bool testPerimeterConnectivity(
-        const std::unordered_set<glm::ivec3, IVec3Hash>& perimeterCells,
-        const std::unordered_set<glm::ivec3, IVec3Hash>& innerRegion,
+        const std::unordered_set<glm::ivec3, Hash::IVec3Hash>& perimeterCells,
+        const std::unordered_set<glm::ivec3, Hash::IVec3Hash>& innerRegion,
         const glm::ivec3& analysisCenter,
-        const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid);
+        const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid);
     
     // Helper methods
     template<typename NodeType>
     std::vector<glm::ivec3> getValidNeighbors(
         const glm::ivec3& coord,
-        const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid) const;
+        const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid) const;
     
     double manhattanDistance(const glm::ivec3& a, const glm::ivec3& b) const;
     bool isWithinCube(const glm::ivec3& point, const glm::ivec3& center, int radius) const;
@@ -102,7 +102,7 @@ private:
 template<typename NodeType>
 bool StructuralAnalyzer::analyzeSingleNode(
     const glm::ivec3& analysisCenter,
-    const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid)
+    const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid)
 {
     auto nodeIt = nodeGrid.find(analysisCenter);
     if (nodeIt == nodeGrid.end()) {
@@ -126,7 +126,7 @@ bool StructuralAnalyzer::analyzeSingleNode(
 template<typename NodeType>
 StructuralAnalyzer::NeighborhoodAnalysis StructuralAnalyzer::findNeighborhood(
     const glm::ivec3& analysisCenter,
-    const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid)
+    const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid)
 {
     NeighborhoodAnalysis result;
     
@@ -135,7 +135,7 @@ StructuralAnalyzer::NeighborhoodAnalysis StructuralAnalyzer::findNeighborhood(
     int outerRadius = m_params.searchRadius + 1;
     
     // Multi-target A* search
-    std::unordered_set<glm::ivec3, IVec3Hash> targetsToFind;
+    std::unordered_set<glm::ivec3, Hash::IVec3Hash> targetsToFind;
     
     // Generate all potential targets within outer cube
     for (int x = -outerRadius; x <= outerRadius; ++x) {
@@ -154,9 +154,9 @@ StructuralAnalyzer::NeighborhoodAnalysis StructuralAnalyzer::findNeighborhood(
     }
     
     // Multi-target A* search
-    std::unordered_set<glm::ivec3, IVec3Hash> foundTargets;
+    std::unordered_set<glm::ivec3, Hash::IVec3Hash> foundTargets;
     
-    auto astarResult = AStar<glm::ivec3, IVec3Hash>::search(
+    auto astarResult = AStar<glm::ivec3, Hash::IVec3Hash>::search(
         analysisCenter,
         [&](const glm::ivec3& node) {
             if (targetsToFind.find(node) != targetsToFind.end()) {
@@ -191,10 +191,10 @@ StructuralAnalyzer::NeighborhoodAnalysis StructuralAnalyzer::findNeighborhood(
 
 template<typename NodeType>
 bool StructuralAnalyzer::testPerimeterConnectivity(
-    const std::unordered_set<glm::ivec3, IVec3Hash>& perimeterCells,
-    const std::unordered_set<glm::ivec3, IVec3Hash>& innerRegion,
+    const std::unordered_set<glm::ivec3, Hash::IVec3Hash>& perimeterCells,
+    const std::unordered_set<glm::ivec3, Hash::IVec3Hash>& innerRegion,
     const glm::ivec3& analysisCenter,
-    const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid)
+    const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid)
 {
     if (perimeterCells.size() <= 1) {
         return true; // Single or no perimeter cell is trivially connected
@@ -204,7 +204,7 @@ bool StructuralAnalyzer::testPerimeterConnectivity(
     glm::ivec3 startingPoint = *perimeterCells.begin();
     
     // Create target set (all perimeter cells except starting point)
-    std::unordered_set<glm::ivec3, IVec3Hash> targetsToFind = perimeterCells;
+    std::unordered_set<glm::ivec3, Hash::IVec3Hash> targetsToFind = perimeterCells;
     targetsToFind.erase(startingPoint);
     
     if (targetsToFind.empty()) {
@@ -212,9 +212,9 @@ bool StructuralAnalyzer::testPerimeterConnectivity(
     }
     
     // Multi-target A* search from starting point to all other perimeter cells
-    std::unordered_set<glm::ivec3, IVec3Hash> foundTargets;
+    std::unordered_set<glm::ivec3, Hash::IVec3Hash> foundTargets;
     
-    auto astarResult = AStar<glm::ivec3, IVec3Hash>::search(
+    auto astarResult = AStar<glm::ivec3, Hash::IVec3Hash>::search(
         startingPoint,
         [&](const glm::ivec3& node) {
             if (targetsToFind.find(node) != targetsToFind.end()) {
@@ -243,7 +243,7 @@ bool StructuralAnalyzer::testPerimeterConnectivity(
 template<typename NodeType>
 std::vector<glm::ivec3> StructuralAnalyzer::getValidNeighbors(
     const glm::ivec3& coord,
-    const std::unordered_map<glm::ivec3, NodeType, IVec3Hash>& nodeGrid) const
+    const std::unordered_map<glm::ivec3, NodeType, Hash::IVec3Hash>& nodeGrid) const
 {
     auto nodeIt = nodeGrid.find(coord);
     if (nodeIt == nodeGrid.end()) {

@@ -560,11 +560,11 @@ size_t Grid::computeHash() const {
     
     // Hash rigid body state (most important)
     if (m_rigidBody) {
-        hash = combineHashes(hash, m_rigidBody->computeHash());
+        hash = Hash::combineHashes(hash, m_rigidBody->computeHash());
     }
     
     // Hash center of mass
-    hash = combineHashes(hash, DVec3Hash{}(m_centerOfMass));
+    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_centerOfMass));
     
     // Hash all cells in deterministic order
     std::vector<std::pair<glm::ivec3, const StructuralBlock*>> sortedCells;
@@ -576,7 +576,7 @@ size_t Grid::computeHash() const {
               [](const auto& a, const auto& b) { return a.second->uniqueId < b.second->uniqueId; });
     
     for (const auto& pair : sortedCells) {
-        hash = combineHashes(hash, pair.second->computeHash());
+        hash = Hash::combineHashes(hash, pair.second->computeHash());
     }
     
     return hash;

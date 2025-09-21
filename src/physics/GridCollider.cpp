@@ -815,7 +815,7 @@ VisibleTrianglesResult GridCollider::getVisibleTriangles(const glm::ivec3& coord
     }
     
     // 4: Create unique vertex list and remap triangle indices
-    std::unordered_map<glm::dvec3, int, DVec3Hash> vertexToIndex;
+    std::unordered_map<glm::dvec3, int, Hash::DVec3Hash> vertexToIndex;
     result.vertices.reserve(vertices.size());
     
     for (const auto& triangleIndices : visibleTriangleIndices) {

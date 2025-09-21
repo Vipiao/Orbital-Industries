@@ -35,7 +35,7 @@ public:
         ANALYSIS_COMPLETE
     };
 
-    StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, IVec3Hash>& cells);
+    StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& cells);
     ~StochasticAnalyzer();
     
     // Perform analysis until endTime, return true if more work needed
@@ -61,7 +61,7 @@ private:
     size_t getRandomIndex(size_t maxValue);
     
 private:
-    const std::unordered_map<glm::ivec3, CellType, IVec3Hash>& m_cells;
+    const std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& m_cells;
 
     // State machine variables
     AnalysisState m_analysisState = AnalysisState::SELECTING_RANDOM_CELLS;
@@ -69,7 +69,7 @@ private:
     glm::ivec3 m_selectedEnd;
 
     // A* generator state
-    std::unique_ptr<Generator<typename AStar<glm::ivec3, IVec3Hash>::Result>> m_astarGenerator;
+    std::unique_ptr<Generator<typename AStar<glm::ivec3, Hash::IVec3Hash>::Result>> m_astarGenerator;
     std::vector<glm::ivec3> m_foundPath;
     bool m_pathExists = false;
     
@@ -82,7 +82,7 @@ private:
 
 // Template implementations (must be in header)
 template<typename CellType>
-StochasticAnalyzer<CellType>::StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, IVec3Hash>& cells) 
+StochasticAnalyzer<CellType>::StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& cells) 
     : m_cells(cells)
 {
     initializeCostsAndCache();
@@ -155,8 +155,8 @@ bool StochasticAnalyzer<CellType>::performAnalysisUntil(
                 // Initialize A* generator
                 m_pathExists = false;
                 m_foundPath.clear();
-                m_astarGenerator = std::make_unique<Generator<typename AStar<glm::ivec3, IVec3Hash>::Result>>(
-                    AStar<glm::ivec3, IVec3Hash>::searchGenerator(
+                m_astarGenerator = std::make_unique<Generator<typename AStar<glm::ivec3, Hash::IVec3Hash>::Result>>(
+                    AStar<glm::ivec3, Hash::IVec3Hash>::searchGenerator(
                         m_selectedStart,
                         [this](const glm::ivec3& node) {
                             // Goal test - return true when we reach the end

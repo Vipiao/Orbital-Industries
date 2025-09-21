@@ -9,7 +9,7 @@
 #include "AStar.h"
 #include "HashFunctions.h"
 
-template<typename CellType, typename CellHash = IVec3Hash>
+template<typename CellType, typename CellHash = Hash::IVec3Hash>
 class PartitionCalculator {
 public:
     struct PartitionResult {

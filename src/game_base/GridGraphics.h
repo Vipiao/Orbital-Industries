@@ -66,7 +66,7 @@ public:
     
 private:
     // Graphics cell storage
-    std::unordered_map<glm::ivec3, GraphicsCell, IVec3Hash> m_graphicsCells;
+    std::unordered_map<glm::ivec3, GraphicsCell, Hash::IVec3Hash> m_graphicsCells;
     
     // Graphics engine reference
     GraphicsEngine* m_graphics;

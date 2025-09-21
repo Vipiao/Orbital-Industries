@@ -491,10 +491,10 @@ size_t GameBase::computeHash() const {
     size_t hash = 0;
     
     // Hash physics timestep
-    hash = combineHashes(hash, std::hash<uint64_t>{}(m_physicsEngine->getCurrentPhysicsTimeStep()));
+    hash = Hash::combineHashes(hash, std::hash<uint64_t>{}(m_physicsEngine->getCurrentPhysicsTimeStep()));
     
     for (const auto& grid : m_grids) {
-        hash = combineHashes(hash, grid->computeHash());
+        hash = Hash::combineHashes(hash, grid->computeHash());
     }
     
     return hash;

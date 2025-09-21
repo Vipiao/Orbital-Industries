@@ -20,7 +20,7 @@ public:
     double m_width;
 
     // Type identification
-    static constexpr int TYPE_ID = hashColliderName("CubeCollider");
+    static constexpr int TYPE_ID = Hash::hashColliderName("CubeCollider");
 
     // Static utility methods for generating standard cube geometry
     static std::vector<glm::dvec3> generateCubeVertices(double width);

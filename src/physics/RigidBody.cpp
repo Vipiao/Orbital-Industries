@@ -65,14 +65,14 @@ void RigidBody::invalidateAngularMomentum() {
 size_t RigidBody::computeHash() const {
     size_t hash = 0;
     
-    hash = combineHashes(hash, DVec3Hash{}(m_position));
-    hash = combineHashes(hash, DVec3Hash{}(m_velocity));
-    hash = combineHashes(hash, DVec3Hash{}(m_forces));
-    hash = combineHashes(hash, DQuatHash{}(m_orientation));
-    hash = combineHashes(hash, DVec3Hash{}(m_angularMomentumBody));
-    hash = combineHashes(hash, DVec3Hash{}(m_torques));
-    hash = combineHashes(hash, std::hash<double>{}(m_mass));
-    hash = combineHashes(hash, std::hash<bool>{}(m_isStatic));
+    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_position));
+    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_velocity));
+    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_forces));
+    hash = Hash::combineHashes(hash, Hash::DQuatHash{}(m_orientation));
+    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_angularMomentumBody));
+    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_torques));
+    hash = Hash::combineHashes(hash, std::hash<double>{}(m_mass));
+    hash = Hash::combineHashes(hash, std::hash<bool>{}(m_isStatic));
     // Note: Don't hash cached values or pointers, only core state
     
     return hash;

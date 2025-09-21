@@ -16,11 +16,11 @@ void GridCell::forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> c
 size_t GridCell::computeHash() const {
     size_t hash = 0;
     
-    hash = combineHashes(hash, std::hash<int>{}(static_cast<int>(type)));
-    hash = combineHashes(hash, IVec3Hash{}(coordinates));
-    hash = combineHashes(hash, std::hash<int>{}(cost));
-    hash = combineHashes(hash, std::hash<double>{}(structuralWeakness));
-    hash = combineHashes(hash, std::hash<uint32_t>{}(uniqueId));
+    hash = Hash::combineHashes(hash, std::hash<int>{}(static_cast<int>(type)));
+    hash = Hash::combineHashes(hash, Hash::IVec3Hash{}(coordinates));
+    hash = Hash::combineHashes(hash, std::hash<int>{}(cost));
+    hash = Hash::combineHashes(hash, std::hash<double>{}(structuralWeakness));
+    hash = Hash::combineHashes(hash, std::hash<uint32_t>{}(uniqueId));
     
     return hash;
 }

@@ -173,7 +173,7 @@ private:
         std::vector<std::pair<uint64_t, std::pair<int, int>>>,
         std::greater<std::pair<uint64_t, std::pair<int, int>>>
     > s_expirationQueue;
-    static std::unordered_map<std::pair<int, int>, CachedInfo, IntPairHash> s_globalCache;
+    static std::unordered_map<std::pair<int, int>, CachedInfo, Hash::IntPairHash> s_globalCache;
     static constexpr uint64_t CLEANUP_FREQUENCY = 10; // Check for cleanup every N operations
 };
 
@@ -189,4 +189,4 @@ std::priority_queue<
 > PairCache<DataType>::s_expirationQueue;
 
 template<typename DataType>
-std::unordered_map<std::pair<int, int>, typename PairCache<DataType>::CachedInfo, IntPairHash> PairCache<DataType>::s_globalCache;
+std::unordered_map<std::pair<int, int>, typename PairCache<DataType>::CachedInfo, Hash::IntPairHash> PairCache<DataType>::s_globalCache;

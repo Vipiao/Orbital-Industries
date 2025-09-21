@@ -83,11 +83,11 @@ public:
     std::vector<Collider*> findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const;
 
     // Allow access to cells for collision detection utils
-    const std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, IVec3Hash>& getCells() const { return m_cells; }
+    const std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, Hash::IVec3Hash>& getCells() const { return m_cells; }
 
     // Optimization: Pre-computed neighborhoods for fast spatial queries
     static constexpr int NEIGHBORHOOD_RADIUS = 1; // 3x3x3 neighborhood
-    std::unordered_map<glm::ivec3, CellNeighborhood, IVec3Hash> m_neighborhoods;
+    std::unordered_map<glm::ivec3, CellNeighborhood, Hash::IVec3Hash> m_neighborhoods;
 
     // Access to local AABB bounds for optimization
     const glm::ivec3& getLocalAABBMin() const { return m_localAABBMin; }
@@ -103,11 +103,11 @@ public:
     glm::dvec3 worldToGrid(const glm::dvec3& worldCoord) const;
 
     // Classification-based cell maps for optimized collision detection
-    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_cornerCells;
-    std::unordered_map<glm::ivec3, Collider*, IVec3Hash> m_edgeCells;
+    std::unordered_map<glm::ivec3, Collider*, Hash::IVec3Hash> m_cornerCells;
+    std::unordered_map<glm::ivec3, Collider*, Hash::IVec3Hash> m_edgeCells;
 
     // Type identification  
-    static constexpr int TYPE_ID = hashColliderName("GridCollider");
+    static constexpr int TYPE_ID = Hash::hashColliderName("GridCollider");
 
 private:
     // Job system references for classification
@@ -116,7 +116,7 @@ private:
     
     // Classification system
     std::queue<glm::ivec3> m_classificationQueue;
-    std::unordered_set<glm::ivec3, IVec3Hash> m_queuedCoordinates;
+    std::unordered_set<glm::ivec3, Hash::IVec3Hash> m_queuedCoordinates;
     std::weak_ptr<Job> m_classificationJob;
 
     // Axis counts for efficient AABB calculation
@@ -133,7 +133,7 @@ private:
     uint64_t m_cornersValidUntilTime = 0;
 
     // Map of grid coordinates to cube colliders
-    std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, IVec3Hash> m_cells;
+    std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, Hash::IVec3Hash> m_cells;
     
     // Shape change tracking for cache invalidation
     uint64_t m_shapeChangeTimestamp = 0;
