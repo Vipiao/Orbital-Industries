@@ -12,12 +12,30 @@
 #include <cstdlib>
 #include <ctime>
 
+#define CHECK_GL_ERROR(operation) \
+   do { \
+      GLenum error = glGetError(); \
+      if (error != GL_NO_ERROR) { \
+         std::cerr << "OpenGL error " << error << " after: " << operation << " at line " << __LINE__ << std::endl; \
+      } \
+   } while(0)
+
 MeshHandler::MeshHandler(size_t maxTriangles, SSBOManager* ssboManager)
    : m_maxTriangles(maxTriangles), m_ssboManager(ssboManager) {
 
    m_shaderProgram.loadVertexShaderFromPath("../src/graphics/vertex_shader.vert");
    m_shaderProgram.loadFragmentShaderFromPath("../src/graphics/fragment_shader.frag");
    m_shaderProgram.linkShaders();
+
+   // Load G-buffer shaders
+   m_gbufferShaderProgram.loadVertexShaderFromPath("../src/graphics/gbuffer_vertex_shader.vert");
+   m_gbufferShaderProgram.loadFragmentShaderFromPath("../src/graphics/gbuffer_fragment_shader.frag");
+   m_gbufferShaderProgram.linkShaders();
+   
+   // Load lighting pass shaders
+   m_lightingShaderProgram.loadVertexShaderFromPath("../src/graphics/lighting_vertex_shader.vert");
+   m_lightingShaderProgram.loadFragmentShaderFromPath("../src/graphics/lighting_fragment_shader.frag");
+   m_lightingShaderProgram.linkShaders();
 
    // Vertex buffer object.
    glGenBuffers(1, &m_vertexBuffer);
@@ -61,6 +79,10 @@ MeshHandler::MeshHandler(size_t maxTriangles, SSBOManager* ssboManager)
 
    glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
+
+   // Setup lighting VAO (for fullscreen triangle)
+   glGenVertexArrays(1, &m_lightingVAO);
+   // No vertex buffer needed - geometry generated in vertex shader
 }
 
 MeshHandler::~MeshHandler() {
@@ -70,6 +92,9 @@ MeshHandler::~MeshHandler() {
    for (size_t ii = 0; ii < m_textures.size(); ii++) {
       glDeleteTextures(1, &m_textures[ii].m_texture);
    }
+   glDeleteVertexArrays(1, &m_lightingVAO);
+
+   cleanupGBuffer();
 }
 
 int MeshHandler::addMesh() {
@@ -613,6 +638,195 @@ void MeshHandler::render(
    glBindVertexArray(m_vao);
    glDrawArrays(GL_TRIANGLES, 0, m_totalTriangles * 3);
    glBindVertexArray(0);
+}
+
+void MeshHandler::setupGBuffer(unsigned int width, unsigned int height) {
+   if (m_gbufferInitialized) {
+      cleanupGBuffer();
+   }
+   
+   m_gbufferWidth = width;
+   m_gbufferHeight = height;
+   
+   // Create framebuffer
+   glGenFramebuffers(1, &m_gbufferFBO);
+   glBindFramebuffer(GL_FRAMEBUFFER, m_gbufferFBO);
+   
+   // Create G-buffer textures
+   glGenTextures(1, &m_gbufferAlbedo);
+   glGenTextures(1, &m_gbufferNormal);
+   glGenTextures(1, &m_gbufferPosition);
+   glGenTextures(1, &m_gbufferMaterial);
+   glGenTextures(1, &m_gbufferDepth);
+   
+   // Setup albedo texture (RT0) (R G B + Metallic)
+   glBindTexture(GL_TEXTURE_2D, m_gbufferAlbedo);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_gbufferAlbedo, 0);
+   
+   // Setup normal texture (RT1) (Nx Ny Nz Roguhness)
+   glBindTexture(GL_TEXTURE_2D, m_gbufferNormal);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_gbufferNormal, 0);
+   
+   // Setup position texture (RT2) (X Y Z + ambient occlusion)
+   glBindTexture(GL_TEXTURE_2D, m_gbufferPosition);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_gbufferPosition, 0);
+   
+   // Setup material texture (RT3) (Emissiveness + has geometry + other flags)
+   glBindTexture(GL_TEXTURE_2D, m_gbufferMaterial);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, m_gbufferMaterial, 0);
+   
+   // Setup depth texture
+   glBindTexture(GL_TEXTURE_2D, m_gbufferDepth);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_gbufferDepth, 0);
+   
+   // Set draw buffers
+   unsigned int attachments[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+   glDrawBuffers(4, attachments);
+   
+   // Check framebuffer completeness
+   if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+      throw std::runtime_error("G-buffer framebuffer not complete!");
+   }
+   
+   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   m_gbufferInitialized = true;
+}
+
+void MeshHandler::cleanupGBuffer() {
+   if (m_gbufferInitialized) {
+      glDeleteTextures(1, &m_gbufferAlbedo);
+      glDeleteTextures(1, &m_gbufferNormal);
+      glDeleteTextures(1, &m_gbufferPosition);
+      glDeleteTextures(1, &m_gbufferMaterial);
+      glDeleteTextures(1, &m_gbufferDepth);
+      glDeleteFramebuffers(1, &m_gbufferFBO);
+      m_gbufferInitialized = false;
+   }
+}
+
+void MeshHandler::renderToGBuffer(
+   const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+   double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos
+) {
+   if (!m_gbufferInitialized) {
+      throw std::runtime_error("G-buffer not initialized. Call setupGBuffer() first.");
+   }
+   
+   // Pass 1: Geometry pass - render to G-buffer
+   glBindFramebuffer(GL_FRAMEBUFFER, m_gbufferFBO);
+   glViewport(0, 0, m_gbufferWidth, m_gbufferHeight);
+   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);  // Clear G-buffer to black
+   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+   
+   // Use G-buffer shader program and set same uniforms as forward rendering
+   m_gbufferShaderProgram.use();
+   
+   // Set uniforms (same as forward rendering)
+   unsigned int programID = m_gbufferShaderProgram.getID();
+   GLint viewLoc = glGetUniformLocation(programID, "view");
+   GLint projectionLoc = glGetUniformLocation(programID, "projection");
+   GLint frameLoc = glGetUniformLocation(programID, "u_frame");
+   GLint timeLoc = glGetUniformLocation(programID, "u_time");
+   GLint timeRemainderLoc = glGetUniformLocation(programID, "u_timeRemainder");
+   GLint cameraPosHighLoc = glGetUniformLocation(programID, "u_cameraPositionHigh");
+   GLint cameraPosLowLoc = glGetUniformLocation(programID, "u_cameraPositionLow");
+   
+   if (viewLoc != -1)
+       glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+   if (projectionLoc != -1)
+       glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+   if (frameLoc != -1)
+       glUniform1ui(frameLoc, frame);
+   if (timeLoc != -1)
+       glUniform1ui(timeLoc, time);
+   if (timeRemainderLoc != -1)
+       glUniform1f(timeRemainderLoc, (float)timeRemainder);
+
+   // Set camera position as Dekker number
+   if (cameraPosHighLoc != -1 && cameraPosLowLoc != -1) {
+      using DekkerFloat = DekkerArithmetic<float>;
+      DekkerFloat::DekkerNumber camX(camPos.x);
+      DekkerFloat::DekkerNumber camY(camPos.y);
+      DekkerFloat::DekkerNumber camZ(camPos.z);
+      glm::vec3 camPosHigh(camX.main, camY.main, camZ.main);
+      glm::vec3 camPosLow(camX.error, camY.error, camZ.error);
+      glUniform3fv(cameraPosHighLoc, 1, glm::value_ptr(camPosHigh));
+      glUniform3fv(cameraPosLowLoc, 1, glm::value_ptr(camPosLow));
+   }
+   
+   // Bind textures
+   for (size_t ii = 0; ii < m_textures.size(); ii++) {
+      const Texture* texture = &m_textures[ii];
+      glActiveTexture(GL_TEXTURE0 + texture->m_textureUnit);
+      glBindTexture(GL_TEXTURE_2D, texture->m_texture);
+      
+      std::string textureName = "u_textures[" + std::to_string(texture->m_textureUnit) + "]";
+      GLint textureLoc = glGetUniformLocation(programID, textureName.c_str());
+      if (textureLoc != -1)
+          glUniform1i(textureLoc, texture->m_textureUnit);
+   }
+   
+   // Render geometry
+   glEnable(GL_DEPTH_TEST);
+   glDepthFunc(GL_LEQUAL);
+   glBindVertexArray(m_vao);
+   glDrawArrays(GL_TRIANGLES, 0, m_totalTriangles * 3);
+   glBindVertexArray(0);
+   
+   // Pass 2: Lighting pass - read G-buffer and output final color
+   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   glViewport(0, 0, m_gbufferWidth, m_gbufferHeight);
+   glDisable(GL_DEPTH_TEST);
+   
+   m_lightingShaderProgram.use();
+   unsigned int lightingProgramID = m_lightingShaderProgram.getID();
+   
+   // Bind G-buffer textures
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, m_gbufferAlbedo);
+   glUniform1i(glGetUniformLocation(lightingProgramID, "gAlbedo"), 0);
+   
+   glActiveTexture(GL_TEXTURE1);
+   glBindTexture(GL_TEXTURE_2D, m_gbufferNormal);
+   glUniform1i(glGetUniformLocation(lightingProgramID, "gNormal"), 1);
+   
+   glActiveTexture(GL_TEXTURE2);
+   glBindTexture(GL_TEXTURE_2D, m_gbufferPosition);
+   glUniform1i(glGetUniformLocation(lightingProgramID, "gPosition"), 2);
+   
+   glActiveTexture(GL_TEXTURE3);
+   glBindTexture(GL_TEXTURE_2D, m_gbufferMaterial);
+   glUniform1i(glGetUniformLocation(lightingProgramID, "gMaterial"), 3);
+   
+   // Set lighting uniforms
+   GLint lightPosLoc = glGetUniformLocation(lightingProgramID, "u_lightPos");
+   if (lightPosLoc != -1) {
+      glm::dvec3 lightPosL = lightPos - camPos;
+      glm::vec3 lightPosFloat(lightPosL);
+      glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+   }
+   
+   // Render fullscreen triangle
+   glBindVertexArray(m_lightingVAO);
+   glDrawArrays(GL_TRIANGLES, 0, 3);
+   glBindVertexArray(0);
+   
+   glEnable(GL_DEPTH_TEST);
 }
 
 MeshHandler::Texture MeshHandler::createTexture(std::string texturePath) {

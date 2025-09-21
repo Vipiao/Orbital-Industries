@@ -35,6 +35,9 @@ GraphicsEngine::GraphicsEngine(
 
     // Create 2D mesh manager
     m_meshManager2D = std::make_unique<MeshManager2D>(1000);
+
+    // Setup G-buffer for deferred rendering
+    m_meshHandler->setupGBuffer(screenWidth, screenHeight);
 }
 
 GraphicsEngine::~GraphicsEngine() {
@@ -64,8 +67,8 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     glm::mat4 view = glm::mat4(viewMatrix);
     glm::mat4 projection = glm::mat4(projectionMatrix);
     
-    // Render using MeshHandler's single-pass render method
-    m_meshHandler->render(
+    // Render using MeshHandler's deferred rendering pipeline
+    m_meshHandler->renderToGBuffer(
         view, projection, 
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
@@ -98,6 +101,9 @@ void GraphicsEngine::setRenderParameters(uint64_t physicsTimeStep, double timeRe
 void GraphicsEngine::framebufferSizeCallback(int width, int height) {
     // Call registered callbacks first
     callFramebufferSizeCallbacks(width, height);
+
+    // Resize G-buffer to match new screen dimensions
+    m_meshHandler->setupGBuffer(width, height);
     
     // No additional logic needed here for GraphicsEngine itself
 }
