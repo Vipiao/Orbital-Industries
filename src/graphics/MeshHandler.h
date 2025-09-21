@@ -115,6 +115,15 @@ struct MeshInfo {
    int nextTriangleId{ 0 };
 };
 
+struct SSAOSettings {
+   bool enabled = true;
+   int sampleCount = 64;
+   double radius = 0.5;
+   double bias = 0.01;
+   double ambientInfluence = 1.0;
+   double diffuseInfluence = 0.2;
+};
+
 class MeshHandler {
 public:
    class Texture {
@@ -164,6 +173,12 @@ public:
    void setupGBuffer(unsigned int width, unsigned int height);
    Texture createTexture(std::string texturePath);
    void unitTest();
+
+   // SSAO configuration
+   SSAOSettings& getSSAOSettings() { return m_ssaoSettings; }
+   const SSAOSettings& getSSAOSettings() const { return m_ssaoSettings; }
+   void setSSAOSettings(const SSAOSettings& settings);
+
    ShaderProgram m_shaderProgram{};
 
 protected:
@@ -185,6 +200,11 @@ protected:
    bool m_gbufferInitialized{false};
 
    void cleanupGBuffer();
+
+   // SSAO
+   SSAOSettings m_ssaoSettings{};
+   std::vector<glm::vec3> m_ssaoKernel{};
+   void generateSSAOKernel();
 
    unsigned int m_vertexBuffer{};
    unsigned int m_vao{};

@@ -161,12 +161,17 @@ void main() {
    vec3 rotatedPosition = applyRotationTransform(orientation, scaledPosition, meshData.centerOfRotation.xyz);
    
    // Build TBN matrix
-   vert_TBN = buildTBNMatrix(orientation, normal, tangent);
-   vec3 N = normalize(orientation * normal);
-   vert_normal = N;
+   mat3 worldTBN = buildTBNMatrix(orientation, normal, tangent);
+   vec3 worldNormal = normalize(orientation * normal);
 
    vec4 worldPos = vec4(meshPositionL + rotatedPosition, 1.0);
-   vert_pos = worldPos.xyz;
+
+   // Transform to view space
+   vec4 viewPos = view * worldPos;
+   vert_pos = viewPos.xyz;
+   vert_normal = mat3(view) * worldNormal;
+   vert_TBN = mat3(view) * worldTBN;
+
    vert_color = color;
    gl_Position = projection * view * worldPos;
 }

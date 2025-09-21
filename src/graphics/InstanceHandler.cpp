@@ -338,8 +338,10 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
     
     // Set light position
     if (lightPosLoc != -1) {
+        // Transform light position to view space
         glm::dvec3 lightPosL = lightPos - camPos;
-        glm::vec3 lightPosFloat(lightPosL);
+        glm::vec4 lightPosView = view * glm::vec4(lightPosL, 1.0);
+        glm::vec3 lightPosFloat(lightPosView.x, lightPosView.y, lightPosView.z);
         glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
     }
     

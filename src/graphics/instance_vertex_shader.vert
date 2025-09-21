@@ -172,13 +172,18 @@ void main() {
     vec3 worldTransformedPos = applyRotationTransform(worldOrientation, localTransformedPos * meshData.scale.xyz, meshData.centerOfRotation.xyz);
 
     // Build TBN matrix
-    vert_TBN = buildTBNMatrix(worldOrientation, localTransformedNormal, localTransformedTangent);
-    vec3 N = normalize(worldOrientation * localTransformedNormal);
-    vert_normal = N;
+   mat3 worldTBN = buildTBNMatrix(worldOrientation, localTransformedNormal, localTransformedTangent);
+   vec3 worldNormal = normalize(worldOrientation * localTransformedNormal);
 
     // Final world position in camera space
     vec4 worldPos = vec4(meshPositionL + worldTransformedPos, 1.0);
-    vert_pos = worldPos.xyz;
+
+   // Transform to view space
+   vec4 viewPos = view * worldPos;
+   vert_pos = viewPos.xyz;
+   vert_normal = mat3(view) * worldNormal;
+   vert_TBN = mat3(view) * worldTBN;
+
     vert_color = instanceColor;
     vert_uv = uv;
     
@@ -189,5 +194,5 @@ void main() {
     vert_emissiveScalar = meshData.emissiveScalar;
     vert_occlusionFactor = 1.0; // Default to no occlusion
     
-    gl_Position = projection * view * worldPos;
+    gl_Position = projection * viewPos;
 }
