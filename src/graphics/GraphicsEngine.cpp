@@ -30,14 +30,15 @@ GraphicsEngine::GraphicsEngine(
     m_ssboManager = std::make_unique<SSBOManager>(maxMeshes);
     m_meshHandler = std::make_unique<MeshHandler>(maxTriangles, m_ssboManager.get());
 
+    // Create deferred renderer
+    m_deferredRenderer = std::make_unique<DeferredRenderer>();
+    m_deferredRenderer->setupGBuffer(screenWidth, screenHeight);
+
     // Create instance handler
     m_instanceHandler = std::make_unique<InstanceHandler>(m_ssboManager.get());
 
     // Create 2D mesh manager
     m_meshManager2D = std::make_unique<MeshManager2D>(1000);
-
-    // Setup G-buffer for deferred rendering
-    m_meshHandler->setupGBuffer(screenWidth, screenHeight);
 }
 
 GraphicsEngine::~GraphicsEngine() {
@@ -67,24 +68,49 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     glm::mat4 view = glm::mat4(viewMatrix);
     glm::mat4 projection = glm::mat4(projectionMatrix);
     
-    // Render using MeshHandler's deferred rendering pipeline
-    m_meshHandler->renderToGBuffer(
+    // Begin deferred geometry pass
+    m_deferredRenderer->beginGeometryPass();
+    
+    // Render geometry to G-buffer
+    m_meshHandler->renderGeometry(
         view, projection, 
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
         m_physicsTimeRemainder,           // time remainder (fractional part)
-        {4.0, 4.0, 4.0},                  // hardcoded light position
+        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
         getCamPos()                       // camera position
     );
 
-    // Render instanced geometry
+    // Render instanced geometry to G-buffer
+    m_instanceHandler->renderGeometry(
+        view, projection,
+        getFrameNum(),                    // frame number
+        m_currentPhysicsTimeStep,         // physics time step
+        m_physicsTimeRemainder,           // time remainder (fractional part)
+        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
+        getCamPos(),                      // camera position
+        /*renderOpaque=*/true, /*renderTransparent=*/false
+    );
+    
+    // End geometry pass and do lighting pass
+    m_deferredRenderer->endGeometryPassAndRenderLighting(
+        viewMatrix, projectionMatrix,
+        getFrameNum(),                    // frame number
+        m_currentPhysicsTimeStep,         // physics time step
+        m_physicsTimeRemainder,           // time remainder (fractional part)
+        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
+        getCamPos()                       // camera position
+    );
+
+    // Render transparent instances with forward rendering after lighting
     m_instanceHandler->render(
         view, projection,
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
         m_physicsTimeRemainder,           // time remainder (fractional part)
-        {4.0, 4.0, 4.0},                  // hardcoded light position
-        getCamPos()                       // camera position
+        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
+        getCamPos(),                      // camera position
+        /*renderOpaque=*/false, /*renderTransparent=*/true
     );
 
     // Render 2D overlay
@@ -103,7 +129,7 @@ void GraphicsEngine::framebufferSizeCallback(int width, int height) {
     callFramebufferSizeCallbacks(width, height);
 
     // Resize G-buffer to match new screen dimensions
-    m_meshHandler->setupGBuffer(width, height);
+    m_deferredRenderer->resizeGBuffer(width, height);
     
     // No additional logic needed here for GraphicsEngine itself
 }

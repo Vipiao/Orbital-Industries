@@ -1,7 +1,7 @@
 // InstanceHandler.cpp
 #include "InstanceHandler.h"
-#include "ShaderProgram.h"
-#include "../math/DekkerArithmetic.h"
+#include "../ShaderProgram.h"
+#include "../../math/DekkerArithmetic.h"
 #include <iostream>
 #include <algorithm>
 #include <set>
@@ -136,6 +136,11 @@ InstanceHandler::InstanceHandler(SSBOManager* ssboManager)
     
     // Create shader program (use instance-specific shaders)
     createShaderProgram();
+
+    // Create G-buffer shader program
+    m_gbufferShaderProgram.loadVertexShaderFromPath("../src/graphics/instanceHandler/instance_vertex_shader.vert");
+    m_gbufferShaderProgram.loadFragmentShaderFromPath("../src/graphics/shared_shaders/gbuffer_fragment_shader.frag");
+    m_gbufferShaderProgram.linkShaders();
 }
 
 InstanceHandler::~InstanceHandler() {
@@ -144,8 +149,8 @@ InstanceHandler::~InstanceHandler() {
 
 void InstanceHandler::createShaderProgram() {
     // Use instance-specific vertex shader but reuse fragment shader
-    m_shaderProgram.loadVertexShaderFromPath("../src/graphics/instance_vertex_shader.vert");
-    m_shaderProgram.loadFragmentShaderFromPath("../src/graphics/fragment_shader.frag");
+    m_shaderProgram.loadVertexShaderFromPath("../src/graphics/instanceHandler/instance_vertex_shader.vert");
+    m_shaderProgram.loadFragmentShaderFromPath("../src/graphics/shared_shaders/fragment_shader.frag");
     m_shaderProgram.linkShaders();
 }
 
@@ -304,20 +309,62 @@ void InstanceHandler::setupGeometryOpenGL(Geometry* geometry,
 
 void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection, 
                            uint64_t frame, uint64_t time, double timeRemainder, 
-                           const glm::dvec3& lightPos, const glm::dvec3& camPos) {
+                           const glm::dvec3& lightPos, const glm::dvec3& camPos,
+                           bool renderOpaque, bool renderTransparent) {
     if (m_geometries.empty()) return;
     
+    // Use forward rendering shader program
     m_shaderProgram.use();
     
-    // Set uniforms (same as MeshHandler)
-    GLint viewLoc = glGetUniformLocation(m_shaderProgram.getID(), "view");
-    GLint projectionLoc = glGetUniformLocation(m_shaderProgram.getID(), "projection");
-    GLint frameLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_frame");
-    GLint timeLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_time");
-    GLint timeRemainderLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_timeRemainder");
-    GLint cameraPosHighLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_cameraPositionHigh");
-    GLint cameraPosLowLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_cameraPositionLow");
+    
+    // Set light position (unique to forward rendering)
     GLint lightPosLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_lightPos");
+    if (lightPosLoc != -1) {
+        // Transform light position to view space
+        glm::dvec3 lightPosL = lightPos - camPos;
+        glm::vec4 lightPosView = view * glm::vec4(lightPosL, 1.0);
+        glm::vec3 lightPosFloat(lightPosView.x, lightPosView.y, lightPosView.z);
+        glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+    }
+
+    // Use helper for common rendering logic
+    renderGeometryHelper(view, projection, frame, time, timeRemainder, camPos, renderOpaque, renderTransparent);
+}
+
+void InstanceHandler::renderGeometry(const glm::mat4& view, const glm::mat4& projection, 
+                                   uint64_t frame, uint64_t time, double timeRemainder, 
+                                   const glm::dvec3& lightPos, const glm::dvec3& camPos,
+                                   bool renderOpaque, bool renderTransparent) {
+    if (m_geometries.empty()) return;
+    
+    // Use G-buffer shader program
+    m_gbufferShaderProgram.use();
+    
+    // Use helper for common rendering logic
+    renderGeometryHelper(view, projection, frame, time, timeRemainder, camPos, renderOpaque, renderTransparent);
+}
+
+void InstanceHandler::renderGeometryHelper(
+    const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+    double timeRemainder, const glm::dvec3& camPos,
+    bool renderOpaque, bool renderTransparent) {
+    
+    // Get currently active shader program
+    GLint currentProgram;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+    if (currentProgram == 0) {
+        throw std::runtime_error("No shader program is currently active");
+    }
+    unsigned int programID = static_cast<unsigned int>(currentProgram);
+    
+    // Set uniforms (same as MeshHandler::renderGeometry)
+    GLint viewLoc = glGetUniformLocation(programID, "view");
+    GLint projectionLoc = glGetUniformLocation(programID, "projection");
+    GLint frameLoc = glGetUniformLocation(programID, "u_frame");
+    GLint timeLoc = glGetUniformLocation(programID, "u_time");
+    GLint timeRemainderLoc = glGetUniformLocation(programID, "u_timeRemainder");
+    GLint cameraPosHighLoc = glGetUniformLocation(programID, "u_cameraPositionHigh");
+    GLint cameraPosLowLoc = glGetUniformLocation(programID, "u_cameraPositionLow");
     
     if (viewLoc != -1) glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
     if (projectionLoc != -1) glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
@@ -325,24 +372,19 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
     if (timeLoc != -1) glUniform1ui(timeLoc, time);
     if (timeRemainderLoc != -1) glUniform1f(timeRemainderLoc, static_cast<float>(timeRemainder));
     
-    // Set camera position using Dekker arithmetic
+    // Set camera position as Dekker number
+    if (cameraPosHighLoc == -1 || cameraPosLowLoc == -1) {
+        throw std::runtime_error("Camera position Dekker uniforms not found in shader");
+    }
     {
-        DekkerArithmetic<float>::DekkerNumber camX(camPos.x);
-        DekkerArithmetic<float>::DekkerNumber camY(camPos.y);
-        DekkerArithmetic<float>::DekkerNumber camZ(camPos.z);
+        typedef DekkerArithmetic<float> DekkerFloat;
+        DekkerFloat::DekkerNumber camX(camPos.x);
+        DekkerFloat::DekkerNumber camY(camPos.y);
+        DekkerFloat::DekkerNumber camZ(camPos.z);
         glm::vec3 camPosHigh(camX.main, camY.main, camZ.main);
         glm::vec3 camPosLow(camX.error, camY.error, camZ.error);
-        if (cameraPosHighLoc != -1) glUniform3fv(cameraPosHighLoc, 1, glm::value_ptr(camPosHigh));
-        if (cameraPosLowLoc != -1) glUniform3fv(cameraPosLowLoc, 1, glm::value_ptr(camPosLow));
-    }
-    
-    // Set light position
-    if (lightPosLoc != -1) {
-        // Transform light position to view space
-        glm::dvec3 lightPosL = lightPos - camPos;
-        glm::vec4 lightPosView = view * glm::vec4(lightPosL, 1.0);
-        glm::vec3 lightPosFloat(lightPosView.x, lightPosView.y, lightPosView.z);
-        glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+        glUniform3fv(cameraPosHighLoc, 1, glm::value_ptr(camPosHigh));
+        glUniform3fv(cameraPosLowLoc, 1, glm::value_ptr(camPosLow));
     }
     
     // Bind all textures
@@ -352,15 +394,24 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
         
         // Set texture uniform
         std::string textureName = "u_textures[" + std::to_string(texture.textureUnit) + "]";
-        GLint textureLoc = glGetUniformLocation(m_shaderProgram.getID(), textureName.c_str());
+        GLint textureLoc = glGetUniformLocation(programID, textureName.c_str());
         if (textureLoc != -1) {
             glUniform1i(textureLoc, static_cast<GLint>(texture.textureUnit));
         }
     }
     
-    // Render each geometry with its instances
+    // Set depth testing and render each geometry with its instances
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LEQUAL);
+    
     for (const auto& geometry : m_geometries) {
         if (geometry->m_instanceData.empty()) continue;
+
+        // Filter based on transparency settings
+        bool isTransparent = geometry->m_enableAlphaBlending;
+        if ((isTransparent && !renderTransparent) || (!isTransparent && !renderOpaque)) {
+            continue;
+        }
 
         // Save current OpenGL state
         GLfloat savedDepthRange[2];
@@ -377,7 +428,7 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         }
-        
+
         glBindVertexArray(geometry->m_VAO);
         
         if (geometry->m_hasIndices) {
@@ -400,3 +451,8 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
     
     glBindVertexArray(0);
 }
+
+
+
+
+

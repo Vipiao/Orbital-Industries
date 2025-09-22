@@ -85,8 +85,8 @@
  * @endcode
  */
 
-#include "ShaderProgram.h"
-#include "SSBOManager.h"
+#include "../ShaderProgram.h"
+#include "../SSBOManager.h"
 
 #include <glm/glm.hpp>
 #include <vector>
@@ -113,15 +113,6 @@ struct MeshInfo {
    int numTriangles{ 0 };
    std::map<uint64_t, uint64_t> triangleIndices{}; // Triangle id to index in vertex data.
    int nextTriangleId{ 0 };
-};
-
-struct SSAOSettings {
-   bool enabled = true;
-   int sampleCount = 32;
-   double radius = 0.5;
-   double bias = 0.2;
-   double ambientInfluence = 1.0;
-   double diffuseInfluence = 0.2;
 };
 
 class MeshHandler {
@@ -166,45 +157,19 @@ public:
    void render(
       const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
       double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos);
-   void renderToGBuffer(
+   void renderGeometry(
       const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
       double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos);
    
-   void setupGBuffer(unsigned int width, unsigned int height);
    Texture createTexture(std::string texturePath);
    void unitTest();
 
-   // SSAO configuration
-   SSAOSettings& getSSAOSettings() { return m_ssaoSettings; }
-   const SSAOSettings& getSSAOSettings() const { return m_ssaoSettings; }
-   void setSSAOSettings(const SSAOSettings& settings);
-
    ShaderProgram m_shaderProgram{};
+   ShaderProgram m_gbufferShaderProgram{};
 
 protected:
 
    std::vector<Texture> m_textures{};
-
-   // G-buffer rendering
-   ShaderProgram m_gbufferShaderProgram{};
-   ShaderProgram m_lightingShaderProgram{};
-   unsigned int m_gbufferFBO{};
-   unsigned int m_gbufferAlbedo{};    // RT0: RGB=albedo, A=metallic
-   unsigned int m_gbufferNormal{};    // RT1: RGB=normal, A=roughness  
-   unsigned int m_gbufferPosition{};  // RT2: RGB=position, A=AO
-   unsigned int m_gbufferMaterial{};  // RT3: Material flags
-   unsigned int m_gbufferDepth{};
-   unsigned int m_gbufferWidth{};
-   unsigned int m_gbufferHeight{};
-   unsigned int m_lightingVAO{};      // For fullscreen triangle
-   bool m_gbufferInitialized{false};
-
-   void cleanupGBuffer();
-
-   // SSAO
-   SSAOSettings m_ssaoSettings{};
-   std::vector<glm::vec3> m_ssaoKernel{};
-   void generateSSAOKernel();
 
    unsigned int m_vertexBuffer{};
    unsigned int m_vao{};
@@ -214,5 +179,11 @@ protected:
    std::vector<Vertex> m_vertexData;
    std::map<int64_t, MeshInfo> m_meshIndexToMeshInfo;
    SSBOManager* m_ssboManager;
+
+private:
+   // Helper function for common rendering logic
+   void renderGeometryHelper(
+       const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+       double timeRemainder, const glm::dvec3& camPos);
 
 };

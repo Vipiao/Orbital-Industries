@@ -7,11 +7,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glad/glad.h>
-#include "TextureManagerBase.h"
-#include "SSBOManager.h"
-#include "AssimpLoader.h"
-#include "ShaderProgram.h"
-#include "STBImageLoader.h"
+#include "../TextureManagerBase.h"
+#include "../SSBOManager.h"
+#include "../AssimpLoader.h"
+#include "../ShaderProgram.h"
+#include "../STBImageLoader.h"
 
 // Forward declarations
 class Geometry;
@@ -130,15 +130,18 @@ public:
     
     // Rendering
     void render(
-        const glm::mat4& view, 
-        const glm::mat4& projection, 
-        uint64_t frame, 
-        uint64_t time,
-        double timeRemainder, 
-        const glm::dvec3& lightPos, 
-        const glm::dvec3& camPos
+        const glm::mat4& view, const glm::mat4& projection, 
+        uint64_t frame, uint64_t time, double timeRemainder, 
+        const glm::dvec3& lightPos, const glm::dvec3& camPos,
+        bool renderOpaque = true, bool renderTransparent = true
     );
-    
+
+    // Geometry-only rendering for deferred pipeline
+    void renderGeometry(
+        const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+        double timeRemainder, const glm::dvec3& lightPos, const glm::dvec3& camPos,
+        bool renderOpaque = true, bool renderTransparent = true);
+
 private:
     // Texture management
     TextureManagerBase m_textureManager;
@@ -149,10 +152,17 @@ private:
     // OpenGL resources
     SSBOManager* m_ssboManager;
     ShaderProgram m_shaderProgram;
+    ShaderProgram m_gbufferShaderProgram;
     
     // Internal helpers
     void loadGeometryFromFile(Geometry* geometry, const std::string& modelPath);
     void setupGeometryOpenGL(Geometry* geometry, const std::vector<GeometryVertex>& vertices, 
                            const std::vector<uint32_t>& indices);
     void createShaderProgram();
+
+    // Helper function for common rendering logic
+    void renderGeometryHelper(
+        const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+        double timeRemainder, const glm::dvec3& camPos,
+        bool renderOpaque, bool renderTransparent);
 };

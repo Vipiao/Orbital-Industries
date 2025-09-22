@@ -1,7 +1,7 @@
 // RadialMenu.cpp
 #include "RadialMenu.h"
 #include "../graphics/GraphicsEngine.h"
-#include "../graphics/InstanceHandler.h"
+#include "../graphics/InstanceHandler/InstanceHandler.h"
 #include "../graphics/SSBOManager.h"
 #include <iostream>
 

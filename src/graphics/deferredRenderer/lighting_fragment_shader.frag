@@ -59,7 +59,7 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       float sampleDepth = texture(gPosition, offset.xy).z;
       
       // Range check to reduce artifacts
-      float haloFactor = 2.;
+      float haloFactor = 1.;
       float rangeCheck = smoothstep(0.0, 1.0, haloFactor * u_ssaoRadius / abs(fragPos.z - sampleDepth));
       
       // Compare depths
@@ -107,7 +107,7 @@ void main() {
 
    // Calculate SSAO
    float ssaoFactor = calculateSSAO(fragPos, normal);
-   ssaoFactor = pow(ssaoFactor, 1.3); // TEST
+   ssaoFactor = pow(ssaoFactor, 1.0); // TEST
    
    // Calculate light and view directions (all in L-space)
    vec3 lightVec = u_lightPos - fragPos;

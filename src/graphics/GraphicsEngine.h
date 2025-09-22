@@ -5,10 +5,11 @@
 #include "GraphicsCallbacks.h"
 #include "CallbackManager.h"
 #include "CallbackManager.h"
-#include "MeshHandler.h"
+#include "meshHandler/MeshHandler.h"
+#include "deferredRenderer/DeferredRenderer.h"
 #include "AssimpLoader.h"
 #include "MeshManager2D/MeshManager2D.h"
-#include "InstanceHandler.h"
+#include "instanceHandler/InstanceHandler.h"
 #include "SSBOManager.h"
 #include <memory>
 #include <string>
@@ -108,6 +109,7 @@ public:
 private:
     std::shared_ptr<GraphicsEngineBase> m_graphicsEngineBase;
 
+    std::unique_ptr<DeferredRenderer> m_deferredRenderer;
     std::unique_ptr<MeshManager2D> m_meshManager2D;
     std::unique_ptr<InstanceHandler> m_instanceHandler;
     // Render parameters

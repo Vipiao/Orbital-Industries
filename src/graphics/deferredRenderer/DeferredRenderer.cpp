@@ -1,0 +1,249 @@
+#include "DeferredRenderer.h"
+#include "../../math/DekkerArithmetic.h"
+#include "../../utils/HashFunctions.h"
+#include <iostream>
+#include <stdexcept>
+#include <limits>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+
+DeferredRenderer::DeferredRenderer() {
+    // Load lighting pass shaders
+    m_lightingShaderProgram.loadVertexShaderFromPath("../src/graphics/deferredRenderer/lighting_vertex_shader.vert");
+    m_lightingShaderProgram.loadFragmentShaderFromPath("../src/graphics/deferredRenderer/lighting_fragment_shader.frag");
+    m_lightingShaderProgram.linkShaders();
+    
+    // Setup lighting VAO (for fullscreen triangle)
+    glGenVertexArrays(1, &m_lightingVAO);
+    // No vertex buffer needed - geometry generated in vertex shader
+    
+    generateSSAOKernel();
+}
+
+DeferredRenderer::~DeferredRenderer() {
+    cleanupGBuffer();
+    glDeleteVertexArrays(1, &m_lightingVAO);
+}
+
+void DeferredRenderer::generateSSAOKernel() {
+    m_ssaoKernel.clear();
+    m_ssaoKernel.reserve(m_ssaoSettings.sampleCount);
+    
+    int seed = 0;
+    for (int i = 0; i < m_ssaoSettings.sampleCount; ++i) {
+        glm::vec3 sample;
+        
+        // Generate point in unit cube, reject if outside unit sphere
+        do {
+            glm::dvec3 rand3 = Hash::pcgUnit3(static_cast<uint64_t>(seed++));
+            double x = rand3.x * 2.0 - 1.0;
+            double y = rand3.y * 2.0 - 1.0;
+            double z = rand3.z * 1.1 - 0.1; // Keep z positive for hemisphere
+            sample = glm::vec3(x, y, z);
+        } while (glm::length(sample) > 1.0);
+        
+        // Normalize and scale by random factor
+        sample = glm::normalize(sample);
+        double scale = Hash::pcgUnit(static_cast<uint64_t>(i + 1000));
+        
+        // Scale samples to be more concentrated near center
+        scale = 0.1 + scale * 0.9; // Range [0.1, 1.0]
+        //scale = scale * scale; // Square to concentrate near center
+        
+        sample *= static_cast<float>(scale);
+        m_ssaoKernel.push_back(sample);
+    }
+}
+
+void DeferredRenderer::setSSAOSettings(const SSAOSettings& settings) {
+    m_ssaoSettings = settings;
+    generateSSAOKernel(); // Regenerate kernel if sample count changed
+}
+
+void DeferredRenderer::setupGBuffer(unsigned int width, unsigned int height) {
+    if (m_gbufferInitialized) {
+        cleanupGBuffer();
+    }
+    
+    m_gbufferWidth = width;
+    m_gbufferHeight = height;
+    
+    // Create framebuffer
+    glGenFramebuffers(1, &m_gbufferFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, m_gbufferFBO);
+    
+    // Create G-buffer textures
+    glGenTextures(1, &m_gbufferAlbedo);
+    glGenTextures(1, &m_gbufferNormal);
+    glGenTextures(1, &m_gbufferPosition);
+    glGenTextures(1, &m_gbufferMaterial);
+    glGenTextures(1, &m_gbufferDepth);
+    
+    // Setup albedo texture (RT0) (R G B + Metallic)
+    glBindTexture(GL_TEXTURE_2D, m_gbufferAlbedo);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_gbufferAlbedo, 0);
+    
+    // Setup normal texture (RT1) (Nx Ny Nz Roguhness)
+    glBindTexture(GL_TEXTURE_2D, m_gbufferNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, m_gbufferNormal, 0);
+    
+    // Setup position texture (RT2) (X Y Z + ambient occlusion)
+    glBindTexture(GL_TEXTURE_2D, m_gbufferPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, m_gbufferPosition, 0);
+    
+    // Setup material texture (RT3) (Emissiveness + has geometry + other flags)
+    glBindTexture(GL_TEXTURE_2D, m_gbufferMaterial);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, m_gbufferMaterial, 0);
+    
+    // Setup depth texture
+    glBindTexture(GL_TEXTURE_2D, m_gbufferDepth);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_gbufferDepth, 0);
+    
+    // Set draw buffers
+    unsigned int attachments[4] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3};
+    glDrawBuffers(4, attachments);
+    
+    // Check framebuffer completeness
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        throw std::runtime_error("G-buffer framebuffer not complete!");
+    }
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    m_gbufferInitialized = true;
+}
+
+void DeferredRenderer::resizeGBuffer(unsigned int width, unsigned int height) {
+    setupGBuffer(width, height);
+}
+
+void DeferredRenderer::cleanupGBuffer() {
+    if (m_gbufferInitialized) {
+        glDeleteTextures(1, &m_gbufferAlbedo);
+        glDeleteTextures(1, &m_gbufferNormal);
+        glDeleteTextures(1, &m_gbufferPosition);
+        glDeleteTextures(1, &m_gbufferMaterial);
+        glDeleteTextures(1, &m_gbufferDepth);
+        glDeleteFramebuffers(1, &m_gbufferFBO);
+        m_gbufferInitialized = false;
+    }
+}
+
+void DeferredRenderer::beginGeometryPass() {
+    if (!m_gbufferInitialized) {
+        throw std::runtime_error("G-buffer not initialized. Call setupGBuffer() first.");
+    }
+    
+    // Bind G-buffer for rendering
+    glBindFramebuffer(GL_FRAMEBUFFER, m_gbufferFBO);
+    glViewport(0, 0, m_gbufferWidth, m_gbufferHeight);
+
+    // Clear each buffer with appropriate values
+    glClearBufferfv(GL_COLOR, 0, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f))); // Albedo: black
+    glClearBufferfv(GL_COLOR, 1, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f))); // Normal: zero
+    glClearBufferfv(GL_COLOR, 2, glm::value_ptr(glm::vec4(0.0f, 0.0f, -std::numeric_limits<float>::max(), 0.0f))); // Position: far negative Z
+    glClearBufferfv(GL_COLOR, 3, glm::value_ptr(glm::vec4(0.0f, 0.0f, 0.0f, 0.0f))); // Material
+    glClear(GL_DEPTH_BUFFER_BIT); // Clear depth buffer
+}
+
+void DeferredRenderer::endGeometryPassAndRenderLighting(
+    const glm::dmat4& view, const glm::dmat4& projection,
+    uint64_t frame, uint64_t time, double timeRemainder,
+    const glm::dvec3& lightPos, const glm::dvec3& camPos)
+{
+    // Switch to default framebuffer for lighting pass
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, m_gbufferWidth, m_gbufferHeight);
+    glDisable(GL_DEPTH_TEST);
+    
+    // Use lighting shader
+    m_lightingShaderProgram.use();
+    unsigned int lightingProgramID = m_lightingShaderProgram.getID();
+
+    // Set SSAO uniforms
+    GLint ssaoEnabledLoc = glGetUniformLocation(lightingProgramID, "u_ssaoEnabled");
+    if (ssaoEnabledLoc != -1) {
+        glUniform1i(ssaoEnabledLoc, m_ssaoSettings.enabled ? 1 : 0);
+    }
+    
+    GLint ssaoRadiusLoc = glGetUniformLocation(lightingProgramID, "u_ssaoRadius");
+    if (ssaoRadiusLoc != -1) {
+        glUniform1f(ssaoRadiusLoc, static_cast<float>(m_ssaoSettings.radius));
+    }
+    
+    GLint ssaoBiasLoc = glGetUniformLocation(lightingProgramID, "u_ssaoBias");
+    if (ssaoBiasLoc != -1) {
+        glUniform1f(ssaoBiasLoc, static_cast<float>(m_ssaoSettings.bias));
+    }
+     
+    GLint lightingTimeRemainderLoc = glGetUniformLocation(lightingProgramID, "u_timeRemainder");
+    if (lightingTimeRemainderLoc != -1) {
+        glUniform1f(lightingTimeRemainderLoc, static_cast<float>(timeRemainder));
+    }
+    
+    // Convert double precision matrices to float for OpenGL
+    glm::mat4 projectionFloat = glm::mat4(projection);
+    GLint projectionLightingLoc = glGetUniformLocation(lightingProgramID, "u_projection");
+    if (projectionLightingLoc != -1) {
+        glUniformMatrix4fv(projectionLightingLoc, 1, GL_FALSE, glm::value_ptr(projectionFloat));
+    }
+    
+    // Set SSAO kernel samples
+    for (int i = 0; i < m_ssaoSettings.sampleCount && i < 32; ++i) {
+        std::string uniformName = "u_ssaoSamples[" + std::to_string(i) + "]";
+        GLint sampleLoc = glGetUniformLocation(lightingProgramID, uniformName.c_str());
+        if (sampleLoc != -1) {
+            glUniform3fv(sampleLoc, 1, glm::value_ptr(m_ssaoKernel[i]));
+        }
+    }
+    
+    // Bind G-buffer textures
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_gbufferAlbedo);
+    glUniform1i(glGetUniformLocation(lightingProgramID, "gAlbedo"), 0);
+    
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_gbufferNormal);
+    glUniform1i(glGetUniformLocation(lightingProgramID, "gNormal"), 1);
+    
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, m_gbufferPosition);
+    glUniform1i(glGetUniformLocation(lightingProgramID, "gPosition"), 2);
+    
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, m_gbufferMaterial);
+    glUniform1i(glGetUniformLocation(lightingProgramID, "gMaterial"), 3);
+    
+    // Set lighting uniforms
+    GLint lightPosLoc = glGetUniformLocation(lightingProgramID, "u_lightPos");
+    if (lightPosLoc != -1) {
+        // Transform light position to view space
+        glm::dvec3 lightPosL = lightPos - camPos;
+        glm::mat4 viewFloat = glm::mat4(view);
+        glm::vec4 lightPosView = viewFloat * glm::vec4(lightPosL, 1.0);
+        glm::vec3 lightPosFloat(lightPosView.x, lightPosView.y, lightPosView.z);
+        glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+    }
+    
+    // Render fullscreen triangle
+    glBindVertexArray(m_lightingVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    
+    // Re-enable depth testing for subsequent rendering
+    glEnable(GL_DEPTH_TEST);
+}

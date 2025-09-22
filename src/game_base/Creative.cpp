@@ -12,7 +12,7 @@
 #include "../graphics/MeshManager2D/MeshManager2D.h"
 #include "../graphics/MeshManager2D/GeometryInstance.h"
 #include "StructuralBlock.h"
-#include "../graphics/InstanceHandler.h"
+#include "../graphics/InstanceHandler/InstanceHandler.h"
 #include "RadialMenu.h"
 #include "ColorTool.h"
 #include "ModifyTool.h"
