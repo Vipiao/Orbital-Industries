@@ -117,9 +117,9 @@ struct MeshInfo {
 
 struct SSAOSettings {
    bool enabled = true;
-   int sampleCount = 64;
+   int sampleCount = 32;
    double radius = 0.5;
-   double bias = 0.01;
+   double bias = 0.2;
    double ambientInfluence = 1.0;
    double diffuseInfluence = 0.2;
 };

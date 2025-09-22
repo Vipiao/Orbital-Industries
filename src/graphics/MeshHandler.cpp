@@ -114,7 +114,7 @@ void MeshHandler::generateSSAOKernel() {
          glm::dvec3 rand3 = Hash::pcgUnit3(static_cast<uint64_t>(seed++));
          double x = rand3.x * 2.0 - 1.0;
          double y = rand3.y * 2.0 - 1.0;
-         double z = rand3.z * 1.3 - 0.3; // Keep z positive for hemisphere
+         double z = rand3.z * 1.2 - 0.2; // Keep z positive for hemisphere
          sample = glm::vec3(x, y, z);
       } while (glm::length(sample) > 1.0);
       
@@ -868,7 +868,7 @@ void MeshHandler::renderToGBuffer(
    }
    
    // Set SSAO kernel samples
-   for (int i = 0; i < m_ssaoSettings.sampleCount && i < 64; ++i) {
+   for (int i = 0; i < m_ssaoSettings.sampleCount && i < 32; ++i) {
       std::string uniformName = "u_ssaoSamples[" + std::to_string(i) + "]";
       GLint sampleLoc = glGetUniformLocation(lightingProgramID, uniformName.c_str());
       if (sampleLoc != -1) {

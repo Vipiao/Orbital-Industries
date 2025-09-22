@@ -12,7 +12,7 @@ uniform bool u_ssaoEnabled;
 uniform float u_timeRemainder;
 uniform float u_ssaoRadius;
 uniform float u_ssaoBias;
-uniform vec3 u_ssaoSamples[64];
+uniform vec3 u_ssaoSamples[32];
 
 in vec2 texCoord;
 
@@ -37,7 +37,7 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    mat3 TBN = mat3(tangent, bitangent, normal);
    
    float occlusion = 0.0;
-   int sampleCount = 60; // Match the uniform array size
+   int sampleCount = 32; // Match the uniform array size
    
    //debugColor.x = 0.;
    for (int i = 0; i < sampleCount; ++i) {
@@ -63,7 +63,10 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       float rangeCheck = smoothstep(0.0, 1.0, haloFactor * u_ssaoRadius / abs(fragPos.z - sampleDepth));
       
       // Compare depths
-      occlusion += (sampleDepth >= samplePos.z + u_ssaoBias ? 1.0 : 0.0) * rangeCheck;
+      //occlusion += (sampleDepth >= samplePos.z + u_ssaoBias ? 1.0 : 0.0) * rangeCheck;
+      float depthDiff = sampleDepth - samplePos.z;
+      float occlusionContribution = smoothstep(-u_ssaoBias, u_ssaoBias, depthDiff);
+      occlusion += occlusionContribution * rangeCheck;
       //debugColor.x *= rangeCheck;
       //debugColor.x = max(debugColor.x, abs(fragPos.z - sampleDepth));
    }
@@ -91,7 +94,6 @@ void main() {
    float geometryFlag = materialSample.g;
    float alpha = materialSample.a;
 
-    
    // Detect background pixels and discard them to preserve sky background
    if (geometryFlag < 0.5) {
        discard;
@@ -105,7 +107,7 @@ void main() {
 
    // Calculate SSAO
    float ssaoFactor = calculateSSAO(fragPos, normal);
-   ssaoFactor = pow(ssaoFactor, 1.5); // TEST
+   ssaoFactor = pow(ssaoFactor, 1.3); // TEST
    
    // Calculate light and view directions (all in L-space)
    vec3 lightVec = u_lightPos - fragPos;
@@ -130,10 +132,8 @@ void main() {
    float spec = pow(max(min(dot(viewDir, reflectDir) + 0.001, 1.0), 0.0), 128.0);
    vec3 specular = specularStrength * spec * vec3(1.0);
    
-   //float ff = pow(smoothstep(0., 0.5, ssaoFactor), 2.); // TEST
-   //float ff = mix(1.0, ssaoFactor, 1.-pow(ssaoFactor, 3.)); // TEST
-   
-   vec3 result = (ambient + (diffuse + specular) * attenuation) * mix(1.0, ssaoFactor, 0.2);
+   float ff =  mix(1.0, ssaoFactor, 0.4);
+   vec3 result = (ambient + (diffuse + specular) * ff * attenuation);
    result = mix(result, albedo, emissiveStrength);
    
    FragColor = vec4(result, 1.);
