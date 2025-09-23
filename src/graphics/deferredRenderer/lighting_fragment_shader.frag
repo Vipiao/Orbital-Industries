@@ -4,10 +4,12 @@ out vec4 FragColor;
 
 uniform sampler2D gAlbedo;
 uniform sampler2D gNormal;
-uniform sampler2D gPosition;
 uniform sampler2D gMaterial;
+uniform sampler2D gDepth;
 uniform vec3 u_lightPos;
 uniform mat4 u_projection;
+uniform mat4 u_inverseProjection;
+uniform vec2 u_screenSize;
 uniform bool u_ssaoEnabled;
 uniform float u_timeRemainder;
 uniform float u_ssaoRadius;
@@ -17,6 +19,18 @@ uniform vec3 u_ssaoSamples[32];
 in vec2 texCoord;
 
 vec3 debugColor = vec3(0.);
+
+vec3 reconstructPosition(vec2 screenCoord, float depth) {
+   // Convert screen coordinates to NDC
+   vec2 ndc = screenCoord * 2.0 - 1.0;
+   
+   // Create clip space coordinates
+   vec4 clipSpace = vec4(ndc, depth * 2.0 - 1.0, 1.0);
+   
+   // Transform to view space
+   vec4 viewSpace = u_inverseProjection * clipSpace;
+   return viewSpace.xyz / viewSpace.w;
+}
 
 float calculateSSAO(vec3 fragPos, vec3 normal) {
    if (!u_ssaoEnabled) {
@@ -56,7 +70,8 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       }
       
       // Sample depth at this position
-      float sampleDepth = texture(gPosition, offset.xy).z;
+      vec3 reconstructedPos = reconstructPosition(offset.xy, texture(gDepth, offset.xy).r);
+      float sampleDepth = reconstructedPos.z;
       
       // Range check to reduce artifacts
       float haloFactor = 1.;
@@ -81,17 +96,17 @@ void main() {
    // Sample G-buffer
    vec4 albedoSample = texture(gAlbedo, texCoord);
    vec4 normalSample = texture(gNormal, texCoord);
-   vec4 positionSample = texture(gPosition, texCoord);
    vec4 materialSample = texture(gMaterial, texCoord);
+   float depth = texture(gDepth, texCoord).r;
    
    vec3 albedo = albedoSample.rgb;
    float metallic = albedoSample.a;
    vec3 normal = normalSample.rgb * 2.0 - 1.0;  // Decode normal from [0,1] to [-1,1]
    float roughness = normalSample.a;
-   vec3 fragPos = positionSample.rgb;
-   //float ao = positionSample.a;
+   vec3 fragPos = reconstructPosition(texCoord, depth);
    float emissiveStrength = materialSample.r;
    float geometryFlag = materialSample.g;
+   float occlusionFactor = materialSample.b;
    float alpha = materialSample.a;
 
    // Detect background pixels and discard them to preserve sky background
@@ -133,7 +148,7 @@ void main() {
    vec3 specular = specularStrength * spec * vec3(1.0);
    
    float ff =  mix(1.0, ssaoFactor, 0.5);
-   vec3 result = (ambient + (diffuse + specular) * ff * attenuation);
+   vec3 result = (ambient + (diffuse + specular) * ff * attenuation) * occlusionFactor;
    result = mix(result, albedo, emissiveStrength);
    
    FragColor = vec4(result, 1.);

@@ -41,8 +41,7 @@ private:
     unsigned int m_gbufferFBO{};
     unsigned int m_gbufferAlbedo{};    // RT0: RGB=albedo, A=metallic
     unsigned int m_gbufferNormal{};    // RT1: RGB=normal, A=roughness  
-    unsigned int m_gbufferPosition{};  // RT2: RGB=position, A=AO
-    unsigned int m_gbufferMaterial{};  // RT3: Material flags
+    unsigned int m_gbufferMaterial{};  // RT2: Material flags + occlusion
     unsigned int m_gbufferDepth{};
     unsigned int m_gbufferWidth{};
     unsigned int m_gbufferHeight{};

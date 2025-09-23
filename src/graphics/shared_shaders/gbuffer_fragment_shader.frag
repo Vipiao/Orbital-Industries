@@ -2,8 +2,7 @@
 
 layout(location = 0) out vec4 gAlbedo;    // RGB: albedo, A: metallic
 layout(location = 1) out vec4 gNormal;    // RGB: world normal, A: roughness
-layout(location = 2) out vec4 gPosition;  // RGB: world position, A: AO
-layout(location = 3) out vec4 gMaterial;  // R: emissive, G: texture flags, B: material ID, A: alpha
+layout(location = 2) out vec4 gMaterial;  // R: emissive, G: texture flags, B: occlusion, A: alpha
 
 uniform sampler2D u_textures[16];
 
@@ -119,6 +118,5 @@ void main() {
    // Output to G-buffer
    gAlbedo = vec4(objectColor, 0.0);  // A: metallic factor (hardcoded to 0 for now)
    gNormal = vec4(normal * 0.5 + 0.5, 0.5);  // Encode normal to [0,1], A: roughness
-   gPosition = vec4(vert_pos, vert_occlusionFactor);  // A: AO factor
-   gMaterial = vec4(emissiveStrength, 1.0, 0.0, alpha);  // R: emissive, G: geometry flag, B: material ID, A: alpha
+   gMaterial = vec4(emissiveStrength, 1.0, vert_occlusionFactor, alpha);  // R: emissive, G: geometry flag, B: occlusion, A: alpha
 }
