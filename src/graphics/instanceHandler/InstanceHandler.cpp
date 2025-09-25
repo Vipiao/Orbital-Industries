@@ -141,6 +141,11 @@ InstanceHandler::InstanceHandler(SSBOManager* ssboManager)
     m_gbufferShaderProgram.loadVertexShaderFromPath("../src/graphics/instanceHandler/instance_vertex_shader.vert");
     m_gbufferShaderProgram.loadFragmentShaderFromPath("../src/graphics/shared_shaders/gbuffer_fragment_shader.frag");
     m_gbufferShaderProgram.linkShaders();
+
+    // Create depth shader program
+    m_depthShaderProgram.loadVertexShaderFromPath("../src/graphics/instanceHandler/instance_depth_vertex_shader.vert");
+    m_depthShaderProgram.loadFragmentShaderFromPath("../src/graphics/shared_shaders/depth_fragment_shader.frag");
+    m_depthShaderProgram.linkShaders();
 }
 
 InstanceHandler::~InstanceHandler() {
@@ -309,7 +314,7 @@ void InstanceHandler::setupGeometryOpenGL(Geometry* geometry,
 
 void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection, 
                            uint64_t frame, uint64_t time, double timeRemainder, 
-                           const glm::dvec3& lightPos, const glm::dvec3& camPos,
+                           const glm::dvec3& lightDir, const glm::dvec3& camPos,
                            bool renderOpaque, bool renderTransparent) {
     if (m_geometries.empty()) return;
     
@@ -317,14 +322,13 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
     m_shaderProgram.use();
     
     
-    // Set light position (unique to forward rendering)
-    GLint lightPosLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_lightPos");
-    if (lightPosLoc != -1) {
-        // Transform light position to view space
-        glm::dvec3 lightPosL = lightPos - camPos;
-        glm::vec4 lightPosView = view * glm::vec4(lightPosL, 1.0);
-        glm::vec3 lightPosFloat(lightPosView.x, lightPosView.y, lightPosView.z);
-        glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+    // Set light direction (unique to forward rendering)
+    GLint lightDirLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_lightDir");
+    if (lightDirLoc != -1) {
+        // Transform light direction to view space
+        glm::vec4 lightDirView = view * glm::vec4(lightDir, 0.0);
+        glm::vec3 lightDirFloat(lightDirView.x, lightDirView.y, lightDirView.z);
+        glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDirFloat));
     }
 
     // Use helper for common rendering logic
@@ -333,12 +337,25 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
 
 void InstanceHandler::renderGeometry(const glm::mat4& view, const glm::mat4& projection, 
                                    uint64_t frame, uint64_t time, double timeRemainder, 
-                                   const glm::dvec3& lightPos, const glm::dvec3& camPos,
+                                   const glm::dvec3& lightDir, const glm::dvec3& camPos,
                                    bool renderOpaque, bool renderTransparent) {
     if (m_geometries.empty()) return;
     
     // Use G-buffer shader program
     m_gbufferShaderProgram.use();
+    
+    // Use helper for common rendering logic
+    renderGeometryHelper(view, projection, frame, time, timeRemainder, camPos, renderOpaque, renderTransparent);
+}
+
+void InstanceHandler::renderDepth(const glm::mat4& view, const glm::mat4& projection, 
+                                uint64_t frame, uint64_t time, double timeRemainder, 
+                                const glm::dvec3& camPos,
+                                bool renderOpaque, bool renderTransparent) {
+    if (m_geometries.empty()) return;
+    
+    // Use depth-only shader program
+    m_depthShaderProgram.use();
     
     // Use helper for common rendering logic
     renderGeometryHelper(view, projection, frame, time, timeRemainder, camPos, renderOpaque, renderTransparent);
@@ -438,7 +455,7 @@ void InstanceHandler::renderGeometryHelper(
             glDrawArraysInstanced(GL_TRIANGLES, 0, geometry->m_vertexCount, 
                                 static_cast<GLsizei>(geometry->m_instanceData.size()));
         }
-        
+
         // Restore OpenGL state
         glDepthRange(savedDepthRange[0], savedDepthRange[1]);
         

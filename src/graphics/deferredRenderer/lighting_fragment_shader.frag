@@ -6,7 +6,10 @@ uniform sampler2D gAlbedo;
 uniform sampler2D gNormal;
 uniform sampler2D gMaterial;
 uniform sampler2D gDepth;
-uniform vec3 u_lightPos;
+uniform sampler2D u_shadowMap;
+uniform mat4 u_lightSpaceMatrix;
+uniform bool u_shadowsEnabled;
+uniform vec3 u_lightDir;
 uniform mat4 u_projection;
 uniform mat4 u_inverseProjection;
 uniform vec2 u_screenSize;
@@ -92,6 +95,69 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    return occlusion;
 }
 
+// Simple hash function for per-pixel randomness
+float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+vec2 hash2(vec2 p) {
+    return fract(sin(vec2(dot(p, vec2(127.1, 211.7)), dot(p, vec2(169.5, 183.3)))) * 43758.5453123);
+}
+
+float calculateShadow(
+   vec3 fragPos, vec3 normal, vec3 lightDir, float bias
+) {
+    if (!u_shadowsEnabled) {
+        return 1.0; // No shadow
+    }
+    
+    // Transform fragment position to light space
+    vec4 fragPosLightSpace = u_lightSpaceMatrix * vec4(fragPos, 1.0);
+    
+    // Perform perspective divide
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    
+    // Transform to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    // Check if fragment is outside shadow map bounds
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0) {
+        return 1.0; // Outside shadow map, assume no shadow
+    }
+    
+    // Get current fragment depth in light space
+    float currentDepth = projCoords.z;
+    
+    // Calculate bias to prevent shadow acne
+    //float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
+    //float bias = 0.;
+
+    // Temporal jittering: add per-pixel random offsets that vary over time
+    vec2 screenPos = gl_FragCoord.xy;
+    vec2 timeOffset = vec2(u_timeRemainder * 0.3, u_timeRemainder * 0.7); // Different time scales for X/Y
+    vec2 jitterSeed = screenPos + timeOffset;
+    vec2 jitter = (hash2(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
+    vec2 texelSize = 1.0 / textureSize(u_shadowMap, 0);
+    vec2 jitteredOffset = jitter * texelSize; // Scale to texel size
+
+    // PCF (Percentage Closer Filtering) for soft shadows
+    float shadow = 0.0;
+    for(int x = -1; x <= 1; ++x) {
+    //for(int x = 0; x < 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+        //for(int y = 0; y < 1; ++y) {
+            // Apply both PCF offset and temporal jitter
+            vec2 sampleOffset = vec2(x, y) * texelSize + jitteredOffset;
+            float pcfDepth = texture(u_shadowMap, projCoords.xy + sampleOffset).r;
+            shadow += currentDepth - bias > pcfDepth ? 0.0 : 1.0;
+            //shadow += smoothstep(-0.001, 0.0, pcfDepth - (currentDepth - bias));
+        }    
+    }
+    shadow /= 9.0; // Average the 9 samples
+    
+    return shadow;
+}
+
 void main() {
    // Sample G-buffer
    vec4 albedoSample = texture(gAlbedo, texCoord);
@@ -124,19 +190,22 @@ void main() {
    float ssaoFactor = calculateSSAO(fragPos, normal);
    ssaoFactor = pow(ssaoFactor, 1.0); // TEST
    
-   // Calculate light and view directions (all in L-space)
-   vec3 lightVec = u_lightPos - fragPos;
-   vec3 lightDir = normalize(lightVec);
+   // For directional light, use the light direction directly
+   vec3 lightDir = normalize(-u_lightDir);
    vec3 viewDir = normalize(-fragPos); // Camera is at origin in view space
-   float sqrDist = dot(lightVec, lightVec);
-   float attenuation = 32.0/sqrDist;
-   //attenuation = 1.0 - 1.0/(1.0+attenuation); // Soft max 1.
-   attenuation = 1.0;
+   
+   // No distance attenuation for directional light
+   float attenuation = 1.0;
+   
+   // Calculate shadow factor
+   float bias = 0.001/(1000./50.) + length(fragPos) * 0.000004;
+   //debugColor.x = length(fragPos) * 0.001;
+   float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias);
    
    // Phong lighting model
    float ambientStrength = 0.3;
    vec3 ambient = ambientStrength * albedo * ssaoFactor;
-   
+
    float diff = max(dot(normal, lightDir), 0.0);
    //diff += max(dot(normal, -lightDir), 0.0) * 0.1;
 
@@ -148,7 +217,7 @@ void main() {
    vec3 specular = specularStrength * spec * vec3(1.0);
    
    float ff =  mix(1.0, ssaoFactor, 0.5);
-   vec3 result = (ambient + (diffuse + specular) * ff * attenuation) * occlusionFactor;
+   vec3 result = (ambient + (diffuse + specular) * ff * attenuation * shadowFactor) * occlusionFactor;
    result = mix(result, albedo, emissiveStrength);
    
    FragColor = vec4(result, 1.);

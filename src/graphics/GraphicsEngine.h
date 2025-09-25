@@ -11,6 +11,7 @@
 #include "MeshManager2D/MeshManager2D.h"
 #include "instanceHandler/InstanceHandler.h"
 #include "SSBOManager.h"
+#include "shadowRenderer/ShadowRenderer.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -102,6 +103,9 @@ public:
     // Render parameter setting
     void setRenderParameters(uint64_t physicsTimeStep, double timeRemainder);
     
+    // Shadow configuration
+    void setShadowsEnabled(bool enabled) { m_shadowsEnabled = enabled; }
+
     std::unique_ptr<SSBOManager> m_ssboManager;
     std::unique_ptr<MeshHandler> m_meshHandler;
     uint64_t currentTime{0};
@@ -112,9 +116,18 @@ private:
     std::unique_ptr<DeferredRenderer> m_deferredRenderer;
     std::unique_ptr<MeshManager2D> m_meshManager2D;
     std::unique_ptr<InstanceHandler> m_instanceHandler;
+    std::unique_ptr<ShadowRenderer> m_shadowRenderer;
+
     // Render parameters
     uint64_t m_currentPhysicsTimeStep = 0;
     double m_physicsTimeRemainder = 0.0;
+
+    // Shadow parameters
+    bool m_shadowsEnabled = true;
+    glm::dvec3 m_lightDirection = glm::normalize(glm::dvec3(1.0, -1.0, -1.0));
     
     GraphicsEngineBase* getGraphicsEngineBase() const;
+
+    // Helper method for shadow rendering
+    void renderShadowPass(const glm::mat4& lightSpaceMatrix);
 };

@@ -29,7 +29,10 @@ public:
     void endGeometryPassAndRenderLighting(
         const glm::dmat4& view, const glm::dmat4& projection,
         uint64_t frame, uint64_t time, double timeRemainder,
-        const glm::dvec3& lightPos, const glm::dvec3& camPos);
+        const glm::dvec3& lightDir, const glm::dvec3& camPos,
+        unsigned int shadowMapTexture = 0,
+        const glm::dmat4& lightSpaceMatrix = glm::dmat4(1.0),
+        bool shadowsEnabled = false);
     
     // SSAO configuration
     SSAOSettings& getSSAOSettings() { return m_ssaoSettings; }

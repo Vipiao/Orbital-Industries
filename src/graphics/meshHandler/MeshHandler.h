@@ -156,16 +156,21 @@ public:
    void removeMesh(int meshIndex);
    void render(
       const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
-      double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos);
+      double timeRemainder, const glm::dvec3& lightDir, glm::dvec3 camPos);
    void renderGeometry(
       const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
-      double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos);
-   
+      double timeRemainder, const glm::dvec3& lightDir, glm::dvec3 camPos);
+   void renderDepth(
+      const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+      double timeRemainder, const glm::dvec3& camPos,
+      bool renderOpaque = true, bool renderTransparent = false);
+
    Texture createTexture(std::string texturePath);
    void unitTest();
 
    ShaderProgram m_shaderProgram{};
    ShaderProgram m_gbufferShaderProgram{};
+   ShaderProgram m_depthShaderProgram{};
 
 protected:
 

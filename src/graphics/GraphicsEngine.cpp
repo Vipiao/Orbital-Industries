@@ -1,6 +1,7 @@
 // GraphicsEngine.cpp
 #include "GraphicsEngine.h"
 #include "GraphicsEngineBase.h"
+#include "../utils/HashFunctions.h"
 #include <iostream>
 #include <filesystem>
 
@@ -39,6 +40,12 @@ GraphicsEngine::GraphicsEngine(
 
     // Create 2D mesh manager
     m_meshManager2D = std::make_unique<MeshManager2D>(1000);
+
+    // Create shadow renderer
+    m_shadowRenderer = std::make_unique<ShadowRenderer>();
+    //m_shadowRenderer->setupShadowMap(4096, 4096); // Default shadow map resolution
+    m_shadowRenderer->setupShadowMap(2048, 2048); // Default shadow map resolution
+    //m_shadowRenderer->setupShadowMap(1024, 1024); // Default shadow map resolution
 }
 
 GraphicsEngine::~GraphicsEngine() {
@@ -67,6 +74,69 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     // Convert double precision matrices to float precision
     glm::mat4 view = glm::mat4(viewMatrix);
     glm::mat4 projection = glm::mat4(projectionMatrix);
+
+    // Shadow mapping variables
+    unsigned int shadowMapTexture = 0;
+    glm::dmat4 lightSpaceMatrix = glm::dmat4(1.0);
+    
+    if (m_shadowsEnabled) {
+        // Calculate light space matrix for directional light
+        // For now, create a simple orthographic projection around the scene
+        double shadowDistance = 1000.0; // Distance from camera to cover
+        glm::dvec3 lightDir = glm::normalize(m_lightDirection);
+        
+        // Light position in L-space (camera-relative coordinates)
+        glm::dvec3 lightPosL = -lightDir * shadowDistance;
+        
+        //lightPos = {0,0,0};
+        //lightDir = {1,0,-1};
+        // Create light view matrix (looking towards light direction)
+        // Since we're in L-space, camera is at origin
+        glm::dmat4 lightView = glm::lookAt(
+            lightPosL,
+            lightPosL + lightDir,
+            glm::dvec3(0.0, 1.0, 0.0) // Up vector
+        );
+        
+        // Create orthographic projection for directional light
+        double orthoSize = 50;
+        glm::dmat4 lightProjection = glm::ortho(
+            -orthoSize, orthoSize,
+            -orthoSize, orthoSize,
+            0.1, shadowDistance * 2.0
+        );
+
+#if 0 // Jitter shadows to hide pixels.
+        // Add temporal jittering to reduce shadow map aliasing
+        // Generate sub-pixel random offsets based on frame number
+        uint64_t frameNum = getFrameNum();
+        glm::dvec3 random3 = Hash::pcgUnit3(frameNum);
+        
+        // Convert to [-1, 1] range and scale to approximately 1 pixel in shadow map space
+        double shadowMapSize = static_cast<double>(m_shadowRenderer->getShadowMapWidth());
+        double offsetScale = 1.0 / shadowMapSize; // x/shadowMapSize pixels worth of jitter for good effect
+        double offsetX = (random3.x - 0.5) * offsetScale;
+        double offsetY = (random3.y - 0.5) * offsetScale;
+        
+        // Apply jitter by translating the projection matrix
+        glm::dmat4 jitterMatrix = glm::translate(glm::dmat4(1.0), glm::dvec3(offsetX, offsetY, 0.0));
+        lightProjection = jitterMatrix * lightProjection;
+#endif
+        // For lighting pass: transform from camera view space to light projection space
+        // Fragment positions are reconstructed in camera view space, so we need:
+        // lightProjection * lightView * inverse(cameraView)
+        // This transforms: camera view space → L-space → light view space → light projection space
+        glm::dmat4 inverseCameraView = glm::inverse(viewMatrix);
+        lightSpaceMatrix = lightProjection * lightView * inverseCameraView;
+        
+        // Render shadow map
+        m_shadowRenderer->beginShadowPass();
+        // For shadow pass: transform directly from L-space to light projection space
+        renderShadowPass(glm::mat4(lightProjection * lightView));
+        m_shadowRenderer->endShadowPass();
+        
+        shadowMapTexture = m_shadowRenderer->getShadowMapTexture();
+    }
     
     // Begin deferred geometry pass
     m_deferredRenderer->beginGeometryPass();
@@ -77,7 +147,7 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
         m_physicsTimeRemainder,           // time remainder (fractional part)
-        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
+        m_lightDirection,                 // light direction
         getCamPos()                       // camera position
     );
 
@@ -87,7 +157,7 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
         m_physicsTimeRemainder,           // time remainder (fractional part)
-        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
+        m_lightDirection,                 // light direction
         getCamPos(),                      // camera position
         /*renderOpaque=*/true, /*renderTransparent=*/false
     );
@@ -98,8 +168,11 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
         m_physicsTimeRemainder,           // time remainder (fractional part)
-        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
-        getCamPos()                       // camera position
+        m_lightDirection,                 // light direction (for directional light)
+        getCamPos(),                      // camera position
+        shadowMapTexture,                 // shadow map texture
+        lightSpaceMatrix,                 // light space transformation matrix
+        m_shadowsEnabled                  // whether shadows are enabled
     );
 
     // Render transparent instances with forward rendering after lighting
@@ -108,7 +181,7 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
         getFrameNum(),                    // frame number
         m_currentPhysicsTimeStep,         // physics time step
         m_physicsTimeRemainder,           // time remainder (fractional part)
-        glm::dvec3(4.0, 4.0, 4.0),        // hardcoded light position
+        m_lightDirection,                 // light direction
         getCamPos(),                      // camera position
         /*renderOpaque=*/false, /*renderTransparent=*/true
     );
@@ -117,6 +190,27 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     float aspectRatio = getScreenWidth() / (float)getScreenHeight();
     glm::mat4 projection2D = glm::ortho(-1.0f, 1.0f, -1.0f/aspectRatio, 1.0f/aspectRatio, 0.0f, 1.0f);
     m_meshManager2D->render(projection2D);
+}
+
+void GraphicsEngine::renderShadowPass(const glm::mat4& lightSpaceMatrix) {
+    // Render depth-only pass for shadow mapping
+    m_meshHandler->renderDepth(
+        glm::mat4(1.0), lightSpaceMatrix,  // Identity view, light projection for transform
+        getFrameNum(),                     // frame number
+        m_currentPhysicsTimeStep,          // physics time step
+        m_physicsTimeRemainder,            // time remainder (fractional part)
+        getCamPos(),                       // camera position
+        /*renderOpaque=*/true, /*renderTransparent=*/false  // Only opaque objects cast shadows
+    );
+
+    m_instanceHandler->renderDepth(
+        glm::mat4(1.0), lightSpaceMatrix,  // Identity view, light projection for transform
+        getFrameNum(),                     // frame number
+        m_currentPhysicsTimeStep,          // physics time step
+        m_physicsTimeRemainder,            // time remainder (fractional part)
+        getCamPos(),                       // camera position
+        /*renderOpaque=*/true, /*renderTransparent=*/false  // Only opaque objects cast shadows
+    );
 }
 
 void GraphicsEngine::setRenderParameters(uint64_t physicsTimeStep, double timeRemainder) {

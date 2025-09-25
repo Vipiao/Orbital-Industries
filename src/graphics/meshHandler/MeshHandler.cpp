@@ -34,6 +34,11 @@ MeshHandler::MeshHandler(size_t maxTriangles, SSBOManager* ssboManager)
    m_gbufferShaderProgram.loadFragmentShaderFromPath("../src/graphics/shared_shaders/gbuffer_fragment_shader.frag");
    m_gbufferShaderProgram.linkShaders();
 
+   // Load depth-only shaders
+   m_depthShaderProgram.loadVertexShaderFromPath("../src/graphics/meshHandler/mesh_depth_vertex_shader.vert");
+   m_depthShaderProgram.loadFragmentShaderFromPath("../src/graphics/shared_shaders/depth_fragment_shader.frag");
+   m_depthShaderProgram.linkShaders();
+
    // Vertex buffer object.
    glGenBuffers(1, &m_vertexBuffer);
    glBindBuffer(GL_ARRAY_BUFFER, m_vertexBuffer);
@@ -551,19 +556,18 @@ void MeshHandler::removeMesh(int meshIndex) {
 
 void MeshHandler::render(
    const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
-   double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos
+   double timeRemainder, const glm::dvec3& lightDir, glm::dvec3 camPos
 ) {
    // Use forward rendering shader program
    m_shaderProgram.use();
    
-   // Set light position (unique to forward rendering)
-   GLint lightPosLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_lightPos");
-   if (lightPosLoc != -1) {
-      // Transform light position to view space
-      glm::dvec3 lightPosL = lightPos - camPos;
-      glm::vec4 lightPosView = view * glm::vec4(lightPosL, 1.0);
-      glm::vec3 lightPosFloat(lightPosView.x, lightPosView.y, lightPosView.z);
-      glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+   // Set light direction (unique to forward rendering)
+   GLint lightDirLoc = glGetUniformLocation(m_shaderProgram.getID(), "u_lightDir");
+   if (lightDirLoc != -1) {
+      // Transform light direction to view space
+      glm::vec4 lightDirView = view * glm::vec4(lightDir, 0.0);
+      glm::vec3 lightDirFloat(lightDirView.x, lightDirView.y, lightDirView.z);
+      glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDirFloat));
    }
 
    // Use helper for common rendering logic
@@ -572,10 +576,22 @@ void MeshHandler::render(
 
 void MeshHandler::renderGeometry(
    const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
-   double timeRemainder, const glm::dvec3& lightPos, glm::dvec3 camPos
+   double timeRemainder, const glm::dvec3& lightDir, glm::dvec3 camPos
 ) {
    // Use G-buffer shader program
    m_gbufferShaderProgram.use();
+   
+   // Use helper for common rendering logic
+   renderGeometryHelper(view, projection, frame, time, timeRemainder, camPos);
+}
+
+void MeshHandler::renderDepth(
+   const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+   double timeRemainder, const glm::dvec3& camPos,
+   bool renderOpaque, bool renderTransparent
+) {
+   // Use depth-only shader program
+   m_depthShaderProgram.use();
    
    // Use helper for common rendering logic
    renderGeometryHelper(view, projection, frame, time, timeRemainder, camPos);

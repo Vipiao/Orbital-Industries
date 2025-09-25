@@ -7,7 +7,7 @@ uniform vec3 u_cameraPositionLow;
 uniform sampler2D u_textures[16];
 uniform uint u_time;
 uniform float u_timeRemainder;
-uniform vec3 u_lightPos;
+uniform vec3 u_lightDir;
 
 in vec3 vert_normal;
 in mat3 vert_TBN;
@@ -135,15 +135,13 @@ void main() {
       return;
    }
 
-   // Calculate light and view directions (all in L-space now)
-   vec3 lightVec = u_lightPos - vert_pos;
-   vec3 lightDir = normalize(lightVec);
+   // Calculate light and view directions (directional light)
+   vec3 lightDir = normalize(-u_lightDir);
    vec3 viewDir = normalize(-vert_pos); // Camera is at origin in L-space
-   float sqrDist = dot(lightVec, lightVec);
-   float attenuation = 32./sqrDist;// + 4./length(lightVec);
-   attenuation = 1. - 1./(1+attenuation); // Soft max 1.
-   attenuation = 1.;
    
+   // No distance attenuation for directional light
+   float attenuation = 1.0;
+
    // Phong lighting model components
    
    // 1. Ambient light - base illumination
@@ -152,7 +150,6 @@ void main() {
    
    // 2. Diffuse light - varies with surface orientation to light
    float diff = max(dot(normal, lightDir), 0.0);
-   //diff += max(dot(normal, -lightDir), 0.0) * 0.1;
    vec3 diffuse = diff * objectColor;
    
    // 3. Specular light - reflective highlights

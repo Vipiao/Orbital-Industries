@@ -153,7 +153,10 @@ void DeferredRenderer::beginGeometryPass() {
 void DeferredRenderer::endGeometryPassAndRenderLighting(
     const glm::dmat4& view, const glm::dmat4& projection,
     uint64_t frame, uint64_t time, double timeRemainder,
-    const glm::dvec3& lightPos, const glm::dvec3& camPos)
+    const glm::dvec3& lightDir, const glm::dvec3& camPos,
+    unsigned int shadowMapTexture,
+    const glm::dmat4& lightSpaceMatrix,
+    bool shadowsEnabled)
 {
     // Switch to default framebuffer for lighting pass
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -213,6 +216,20 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
             glUniform3fv(sampleLoc, 1, glm::value_ptr(m_ssaoKernel[i]));
         }
     }
+
+    // Set shadow mapping uniforms
+    GLint shadowsEnabledLoc = glGetUniformLocation(lightingProgramID, "u_shadowsEnabled");
+    if (shadowsEnabledLoc != -1) {
+        glUniform1i(shadowsEnabledLoc, shadowsEnabled ? 1 : 0);
+    }
+    
+    if (shadowsEnabled && shadowMapTexture != 0) {
+        GLint lightSpaceMatrixLoc = glGetUniformLocation(lightingProgramID, "u_lightSpaceMatrix");
+        if (lightSpaceMatrixLoc != -1) {
+            glm::mat4 lightSpaceMatrixFloat = glm::mat4(lightSpaceMatrix);
+            glUniformMatrix4fv(lightSpaceMatrixLoc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrixFloat));
+        }
+    }
     
     // Bind G-buffer textures
     glActiveTexture(GL_TEXTURE0);
@@ -231,15 +248,21 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
     glBindTexture(GL_TEXTURE_2D, m_gbufferDepth);
     glUniform1i(glGetUniformLocation(lightingProgramID, "gDepth"), 3);
     
+    // Bind shadow map texture
+    if (shadowsEnabled && shadowMapTexture != 0) {
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, shadowMapTexture);
+        glUniform1i(glGetUniformLocation(lightingProgramID, "u_shadowMap"), 4);
+    }
+
     // Set lighting uniforms
-    GLint lightPosLoc = glGetUniformLocation(lightingProgramID, "u_lightPos");
-    if (lightPosLoc != -1) {
-        // Transform light position to view space
-        glm::dvec3 lightPosL = lightPos - camPos;
+    GLint lightDirLoc = glGetUniformLocation(lightingProgramID, "u_lightDir");
+    if (lightDirLoc != -1) {
+        // Transform light direction to view space
         glm::mat4 viewFloat = glm::mat4(view);
-        glm::vec4 lightPosView = viewFloat * glm::vec4(lightPosL, 1.0);
-        glm::vec3 lightPosFloat(lightPosView.x, lightPosView.y, lightPosView.z);
-        glUniform3fv(lightPosLoc, 1, glm::value_ptr(lightPosFloat));
+        glm::vec4 lightDirView = viewFloat * glm::vec4(lightDir, 0.0);
+        glm::vec3 lightDirFloat(lightDirView.x, lightDirView.y, lightDirView.z);
+        glUniform3fv(lightDirLoc, 1, glm::value_ptr(lightDirFloat));
     }
     
     // Render fullscreen triangle

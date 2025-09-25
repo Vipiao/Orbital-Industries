@@ -130,9 +130,9 @@ public:
     
     // Rendering
     void render(
-        const glm::mat4& view, const glm::mat4& projection, 
-        uint64_t frame, uint64_t time, double timeRemainder, 
-        const glm::dvec3& lightPos, const glm::dvec3& camPos,
+        const glm::mat4& view, const glm::mat4& projection,
+        uint64_t frame, uint64_t time, double timeRemainder,
+        const glm::dvec3& lightDir, const glm::dvec3& camPos,
         bool renderOpaque = true, bool renderTransparent = true
     );
 
@@ -140,6 +140,10 @@ public:
     void renderGeometry(
         const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
         double timeRemainder, const glm::dvec3& lightPos, const glm::dvec3& camPos,
+        bool renderOpaque = true, bool renderTransparent = true);
+    void renderDepth(
+        const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
+        double timeRemainder, const glm::dvec3& camPos,
         bool renderOpaque = true, bool renderTransparent = true);
 
 private:
@@ -153,6 +157,7 @@ private:
     SSBOManager* m_ssboManager;
     ShaderProgram m_shaderProgram;
     ShaderProgram m_gbufferShaderProgram;
+    ShaderProgram m_depthShaderProgram;
     
     // Internal helpers
     void loadGeometryFromFile(Geometry* geometry, const std::string& modelPath);
