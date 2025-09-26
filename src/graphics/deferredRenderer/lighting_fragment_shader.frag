@@ -198,7 +198,8 @@ void main() {
    float attenuation = 1.0;
    
    // Calculate shadow factor
-   float bias = 0.001/(1000./50.) + length(fragPos) * 0.000004;
+   float scale = 2048./2048. * 50./50.;
+   float bias = 0.00005 * scale + length(fragPos) * 0.000002 * scale;
    //debugColor.x = length(fragPos) * 0.001;
    float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias);
    

@@ -161,7 +161,7 @@ void GraphicsEngineBase::startRenderLoop() {
       // Set m_fieldOfView as horizontal field of view.
       double fieldOfViewVertical = 2.0 * atan(tan(m_fieldOfView / 2.0) / aspectRatio);
       projectionMatrix =
-         glm::perspective(fieldOfViewVertical, aspectRatio, 0.01, 1000.);
+         glm::perspective(fieldOfViewVertical, aspectRatio, 0.01, 1000000.);
 
       callRenderCallbacks(viewMatrix, projectionMatrix);
 
