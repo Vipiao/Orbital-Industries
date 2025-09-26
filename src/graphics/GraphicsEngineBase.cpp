@@ -165,6 +165,8 @@ void GraphicsEngineBase::startRenderLoop() {
 
       callRenderCallbacks(viewMatrix, projectionMatrix);
 
+      callPostRenderCallbacks(m_frameNum);
+
       // Check for OpenGL errors
       GLenum error = glGetError();
       while (error != GL_NO_ERROR) {

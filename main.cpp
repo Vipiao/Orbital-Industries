@@ -178,6 +178,11 @@ public:
         // Game's own render logic
     }
 
+    virtual void postRenderCallback(uint64_t frameNum) override {
+        // Call registered callbacks first
+        callPostRenderCallbacks(frameNum);
+    }
+
     virtual void framebufferSizeCallback(int width, int height) override {
         // Call registered callbacks first
         callFramebufferSizeCallbacks(width, height);

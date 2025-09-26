@@ -192,6 +192,11 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     m_meshManager2D->render(projection2D);
 }
 
+void GraphicsEngine::postRenderCallback(uint64_t frameNum) {
+    // Call registered callbacks first
+    callPostRenderCallbacks(frameNum);
+}
+
 void GraphicsEngine::renderShadowPass(const glm::mat4& lightSpaceMatrix) {
     // Render depth-only pass for shadow mapping
     m_meshHandler->renderDepth(

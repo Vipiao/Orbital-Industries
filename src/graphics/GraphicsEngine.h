@@ -34,6 +34,7 @@ public:
     // IGraphicsCallbacks implementation
     virtual void preRenderCallback(uint64_t frameNum) override;
     virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override;
+    virtual void postRenderCallback(uint64_t frameNum) override;
     virtual void framebufferSizeCallback(int width, int height) override;
     virtual void windowPosCallback(int xpos, int ypos) override;
     

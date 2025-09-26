@@ -22,6 +22,12 @@ void CallbackManager::callRenderCallbacks(glm::dmat4 viewMatrix, glm::dmat4 proj
     }
 }
 
+void CallbackManager::callPostRenderCallbacks(uint64_t frameNum) {
+    for (auto& callback : m_callbacks) {
+        callback->postRenderCallback(frameNum);
+    }
+}
+
 void CallbackManager::callFramebufferSizeCallbacks(int width, int height) {
     for (auto& callback : m_callbacks) {
         callback->framebufferSizeCallback(width, height);

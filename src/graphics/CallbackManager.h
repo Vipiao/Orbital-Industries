@@ -19,6 +19,7 @@ public:
 protected:
     void callPreRenderCallbacks(uint64_t frameNum);
     void callRenderCallbacks(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix);
+    void callPostRenderCallbacks(uint64_t frameNum);
     void callFramebufferSizeCallbacks(int width, int height);
     void callWindowPosCallbacks(int xpos, int ypos);
 

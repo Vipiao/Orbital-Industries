@@ -350,14 +350,14 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
-    auto currentTime = m_timeHandler->now();
-    auto deltaTime = std::chrono::duration<double>(currentTime - m_lastFrameTime).count();
-    m_lastFrameTime = currentTime;
+    m_currentFrameStartTime = m_timeHandler->now();
+    auto deltaTime = std::chrono::duration<double>(m_currentFrameStartTime - m_lastFrameTime).count();
+    m_lastFrameTime = m_currentFrameStartTime;
     
     processInput();
     
     // Schedule physics job if needed
-    if (currentTime >= m_nextPhysicsTime) {
+    if (m_currentFrameStartTime >= m_nextPhysicsTime) {
         // Schedule physics as a high-priority job
         auto jobHandle = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
             return updatePhysics(endTime);
@@ -371,10 +371,20 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     }
     
     update(deltaTime);
+}
+
+void GameBase::postRenderCallback(uint64_t frameNum) {
+    // Call registered callbacks first
+    callPostRenderCallbacks(frameNum);
+    
+    // Process background jobs with remaining frame time
+    if (!m_timeHandler) {
+        throw std::runtime_error("TimeHandler cannot be null");
+    }
 
     // Process jobs with remaining frame time
     double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->getFrameRate());
-    auto targetFrameEnd = currentTime  + 
+    auto targetFrameEnd = m_currentFrameStartTime + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(targetFrameDuration));
 
@@ -384,14 +394,9 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
     m_jobManager->work(jobEndTime);
 
-    if(m_timeHandler->now() >= targetFrameEnd) {
+    if (m_timeHandler->now() >= targetFrameEnd) {
         std::cout << "Frame drop" << std::endl;
     }
-}
-
-void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
-    // Call registered callbacks first
-    callRenderCallbacks(viewMatrix, projectionMatrix);
     
     // Calculate timing parameters for graphics engine
     if (!m_timeHandler) {
@@ -406,6 +411,11 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
         m_physicsEngine->getCurrentPhysicsTimeStep(),
         physicsTimeRemainder
     );
+}
+
+void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
+    // Call registered callbacks first
+    callRenderCallbacks(viewMatrix, projectionMatrix);
 }
 
 void GameBase::framebufferSizeCallback(int width, int height) {
