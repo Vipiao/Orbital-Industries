@@ -35,6 +35,21 @@ vec3 reconstructPosition(vec2 screenCoord, float depth) {
    return viewSpace.xyz / viewSpace.w;
 }
 
+float reconstructPositionZ(vec2 screenCoord, float depth) {
+   // Convert screen coordinates to NDC
+   vec2 ndc = screenCoord * 2.0 - 1.0;
+   
+   // Create clip space coordinates
+   vec4 clipSpace = vec4(ndc, depth * 2.0 - 1.0, 1.0);
+   
+   // Extract Z and W rows from the matrix and compute only what we need
+   vec4 zRow = vec4(u_inverseProjection[0].z, u_inverseProjection[1].z, u_inverseProjection[2].z, u_inverseProjection[3].z);
+   vec4 wRow = vec4(u_inverseProjection[0].w, u_inverseProjection[1].w, u_inverseProjection[2].w, u_inverseProjection[3].w);
+   float viewSpaceZ = dot(zRow, clipSpace);
+   float viewSpaceW = dot(wRow, clipSpace);
+   return viewSpaceZ / viewSpaceW;
+}
+
 float calculateSSAO(vec3 fragPos, vec3 normal) {
    if (!u_ssaoEnabled) {
       return 1.0;
@@ -73,8 +88,9 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       }
       
       // Sample depth at this position
-      vec3 reconstructedPos = reconstructPosition(offset.xy, texture(gDepth, offset.xy).r);
-      float sampleDepth = reconstructedPos.z;
+      //vec3 reconstructedPos = reconstructPosition(offset.xy, texture(gDepth, offset.xy).r);
+      //float sampleDepth = reconstructedPos.z;
+      float sampleDepth = reconstructPositionZ(offset.xy, texture(gDepth, offset.xy).r);
       
       // Range check to reduce artifacts
       float haloFactor = 1.;
@@ -322,7 +338,7 @@ void main() {
    float attenuation = 1.0;
    
    // Calculate shadow factor
-   float scale = 2048./2048. * 50./50.;
+   float scale = 2048./2048. * 10./50.;
    float bias = 0.00012 * scale + length(fragPos) * 0.000002 * scale;
    //debugColor.x = length(fragPos) * 0.001;
    float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias);
