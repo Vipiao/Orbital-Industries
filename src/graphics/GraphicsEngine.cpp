@@ -114,7 +114,8 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
         
         // Convert to [-1, 1] range and scale to approximately 1 pixel in shadow map space
         double shadowMapSize = static_cast<double>(m_shadowRenderer->getShadowMapWidth());
-        double offsetScale = 1.0 / shadowMapSize; // x/shadowMapSize pixels worth of jitter for good effect
+        double scale = 1.;
+        double offsetScale = scale / shadowMapSize; // x/shadowMapSize pixels worth of jitter for good effect
         double offsetX = (random3.x - 0.5) * offsetScale;
         double offsetY = (random3.y - 0.5) * offsetScale;
         

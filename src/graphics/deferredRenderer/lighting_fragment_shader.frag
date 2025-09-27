@@ -158,6 +158,130 @@ float calculateShadow(
     return shadow;
 }
 
+vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir) {
+    // Calculate reflection direction
+    vec3 reflectionDir = reflect(-viewDir, normal);
+    
+    // Hardcode scale as 5.0
+    float scale = 10.0 * (1.-dot(normal, reflectionDir));
+    
+    // Choose number of steps
+    int numSteps = 16;
+    
+    // March linearly in view space along the reflection ray
+    vec3 stepSize = (reflectionDir * scale) / float(numSteps);
+    
+    for (int i = 1; i <= numSteps; i++) {
+        // Get current position in view space
+        vec3 currentPos = fragPos + stepSize * float(i);
+        
+        // Check if ray goes behind the camera (positive Z in view space)
+        if (currentPos.z > 0.0) {
+            break;
+        }
+        
+        // Project current position to screen space
+        vec4 screenPos = u_projection * vec4(currentPos, 1.0);
+        screenPos.xyz /= screenPos.w;
+        
+        // Convert to [0,1] range for sampling
+        vec2 screenUV = screenPos.xy * 0.5 + 0.5;
+        float projectedDepth = screenPos.z * 0.5 + 0.5;
+        
+        //// Check bounds
+        //if (screenUV.x < 0.0 || screenUV.x > 1.0 || 
+        //    screenUV.y < 0.0 || screenUV.y > 1.0) {
+        //    break;
+        //}
+
+        // Calculate screen edge fade factor
+        float ff = smoothstep(0.0, 0.1, screenUV.x) *
+                   (1.0 - smoothstep(0.9, 1.0, screenUV.x)) *
+                   smoothstep(0.0, 0.1, screenUV.y) *
+                   (1.0 - smoothstep(0.9, 1.0, screenUV.y));
+        
+        // Calculate fresnel factor
+        float fresnelFactor = 1.0 - pow(max(dot(viewDir, normal), 0.0), 1.0);
+        ff *= fresnelFactor;
+        
+        // Skip if fade factor is too low
+        if (ff < 0.01) {
+            continue;
+        }
+        
+        // Sample depth at current screen position
+        float sampledDepth = texture(gDepth, screenUV).r;
+
+        // Reconstruct world position of the sampled surface
+        vec3 surfacePos = reconstructPosition(screenUV, sampledDepth);
+        
+        // Calculate actual view space penetration depth  
+        float penetrationDepth = surfacePos.z - currentPos.z; // Both in view space
+        float maxThickness = 1.6*scale/float(numSteps); // World space units - much easier to tune!
+         
+        // If ray has penetrated past surface but within reasonable thickness
+        // (penetrationDepth > 0 means currentPos has gone past surfacePos)
+        if (penetrationDepth > 0.0 && penetrationDepth < maxThickness) {
+            // We've hit a surface, get the color
+            vec3 reflectedColor = texture(gAlbedo, screenUV).rgb * ff;
+            // Add distance fade - closer hits have more weight
+            float distanceFade = float(i) / float(numSteps);
+            distanceFade = 1.0 - distanceFade*distanceFade;
+            float finalWeight = ff * distanceFade;
+            //debugColor.r = finalWeight;
+            
+            return vec4(reflectedColor, finalWeight);
+        }
+    }
+    
+    // No hit found
+    return vec4(0.0, 0.0, 0.0, 0.0);
+}
+
+//vec3 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir) {
+//   // Calculate view direction and reflection direction
+//   vec3 reflectionDir = reflect(-viewDir, normal);
+//    
+//   vec3 reflectedColor = vec3(0.0);
+//    
+//   // March along reflection direction
+//   float scale = min(1., length(fragPos));
+//   vec3 samplePos = fragPos + reflectionDir;
+//   
+//   // Project to screen space
+//   vec4 screenPosStart = u_projection * vec4(fragPos, 1.0);
+//   screenPosStart.xy /= screenPosStart.w;
+//   screenPosStart.xy = screenPosStart.xy * 0.5 + 0.5;
+//   vec4 screenPos = u_projection * vec4(samplePos, 1.0);
+//   screenPos.xy /= screenPos.w;
+//   screenPos.xy = screenPos.xy * 0.5 + 0.5;
+//   //screenPos.xy = 0.1*normalize(screenPos.xy - screenPosStart.xy) +
+//   //   screenPosStart.xy;
+//   
+//   // Check bounds and sample albedo
+//   //if (screenPos.x >= 0.0 && screenPos.x <= 1.0 && screenPos.y >= 0.0 && screenPos.y <= 1.0) {
+//   vec3 sampledAlbedo = texture(gAlbedo, screenPos.xy).rgb;
+//   reflectedColor += sampledAlbedo;
+//   float ff = smoothstep(0.0, 0.1, screenPos.x) *
+//              (1.-smoothstep(0.9, 1.0, screenPos.x)) *
+//              smoothstep(0.0, 0.1, screenPos.y) *
+//              (1.-smoothstep(0.9, 1.0, screenPos.y))
+//   ;
+//   ff *= min(1., length(fragPos));
+//   vec3 reconstructedPos = reconstructPosition(screenPos.xy, texture(gDepth, screenPos.xy).r);
+//   vec3 sampleNormal = texture(gNormal, screenPos.xy).xyz * 2.0 - 1.0;
+//   vec3 hitDir = normalize(reconstructedPos - fragPos);
+//   ff *= max(0., dot(-hitDir, sampleNormal));
+//   ff *= max(0., dot(hitDir, reflectionDir));
+//   //debugColor = vec3(test);
+//   //ff = mix(ff, 1., 0.2);
+//   float fresnelFactor = pow(1.-max(dot(viewDir, normal), 0.0), 1.);
+//   reflectedColor *= ff * fresnelFactor;
+//   //debugColor = vec3(fresnelFactor);
+//   
+//   return reflectedColor;
+//}
+
 void main() {
    // Sample G-buffer
    vec4 albedoSample = texture(gAlbedo, texCoord);
@@ -167,7 +291,7 @@ void main() {
    
    vec3 albedo = albedoSample.rgb;
    float metallic = albedoSample.a;
-   vec3 normal = normalSample.rgb * 2.0 - 1.0;  // Decode normal from [0,1] to [-1,1]
+   vec3 normal = normalize(normalSample.rgb * 2.0 - 1.0);  // Decode normal from [0,1] to [-1,1]
    float roughness = normalSample.a;
    vec3 fragPos = reconstructPosition(texCoord, depth);
    float emissiveStrength = materialSample.r;
@@ -199,7 +323,7 @@ void main() {
    
    // Calculate shadow factor
    float scale = 2048./2048. * 50./50.;
-   float bias = 0.00008 * scale + length(fragPos) * 0.000002 * scale;
+   float bias = 0.00012 * scale + length(fragPos) * 0.000002 * scale;
    //debugColor.x = length(fragPos) * 0.001;
    float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias);
    
@@ -221,7 +345,17 @@ void main() {
    vec3 result = (ambient + (diffuse + specular) * ff * attenuation * shadowFactor) * occlusionFactor;
    result = mix(result, albedo, emissiveStrength);
    
-   FragColor = vec4(result, 1.);
+   // Add screen space reflections with Fresnel
+   //float fresnelFactor = pow(max(dot(viewDir, normal), 0.0), 1.);
+   vec4 reflectionResult = calculateSSR(fragPos, normal, viewDir);
+   //debugColor.r = reflectionResult.a;
+   vec3 reflectedColor = reflectionResult.rgb;
+   float reflectionWeight = reflectionResult.a;
+   float reflectionStrength = 0.5;
+   vec3 reflectionContribution = reflectedColor * reflectionStrength * reflectionWeight;
+   result += reflectionContribution * (1.0 - metallic * 0.5); // Reduce for metals to avoid over-brightening
+   
+   FragColor = vec4(result, 1.0);
    //debugColor.yz = result.yz;
    //FragColor = vec4(debugColor, 1.);
 }
