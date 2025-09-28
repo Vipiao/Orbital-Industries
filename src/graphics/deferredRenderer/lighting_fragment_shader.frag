@@ -71,7 +71,6 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    float occlusion = 0.0;
    int sampleCount = 32; // Match the uniform array size
    
-   //debugColor.x = 0.;
    for (int i = 0; i < sampleCount; ++i) {
       // Get sample position in world space
       vec3 samplePos = TBN * u_ssaoSamples[i];
@@ -101,10 +100,7 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       float depthDiff = sampleDepth - samplePos.z;
       float occlusionContribution = smoothstep(-u_ssaoBias, u_ssaoBias, depthDiff);
       occlusion += occlusionContribution * rangeCheck;
-      //debugColor.x *= rangeCheck;
-      //debugColor.x = max(debugColor.x, abs(fragPos.z - sampleDepth));
    }
-   //debugColor.x = occlusion / float(sampleCount);
    
    occlusion = 1.0 - (occlusion / float(sampleCount));
    
@@ -174,22 +170,31 @@ float calculateShadow(
     return shadow;
 }
 
-vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir) {
+vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir, vec3 lightDir) {
     // Calculate reflection direction
     vec3 reflectionDir = reflect(-viewDir, normal);
     
     // Hardcode scale as 5.0
     float scale = 10.0 * (1.-dot(normal, reflectionDir));
+    //float scale = 10.0;
     
     // Choose number of steps
-    int numSteps = 16;
+    int numSteps = 32;
     
     // March linearly in view space along the reflection ray
     vec3 stepSize = (reflectionDir * scale) / float(numSteps);
     
+    // Jitter: add temporal randomness to starting position
+    vec2 screenPos = gl_FragCoord.xy;
+    vec2 timeOffset = vec2(u_timeRemainder * 0.17, u_timeRemainder * 0.23); // Different time scales
+    vec2 jitterSeed = screenPos + timeOffset;
+    float jitter = (hash(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
+    
+    vec3 currentPos = fragPos + stepSize * jitter;
     for (int i = 1; i <= numSteps; i++) {
         // Get current position in view space
-        vec3 currentPos = fragPos + stepSize * float(i);
+        //float stepSizeScale = abs(pow(abs(dot(viewDir, reflectionDir)), 4.));
+        currentPos += stepSize;
         
         // Check if ray goes behind the camera (positive Z in view space)
         if (currentPos.z > 0.0) {
@@ -217,8 +222,8 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir) {
                    (1.0 - smoothstep(0.9, 1.0, screenUV.y));
         
         // Calculate fresnel factor
-        float fresnelFactor = 1.0 - pow(max(dot(viewDir, normal), 0.0), 1.0);
-        ff *= fresnelFactor;
+        float fresnelFactor = 1.0 - pow(max(dot(viewDir, normal), 0.0), 1.);
+        ff *= mix(fresnelFactor, 1., 0.2);
         
         // Skip if fade factor is too low
         if (ff < 0.01) {
@@ -237,14 +242,23 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir) {
          
         // If ray has penetrated past surface but within reasonable thickness
         // (penetrationDepth > 0 means currentPos has gone past surfacePos)
+        //float thicknessScale = 1./abs(pow(abs(dot(viewDir, reflectionDir)), 4.));
+        
         if (penetrationDepth > 0.0 && penetrationDepth < maxThickness) {
             // We've hit a surface, get the color
+            vec3 surfaceNormal = normalize(texture(gNormal, screenUV).rgb * 2.0 - 1.0);
+            //if (dot(surfaceNormal, reflectionDir) >= 0.) return vec4(0.);
+            if (abs(dot(surfaceNormal, normal)) > 0.99) return vec4(0.);
             vec3 reflectedColor = texture(gAlbedo, screenUV).rgb * ff;
+            
             // Add distance fade - closer hits have more weight
             float distanceFade = float(i) / float(numSteps);
             distanceFade = 1.0 - distanceFade*distanceFade;
             float finalWeight = ff * distanceFade;
-            //debugColor.r = finalWeight;
+
+            // Diffuse shading
+            float diff = max(dot(surfaceNormal, lightDir), 0.0);
+            reflectedColor *= mix(diff, 1., 0.5);
             
             return vec4(reflectedColor, finalWeight);
         }
@@ -253,50 +267,6 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir) {
     // No hit found
     return vec4(0.0, 0.0, 0.0, 0.0);
 }
-
-//vec3 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir) {
-//   // Calculate view direction and reflection direction
-//   vec3 reflectionDir = reflect(-viewDir, normal);
-//    
-//   vec3 reflectedColor = vec3(0.0);
-//    
-//   // March along reflection direction
-//   float scale = min(1., length(fragPos));
-//   vec3 samplePos = fragPos + reflectionDir;
-//   
-//   // Project to screen space
-//   vec4 screenPosStart = u_projection * vec4(fragPos, 1.0);
-//   screenPosStart.xy /= screenPosStart.w;
-//   screenPosStart.xy = screenPosStart.xy * 0.5 + 0.5;
-//   vec4 screenPos = u_projection * vec4(samplePos, 1.0);
-//   screenPos.xy /= screenPos.w;
-//   screenPos.xy = screenPos.xy * 0.5 + 0.5;
-//   //screenPos.xy = 0.1*normalize(screenPos.xy - screenPosStart.xy) +
-//   //   screenPosStart.xy;
-//   
-//   // Check bounds and sample albedo
-//   //if (screenPos.x >= 0.0 && screenPos.x <= 1.0 && screenPos.y >= 0.0 && screenPos.y <= 1.0) {
-//   vec3 sampledAlbedo = texture(gAlbedo, screenPos.xy).rgb;
-//   reflectedColor += sampledAlbedo;
-//   float ff = smoothstep(0.0, 0.1, screenPos.x) *
-//              (1.-smoothstep(0.9, 1.0, screenPos.x)) *
-//              smoothstep(0.0, 0.1, screenPos.y) *
-//              (1.-smoothstep(0.9, 1.0, screenPos.y))
-//   ;
-//   ff *= min(1., length(fragPos));
-//   vec3 reconstructedPos = reconstructPosition(screenPos.xy, texture(gDepth, screenPos.xy).r);
-//   vec3 sampleNormal = texture(gNormal, screenPos.xy).xyz * 2.0 - 1.0;
-//   vec3 hitDir = normalize(reconstructedPos - fragPos);
-//   ff *= max(0., dot(-hitDir, sampleNormal));
-//   ff *= max(0., dot(hitDir, reflectionDir));
-//   //debugColor = vec3(test);
-//   //ff = mix(ff, 1., 0.2);
-//   float fresnelFactor = pow(1.-max(dot(viewDir, normal), 0.0), 1.);
-//   reflectedColor *= ff * fresnelFactor;
-//   //debugColor = vec3(fresnelFactor);
-//   
-//   return reflectedColor;
-//}
 
 void main() {
    // Sample G-buffer
@@ -340,15 +310,16 @@ void main() {
    // Calculate shadow factor
    float scale = 2048./2048. * 50./50.;
    float bias = 0.00012 * scale + length(fragPos) * 0.000002 * scale;
-   //debugColor.x = length(fragPos) * 0.001;
    float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias);
    
    // Phong lighting model
    float ambientStrength = 0.3;
    vec3 ambient = ambientStrength * albedo * ssaoFactor;
 
-   float diff = max(dot(normal, lightDir), 0.0);
-   //diff += max(dot(normal, -lightDir), 0.0) * 0.1;
+   float dd = dot(normal, lightDir);
+   float diff = max(dd, 0.0);
+   //diff -= max(dot(normal, -lightDir), 0.0) * 0.1;
+   diff = max(0., diff - 4.*pow(1. - abs(dd), 4.)); // Hide shadow acnes.
 
    vec3 diffuse = diff * albedo;// * mix(1.0, ssaoFactor, 0.2);
    
@@ -363,8 +334,7 @@ void main() {
    
    // Add screen space reflections with Fresnel
    //float fresnelFactor = pow(max(dot(viewDir, normal), 0.0), 1.);
-   vec4 reflectionResult = calculateSSR(fragPos, normal, viewDir);
-   //debugColor.r = reflectionResult.a;
+   vec4 reflectionResult = calculateSSR(fragPos, normal, viewDir, lightDir);
    vec3 reflectedColor = reflectionResult.rgb;
    float reflectionWeight = reflectionResult.a;
    float reflectionStrength = 0.5;
