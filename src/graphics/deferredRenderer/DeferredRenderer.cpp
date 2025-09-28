@@ -273,3 +273,11 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
     // Re-enable depth testing for subsequent rendering
     glEnable(GL_DEPTH_TEST);
 }
+
+std::pair<bool, std::string> DeferredRenderer::reloadShaders() {
+   auto [success, error] = m_lightingShaderProgram.reloadShaders();
+   
+   return {success, success ? 
+      "DeferredRenderer lighting shader reloaded successfully" : 
+      "DeferredRenderer lighting shader: " + error};
+}

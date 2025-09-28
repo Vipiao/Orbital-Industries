@@ -462,3 +462,33 @@ std::vector<uint32_t> GraphicsEngine::loadModelIntoMesh(
     
     return allTriangleIds;
 }
+
+std::pair<bool, std::string> GraphicsEngine::reloadShaders() {
+   std::string allErrors;
+   bool allSuccess = true;
+   
+   auto [success1, error1] = m_meshHandler->reloadShaders();
+   auto [success2, error2] = m_instanceHandler->reloadShaders();
+   auto [success3, error3] = m_deferredRenderer->reloadShaders();
+   auto [success4, error4] = m_shadowRenderer->reloadShaders();
+   
+   if (!success1) {
+      allSuccess = false;
+      allErrors += "MeshHandler: " + error1 + "\n";
+   }
+   if (!success2) {
+      allSuccess = false;
+      allErrors += "InstanceHandler: " + error2 + "\n";
+   }
+   if (!success3) {
+      allSuccess = false;
+      allErrors += "DeferredRenderer: " + error3 + "\n";
+   }
+   if (!success4) {
+      allSuccess = false;
+      allErrors += "ShadowRenderer: " + error4 + "\n";
+   }
+   
+   return {allSuccess, allSuccess ?
+      "All graphics engine shaders reloaded successfully" : allErrors};
+}

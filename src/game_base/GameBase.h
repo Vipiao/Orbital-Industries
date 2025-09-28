@@ -40,6 +40,9 @@ public:
     // Grid partitioning/splitting - now deferred
     void scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
+    // Shader reloading
+    std::pair<bool, std::string> reloadShaders();
+
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
     std::unique_ptr<JobManager> m_jobManager;

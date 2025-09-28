@@ -38,6 +38,9 @@ public:
     SSAOSettings& getSSAOSettings() { return m_ssaoSettings; }
     const SSAOSettings& getSSAOSettings() const { return m_ssaoSettings; }
     void setSSAOSettings(const SSAOSettings& settings);
+
+    // Shader reloading
+    std::pair<bool, std::string> reloadShaders();
     
 private:
     // G-buffer resources

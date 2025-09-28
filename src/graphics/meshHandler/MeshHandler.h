@@ -168,6 +168,9 @@ public:
    Texture createTexture(std::string texturePath);
    void unitTest();
 
+   // Shader reloading
+   std::pair<bool, std::string> reloadShaders();
+
    ShaderProgram m_shaderProgram{};
    ShaderProgram m_gbufferShaderProgram{};
    ShaderProgram m_depthShaderProgram{};

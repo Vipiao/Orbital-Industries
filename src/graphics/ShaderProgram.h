@@ -3,6 +3,7 @@
 #include <string>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <utility>
 
 class ShaderProgram {
 private:
@@ -19,6 +20,15 @@ private:
    bool m_tessellationEvaluationShaderIsLoaded = false;
    bool m_geometryShaderIsLoaded = false;
    bool m_programIsLinked = false;
+
+   // Shader file paths for reloading
+   std::string m_vertexShaderPath;
+   std::string m_fragmentShaderPath;
+   std::string m_tessellationControlShaderPath;
+   std::string m_tessellationEvaluationShaderPath;
+   std::string m_geometryShaderPath;
+   bool m_hasStoredPaths = false;
+
 public:
    static std::string loadTextFileFromPath(std::string path);
    static void printWithLineNumbers(std::string code);
@@ -35,6 +45,9 @@ public:
    void linkShaders();
    unsigned int getID();
    void use();
+
+   // Shader reloading
+   std::pair<bool, std::string> reloadShaders();
    
    // Uniform setters
    void setUniformMatrix4f(const std::string& name, const glm::mat4& matrix);

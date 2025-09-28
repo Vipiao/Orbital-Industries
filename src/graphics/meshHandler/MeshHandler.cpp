@@ -698,6 +698,25 @@ MeshHandler::Texture MeshHandler::createTexture(std::string texturePath) {
    return m_textures.back();
 }
 
+std::pair<bool, std::string> MeshHandler::reloadShaders() {
+   std::string allErrors;
+   bool allSuccess = true;
+   
+   auto [success1, error1] = m_shaderProgram.reloadShaders();
+   auto [success2, error2] = m_gbufferShaderProgram.reloadShaders();
+   auto [success3, error3] = m_depthShaderProgram.reloadShaders();
+   
+   if (!success1) { allSuccess = false; allErrors += "Main shader: " + error1 + "\n"; }
+   if (!success2) { allSuccess = false; allErrors += "GBuffer shader: " + error2 + "\n"; }
+   if (!success3) { allSuccess = false; allErrors += "Depth shader: " + error3 + "\n"; }
+   
+   if (allSuccess) {
+      return {true, "All MeshHandler shaders reloaded successfully"};
+   } else {
+      return {false, allErrors};
+   }
+}
+
 struct TestMeshData {
    int meshId;
    std::vector<uint32_t> triangleIndices;

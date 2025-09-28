@@ -107,6 +107,9 @@ public:
     // Shadow configuration
     void setShadowsEnabled(bool enabled) { m_shadowsEnabled = enabled; }
 
+    // Shader reloading
+    std::pair<bool, std::string> reloadShaders();
+
     std::unique_ptr<SSBOManager> m_ssboManager;
     std::unique_ptr<MeshHandler> m_meshHandler;
     uint64_t currentTime{0};

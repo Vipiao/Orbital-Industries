@@ -146,6 +146,9 @@ public:
         double timeRemainder, const glm::dvec3& camPos,
         bool renderOpaque = true, bool renderTransparent = true);
 
+    // Shader reloading
+    std::pair<bool, std::string> reloadShaders();
+
 private:
     // Texture management
     TextureManagerBase m_textureManager;

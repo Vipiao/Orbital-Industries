@@ -2,6 +2,8 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <string>
+#include <utility>
 #include <glad/glad.h>
 
 class ShadowRenderer {
@@ -21,6 +23,9 @@ public:
     unsigned int getShadowMapTexture() const { return m_shadowDepthTexture; }
     unsigned int getShadowMapWidth() const { return m_shadowMapWidth; }
     unsigned int getShadowMapHeight() const { return m_shadowMapHeight; }
+
+    // Shader reloading
+    std::pair<bool, std::string> reloadShaders();
     
 private:
     // Shadow map resources

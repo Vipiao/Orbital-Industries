@@ -26,6 +26,9 @@ private:
     std::unique_ptr<Mode> m_mode;
     DebugRendererGuard m_debugGuard;
 
+    // Shader reload management
+    bool m_shaderReloadRequested = false;
+
 public:
 
     Game(TimeHandler* timeHandler, 
@@ -152,6 +155,13 @@ public:
     // GameBase::Callback implementation
     virtual void onPhysicsUpdateComplete() override {
         m_mode->physics();
+
+        // Handle shader reload request if pending
+        if (m_shaderReloadRequested) {
+            m_shaderReloadRequested = false;
+            auto [success, message] = m_gameBase->reloadShaders();
+            std::cout << "Shader Reload " << (success ? "SUCCESS" : "FAILED") << ": " << message << std::endl;
+        }
     }
 
     // Helper method for setting up debug visualization
@@ -168,6 +178,11 @@ public:
         
         // Game's own preRender logic
         // Process input BEFORE calling gamebase preRenderCallback
+
+        if (m_gameBase->m_graphicsEngine->getKeyboardHandler()->m_n.justPressed()) {
+            m_shaderReloadRequested = true;
+        }
+
         m_mode->processInputs();
     }
 

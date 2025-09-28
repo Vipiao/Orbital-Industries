@@ -38,26 +38,36 @@ void ShaderProgram::printWithLineNumbers(std::string code) {
 
 void ShaderProgram::loadVertexShaderFromPath(std::string vertexCodePath) {
    std::string vertexCode(ShaderProgram::loadTextFileFromPath(vertexCodePath));
+   m_vertexShaderPath = vertexCodePath;
+   m_hasStoredPaths = true;
    loadVertexShader(vertexCode);
 }
 
 void ShaderProgram::loadFragmentShaderFromPath(std::string fragmentCodePath) {
    std::string fragmentCode(ShaderProgram::loadTextFileFromPath(fragmentCodePath));
+   m_fragmentShaderPath = fragmentCodePath;
+   m_hasStoredPaths = true;
    loadFragmentShader(fragmentCode);
 }
 
 void ShaderProgram::loadTessellationControlShaderFromPath(std::string tessContrCodePath) {
    std::string tessCode(ShaderProgram::loadTextFileFromPath(tessContrCodePath));
+   m_tessellationControlShaderPath = tessContrCodePath;
+   m_hasStoredPaths = true;
    loadTessellationControlShader(tessCode);
 }
 
 void ShaderProgram::loadTessellationEvaluationShaderFromPath(std::string tessEvalCodePath) {
    std::string tessCode(ShaderProgram::loadTextFileFromPath(tessEvalCodePath));
+   m_tessellationEvaluationShaderPath = tessEvalCodePath;
+   m_hasStoredPaths = true;
    loadTessellationEvaluationShader(tessCode);
 }
 
 void ShaderProgram::loadGeometryShaderFromPath(std::string geometryCodePath) {
    std::string geometryCode(ShaderProgram::loadTextFileFromPath(geometryCodePath));
+   m_geometryShaderPath = geometryCodePath;
+   m_hasStoredPaths = true;
    loadGeometryShader(geometryCode);
 }
 
@@ -226,6 +236,149 @@ void ShaderProgram::use() {
       throw std::runtime_error("ERROR: Cannot use a program before it is linked.");
    }
    glUseProgram(m_shaderProgram);
+}
+
+std::pair<bool, std::string> ShaderProgram::reloadShaders() {
+   if (!m_hasStoredPaths) {
+      return {false, "Cannot reload shaders: no file paths stored (shaders were loaded from strings)"};
+   }
+   
+   std::string errorMessages;
+   bool hasErrors = false;
+   
+   // Store old shader IDs
+   unsigned int oldVertexShader = m_vertexShader;
+   unsigned int oldFragmentShader = m_fragmentShader;
+   unsigned int oldTessellationControlShader = m_tessellationControlShader;
+   unsigned int oldTessellationEvaluationShader = m_tessellationEvaluationShader;
+   unsigned int oldGeometryShader = m_geometryShader;
+   unsigned int oldShaderProgram = m_shaderProgram;
+   bool oldProgramIsLinked = m_programIsLinked;
+   
+   // Store old load states
+   bool oldVertexShaderIsLoaded = m_vertexShaderIsLoaded;
+   bool oldFragmentShaderIsLoaded = m_fragmentShaderIsLoaded;
+   bool oldTessellationControlShaderIsLoaded = m_tessellationControlShaderIsLoaded;
+   bool oldTessellationEvaluationShaderIsLoaded = m_tessellationEvaluationShaderIsLoaded;
+   bool oldGeometryShaderIsLoaded = m_geometryShaderIsLoaded;
+   
+   // Reset states for new loading
+   m_vertexShader = 0;
+   m_fragmentShader = 0;
+   m_tessellationControlShader = 0;
+   m_tessellationEvaluationShader = 0;
+   m_geometryShader = 0;
+   m_shaderProgram = 0;
+   m_programIsLinked = false;
+   m_vertexShaderIsLoaded = false;
+   m_fragmentShaderIsLoaded = false;
+   m_tessellationControlShaderIsLoaded = false;
+   m_tessellationEvaluationShaderIsLoaded = false;
+   m_geometryShaderIsLoaded = false;
+   
+   try {
+      // Try to reload vertex shader if it was loaded
+      if (oldVertexShaderIsLoaded && !m_vertexShaderPath.empty()) {
+         try {
+            std::string vertexCode(ShaderProgram::loadTextFileFromPath(m_vertexShaderPath));
+            loadVertexShader(vertexCode);
+         } catch (const std::exception& e) {
+            hasErrors = true;
+            errorMessages += "Vertex shader reload failed: " + std::string(e.what()) + "\n";
+         }
+      }
+      
+      // Try to reload fragment shader if it was loaded
+      if (oldFragmentShaderIsLoaded && !m_fragmentShaderPath.empty()) {
+         try {
+            std::string fragmentCode(ShaderProgram::loadTextFileFromPath(m_fragmentShaderPath));
+            loadFragmentShader(fragmentCode);
+         } catch (const std::exception& e) {
+            hasErrors = true;
+            errorMessages += "Fragment shader reload failed: " + std::string(e.what()) + "\n";
+         }
+      }
+      
+      // Try to reload tessellation control shader if it was loaded
+      if (oldTessellationControlShaderIsLoaded && !m_tessellationControlShaderPath.empty()) {
+         try {
+            std::string tessCode(ShaderProgram::loadTextFileFromPath(m_tessellationControlShaderPath));
+            loadTessellationControlShader(tessCode);
+         } catch (const std::exception& e) {
+            hasErrors = true;
+            errorMessages += "Tessellation control shader reload failed: " + std::string(e.what()) + "\n";
+         }
+      }
+      
+      // Try to reload tessellation evaluation shader if it was loaded
+      if (oldTessellationEvaluationShaderIsLoaded && !m_tessellationEvaluationShaderPath.empty()) {
+         try {
+            std::string tessCode(ShaderProgram::loadTextFileFromPath(m_tessellationEvaluationShaderPath));
+            loadTessellationEvaluationShader(tessCode);
+         } catch (const std::exception& e) {
+            hasErrors = true;
+            errorMessages += "Tessellation evaluation shader reload failed: " + std::string(e.what()) + "\n";
+         }
+      }
+      
+      // Try to reload geometry shader if it was loaded
+      if (oldGeometryShaderIsLoaded && !m_geometryShaderPath.empty()) {
+         try {
+            std::string geometryCode(ShaderProgram::loadTextFileFromPath(m_geometryShaderPath));
+            loadGeometryShader(geometryCode);
+         } catch (const std::exception& e) {
+            hasErrors = true;
+            errorMessages += "Geometry shader reload failed: " + std::string(e.what()) + "\n";
+         }
+      }
+      
+      // Try to link the new shaders
+      if (m_vertexShaderIsLoaded && m_fragmentShaderIsLoaded) {
+         try {
+            linkShaders();
+         } catch (const std::exception& e) {
+            hasErrors = true;
+            errorMessages += "Shader linking failed: " + std::string(e.what()) + "\n";
+         }
+      }
+      
+   } catch (...) {
+      hasErrors = true;
+      errorMessages += "Unexpected error during shader reload\n";
+   }
+   
+   // If there were errors, restore old shaders and clean up failed new ones
+   if (hasErrors || !m_programIsLinked) {
+      // Clean up any partially created new shaders
+      if (m_vertexShader != 0) glDeleteShader(m_vertexShader);
+      if (m_fragmentShader != 0) glDeleteShader(m_fragmentShader);
+      if (m_tessellationControlShader != 0) glDeleteShader(m_tessellationControlShader);
+      if (m_tessellationEvaluationShader != 0) glDeleteShader(m_tessellationEvaluationShader);
+      if (m_geometryShader != 0) glDeleteShader(m_geometryShader);
+      if (m_shaderProgram != 0) glDeleteProgram(m_shaderProgram);
+      
+      // Restore old shaders
+      m_vertexShader = oldVertexShader;
+      m_fragmentShader = oldFragmentShader;
+      m_tessellationControlShader = oldTessellationControlShader;
+      m_tessellationEvaluationShader = oldTessellationEvaluationShader;
+      m_geometryShader = oldGeometryShader;
+      m_shaderProgram = oldShaderProgram;
+      m_programIsLinked = oldProgramIsLinked;
+      m_vertexShaderIsLoaded = oldVertexShaderIsLoaded;
+      m_fragmentShaderIsLoaded = oldFragmentShaderIsLoaded;
+      m_tessellationControlShaderIsLoaded = oldTessellationControlShaderIsLoaded;
+      m_tessellationEvaluationShaderIsLoaded = oldTessellationEvaluationShaderIsLoaded;
+      m_geometryShaderIsLoaded = oldGeometryShaderIsLoaded;
+      
+      return {false, errorMessages.empty() ? "Shader reload failed" : errorMessages};
+   } else {
+      // Success! Clean up old shaders
+      if (oldShaderProgram != 0) glDeleteProgram(oldShaderProgram);
+      // Note: individual shaders are cleaned up by linkShaders()
+      
+      return {true, "Shaders reloaded successfully"};
+   }
 }
 
 // Uniform setters

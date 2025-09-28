@@ -93,3 +93,9 @@ void ShadowRenderer::endShadowPass() {
     glCullFace(GL_BACK);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
+
+std::pair<bool, std::string> ShadowRenderer::reloadShaders() {
+    // ShadowRenderer currently uses depth shaders from MeshHandler and InstanceHandler
+    // If it gets its own shaders in the future, reload them here
+    return {true, "ShadowRenderer: No shaders to reload (uses external depth shaders)"};
+}

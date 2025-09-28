@@ -509,3 +509,9 @@ size_t GameBase::computeHash() const {
     
     return hash;
 }
+
+std::pair<bool, std::string> GameBase::reloadShaders() {
+    auto [success, message] = m_graphicsEngine->reloadShaders();
+    
+    return {success, success ? "GameBase: " + message : "GameBase: " + message};
+}
