@@ -223,7 +223,7 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir, vec3 lightDir) {
         
         // Calculate fresnel factor
         float fresnelFactor = 1.0 - pow(max(dot(viewDir, normal), 0.0), 1.);
-        ff *= mix(fresnelFactor, 1., 0.2);
+        ff *= mix(fresnelFactor, 1., 0.5);
         
         // Skip if fade factor is too low
         if (ff < 0.01) {
@@ -337,6 +337,7 @@ void main() {
    vec4 reflectionResult = calculateSSR(fragPos, normal, viewDir, lightDir);
    vec3 reflectedColor = reflectionResult.rgb;
    float reflectionWeight = reflectionResult.a;
+   reflectionWeight = min(0.5, reflectionWeight);
    float reflectionStrength = 0.5;
    vec3 reflectionContribution =
       reflectedColor * reflectionStrength *
