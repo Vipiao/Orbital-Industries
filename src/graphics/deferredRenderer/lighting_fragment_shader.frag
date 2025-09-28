@@ -338,8 +338,11 @@ void main() {
    vec3 reflectedColor = reflectionResult.rgb;
    float reflectionWeight = reflectionResult.a;
    float reflectionStrength = 0.5;
-   vec3 reflectionContribution = reflectedColor * reflectionStrength * reflectionWeight;
-   result += reflectionContribution * (1.0 - metallic * 0.5); // Reduce for metals to avoid over-brightening
+   vec3 reflectionContribution =
+      reflectedColor * reflectionStrength *
+      reflectionWeight * mix(shadowFactor, 1., 0.4);
+   result += reflectionContribution * (1.0 - metallic * 0.5);
+   //result = mix(result, reflectionContribution, 0.9);
    
    FragColor = vec4(result, 1.0);
    //debugColor.yz = result.yz;
