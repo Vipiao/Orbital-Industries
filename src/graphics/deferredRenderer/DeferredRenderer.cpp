@@ -61,6 +61,11 @@ void DeferredRenderer::setSSAOSettings(const SSAOSettings& settings) {
 }
 
 void DeferredRenderer::setupGBuffer(unsigned int width, unsigned int height) {
+    // Clean up and skip G-buffer creation for invalid dimensions (e.g., when window is minimized)
+    if (width == 0 || height == 0) {
+        cleanupGBuffer();
+        return;
+    }
     if (m_gbufferInitialized) {
         cleanupGBuffer();
     }
@@ -120,6 +125,11 @@ void DeferredRenderer::setupGBuffer(unsigned int width, unsigned int height) {
 }
 
 void DeferredRenderer::resizeGBuffer(unsigned int width, unsigned int height) {
+    // Clean up and skip resize for invalid dimensions (e.g., when window is minimized)  
+    if (width == 0 || height == 0) {
+        cleanupGBuffer();
+        return;
+    }
     setupGBuffer(width, height);
 }
 
@@ -135,6 +145,10 @@ void DeferredRenderer::cleanupGBuffer() {
 }
 
 void DeferredRenderer::beginGeometryPass() {
+    // Skip geometry pass if G-buffer is not initialized (e.g., window minimized)
+    if (!m_gbufferInitialized) {
+        return;
+    }
     if (!m_gbufferInitialized) {
         throw std::runtime_error("G-buffer not initialized. Call setupGBuffer() first.");
     }
@@ -158,6 +172,10 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
     const glm::dmat4& lightSpaceMatrix,
     bool shadowsEnabled)
 {
+    // Skip lighting pass if G-buffer is not initialized (e.g., window minimized)
+    if (!m_gbufferInitialized) {
+        return;
+    }
     // Switch to default framebuffer for lighting pass
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, m_gbufferWidth, m_gbufferHeight);
