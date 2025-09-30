@@ -168,8 +168,10 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
     const glm::dmat4& view, const glm::dmat4& projection,
     uint64_t frame, uint64_t time, double timeRemainder,
     const glm::dvec3& lightDir, const glm::dvec3& camPos,
+    unsigned int numCascades,
+    const std::vector<glm::dmat4>& cascadeMatrices,
+    const std::vector<float>& cascadeBiasScales,
     unsigned int shadowMapTexture,
-    const glm::dmat4& lightSpaceMatrix,
     bool shadowsEnabled)
 {
     // Skip lighting pass if G-buffer is not initialized (e.g., window minimized)
@@ -235,18 +237,10 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
         }
     }
 
-    // Set shadow mapping uniforms
+    // Set shadows enabled uniform
     GLint shadowsEnabledLoc = glGetUniformLocation(lightingProgramID, "u_shadowsEnabled");
     if (shadowsEnabledLoc != -1) {
         glUniform1i(shadowsEnabledLoc, shadowsEnabled ? 1 : 0);
-    }
-    
-    if (shadowsEnabled && shadowMapTexture != 0) {
-        GLint lightSpaceMatrixLoc = glGetUniformLocation(lightingProgramID, "u_lightSpaceMatrix");
-        if (lightSpaceMatrixLoc != -1) {
-            glm::mat4 lightSpaceMatrixFloat = glm::mat4(lightSpaceMatrix);
-            glUniformMatrix4fv(lightSpaceMatrixLoc, 1, GL_FALSE, glm::value_ptr(lightSpaceMatrixFloat));
-        }
     }
     
     // Bind G-buffer textures
@@ -267,10 +261,37 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
     glUniform1i(glGetUniformLocation(lightingProgramID, "gDepth"), 3);
     
     // Bind shadow map texture
-    if (shadowsEnabled && shadowMapTexture != 0) {
+    if (shadowsEnabled && shadowMapTexture != 0 && numCascades > 0) {
         glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, shadowMapTexture);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, shadowMapTexture);
         glUniform1i(glGetUniformLocation(lightingProgramID, "u_shadowMap"), 4);
+
+        // Pass number of cascades
+        GLint numCascadesLoc = glGetUniformLocation(lightingProgramID, "u_numCascades");
+        if (numCascadesLoc != -1) {
+            glUniform1i(numCascadesLoc, static_cast<int>(numCascades));
+        }
+        
+        // Pass cascade light space matrices array
+        GLint lightSpaceMatricesLoc = glGetUniformLocation(lightingProgramID, "u_lightSpaceMatrices");
+        if (lightSpaceMatricesLoc != -1 && cascadeMatrices.size() > 0) {
+            // Convert double precision matrices to float for OpenGL
+            std::vector<glm::mat4> cascadeMatricesFloat(cascadeMatrices.size());
+            for (size_t i = 0; i < cascadeMatrices.size(); ++i) {
+                cascadeMatricesFloat[i] = glm::mat4(cascadeMatrices[i]);
+            }
+            glUniformMatrix4fv(lightSpaceMatricesLoc, static_cast<GLsizei>(cascadeMatricesFloat.size()),
+                             GL_FALSE, glm::value_ptr(cascadeMatricesFloat[0]));
+        }
+
+        // Pass cascade bias scales array
+        GLint cascadeBiasScalesLoc = glGetUniformLocation(lightingProgramID, "u_cascadeBiasScales");
+        if (cascadeBiasScalesLoc != -1 && cascadeBiasScales.size() > 0) {
+            // Ensure we don't exceed shader array size
+            size_t numScales = std::min(cascadeBiasScales.size(), static_cast<size_t>(4));
+            glUniform1fv(cascadeBiasScalesLoc, static_cast<GLsizei>(numScales),
+                        cascadeBiasScales.data());
+        }
     }
 
     // Set lighting uniforms

@@ -1,5 +1,6 @@
 #include "ShadowRenderer.h"
 #include <iostream>
+#include <glm/gtc/matrix_transform.hpp>
 #include <stdexcept>
 
 ShadowRenderer::ShadowRenderer() {
@@ -10,35 +11,76 @@ ShadowRenderer::~ShadowRenderer() {
     cleanupShadowMap();
 }
 
-void ShadowRenderer::setupShadowMap(unsigned int width, unsigned int height) {
+void ShadowRenderer::setupShadowMaps(unsigned int width, unsigned int height,
+                                     unsigned int numCascades,
+                                     const std::vector<double>& orthoSizes) {
     if (m_shadowMapInitialized) {
         cleanupShadowMap();
     }
     
     m_shadowMapWidth = width;
     m_shadowMapHeight = height;
+    m_numCascades = numCascades;
+    m_cascadeOrthoSizes = orthoSizes;
+    
+    // Ensure we have ortho sizes for all cascades
+    if (m_cascadeOrthoSizes.size() < m_numCascades) {
+        std::cerr << "Warning: Not enough ortho sizes provided, using defaults" << std::endl;
+        m_cascadeOrthoSizes.resize(m_numCascades);
+        for (unsigned int i = 0; i < m_numCascades; ++i) {
+            m_cascadeOrthoSizes[i] = 50.0 * (1 << (i * 2)); // 50, 200, 800...
+        }
+    }
+
+    // Calculate near and far planes
+    double nearPlane = 0.1;
+    double farPlane = m_shadowDistance * 2.0;
+    
+    // Pre-calculate projection matrices (these don't change between frames)
+    m_cascadeProjectionMatrices.resize(m_numCascades);
+    for (unsigned int i = 0; i < m_numCascades; ++i) {
+        double orthoSize = m_cascadeOrthoSizes[i];
+        m_cascadeProjectionMatrices[i] = glm::ortho(
+            -orthoSize, orthoSize,
+            -orthoSize, orthoSize,
+            nearPlane, farPlane
+        );
+    }
+
+    // Pre-calculate bias scales for each cascade
+    // Scale is resolution * orthoSize
+    m_cascadeBiasScales.resize(m_numCascades);
+    double referenceResolution = 1.0;
+    double referenceOrthoSize = 1.0;
+    for (unsigned int i = 0; i < m_numCascades; ++i) {
+        double resolutionScale = static_cast<double>(width) / referenceResolution;
+        double orthoScale = m_cascadeOrthoSizes[i] / referenceOrthoSize;
+        m_cascadeBiasScales[i] = static_cast<float>(orthoScale / resolutionScale);
+    }
+    
+    // Initialize light space matrices storage
+    m_lightSpaceMatrices.resize(m_numCascades);
     
     // Create framebuffer
     glGenFramebuffers(1, &m_shadowMapFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, m_shadowMapFBO);
     
-    // Create depth texture
-    glGenTextures(1, &m_shadowDepthTexture);
-    glBindTexture(GL_TEXTURE_2D, m_shadowDepthTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    // Create depth texture array
+    glGenTextures(1, &m_shadowDepthTextureArray);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, m_shadowDepthTextureArray);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, 
+                 width, height, m_numCascades, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     
     // Set border color to maximum depth (white/far plane)
     float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+    glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, borderColor);
     
-    // Attach depth texture to framebuffer
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_shadowDepthTexture, 0);
+    // Attach depth texture array to framebuffer (base level)
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, m_shadowDepthTextureArray, 0);
     
     // No color buffer needed for shadow mapping
     glDrawBuffer(GL_NONE);
@@ -53,21 +95,40 @@ void ShadowRenderer::setupShadowMap(unsigned int width, unsigned int height) {
     m_shadowMapInitialized = true;
 }
 
-void ShadowRenderer::resizeShadowMap(unsigned int width, unsigned int height) {
-    setupShadowMap(width, height);
+void ShadowRenderer::resizeShadowMaps(unsigned int width, unsigned int height) {
+    // Preserve cascade configuration when resizing
+    std::vector<double> orthoSizes = m_cascadeOrthoSizes;
+    unsigned int numCascades = m_numCascades;
+    setupShadowMaps(width, height, numCascades, orthoSizes);
 }
 
 void ShadowRenderer::cleanupShadowMap() {
     if (m_shadowMapInitialized) {
-        glDeleteTextures(1, &m_shadowDepthTexture);
+        glDeleteTextures(1, &m_shadowDepthTextureArray);
         glDeleteFramebuffers(1, &m_shadowMapFBO);
         m_shadowMapInitialized = false;
     }
 }
 
-void ShadowRenderer::beginShadowPass() {
+void ShadowRenderer::beginShadowPass(const glm::dvec3& lightDir, const glm::dvec3& camPos) {
     if (!m_shadowMapInitialized) {
         throw std::runtime_error("Shadow map not initialized. Call setupShadowMap() first.");
+    }
+
+    // Calculate light position in L-space (camera-relative coordinates)
+    glm::dvec3 lightDirNormalized = glm::normalize(lightDir);
+    glm::dvec3 lightPosL = -lightDirNormalized * m_shadowDistance;
+    
+    // Create light view matrix in L-space
+    glm::dmat4 lightView = glm::lookAt(
+        lightPosL,
+        glm::dvec3(0.0, 0.0, 0.0),  // Look at origin (camera in L-space)
+        glm::dvec3(0.0, 1.0, 0.0)
+    );
+    
+    // Combine pre-calculated projections with view matrix
+    for (unsigned int i = 0; i < m_numCascades; ++i) {
+        m_lightSpaceMatrices[i] = m_cascadeProjectionMatrices[i] * lightView;
     }
     
     // Bind shadow map framebuffer for depth rendering
@@ -86,6 +147,36 @@ void ShadowRenderer::beginShadowPass() {
     glEnable(GL_CULL_FACE);
     //glCullFace(GL_FRONT);
     glCullFace(GL_BACK);
+}
+
+void ShadowRenderer::bindCascadeLayer(unsigned int cascadeIndex) {
+    if (!m_shadowMapInitialized) {
+        throw std::runtime_error("Shadow map not initialized");
+    }
+    if (cascadeIndex >= m_numCascades) {
+        throw std::runtime_error("Cascade index out of range");
+    }
+    
+    // Bind specific cascade layer to framebuffer
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, 
+                              m_shadowDepthTextureArray, 0, cascadeIndex);
+    
+    // Clear this cascade's depth buffer
+    glClear(GL_DEPTH_BUFFER_BIT);
+}
+
+std::vector<glm::dmat4> ShadowRenderer::getLightSpaceMatricesForViewSpace(const glm::dmat4& viewMatrix) const {
+    // Transform cascade matrices from L-space to work with view-space fragment positions
+    // Fragment positions in lighting shader are in view space, so we need:
+    // cascadeMatrix * inverse(viewMatrix) to transform view-space -> L-space -> cascade-space
+    glm::dmat4 inverseView = glm::inverse(viewMatrix);
+    
+    std::vector<glm::dmat4> viewSpaceMatrices;
+    viewSpaceMatrices.reserve(m_lightSpaceMatrices.size());
+    for (const auto& cascadeMatrix : m_lightSpaceMatrices) {
+        viewSpaceMatrices.push_back(cascadeMatrix * inverseView);
+    }
+    return viewSpaceMatrices;
 }
 
 void ShadowRenderer::endShadowPass() {

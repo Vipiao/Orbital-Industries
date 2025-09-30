@@ -133,5 +133,5 @@ private:
     GraphicsEngineBase* getGraphicsEngineBase() const;
 
     // Helper method for shadow rendering
-    void renderShadowPass(const glm::mat4& lightSpaceMatrix);
+    void renderShadowPass();
 };

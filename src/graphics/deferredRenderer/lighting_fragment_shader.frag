@@ -6,8 +6,10 @@ uniform sampler2D gAlbedo;
 uniform sampler2D gNormal;
 uniform sampler2D gMaterial;
 uniform sampler2D gDepth;
-uniform sampler2D u_shadowMap;
-uniform mat4 u_lightSpaceMatrix;
+uniform sampler2DArray u_shadowMap;
+uniform int u_numCascades;
+uniform mat4 u_lightSpaceMatrices[4];
+uniform float u_cascadeBiasScales[4];
 uniform bool u_shadowsEnabled;
 uniform vec3 u_lightDir;
 uniform mat4 u_projection;
@@ -116,15 +118,56 @@ vec2 hash2(vec2 p) {
     return fract(sin(vec2(dot(p, vec2(127.1, 211.7)), dot(p, vec2(169.5, 183.3)))) * 43758.5453123);
 }
 
+// Generate temporal jitter value in [-1, 1] range
+float temporalJitter(vec2 timeScales) {
+    vec2 screenPos = gl_FragCoord.xy;
+    vec2 timeOffset = vec2(u_timeRemainder * timeScales.x, u_timeRemainder * timeScales.y);
+    vec2 jitterSeed = screenPos + timeOffset;
+    return (hash(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
+}
+
+int selectCascade(vec3 fragPos) {
+    // Try cascades from highest to lowest resolution (0 is highest detail)
+    // Calculate margin as 1 texel to avoid edge artifacts
+    ivec3 texSize = textureSize(u_shadowMap, 0);
+    float baseMargin = 1.0 / float(texSize.x);
+    
+    // Add temporal jitter to margin to reduce aliasing at cascade boundaries
+    float jitter = temporalJitter(vec2(0.11, 0.13));
+    float margin = baseMargin * (1.0 + abs(jitter)*128.);
+
+    for (int i = 0; i < u_numCascades; ++i) {
+        // Transform fragment position to this cascade's light space
+        vec4 fragPosLightSpace = u_lightSpaceMatrices[i] * vec4(fragPos, 1.0);
+        vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+        projCoords = projCoords * 0.5 + 0.5;
+        
+        // Check if coordinates are inside [margin, 1-margin] range
+        if (projCoords.x > margin && projCoords.x < (1.0 - margin) &&
+            projCoords.y > margin && projCoords.y < (1.0 - margin)) {
+            return i;  // Use this cascade
+        }
+    }
+    
+    // Outside all cascades
+    return -1;
+}
+
 float calculateShadow(
-   vec3 fragPos, vec3 normal, vec3 lightDir, float bias
+   vec3 fragPos, vec3 normal, vec3 lightDir, float bias, int cascadeIndex
 ) {
     if (!u_shadowsEnabled) {
         return 1.0; // No shadow
     }
     
-    // Transform fragment position to light space
-    vec4 fragPosLightSpace = u_lightSpaceMatrix * vec4(fragPos, 1.0);
+    // Select which cascade to use
+    if (cascadeIndex < 0) {
+        return 1.0; // Outside all cascades, no shadow
+    }
+    //cascadeIndex = 1;
+    
+    // Transform fragment position to selected cascade's light space
+    vec4 fragPosLightSpace = u_lightSpaceMatrices[cascadeIndex] * vec4(fragPos, 1.0);
     
     // Perform perspective divide
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -149,7 +192,7 @@ float calculateShadow(
     vec2 timeOffset = vec2(u_timeRemainder * 0.3, u_timeRemainder * 0.7); // Different time scales for X/Y
     vec2 jitterSeed = screenPos + timeOffset;
     vec2 jitter = (hash2(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
-    vec2 texelSize = 1.0 / textureSize(u_shadowMap, 0);
+    vec2 texelSize = 1.0 / vec2(textureSize(u_shadowMap, 0).xy);
     vec2 jitteredOffset = jitter * texelSize; // Scale to texel size
 
     // PCF (Percentage Closer Filtering) for soft shadows
@@ -160,7 +203,8 @@ float calculateShadow(
         //for(int y = 0; y < 1; ++y) {
             // Apply both PCF offset and temporal jitter
             vec2 sampleOffset = vec2(x, y) * texelSize + jitteredOffset;
-            float pcfDepth = texture(u_shadowMap, projCoords.xy + sampleOffset).r;
+            vec2 sampleCoords = projCoords.xy + sampleOffset;
+            float pcfDepth = texture(u_shadowMap, vec3(sampleCoords, float(cascadeIndex))).r;
             shadow += currentDepth - bias > pcfDepth ? 0.0 : 1.0;
             //shadow += smoothstep(-0.001, 0.0, pcfDepth - (currentDepth - bias));
         }    
@@ -185,11 +229,7 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir, vec3 lightDir) {
     vec3 stepSize = (reflectionDir * scale) / float(numSteps);
     
     // Jitter: add temporal randomness to starting position
-    vec2 screenPos = gl_FragCoord.xy;
-    vec2 timeOffset = vec2(u_timeRemainder * 0.17, u_timeRemainder * 0.23); // Different time scales
-    vec2 jitterSeed = screenPos + timeOffset;
-    float jitter = (hash(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
-    
+    float jitter = temporalJitter(vec2(0.17, 0.23));
     vec3 currentPos = fragPos + stepSize * jitter;
     for (int i = 1; i <= numSteps; i++) {
         // Get current position in view space
@@ -298,7 +338,8 @@ void main() {
 
    // Calculate SSAO
    float ssaoFactor = calculateSSAO(fragPos, normal);
-   ssaoFactor = pow(ssaoFactor, 1.0); // TEST
+   ssaoFactor = pow(ssaoFactor, 1.0);
+   //ssaoFactor = 1.;
    
    // For directional light, use the light direction directly
    vec3 lightDir = normalize(-u_lightDir);
@@ -308,9 +349,12 @@ void main() {
    float attenuation = 1.0;
    
    // Calculate shadow factor
-   float scale = 2048./2048. * 50./50.;
-   float bias = 0.00012 * scale + length(fragPos) * 0.000002 * scale;
-   float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias);
+   int cascadeIndex = selectCascade(fragPos);
+   float bias = 0.;
+   if (cascadeIndex >= 0) {
+      bias = 0.003 * u_cascadeBiasScales[cascadeIndex];
+   }
+   float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias, cascadeIndex);
    
    // Phong lighting model
    float ambientStrength = 0.3;
@@ -343,7 +387,6 @@ void main() {
       reflectedColor * reflectionStrength *
       reflectionWeight * mix(shadowFactor, 1., 0.4);
    result += reflectionContribution * (1.0 - metallic * 0.5);
-   //result = mix(result, reflectionContribution, 0.9);
    
    FragColor = vec4(result, 1.0);
    //debugColor.yz = result.yz;
