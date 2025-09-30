@@ -171,6 +171,7 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
     unsigned int numCascades,
     const std::vector<glm::dmat4>& cascadeMatrices,
     const std::vector<float>& cascadeBiasScales,
+    const std::vector<double>& cascadeOrthoSizes,
     unsigned int shadowMapTexture,
     bool shadowsEnabled)
 {
@@ -291,6 +292,16 @@ void DeferredRenderer::endGeometryPassAndRenderLighting(
             size_t numScales = std::min(cascadeBiasScales.size(), static_cast<size_t>(4));
             glUniform1fv(cascadeBiasScalesLoc, static_cast<GLsizei>(numScales),
                         cascadeBiasScales.data());
+        }
+
+        // Pass cascade ortho sizes array
+        GLint cascadeOrthoSizesLoc = glGetUniformLocation(lightingProgramID, "u_cascadeOrthoSizes");
+        if (cascadeOrthoSizesLoc != -1 && cascadeOrthoSizes.size() > 0) {
+            // Convert double to float for OpenGL
+            std::vector<float> orthoSizesFloat(cascadeOrthoSizes.begin(), cascadeOrthoSizes.end());
+            size_t numSizes = std::min(orthoSizesFloat.size(), static_cast<size_t>(4));
+            glUniform1fv(cascadeOrthoSizesLoc, static_cast<GLsizei>(numSizes),
+                        orthoSizesFloat.data());
         }
     }
 

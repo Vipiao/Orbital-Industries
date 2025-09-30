@@ -43,8 +43,10 @@ GraphicsEngine::GraphicsEngine(
 
     // Create shadow renderer
     m_shadowRenderer = std::make_unique<ShadowRenderer>();
-    m_shadowRenderer->setupShadowMaps(2048, 2048, 3, {50.0, 200.0, 800.0});
+    m_shadowRenderer->setupShadowMaps(4096, 4096, 3, {50.0, 200.0, 800.0});
+    //m_shadowRenderer->setupShadowMaps(2048, 2048, 3, {50.0, 200.0, 800.0});
     //m_shadowRenderer->setupShadowMaps(1024, 1024, 3, {25.0, 100.0, 400.0});
+    //m_shadowRenderer->setupShadowMaps(512, 512, 3, {12.0, 50.0, 200.0});
 }
 
 GraphicsEngine::~GraphicsEngine() {
@@ -121,6 +123,7 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
         m_shadowRenderer->getNumCascades(), // number of cascades
         m_shadowRenderer->getLightSpaceMatricesForViewSpace(viewMatrix), // cascade matrices for view space
         m_shadowRenderer->getCascadeBiasScales(), // cascade bias scales
+        m_shadowRenderer->getCascadeOrthoSizes(),
         shadowMapTextureArray,            // shadow map texture array
         m_shadowsEnabled                  // whether shadows are enabled
     );

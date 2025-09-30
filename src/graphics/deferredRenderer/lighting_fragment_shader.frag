@@ -10,6 +10,7 @@ uniform sampler2DArray u_shadowMap;
 uniform int u_numCascades;
 uniform mat4 u_lightSpaceMatrices[4];
 uniform float u_cascadeBiasScales[4];
+uniform float u_cascadeOrthoSizes[4];
 uniform bool u_shadowsEnabled;
 uniform vec3 u_lightDir;
 uniform mat4 u_projection;
@@ -127,24 +128,36 @@ float temporalJitter(vec2 timeScales) {
 }
 
 int selectCascade(vec3 fragPos) {
-    // Try cascades from highest to lowest resolution (0 is highest detail)
+    // Add temporal jitter to fragPos to reduce aliasing
+    float jitter = temporalJitter(vec2(0.11, 0.13));
+    fragPos *= (1.0 + abs(jitter) * 0.125);
+    
+    // Calculate distance from camera (Euclidean distance in view space)
+    float distanceFromCamera = length(fragPos);
+    
     // Calculate margin as 1 texel to avoid edge artifacts
     ivec3 texSize = textureSize(u_shadowMap, 0);
     float baseMargin = 1.0 / float(texSize.x);
     
-    // Add temporal jitter to margin to reduce aliasing at cascade boundaries
-    float jitter = temporalJitter(vec2(0.11, 0.13));
-    float margin = baseMargin * (1.0 + abs(jitter)*128.);
-
+    // Try cascades from highest to lowest resolution (0 is highest detail)
     for (int i = 0; i < u_numCascades; ++i) {
+        // Check if distance allows this cascade level
+        float cascadeDistance = u_cascadeOrthoSizes[i] * 2.0;
+        bool distanceAllowsCascade = (i == u_numCascades - 1) || 
+                                      (distanceFromCamera < cascadeDistance);
+        
+        if (!distanceAllowsCascade) {
+            continue;  // Skip to coarser cascade
+        }
+
         // Transform fragment position to this cascade's light space
         vec4 fragPosLightSpace = u_lightSpaceMatrices[i] * vec4(fragPos, 1.0);
         vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
         projCoords = projCoords * 0.5 + 0.5;
         
-        // Check if coordinates are inside [margin, 1-margin] range
-        if (projCoords.x > margin && projCoords.x < (1.0 - margin) &&
-            projCoords.y > margin && projCoords.y < (1.0 - margin)) {
+        // Check if coordinates are inside [baseMargin, 1-baseMargin] range
+        if (projCoords.x > baseMargin && projCoords.x < (1.0 - baseMargin) &&
+            projCoords.y > baseMargin && projCoords.y < (1.0 - baseMargin)) {
             return i;  // Use this cascade
         }
     }
@@ -182,10 +195,6 @@ float calculateShadow(
     
     // Get current fragment depth in light space
     float currentDepth = projCoords.z;
-    
-    // Calculate bias to prevent shadow acne
-    //float bias = max(0.005 * (1.0 - dot(normal, lightDir)), 0.001);
-    //float bias = 0.;
 
     // Temporal jittering: add per-pixel random offsets that vary over time
     vec2 screenPos = gl_FragCoord.xy;
@@ -205,8 +214,7 @@ float calculateShadow(
             vec2 sampleOffset = vec2(x, y) * texelSize + jitteredOffset;
             vec2 sampleCoords = projCoords.xy + sampleOffset;
             float pcfDepth = texture(u_shadowMap, vec3(sampleCoords, float(cascadeIndex))).r;
-            shadow += currentDepth - bias > pcfDepth ? 0.0 : 1.0;
-            //shadow += smoothstep(-0.001, 0.0, pcfDepth - (currentDepth - bias));
+            shadow += pcfDepth < 1. && (currentDepth - bias > pcfDepth) ? 0.0 : 1.0;
         }    
     }
     shadow /= 9.0; // Average the 9 samples
@@ -219,7 +227,7 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir, vec3 lightDir) {
     vec3 reflectionDir = reflect(-viewDir, normal);
     
     // Hardcode scale as 5.0
-    float scale = 10.0 * (1.-dot(normal, reflectionDir));
+    float scale = 20.0 * (1.-dot(normal, reflectionDir));
     //float scale = 10.0;
     
     // Choose number of steps
@@ -354,8 +362,9 @@ void main() {
    if (cascadeIndex >= 0) {
       bias = 0.003 * u_cascadeBiasScales[cascadeIndex];
    }
-   float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias, cascadeIndex);
    
+   float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias, cascadeIndex);
+
    // Phong lighting model
    float ambientStrength = 0.3;
    vec3 ambient = ambientStrength * albedo * ssaoFactor;

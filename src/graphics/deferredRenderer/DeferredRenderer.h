@@ -33,6 +33,7 @@ public:
         unsigned int numCascades,
         const std::vector<glm::dmat4>& cascadeMatrices,
         const std::vector<float>& cascadeBiasScales,
+        const std::vector<double>& cascadeOrthoSizes,
         unsigned int shadowMapTexture = 0,
         bool shadowsEnabled = false);
     

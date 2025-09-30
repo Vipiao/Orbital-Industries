@@ -32,6 +32,7 @@ public:
     const std::vector<glm::dmat4>& getLightSpaceMatrices() const { return m_lightSpaceMatrices; }  // For rendering (L-space)
     std::vector<glm::dmat4> getLightSpaceMatricesForViewSpace(const glm::dmat4& viewMatrix) const;  // For lighting (view-space)
     const std::vector<float>& getCascadeBiasScales() const { return m_cascadeBiasScales; }
+    const std::vector<double>& getCascadeOrthoSizes() const { return m_cascadeOrthoSizes; }
 
     // Shader reloading
     std::pair<bool, std::string> reloadShaders();
