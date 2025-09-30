@@ -74,6 +74,7 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    float occlusion = 0.0;
    int sampleCount = 32; // Match the uniform array size
    
+   float weight = 0.;
    for (int i = 0; i < sampleCount; ++i) {
       // Get sample position in world space
       vec3 samplePos = TBN * u_ssaoSamples[i];
@@ -97,7 +98,8 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       // Range check to reduce artifacts
       float haloFactor = 1.;
       float rangeCheck = smoothstep(0.0, 1.0, haloFactor * u_ssaoRadius / abs(fragPos.z - sampleDepth));
-      
+      weight += rangeCheck;
+
       // Compare depths
       //occlusion += (sampleDepth >= samplePos.z + u_ssaoBias ? 1.0 : 0.0) * rangeCheck;
       float depthDiff = sampleDepth - samplePos.z;
@@ -105,7 +107,8 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       occlusion += occlusionContribution * rangeCheck;
    }
    
-   occlusion = 1.0 - (occlusion / float(sampleCount));
+   //occlusion = 1.0 - (occlusion / float(sampleCount));
+   occlusion = 1.0 - (occlusion / weight);
    
    return occlusion;
 }
