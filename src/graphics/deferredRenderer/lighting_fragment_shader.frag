@@ -170,16 +170,19 @@ int selectCascade(vec3 fragPos) {
 }
 
 float calculateShadow(
-   vec3 fragPos, vec3 normal, vec3 lightDir, float bias, int cascadeIndex
+   vec3 fragPos, vec3 normal, vec3 lightDir, int cascadeIndex
 ) {
     if (!u_shadowsEnabled) {
         return 1.0; // No shadow
     }
     
-    // Select which cascade to use
     if (cascadeIndex < 0) {
         return 1.0; // Outside all cascades, no shadow
     }
+    
+    // Calculate normalized bias: cascadeBiasScales already includes depth range normalization
+    float worldSpaceBias = 8.;
+    float normalizedBias = worldSpaceBias * u_cascadeBiasScales[cascadeIndex];
     //cascadeIndex = 1;
     
     // Transform fragment position to selected cascade's light space
@@ -217,7 +220,7 @@ float calculateShadow(
             vec2 sampleOffset = vec2(x, y) * texelSize + jitteredOffset;
             vec2 sampleCoords = projCoords.xy + sampleOffset;
             float pcfDepth = texture(u_shadowMap, vec3(sampleCoords, float(cascadeIndex))).r;
-            shadow += pcfDepth < 1. && (currentDepth - bias > pcfDepth) ? 0.0 : 1.0;
+            shadow += pcfDepth < 1. && (currentDepth - normalizedBias > pcfDepth) ? 0.0 : 1.0;
         }    
     }
     shadow /= 9.0; // Average the 9 samples
@@ -361,12 +364,7 @@ void main() {
    
    // Calculate shadow factor
    int cascadeIndex = selectCascade(fragPos);
-   float bias = 0.;
-   if (cascadeIndex >= 0) {
-      bias = 0.003 * u_cascadeBiasScales[cascadeIndex];
-   }
-   
-   float shadowFactor = calculateShadow(fragPos, normal, lightDir, bias, cascadeIndex);
+   float shadowFactor = calculateShadow(fragPos, normal, lightDir, cascadeIndex);
 
    // Phong lighting model
    float ambientStrength = 0.3;

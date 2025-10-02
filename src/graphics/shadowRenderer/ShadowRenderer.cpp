@@ -47,15 +47,16 @@ void ShadowRenderer::setupShadowMaps(unsigned int width, unsigned int height,
         );
     }
 
-    // Pre-calculate bias scales for each cascade
-    // Scale is resolution * orthoSize
+    // Calculate depth range for bias calculations
+    double depthRange = farPlane - nearPlane;
+
+    // Pre-calculate bias scales for each cascade including depth range
+    // Scale is (orthoSize / resolution) / depthRange
     m_cascadeBiasScales.resize(m_numCascades);
-    double referenceResolution = 1.0;
-    double referenceOrthoSize = 1.0;
     for (unsigned int i = 0; i < m_numCascades; ++i) {
-        double resolutionScale = static_cast<double>(width) / referenceResolution;
-        double orthoScale = m_cascadeOrthoSizes[i] / referenceOrthoSize;
-        m_cascadeBiasScales[i] = static_cast<float>(orthoScale / resolutionScale);
+        double resolutionScale = static_cast<double>(width);
+        double orthoScale = m_cascadeOrthoSizes[i];
+        m_cascadeBiasScales[i] = static_cast<float>((orthoScale / resolutionScale) / depthRange);
     }
     
     // Initialize light space matrices storage
