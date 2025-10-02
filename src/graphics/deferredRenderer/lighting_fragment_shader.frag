@@ -80,7 +80,7 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    int sampleCount = 32; // Match the uniform array size
    
    //float weight = 0.;
-   int count = 0;
+   //int count = 0;
    for (int i = 0; i < sampleCount; ++i) {
       // Get sample position in world space
       vec3 samplePos = TBN * u_ssaoSamples[i];
