@@ -57,6 +57,11 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    if (!u_ssaoEnabled) {
       return 1.0;
    }
+
+   // Scale radius based on distance from camera to maintain consistent world-space coverage
+   // Objects further away need larger view-space radius to maintain same world-space effect
+   float distanceFromCamera = length(fragPos);
+   float scaledRadius = u_ssaoRadius * (1.0 + distanceFromCamera * 0.08);
    
    // Generate random tangent vector that rotates each frame
    vec2 timeOffset = vec2(u_timeRemainder * 0.1, u_timeRemainder * 0.13);
@@ -75,10 +80,11 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    int sampleCount = 32; // Match the uniform array size
    
    //float weight = 0.;
+   int count = 0;
    for (int i = 0; i < sampleCount; ++i) {
       // Get sample position in world space
       vec3 samplePos = TBN * u_ssaoSamples[i];
-      samplePos = fragPos + samplePos * u_ssaoRadius;
+      samplePos = fragPos + samplePos * scaledRadius;
       
       // Project to screen space
       vec4 offset = u_projection * vec4(samplePos, 1.0);
@@ -96,8 +102,10 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       float sampleDepth = reconstructPositionZ(offset.xy, texture(gDepth, offset.xy).r);
       
       // Range check to reduce artifacts
-      float haloFactor = 1.;
-      float rangeCheck = smoothstep(0.0, 1.0, haloFactor * u_ssaoRadius / abs(fragPos.z - sampleDepth));
+      // Use scaled radius for consistent range checking at all distances
+      float depthDifference = abs(fragPos.z - sampleDepth);
+      float rangeThreshold = scaledRadius * 2.0;  // Samples beyond 2x radius are ignored
+      float rangeCheck = smoothstep(rangeThreshold, rangeThreshold * 0.5, depthDifference);
       //weight += rangeCheck;
 
       // Compare depths
@@ -105,10 +113,12 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
       float depthDiff = sampleDepth - samplePos.z;
       float occlusionContribution = smoothstep(-u_ssaoBias, u_ssaoBias, depthDiff);
       occlusion += occlusionContribution * rangeCheck;
+      //if(occlusionContribution > 0.5) count++;
    }
    
    occlusion = 1.0 - (occlusion / float(sampleCount));
    //occlusion = 1.0 - (occlusion / weight);
+   //if(count > 21) return u_timeRemainder*4.;
    
    return occlusion;
 }
