@@ -181,7 +181,7 @@ float calculateShadow(
     }
     
     // Calculate normalized bias: cascadeBiasScales already includes depth range normalization
-    float worldSpaceBias = 8.;
+    float worldSpaceBias = 6.;
     float normalizedBias = worldSpaceBias * u_cascadeBiasScales[cascadeIndex];
     //cascadeIndex = 1;
     
