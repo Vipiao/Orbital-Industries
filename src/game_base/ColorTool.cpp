@@ -123,7 +123,7 @@ void ColorTool::onPhysicsUpdateComplete() {
     glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
     
     // Find closest ray intersection across all grids
-    for (const auto& gridShared : m_gameBase->m_grids) {
+    for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
         if (!gridShared) continue; // Safety check
         
         // Transform world ray to grid-local space

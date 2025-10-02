@@ -8,8 +8,7 @@
 #include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
 #include "../utils/IHashable.h"
-#include "../utils/HashFunctions.h"
-#include "Grid.h"
+#include "GridSubsystem.h"
 #include "../utils/Generator.h"
 #include <vector>
 #include <memory>
@@ -37,7 +36,6 @@ public:
     void run();
     void addPhysicsCallback(Callback* callback);
 
-    // Grid partitioning/splitting - now deferred
     void scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
     // Shader reloading
@@ -46,7 +44,7 @@ public:
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
     std::unique_ptr<JobManager> m_jobManager;
-    std::vector<std::shared_ptr<Grid>> m_grids;
+    std::unique_ptr<GridSubsystem> m_gridSubsystem;
     TimeHandler* m_timeHandler;
     std::vector<Callback*> m_callbacks;
 
@@ -56,6 +54,9 @@ public:
     // Debug support
     void setDebugRenderer(DebugRenderer* debugRenderer);
     DebugRenderer* getDebugRenderer() const { return m_debugRenderer; }
+
+    // Subsystem access
+    GridSubsystem* getGridSubsystem() const { return m_gridSubsystem.get(); }
     
     // IGraphicsCallbacks implementation
     virtual void preRenderCallback(uint64_t frameNum) override;
@@ -76,14 +77,6 @@ protected:
     void trackJob(std::weak_ptr<Job> jobHandle);
 
 private:
-    // Deferred grid splitting
-    std::unordered_map<uint64_t, std::unordered_set<glm::ivec3, Hash::IVec3Hash>> m_pendingGridSplits;
-    bool handlePendingSplits(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
-    Generator<bool> handlePendingSplitsAsync();
-    Generator<bool> performGridSplitAsync(Grid* sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
-
-    // Async state management
-    std::unique_ptr<Generator<bool>> m_pendingSplitsGenerator;
     
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;

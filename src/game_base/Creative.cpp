@@ -77,7 +77,7 @@ void Creative::physics() {
         glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
         
         // Find closest ray intersection across all grids
-        for (const auto& gridShared : m_gameBase->m_grids) {
+        for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
             if (!gridShared) continue; // Safety check
             
             // Transform world ray to grid-local space
@@ -160,7 +160,7 @@ void Creative::physics() {
 
 void Creative::applyDragForces() {
     // Apply drag to all objects before running physics
-    for (const auto& gridShared : m_gameBase->m_grids) {
+    for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
         if (!gridShared) continue;
         RigidBody* body = gridShared->getRigidBody();
         if (body && !body->m_isStatic && body->m_forces == glm::dvec3{0,0,0}) {
@@ -211,9 +211,9 @@ void Creative::processInputLogic() {
     // TEST START
     //CellMetadata* metadata = collider->get_pointer<CellMetadata>();
     if (keyboard->m_h.justPressed()) {
-        for (size_t ii = 0; ii < m_gameBase->m_grids.size(); ii++) {
-            auto cells = m_gameBase->m_grids[ii]->getCells();
-            GridCollider* gridCollider = static_cast<GridCollider*>(m_gameBase->m_grids[ii]->getRigidBody()->m_collider);
+        for (size_t ii = 0; ii < m_gameBase->getGridSubsystem()->getGrids().size(); ii++) {
+            auto cells = m_gameBase->getGridSubsystem()->getGrids()[ii]->getCells();
+            GridCollider* gridCollider = static_cast<GridCollider*>(m_gameBase->getGridSubsystem()->getGrids()[ii]->getRigidBody()->m_collider);
             
             for (auto cell: cells) {
                 glm::ivec3 coord = cell.first;
@@ -246,7 +246,7 @@ void Creative::processInputLogic() {
                         break;
                 }
                 
-                m_gameBase->m_grids[ii]->setColor(coord, color);
+                m_gameBase->getGridSubsystem()->getGrids()[ii]->setColor(coord, color);
             }
         }
     }
@@ -269,7 +269,7 @@ void Creative::processInputLogic() {
     if (keyboard->m_g.justPressed()) {
         //std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
         
-        for (const auto& gridShared : m_gameBase->m_grids) {
+        for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
             if (gridShared) gridShared->visualizeStructuralIntegrity();
         }
     }
