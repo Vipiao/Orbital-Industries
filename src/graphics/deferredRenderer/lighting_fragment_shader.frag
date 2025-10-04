@@ -61,7 +61,7 @@ float calculateSSAO(vec3 fragPos, vec3 normal) {
    // Scale radius based on distance from camera to maintain consistent world-space coverage
    // Objects further away need larger view-space radius to maintain same world-space effect
    float distanceFromCamera = length(fragPos);
-   float scaledRadius = u_ssaoRadius * (1.0 + distanceFromCamera * 0.08);
+   float scaledRadius = u_ssaoRadius * (1.0 + distanceFromCamera * 0.01);
    
    // Generate random tangent vector that rotates each frame
    vec2 timeOffset = vec2(u_timeRemainder * 0.1, u_timeRemainder * 0.13);
