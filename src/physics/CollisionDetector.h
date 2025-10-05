@@ -10,8 +10,15 @@
 #include <chrono>
 #include "../utils/Generator.h"
 
+// Forward declarations for factory methods
+class GridCollider;
+class PolyhedronCollider;
+class BallCollider;
+class CubeCollider;
+
 // Forward declaration
 class TimeHandler;
+class JobManager;
 
 // Custom comparator for deterministic collision pair ordering
 struct ColliderPairComparator {
@@ -28,11 +35,31 @@ public:
     CollisionDetector(TimeHandler* timeHandler);
     ~CollisionDetector() = default;
     
-    // Add a collider to the collision detection system
-    void addCollider(Collider* collider);
+    // Factory methods - create and take ownership of colliders
+    std::weak_ptr<GridCollider> addGridCollider(
+        const glm::dvec3& position,
+        const glm::dquat& orientation,
+        JobManager* jobManager,
+        TimeHandler* timeHandler);
     
-    // Remove a collider from the collision detection system
-    void removeCollider(Collider* collider);
+    std::weak_ptr<PolyhedronCollider> addPolyhedronCollider(
+        const glm::dvec3& position,
+        const glm::dquat& orientation,
+        const std::vector<glm::dvec3>& localVertices,
+        const std::vector<glm::dvec3>& localFaceAxes,
+        const std::vector<glm::dvec3>& localEdgeAxes);
+    
+    std::weak_ptr<BallCollider> addBallCollider(
+        const glm::dvec3& position,
+        double radius);
+    
+    std::weak_ptr<CubeCollider> addCubeCollider(
+        const glm::dvec3& position,
+        const glm::dquat& orientation,
+        double halfWidth);
+    
+    // Remove a collider from the collision detection system (pass back what factory gave you)
+    void removeCollider(std::weak_ptr<Collider> colliderWeak);
     
     // Run collision detection
     Generator<bool> run(std::vector<CollisionResult>& collisions);
@@ -44,7 +71,10 @@ public:
     void setTimestep(uint64_t timestep);
     
 private:
-    std::vector<Collider*> colliders;
+    // Helper for factory methods
+    void registerCollider(std::shared_ptr<Collider> collider);
+    
+    std::vector<std::shared_ptr<Collider>> m_colliders;
     std::vector<std::unique_ptr<Edge>> edgesX;
     std::vector<std::unique_ptr<Edge>> edgesY;
     std::vector<std::unique_ptr<Edge>> edgesZ;

@@ -2,10 +2,10 @@
 #include "GridCollider.h"
 #include "CubeCollider.h"
 #include "PolyhedronCollider.h"
-#include <glm/gtx/transform.hpp>
-#include <algorithm>
 #include "../utils/JobManager.h"
 #include "../utils/TimeHandler.h"
+#include <glm/gtx/transform.hpp>
+#include <algorithm>
 #include "../utils/PolyhedronProcessor.h"
 #include "../game_base/JobPriorities.h"
 #include "../utils/GeometryUtils.h"
@@ -13,10 +13,9 @@
 
 GridCollider::GridCollider(const glm::dvec3& position,
                           const glm::dquat& orientation,
-                          ColliderReference* reference,
                           JobManager* jobManager,
                           TimeHandler* timeHandler)
-    : Collider(position, orientation, reference)
+    : Collider(position, orientation)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
 {
@@ -25,10 +24,47 @@ GridCollider::GridCollider(const glm::dvec3& position,
     }
 }
 
+void GridCollider::addCubeCell(const glm::ivec3& coord, double width) {
+    std::vector<glm::dvec3> vertices = CubeCollider::generateCubeVertices(width);
+    std::vector<glm::dvec3> axes = CubeCollider::generateCubeAxes();
+    
+    auto collider = std::make_unique<PolyhedronCollider>(
+        glm::dvec3(0.0),
+        glm::dquat(1.0, 0.0, 0.0, 0.0),
+        vertices,
+        axes,
+        axes); // For cubes, face axes and edge axes are the same
+    
+    addCell(coord, std::move(collider));
+}
+
+void GridCollider::addPolyhedronCell(const glm::ivec3& coord,
+                                     const std::vector<glm::dvec3>& localVertices,
+                                     const std::vector<glm::dvec3>& localFaceAxes,
+                                     const std::vector<glm::dvec3>& localEdgeAxes) {
+    auto collider = std::make_unique<PolyhedronCollider>(
+        glm::dvec3(0.0),
+        glm::dquat(1.0, 0.0, 0.0, 0.0),
+        localVertices,
+        localFaceAxes,
+        localEdgeAxes);
+    
+    addCell(coord, std::move(collider));
+}
+
 GridCollider::~GridCollider() {
     // Cancel pending classification job
     if (!m_classificationJob.expired()) {
         m_jobManager->cancel(m_classificationJob);
+    }
+
+    // Clean up metadata for all remaining cells (GridCollider created them, must delete them)
+    for (auto& pair : m_cells) {
+        CellMetadata* metadata = pair.second->get_pointer<CellMetadata>();
+        if (metadata) {
+            delete metadata;
+            pair.second->remove_pointer<CellMetadata>();
+        }
     }
 }
 
@@ -137,7 +173,6 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     glm::dvec3 worldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
     collider->m_position = worldPos;
     collider->m_orientation = m_orientation;
-    collider->m_reference = m_reference;
 
     // Create and set metadata on the collider
     CellMetadata* metadata = new CellMetadata();

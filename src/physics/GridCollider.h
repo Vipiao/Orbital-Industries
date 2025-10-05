@@ -52,7 +52,6 @@ class GridCollider : public Collider {
 public:
     GridCollider(const glm::dvec3& position = glm::dvec3(0.0),
                  const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
-                 ColliderReference* reference = nullptr,
                  JobManager* jobManager = nullptr,
                  TimeHandler* timeHandler = nullptr);
     
@@ -66,12 +65,15 @@ public:
     virtual RayIntersectionResult intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const override;
     
     // Grid-specific methods
-    /**
-     * @brief Add a collider to the grid at the specified coordinate
-     * @param coord Grid coordinate where the collider will be placed
-     * @param collider Collider to add (ownership is transferred - caller's unique_ptr becomes null after this call)
-     */
-    void addCell(const glm::ivec3& coord, std::unique_ptr<Collider> collider);
+
+    // Factory methods - create and own sub-colliders
+    void addCubeCell(const glm::ivec3& coord, double width);
+    
+    void addPolyhedronCell(const glm::ivec3& coord,
+                          const std::vector<glm::dvec3>& localVertices,
+                          const std::vector<glm::dvec3>& localFaceAxes,
+                          const std::vector<glm::dvec3>& localEdgeAxes);
+    
     void removeCell(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;
     
@@ -110,6 +112,12 @@ public:
     static constexpr int TYPE_ID = Hash::hashColliderName("GridCollider");
 
 private:
+    /**
+     * @brief Internal method to add a collider (used by factory methods)
+     * @note Only callable by factory methods - ensures proper ownership
+     */
+    void addCell(const glm::ivec3& coord, std::unique_ptr<Collider> collider);
+
     // Job system references for classification
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;

@@ -28,27 +28,31 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
         throw std::invalid_argument("JobManager and TimeHandler cannot be null");
     }
 
-    // Create graphics subsystem
-    m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager);
-
-    // Create grid collider for the grid
-    m_collider = std::make_unique<GridCollider>(position, orientation, nullptr, jobManager, timeHandler);
+    // Create grid collider via CollisionDetector factory
+    m_colliderWeak = m_physics->getCollisionDetector().addGridCollider(
+        position,
+        orientation,
+        jobManager,
+        timeHandler);
     
-    // Create rigid body in physics engine
+    // Create rigid body (without collider)
     m_rigidBody = m_physics->addRigidBody(
         position,
         orientation,
-        0.0,  // Mass
-        glm::dmat3(0.0),  // Inertia tensor
-        false, // Not static
-        m_collider.get() // Pass the sphere collider
-    );
+        0.0,               // Mass (will be updated when cells are added)
+        glm::dmat3(0.0),   // Inertia tensor (will be updated when cells are added)
+        false);            // Not static
     
     // Set initial collider offset and update transform
-    if (m_rigidBody) {
-        m_rigidBody->m_colliderOffset = m_centerOfMass;
-    }
+    // Connect collider to rigid body
+    m_physics->connectCollider(m_rigidBody, m_colliderWeak);
+    
+    // Set initial collider offset
+    m_rigidBody->m_colliderOffset = m_centerOfMass;
     m_physics->updateColliderTransform(m_rigidBody);
+
+    // Create graphics subsystem
+    m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager);
 
     // Initial graphics update
     // Use a default distant camera position for initial update
@@ -56,10 +60,14 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
 }
 
 Grid::~Grid() {
-    // Clean up resources
+    // Order matters: disconnect references BEFORE destroying collider
     if (m_rigidBody) {
+        m_physics->disconnectCollider(m_rigidBody);
         m_physics->removeRigidBody(m_rigidBody);
     }
+
+    // Now safe to destroy collider (no more references to it)
+    m_physics->getCollisionDetector().removeCollider(m_colliderWeak);
 
     // Cancel all pending jobs
     for (auto& jobHandle : m_pendingJobs) {
@@ -77,18 +85,12 @@ void Grid::addCell(const glm::ivec3& coord) {
     // If cell already exists, return
     if (hasCell(coord)) return;
 
-    // Add cell to collider - use PolyhedronCollider with optimized cube generation
-    std::vector<glm::dvec3> vertices = CubeCollider::generateCubeVertices(1.0);
-    std::vector<glm::dvec3> axes = CubeCollider::generateCubeAxes();
-    
-    auto cubeCollider = std::make_unique<PolyhedronCollider>(
-        glm::dvec3(0.0),           // position
-        glm::dquat(1.0, 0.0, 0.0, 0.0), // orientation  
-        vertices,                  // local vertices
-        axes,                      // face axes
-        axes                       // edge axes (same as face for cubes)
-    );
-    m_collider->addCell(coord, std::move(cubeCollider));
+    // Add cell to collider using factory method
+    auto collider = m_colliderWeak.lock();
+    if (!collider) {
+        throw std::runtime_error("Grid::addCell: Collider has been destroyed");
+    }
+    collider->addCubeCell(coord, 1.0);
 
     // Cancel existing analysis to prevent accessing deleted cells
     cancelStructuralAnalysis();
@@ -139,7 +141,10 @@ void Grid::removeCell(const glm::ivec3& coord) {
     m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
     
     // Remove from collider
-    m_collider->removeCell(coord);
+    auto collider = m_colliderWeak.lock();
+    if (collider) {
+        collider->removeCell(coord);
+    }
     
     // Remove from graphics subsystem
     m_gridGraphics->removeCell(coord);
@@ -195,17 +200,13 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
         vertices.push_back(glm::dvec3(vertex) / double(StructuralBlock::MAX_SIZE) - glm::dvec3(0.5));
     }
     
-    // Remove old cell from collider and add new one
-    m_collider->removeCell(coord);
-    
-    auto newCollider = std::make_unique<PolyhedronCollider>(
-        glm::dvec3(0.0),           // position
-        glm::dquat(1.0, 0.0, 0.0, 0.0), // orientation  
-        vertices,                  // local vertices
-        axes.faceAxis,             // face axes
-        axes.edgeAxis              // edge axes
-    );
-    m_collider->addCell(coord, std::move(newCollider));
+    // Remove old cell from collider and add new one using factory method
+    auto collider = m_colliderWeak.lock();
+    if (!collider) {
+        throw std::runtime_error("Grid::modifyCell: Collider has been destroyed");
+    }
+    collider->removeCell(coord);
+    collider->addPolyhedronCell(coord, vertices, axes.faceAxis, axes.edgeAxis);
     
     // Schedule mesh updates for this cell and neighbors
     scheduleMeshUpdatesForCellAndNeighbors(coord);
@@ -500,15 +501,19 @@ glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
 }
 
 RayIntersectionResult Grid::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
-    if (!m_collider) return RayIntersectionResult();
-    return m_collider->intersectRay(rayStart, rayEnd);
+    auto collider = m_colliderWeak.lock();
+    if (!collider) {
+        return RayIntersectionResult();
+    }
+    return collider->intersectRay(rayStart, rayEnd);
 }
 
 double Grid::getApproximateRadius() const {
-    if (m_collider && !m_collider->getCells().empty()) {
+    auto collider = m_colliderWeak.lock();
+    if (collider && !collider->getCells().empty()) {
         // Use the collider's bounding box to estimate radius (AABB already updated by collision detector)
         
-        glm::dvec3 bboxSize = m_collider->m_AABBMax - m_collider->m_AABBMin;
+        glm::dvec3 bboxSize = collider->m_AABBMax - collider->m_AABBMin;
         // Use half the maximum dimension as approximate radius
         double maxDimension = glm::max(glm::max(bboxSize.x, bboxSize.y), bboxSize.z);
         return maxDimension * 0.5;

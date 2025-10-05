@@ -5,9 +5,8 @@
 
 BallCollider::BallCollider(const glm::dvec3& position,
                            const glm::dquat& orientation,
-                           double radius,
-                           ColliderReference* reference)
-    : Collider(position, orientation, reference)
+                           double radius)
+    : Collider(position, orientation)
     , m_radius(radius)
 {
     

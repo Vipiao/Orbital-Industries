@@ -3,13 +3,11 @@
 
 CubeCollider::CubeCollider(const glm::dvec3& position,
                            const glm::dquat& orientation,
-                           double width,
-                           ColliderReference* reference)
+                           double width)
     : PolyhedronCollider(position, orientation, 
                          generateCubeVertices(width),
                          generateCubeAxes(),
-                         generateCubeAxes(), // For cubes, face axes and edge axes are the same
-                         reference)
+                         generateCubeAxes()) // For cubes, face axes and edge axes are the same
     , m_width(width)
 {
 }

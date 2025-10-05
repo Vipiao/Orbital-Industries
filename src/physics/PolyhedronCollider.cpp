@@ -9,9 +9,8 @@ PolyhedronCollider::PolyhedronCollider(const glm::dvec3& position,
                                        const glm::dquat& orientation,
                                        const std::vector<glm::dvec3>& localVertices,
                                        const std::vector<glm::dvec3>& localFaceAxes,
-                                       const std::vector<glm::dvec3>& localEdgeAxes,
-                                       ColliderReference* reference)
-    : Collider(position, orientation, reference)
+                                       const std::vector<glm::dvec3>& localEdgeAxes)
+    : Collider(position, orientation)
 {
     // Filter duplicate vertices
     const double vertexTolerance = 1e-9;

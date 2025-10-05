@@ -1,6 +1,10 @@
 // CollisionDetector.cpp
 #include "CollisionDetector.h"
 #include "CollisionDetectionUtils.h"
+#include "GridCollider.h"
+#include "PolyhedronCollider.h"
+#include "BallCollider.h"
+#include "CubeCollider.h"
 #include <algorithm>
 #include "../utils/PairCache.h"
 #include <iostream>
@@ -13,35 +17,95 @@ CollisionDetector::CollisionDetector(TimeHandler* timeHandler)
     }
 }
 
-void CollisionDetector::addCollider(Collider* collider) {
+void CollisionDetector::registerCollider(std::shared_ptr<Collider> collider) {
     if (!collider) return;
     
-    // Add to colliders list
-    colliders.push_back(collider);
+    // Store ownership
+    m_colliders.push_back(collider);
     
     // Create edges for this collider
-    edgesX.push_back(std::make_unique<Edge>(collider, EdgeType::MIN, EdgeAxis::X));
-    edgesX.push_back(std::make_unique<Edge>(collider, EdgeType::MAX, EdgeAxis::X));
+    Collider* rawPtr = collider.get();
+    edgesX.push_back(std::make_unique<Edge>(rawPtr, EdgeType::MIN, EdgeAxis::X));
+    edgesX.push_back(std::make_unique<Edge>(rawPtr, EdgeType::MAX, EdgeAxis::X));
     
-    edgesY.push_back(std::make_unique<Edge>(collider, EdgeType::MIN, EdgeAxis::Y));
-    edgesY.push_back(std::make_unique<Edge>(collider, EdgeType::MAX, EdgeAxis::Y));
+    edgesY.push_back(std::make_unique<Edge>(rawPtr, EdgeType::MIN, EdgeAxis::Y));
+    edgesY.push_back(std::make_unique<Edge>(rawPtr, EdgeType::MAX, EdgeAxis::Y));
     
-    edgesZ.push_back(std::make_unique<Edge>(collider, EdgeType::MIN, EdgeAxis::Z));
-    edgesZ.push_back(std::make_unique<Edge>(collider, EdgeType::MAX, EdgeAxis::Z));
+    edgesZ.push_back(std::make_unique<Edge>(rawPtr, EdgeType::MIN, EdgeAxis::Z));
+    edgesZ.push_back(std::make_unique<Edge>(rawPtr, EdgeType::MAX, EdgeAxis::Z));
 }
 
-void CollisionDetector::removeCollider(Collider* collider) {
-    if (!collider) return;
+std::weak_ptr<GridCollider> CollisionDetector::addGridCollider(
+    const glm::dvec3& position,
+    const glm::dquat& orientation,
+    JobManager* jobManager,
+    TimeHandler* timeHandler) {
     
-    // Remove from colliders list
-    colliders.erase(std::remove(colliders.begin(), colliders.end(), collider), colliders.end());
+    auto collider = std::make_shared<GridCollider>(
+        position, orientation, jobManager, timeHandler);
+    registerCollider(collider);
+    return collider;
+}
+
+std::weak_ptr<PolyhedronCollider> CollisionDetector::addPolyhedronCollider(
+    const glm::dvec3& position,
+    const glm::dquat& orientation,
+    const std::vector<glm::dvec3>& localVertices,
+    const std::vector<glm::dvec3>& localFaceAxes,
+    const std::vector<glm::dvec3>& localEdgeAxes) {
     
-    // Remove edges for this collider
-    auto removeEdges = [collider](std::vector<std::unique_ptr<Edge>>& edges) {
+    auto collider = std::make_shared<PolyhedronCollider>(
+        position, orientation, localVertices, localFaceAxes, localEdgeAxes);
+    registerCollider(collider);
+    return collider;
+}
+
+std::weak_ptr<BallCollider> CollisionDetector::addBallCollider(
+    const glm::dvec3& position,
+    double radius) {
+    
+    auto collider = std::make_shared<BallCollider>(
+        position,
+        glm::dquat(1.0, 0.0, 0.0, 0.0),
+        radius);
+    registerCollider(collider);
+    return collider;
+}
+
+std::weak_ptr<CubeCollider> CollisionDetector::addCubeCollider(
+    const glm::dvec3& position,
+    const glm::dquat& orientation,
+    double halfWidth) {
+    
+    auto collider = std::make_shared<CubeCollider>(
+        position,
+        orientation,
+        halfWidth);
+    registerCollider(collider);
+    return collider;
+}
+
+void CollisionDetector::removeCollider(std::weak_ptr<Collider> colliderWeak) {
+    auto collider = colliderWeak.lock();
+    if (!collider) {
+        return; // Already destroyed
+    }
+    
+    // Remove from colliders list (releases ownership, destroying collider)
+    m_colliders.erase(
+        std::remove_if(m_colliders.begin(), m_colliders.end(),
+            [&collider](const std::shared_ptr<Collider>& ptr) {
+                return ptr.get() == collider.get();
+            }),
+        m_colliders.end());
+    
+    // Remove edges for this collider (use raw pointer for edge removal)
+    Collider* rawPtr = collider.get();
+    auto removeEdges = [rawPtr](std::vector<std::unique_ptr<Edge>>& edges) {
         edges.erase(
             std::remove_if(edges.begin(), edges.end(),
-                [collider](const std::unique_ptr<Edge>& edge) {
-                    return edge->m_collider == collider;
+                [rawPtr](const std::unique_ptr<Edge>& edge) {
+                    return edge->m_collider == rawPtr;
                 }),
             edges.end()
         );
@@ -52,10 +116,10 @@ void CollisionDetector::removeCollider(Collider* collider) {
     removeEdges(edgesZ);
 
     
-    // Remove any active collision pairs involving this collider
+    // Remove any active collision pairs involving this collider (use raw pointer)
     auto it = m_activeAABBS.begin();
     while (it != m_activeAABBS.end()) {
-        if (it->first == collider || it->second == collider) {
+        if (it->first == rawPtr || it->second == rawPtr) {
             it = m_activeAABBS.erase(it);
         } else {
             ++it;
@@ -144,7 +208,7 @@ Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions)
 }
 
 void CollisionDetector::updateAllCollidersAndAABB() {
-    for (Collider* collider : colliders) {
+    for (auto& collider : m_colliders) {
         if (collider) {
             collider->updateSimpleAABB(m_currentTimestep);
         }
@@ -185,7 +249,7 @@ void CollisionDetector::insertionSort(std::vector<std::unique_ptr<Edge>>& edges,
             j--;
         }
     }
- }
+}
 
 std::pair<Collider*, Collider*> CollisionDetector::makePair(Collider* a, Collider* b) {
     // Ensure consistent ordering to avoid duplicates

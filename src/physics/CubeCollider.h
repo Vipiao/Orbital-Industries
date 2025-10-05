@@ -8,8 +8,7 @@ class CubeCollider : public PolyhedronCollider {
 public:
     CubeCollider(const glm::dvec3& position = glm::dvec3(0.0),
                  const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
-                 double width = 1.0,
-                 ColliderReference* reference = nullptr);
+                 double width = 1.0);
     
     virtual ~CubeCollider() = default;
     

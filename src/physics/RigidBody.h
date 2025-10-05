@@ -4,12 +4,11 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include "../utils/IHashable.h"
-#include "ColliderReference.h"
 
 // Forward declarations
 class Collider;
 
-class RigidBody : public ColliderReference, public IHashable {
+class RigidBody : public IHashable {
 public:
     glm::dvec3 m_position;        // Position in world space
     glm::dvec3 m_velocity;        // Linear velocity (already includes deltaTime)

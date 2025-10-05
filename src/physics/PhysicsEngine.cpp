@@ -23,8 +23,7 @@ RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position,
                                const glm::dquat& orientation,
                                double mass, 
                                const glm::dmat3& inertiaTensor,
-                               bool isStatic,
-                               Collider* collider) {
+                               bool isStatic) {
     
     auto body = std::make_unique<RigidBody>();
     body->m_position = position;
@@ -46,21 +45,40 @@ RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position,
         body->m_invInertiaTensor = glm::dmat3(0.0);
     }
     body->m_isStatic = isStatic;
-    body->m_collider = collider;
+    body->m_collider = nullptr;
     body->m_colliderOffset = glm::dvec3{0.0, 0.0, 0.0}; // Initialize to zero offset
 
     RigidBody* bodyPtr = body.get();
-     
-    // Add collider to collision detection system if provided
-    if (collider) {
-        // Set the rigid body as the reference for this collider
-        collider->m_reference = bodyPtr;
-        m_collisionDetector.addCollider(collider);
-    }
 
     m_rigidBodies.push_back(std::move(body));
     
     return bodyPtr;
+}
+
+void PhysicsEngine::connectCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak) {
+    auto collider = colliderWeak.lock();
+    if (!body || !collider) return;
+
+    // Disconnect existing collider if any
+    if (body->m_collider) {
+        disconnectCollider(body);
+    }
+    
+    // Set forward reference (RigidBody -> Collider)
+    body->m_collider = collider.get();
+    
+    // Set back reference (Collider -> RigidBody) via PointerStorage
+    collider->set_pointer<RigidBody>(body);
+}
+
+void PhysicsEngine::disconnectCollider(RigidBody* body) {
+    if (!body || !body->m_collider) return;
+    
+    // Clear back reference
+    body->m_collider->remove_pointer<RigidBody>();
+    
+    // Clear forward reference
+    body->m_collider = nullptr;
 }
 
 void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
@@ -69,9 +87,9 @@ void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
     // Find the body to get its collider before removal
     Collider* colliderToRemove = bodyToRemove->m_collider;
 
-    // Clear the collider reference
-    if (colliderToRemove && colliderToRemove->m_reference) {
-        colliderToRemove->m_reference = nullptr;
+    // Clear back reference via PointerStorage
+    if (colliderToRemove) {
+        colliderToRemove->remove_pointer<RigidBody>();
     }
     
     // Remove from rigid bodies
@@ -82,11 +100,6 @@ void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
      
     if (removeIt != m_rigidBodies.end()) {
         m_rigidBodies.erase(removeIt, m_rigidBodies.end());
-    }
-    
-    // Remove collider from collision detection system
-    if (colliderToRemove) {
-        m_collisionDetector.removeCollider(colliderToRemove);
     }
 }
 
@@ -329,8 +342,8 @@ void PhysicsEngine::updatePositions() {
 
 void PhysicsEngine::resolveCollision(CollisionResult& collision) {
     // Find the rigid bodies associated with these colliders
-    RigidBody* bodyA = static_cast<RigidBody*>(collision.m_colliderA->m_reference);
-    RigidBody* bodyB = static_cast<RigidBody*>(collision.m_colliderB->m_reference);
+    RigidBody* bodyA = collision.m_colliderA->get_pointer<RigidBody>();
+    RigidBody* bodyB = collision.m_colliderB->get_pointer<RigidBody>();
 
     if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
         return; // Skip if we can't find bodies
@@ -414,8 +427,8 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
 
 void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
     // Find the rigid bodies associated with these colliders
-    RigidBody* bodyA = static_cast<RigidBody*>(collision.m_colliderA->m_reference);
-    RigidBody* bodyB = static_cast<RigidBody*>(collision.m_colliderB->m_reference);
+    RigidBody* bodyA = collision.m_colliderA->get_pointer<RigidBody>();
+    RigidBody* bodyB = collision.m_colliderB->get_pointer<RigidBody>();
     
     if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
         return; // Skip if we can't find bodies

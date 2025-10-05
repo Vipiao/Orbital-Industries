@@ -1,7 +1,6 @@
 // Collider.h
 #pragma once
 
-#include "ColliderReference.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <utility>
@@ -27,11 +26,9 @@ public:
     const int m_debugId;
 
     Collider(const glm::dvec3& position = glm::dvec3(0.0), 
-             const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
-             ColliderReference* reference = nullptr)
+             const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0))
         : CoordinateSystem(position, orientation)
         , m_debugId(s_nextId++)
-        , m_reference(reference)
         , m_AABBMin(0.0)
         , m_AABBMax(0.0)
         , m_simpleAABBValidUntilTime(0)
@@ -78,9 +75,6 @@ public:
 
     // Dependent positioning system
     void updatePosition(uint64_t currentTimestep);
-
-    // Public member variables
-    ColliderReference* m_reference;
 
     // Dependent positioning
     CoordinateSystem* m_dependentPosition = nullptr;

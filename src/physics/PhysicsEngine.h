@@ -33,8 +33,13 @@ public:
                            const glm::dquat& orientation,
                            double mass = 1.0, 
                            const glm::dmat3& inertiaTensor = glm::dmat3(1.0),
-                           bool isStatic = false,
-                           Collider* collider = nullptr);
+                           bool isStatic = false);
+
+    // Connect a collider to a rigid body
+    void connectCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak);
+    
+    // Disconnect a collider from a rigid body
+    void disconnectCollider(RigidBody* body);
     
     //
     uint64_t getCurrentPhysicsTimeStep() const { return m_currentPhysicsTimeStep; }
@@ -63,6 +68,9 @@ public:
     // Debug support
     void setDebugRenderer(DebugRenderer* debugRenderer) { m_debugRenderer = debugRenderer; }
     DebugRenderer* getDebugRenderer() const { return m_debugRenderer; }
+
+    // Access to collision detector for creating colliders
+    CollisionDetector& getCollisionDetector() { return m_collisionDetector; }
     
 private:
     // Physics simulation steps

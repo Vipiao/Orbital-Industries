@@ -11,8 +11,7 @@ public:
                        const glm::dquat& orientation,
                        const std::vector<glm::dvec3>& localVertices,
                        const std::vector<glm::dvec3>& localFaceAxes,
-                       const std::vector<glm::dvec3>& localEdgeAxes,
-                       ColliderReference* reference = nullptr);
+                       const std::vector<glm::dvec3>& localEdgeAxes);
     
     virtual ~PolyhedronCollider() = default;
     

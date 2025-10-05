@@ -5,7 +5,7 @@
 #include <vector>
 #include <stdexcept>
 
-// Forward declaration for type-safe collider references
+// Forward declaration
 class Collider;
 
 struct ContactData {
@@ -37,7 +37,7 @@ struct CollisionResult {
     bool m_collisionMassesCalculated = false;   // Flag to avoid recalculation
     bool m_isFiltered = false;                  // Flag to indicate collision was filtered out
 
-    // For collision resolution - now type-safe!
+    // Colliders involved in collision (resolution gets RigidBody via PointerStorage)
     Collider* m_colliderA = nullptr;
     Collider* m_colliderB = nullptr;
     

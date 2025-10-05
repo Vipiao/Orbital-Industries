@@ -126,8 +126,8 @@ private:
 
     PhysicsEngine* m_physics;
     RigidBody* m_rigidBody{nullptr};
-    std::unique_ptr<GridCollider> m_collider;
 
+    std::weak_ptr<GridCollider> m_colliderWeak;
     // Graphics subsystem
     std::unique_ptr<GridGraphics> m_gridGraphics;
 
