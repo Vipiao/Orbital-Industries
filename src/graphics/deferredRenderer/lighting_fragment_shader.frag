@@ -396,7 +396,7 @@ void main() {
    float spec = pow(max(min(dot(viewDir, reflectDir) + 0.001, 1.0), 0.0), 128.0);
    vec3 specular = specularStrength * spec * vec3(1.0);
    
-   float ff =  mix(1.0, ssaoFactor, 0.5);
+   float ff =  mix(1.0, ssaoFactor, 0.2);
    vec3 result = (ambient + (diffuse + specular) * ff * attenuation * shadowFactor) * occlusionFactor;
    result = mix(result, albedo, emissiveStrength);
    
