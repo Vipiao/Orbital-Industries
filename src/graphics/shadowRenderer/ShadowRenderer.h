@@ -19,7 +19,7 @@ public:
     void resizeShadowMaps(unsigned int width, unsigned int height);
     
     // Shadow pass rendering
-    void beginShadowPass(const glm::dvec3& lightDir, const glm::dvec3& camPos);
+    void beginShadowPass(const glm::dvec3& lightDir, const glm::dvec3& camPos, uint64_t frameNum);
     void endShadowPass();
     void bindCascadeLayer(unsigned int cascadeIndex);
     

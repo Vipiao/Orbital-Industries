@@ -43,7 +43,9 @@ GraphicsEngine::GraphicsEngine(
 
     // Create shadow renderer
     m_shadowRenderer = std::make_unique<ShadowRenderer>();
-    m_shadowRenderer->setupShadowMaps(4096, 4096, 3, {50.0, 200.0, 800.0});
+    //m_shadowRenderer->setupShadowMaps(8192, 8192, 3, {50.0, 200.0, 800.0});
+    m_shadowRenderer->setupShadowMaps(4096, 4096, 4, {27., 81.0, 243.0, 729.0});
+    //m_shadowRenderer->setupShadowMaps(4096, 4096, 3, {50.0, 200.0, 800.0});
     //m_shadowRenderer->setupShadowMaps(2048, 2048, 3, {50.0, 200.0, 800.0});
     //m_shadowRenderer->setupShadowMaps(1024, 1024, 3, {25.0, 100.0, 400.0});
     //m_shadowRenderer->setupShadowMaps(512, 512, 3, {12.0, 50.0, 200.0});
@@ -81,7 +83,7 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     
     if (m_shadowsEnabled) {
         // Render shadow map
-        m_shadowRenderer->beginShadowPass(m_lightDirection, getCamPos());
+        m_shadowRenderer->beginShadowPass(m_lightDirection, getCamPos(), getFrameNum());
         renderShadowPass();
         m_shadowRenderer->endShadowPass();
         

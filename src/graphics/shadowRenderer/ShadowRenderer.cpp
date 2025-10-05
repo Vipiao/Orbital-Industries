@@ -1,6 +1,7 @@
 #include "ShadowRenderer.h"
 #include <iostream>
 #include <glm/gtc/matrix_transform.hpp>
+#include "../../utils/HashFunctions.h"
 #include <stdexcept>
 
 ShadowRenderer::ShadowRenderer() {
@@ -71,8 +72,10 @@ void ShadowRenderer::setupShadowMaps(unsigned int width, unsigned int height,
     glBindTexture(GL_TEXTURE_2D_ARRAY, m_shadowDepthTextureArray);
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F, 
                  width, height, m_numCascades, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     
@@ -111,20 +114,37 @@ void ShadowRenderer::cleanupShadowMap() {
     }
 }
 
-void ShadowRenderer::beginShadowPass(const glm::dvec3& lightDir, const glm::dvec3& camPos) {
+void ShadowRenderer::beginShadowPass(const glm::dvec3& lightDir, const glm::dvec3& camPos, uint64_t frameNum) {
     if (!m_shadowMapInitialized) {
         throw std::runtime_error("Shadow map not initialized. Call setupShadowMap() first.");
     }
 
     // Calculate light position in L-space (camera-relative coordinates)
     glm::dvec3 lightDirNormalized = glm::normalize(lightDir);
+
+    // Generate deterministic jitter and project to plane perpendicular to light direction
+    glm::dvec3 jitter3D = Hash::pcgUnit3(frameNum) - glm::dvec3(0.5); // Center around 0
+    //glm::dvec3 jitterProjected = jitter3D - glm::dot(jitter3D, lightDirNormalized) * lightDirNormalized;
+    //
+    //// Scale by pixel size in finest cascade
+    //double pixelSize = m_cascadeOrthoSizes[0] / static_cast<double>(m_shadowMapWidth);
+    //glm::dvec3 jitter = jitterProjected * pixelSize;
+    //
     glm::dvec3 lightPosL = -lightDirNormalized * m_shadowDistance;
+    //lightPosL += jitter*100.;
+    double ll = glm::dot(jitter3D, jitter3D);
+    glm::dvec3 up = {0,1,0};
+    if (ll > 0.)
+    {
+        up = jitter3D / glm::sqrt(ll);
+    }
     
+
     // Create light view matrix in L-space
     glm::dmat4 lightView = glm::lookAt(
         lightPosL,
         glm::dvec3(0.0, 0.0, 0.0),  // Look at origin (camera in L-space)
-        glm::dvec3(0.0, 1.0, 0.0)
+        up
     );
     
     // Combine pre-calculated projections with view matrix

@@ -143,7 +143,7 @@ float temporalJitter(vec2 timeScales) {
 int selectCascade(vec3 fragPos) {
     // Add temporal jitter to fragPos to reduce aliasing
     float jitter = temporalJitter(vec2(0.11, 0.13));
-    fragPos *= (1.0 + abs(jitter) * 0.125);
+    fragPos *= (1.0 + abs(jitter) * 0.25);
     
     // Calculate distance from camera (Euclidean distance in view space)
     float distanceFromCamera = length(fragPos);
@@ -191,7 +191,8 @@ float calculateShadow(
     }
     
     // Calculate normalized bias: cascadeBiasScales already includes depth range normalization
-    float worldSpaceBias = 6.;
+    float dd = abs(dot(normal, lightDir));
+    float worldSpaceBias = 1.0 + 16. * (1. - dd);
     float normalizedBias = worldSpaceBias * u_cascadeBiasScales[cascadeIndex];
     //cascadeIndex = 1;
     
@@ -219,6 +220,9 @@ float calculateShadow(
     vec2 jitter = (hash2(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
     vec2 texelSize = 1.0 / vec2(textureSize(u_shadowMap, 0).xy);
     vec2 jitteredOffset = jitter * texelSize; // Scale to texel size
+    jitteredOffset *= 0.5;
+    jitteredOffset *= 1. + 1.*(1. - dd);
+    //debugColor.x = jitteredOffset.x*4000.;
 
     // PCF (Percentage Closer Filtering) for soft shadows
     float shadow = 0.0;
@@ -234,6 +238,7 @@ float calculateShadow(
         }    
     }
     shadow /= 9.0; // Average the 9 samples
+    //if(shadow < 0.7) debugColor.x = 1.;
     
     return shadow;
 }
@@ -383,7 +388,6 @@ void main() {
    float dd = dot(normal, lightDir);
    float diff = max(dd, 0.0);
    //diff -= max(dot(normal, -lightDir), 0.0) * 0.1;
-   diff = max(0., diff - 4.*pow(1. - abs(dd), 4.)); // Hide shadow acnes.
 
    vec3 diffuse = diff * albedo;// * mix(1.0, ssaoFactor, 0.2);
    
