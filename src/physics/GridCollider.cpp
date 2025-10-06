@@ -1,6 +1,7 @@
 // GridCollider.cpp
 #include "GridCollider.h"
 #include "CubeCollider.h"
+#include "../utils/PolyhedronProcessor.h"
 #include "PolyhedronCollider.h"
 #include "../utils/JobManager.h"
 #include "../utils/TimeHandler.h"
@@ -25,8 +26,8 @@ GridCollider::GridCollider(const glm::dvec3& position,
 }
 
 void GridCollider::addCubeCell(const glm::ivec3& coord, double width) {
-    std::vector<glm::dvec3> vertices = CubeCollider::generateCubeVertices(width);
-    std::vector<glm::dvec3> axes = CubeCollider::generateCubeAxes();
+    std::vector<glm::dvec3> vertices = PolyhedronProcessor::generateCubeVertices(width);
+    std::vector<glm::dvec3> axes = PolyhedronProcessor::generateCubeAxes();
     
     auto collider = std::make_unique<PolyhedronCollider>(
         glm::dvec3(0.0),

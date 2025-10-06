@@ -117,6 +117,19 @@ public:
     static glm::dvec3 calculateTetrahedronCentroid(const glm::dvec3& apex, const glm::dvec3& v1, const glm::dvec3& v2, const glm::dvec3& v3);
 
     /**
+     * @brief Generate standard cube vertices in local space
+     * @param width Width of the cube (edge length)
+     * @return Vector of 8 vertices ordered: bottom (CCW from -X-Y), top (CCW from -X-Y)
+     */
+    static std::vector<glm::dvec3> generateCubeVertices(double width);
+
+    /**
+     * @brief Generate standard cube axes (X, Y, Z)
+     * @return Vector of 3 orthogonal unit axes
+     */
+    static std::vector<glm::dvec3> generateCubeAxes();
+
+    /**
      * @brief Check if a 2D point is inside a convex polygon with margin
      * @param point The 2D point to test
      * @param polygon Vector of polygon vertices ordered counter-clockwise

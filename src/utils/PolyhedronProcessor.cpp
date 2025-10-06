@@ -563,6 +563,25 @@ glm::dvec3 PolyhedronProcessor::calculateTetrahedronCentroid(const glm::dvec3& a
     return (apex + v1 + v2 + v3) * 0.25;
 }
 
+std::vector<glm::dvec3> PolyhedronProcessor::generateCubeVertices(double width) {
+    double halfWidth = width * 0.5;
+    
+    return {
+        {-halfWidth, -halfWidth, -halfWidth}, { halfWidth, -halfWidth, -halfWidth},
+        { halfWidth,  halfWidth, -halfWidth}, {-halfWidth,  halfWidth, -halfWidth},
+        {-halfWidth, -halfWidth,  halfWidth}, { halfWidth, -halfWidth,  halfWidth},
+        { halfWidth,  halfWidth,  halfWidth}, {-halfWidth,  halfWidth,  halfWidth}
+    };
+}
+
+std::vector<glm::dvec3> PolyhedronProcessor::generateCubeAxes() {
+    return {
+        glm::dvec3(1.0, 0.0, 0.0),  // X-axis
+        glm::dvec3(0.0, 1.0, 0.0),  // Y-axis
+        glm::dvec3(0.0, 0.0, 1.0)   // Z-axis
+    };
+}
+
 bool PolyhedronProcessor::isPointInConvexPolygon(
     const glm::dvec2& point,
     const std::vector<glm::dvec2>& polygon,

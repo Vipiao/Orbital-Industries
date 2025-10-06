@@ -21,10 +21,6 @@ public:
     // Type identification
     static constexpr int TYPE_ID = Hash::hashColliderName("CubeCollider");
 
-    // Static utility methods for generating standard cube geometry
-    static std::vector<glm::dvec3> generateCubeVertices(double width);
-    static std::vector<glm::dvec3> generateCubeAxes();
-
 private:
 
 protected:

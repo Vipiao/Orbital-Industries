@@ -1,34 +1,16 @@
 // CubeCollider.cpp
 #include "CubeCollider.h"
+#include "../utils/PolyhedronProcessor.h"
 
 CubeCollider::CubeCollider(const glm::dvec3& position,
                            const glm::dquat& orientation,
                            double width)
     : PolyhedronCollider(position, orientation, 
-                         generateCubeVertices(width),
-                         generateCubeAxes(),
-                         generateCubeAxes()) // For cubes, face axes and edge axes are the same
+                         PolyhedronProcessor::generateCubeVertices(width),
+                         PolyhedronProcessor::generateCubeAxes(),
+                         PolyhedronProcessor::generateCubeAxes()) // For cubes, face axes and edge axes are the same
     , m_width(width)
 {
-}
-
-std::vector<glm::dvec3> CubeCollider::generateCubeVertices(double width) {
-    double halfWidth = width * 0.5;
-    
-    return {
-        {-halfWidth, -halfWidth, -halfWidth}, { halfWidth, -halfWidth, -halfWidth},
-        { halfWidth,  halfWidth, -halfWidth}, {-halfWidth,  halfWidth, -halfWidth},
-        {-halfWidth, -halfWidth,  halfWidth}, { halfWidth, -halfWidth,  halfWidth},
-        { halfWidth,  halfWidth,  halfWidth}, {-halfWidth,  halfWidth,  halfWidth}
-    };
-}
-
-std::vector<glm::dvec3> CubeCollider::generateCubeAxes() {
-    return {
-        glm::dvec3(1.0, 0.0, 0.0),  // X-axis
-        glm::dvec3(0.0, 1.0, 0.0),  // Y-axis
-        glm::dvec3(0.0, 0.0, 1.0)   // Z-axis
-    };
 }
 
 void CubeCollider::updateCachedCollisionAxes() const {
