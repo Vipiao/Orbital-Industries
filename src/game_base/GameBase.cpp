@@ -35,6 +35,14 @@ GameBase::GameBase(
         m_timeHandler
     );
 
+    // Create character subsystem
+    m_characterSubsystem = std::make_unique<CharacterSubsystem>(
+        m_physicsEngine.get(),
+        m_graphicsEngine.get(),
+        m_jobManager.get(),
+        m_timeHandler
+    );
+
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
@@ -80,6 +88,10 @@ std::weak_ptr<Grid> GameBase::createGrid(const glm::dvec3& position, const glm::
     return m_gridSubsystem->createGrid(position, orientation);
 }
 
+std::weak_ptr<Digitbot> GameBase::createDigitbot() {
+    return m_characterSubsystem->createDigitbot();
+}
+
 void GameBase::removeGrid(std::weak_ptr<Grid> gridWeak) {
     m_gridSubsystem->removeGrid(gridWeak);
 }
@@ -99,16 +111,20 @@ void GameBase::run() {
 int hit_count = 0;
 
 void GameBase::preRenderCallback(uint64_t frameNum) {
-    // Call registered callbacks first
-    callPreRenderCallbacks(frameNum);
-    
-    // GameBase's own preRender logic
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
     m_currentFrameStartTime = m_timeHandler->now();
     auto deltaTime = std::chrono::duration<double>(m_currentFrameStartTime - m_lastFrameTime).count();
     m_lastFrameTime = m_currentFrameStartTime;
+
+    // Call registered callbacks first
+    callPreRenderCallbacks(frameNum);
+
+    // Update characters pre-render
+    m_characterSubsystem->updateAllPreRender(frameNum);
+    
+    // GameBase's own preRender logic
     
     processInput();
     
@@ -213,6 +229,9 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
     
     // Update graphics only when physics step is complete
     m_gridSubsystem->updateAllGraphics(m_graphicsEngine->getCamPos());
+
+    // Update characters after physics
+    m_characterSubsystem->updateAllPhysicsComplete();
 
     // Call physics update callbacks
     for (auto* callback : m_callbacks) {

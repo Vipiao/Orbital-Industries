@@ -72,6 +72,13 @@ public:
         initialGrid->addCell(glm::ivec3(0,0,0));
         //initialGrid->addCell(glm::ivec3(1,0,0));
         //bb->setAngularVelocityBody({0,0,0.1});
+
+        // Create a Digitbot character at origin
+        auto digitbotWeak = m_gameBase->createDigitbot();
+        auto digitbot = digitbotWeak.lock();
+        if (digitbot) {
+            digitbot->showCollisionBox();
+        }
         
         //for (int ll = 0; ll < 2; ll++) {
         //    for (int ii = -3; ii < 4; ii++)

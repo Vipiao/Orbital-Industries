@@ -81,7 +81,7 @@ public:
     Collider* getCell(const glm::ivec3& coord);
     const Collider* getCell(const glm::ivec3& coord) const;
 
-    // Spatial search within radius  
+    // Spatial search within radius
     std::vector<Collider*> findCellsInRadius(const glm::dvec3& worldPos, double searchRadius) const;
 
     // Allow access to cells for collision detection utils

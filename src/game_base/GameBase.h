@@ -9,6 +9,7 @@
 #include "../physics/PhysicsEngine.h"
 #include "../utils/IHashable.h"
 #include "GridSubsystem.h"
+#include "../characters/CharacterSubsystem.h"
 #include "../utils/Generator.h"
 #include <vector>
 #include <memory>
@@ -17,6 +18,7 @@
 // Forward declaration
 class TimeHandler;
 class DebugRenderer;
+class Digitbot;
 
 class GameBase : public IGraphicsCallbacks, public CallbackManager, public IHashable {
 public:
@@ -33,6 +35,7 @@ public:
     
     std::weak_ptr<Grid> createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     void removeGrid(std::weak_ptr<Grid> grid);
+    std::weak_ptr<Digitbot> createDigitbot();
     void run();
     void addPhysicsCallback(Callback* callback);
 
@@ -45,6 +48,7 @@ public:
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
     std::unique_ptr<JobManager> m_jobManager;
     std::unique_ptr<GridSubsystem> m_gridSubsystem;
+    std::unique_ptr<CharacterSubsystem> m_characterSubsystem;
     TimeHandler* m_timeHandler;
     std::vector<Callback*> m_callbacks;
 
