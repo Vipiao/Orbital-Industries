@@ -44,7 +44,8 @@ GraphicsEngine::GraphicsEngine(
     // Create shadow renderer
     m_shadowRenderer = std::make_unique<ShadowRenderer>();
     //m_shadowRenderer->setupShadowMaps(8192, 8192, 3, {50.0, 200.0, 800.0});
-    m_shadowRenderer->setupShadowMaps(4096, 4096, 4, {27., 81.0, 243.0, 729.0});
+    m_shadowRenderer->setupShadowMaps(4096, 4096, 4, {8., 32.0, 128.0, 512.0});
+    //m_shadowRenderer->setupShadowMaps(4096, 4096, 4, {27., 81.0, 243.0, 729.0});
     //m_shadowRenderer->setupShadowMaps(4096, 4096, 3, {50.0, 200.0, 800.0});
     //m_shadowRenderer->setupShadowMaps(2048, 2048, 3, {50.0, 200.0, 800.0});
     //m_shadowRenderer->setupShadowMaps(1024, 1024, 3, {25.0, 100.0, 400.0});

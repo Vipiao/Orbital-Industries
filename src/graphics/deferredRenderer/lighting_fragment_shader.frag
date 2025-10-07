@@ -132,12 +132,27 @@ vec2 hash2(vec2 p) {
     return fract(sin(vec2(dot(p, vec2(127.1, 211.7)), dot(p, vec2(169.5, 183.3)))) * 43758.5453123);
 }
 
+vec3 hash3(vec2 p) {
+    return fract(sin(vec3(
+        dot(p, vec2(127.1, 311.7)),
+        dot(p, vec2(269.5, 183.3)),
+        dot(p, vec2(419.2, 371.9))
+    )) * 43758.5453123);
+}
+
 // Generate temporal jitter value in [-1, 1] range
 float temporalJitter(vec2 timeScales) {
     vec2 screenPos = gl_FragCoord.xy;
     vec2 timeOffset = vec2(u_timeRemainder * timeScales.x, u_timeRemainder * timeScales.y);
     vec2 jitterSeed = screenPos + timeOffset;
     return (hash(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
+}
+
+vec3 temporalJitter3d(vec2 timeScales, float seed) {
+    vec2 screenPos = gl_FragCoord.xy;
+    vec2 timeOffset = vec2(u_timeRemainder * timeScales.x, u_timeRemainder * timeScales.y);
+    vec2 jitterSeed = screenPos + timeOffset + vec2(seed * 17.3, seed * 23.7);
+    return (hash3(jitterSeed) - 0.5) * 2.0; // [-1, 1] range
 }
 
 int selectCascade(vec3 fragPos) {
