@@ -3,8 +3,12 @@
 
 #include "Character.h"
 #include <memory>
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 class GridCollider;
+class Geometry;
+class Instance;
 
 /**
  * @brief Bipedal robot character with reverse-articulated legs
@@ -32,7 +36,13 @@ public:
 private:
     void createCollisionBoxMesh();
     void updateCollisionBoxTransform();
+    void updateVisualModelTransform();
 
     std::weak_ptr<GridCollider> m_colliderWeak;
     int m_collisionBoxMeshId;
+
+    // Visual model (instanced rendering)
+    std::weak_ptr<Geometry> m_visualGeometry;
+    std::weak_ptr<Instance> m_visualInstance;
+    int m_visualMeshSSBOIndex;
 };

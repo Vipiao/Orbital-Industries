@@ -77,7 +77,7 @@ public:
         auto digitbotWeak = m_gameBase->createDigitbot();
         auto digitbot = digitbotWeak.lock();
         if (digitbot) {
-            digitbot->showCollisionBox();
+            //digitbot->showCollisionBox();
         }
         
         //for (int ll = 0; ll < 2; ll++) {

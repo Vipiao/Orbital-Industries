@@ -7,11 +7,13 @@
 #include "../utils/PolyhedronProcessor.h"
 #include "../utils/MassInertiaCalculator.h"
 #include "../utils/GridGeometry.h"
+#include "../graphics/instanceHandler/InstanceHandler.h"
 
 Digitbot::Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
                    JobManager* jobManager, TimeHandler* timeHandler)
     : Character(physics, graphics, jobManager, timeHandler)
     , m_collisionBoxMeshId(-1)
+    , m_visualMeshSSBOIndex(-1)
 {
     // 1. Create GridCollider at origin
     m_colliderWeak = m_physics->getCollisionDetector().addGridCollider(
@@ -70,9 +72,52 @@ Digitbot::Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
     // 4. Connect collider to rigid body
     m_physics->connectCollider(m_rigidBody, m_colliderWeak);
     m_physics->updateColliderTransform(m_rigidBody);
+
+    // 5. Setup visual model using instanced rendering
+    // Allocate SSBO index for visual model transform
+    m_visualMeshSSBOIndex = m_graphics->m_ssboManager->allocateIndex();
+
+    // Load visual geometry
+    m_visualGeometry = m_graphics->getInstanceHandler()->createGeometry(
+        "../media/characters/digibot.obj");
+
+    // Create instance attached to our SSBO slot
+    auto geometry = m_visualGeometry.lock();
+    if (geometry) {
+        m_visualInstance = geometry->addInstance(
+            m_visualMeshSSBOIndex,  // meshIndex - our SSBO slot
+            -1,                      // colorTextureUnit - no texture
+            -1,                      // normalTextureUnit - no texture
+            -1,                      // materialTextureUnit - no texture
+            glm::dvec4(1.0, 1.0, 1.0, 1.0));  // white color
+
+        // Set instance local position to center the model at the feet position
+        // Model origin is at feet, cubes have origin at corner, offset to center
+        if (auto instance = m_visualInstance.lock()) {
+            instance->m_localPosition = glm::dvec3(0.5, 0.5, 0.0);
+            instance->m_localOrientation = glm::dquat(1.0, 0.0, 0.0, 0.0);
+            instance->m_localScale = glm::dvec3(1.0, 1.0, 1.0);
+            geometry->updateInstanceInBuffer(instance.get());
+        }
+    }
+
+    // Initial SSBO update
+    updateVisualModelTransform();
 }
 
 Digitbot::~Digitbot() {
+    // Remove visual model instance
+    if (auto geometry = m_visualGeometry.lock()) {
+        if (auto instance = m_visualInstance.lock()) {
+            geometry->removeInstance(instance);
+        }
+    }
+
+    // Deallocate SSBO index
+    if (m_visualMeshSSBOIndex != -1) {
+        m_graphics->m_ssboManager->deallocateIndex(m_visualMeshSSBOIndex);
+    }
+
     // Remove collision box mesh if visible
     if (m_collisionBoxMeshId != -1) {
         hideCollisionBox();
@@ -101,6 +146,9 @@ void Digitbot::onPhysicsUpdateComplete() {
     if (isCollisionBoxVisible()) {
         updateCollisionBoxTransform();
     }
+
+    // Update visual model transform every physics step
+    updateVisualModelTransform();
 }
 
 void Digitbot::showCollisionBox() {
@@ -198,6 +246,41 @@ void Digitbot::updateCollisionBoxTransform() {
         -1, -1, -1,
         currentPhysicsTimeStep,
         0.0
+    );
+}
+
+void Digitbot::updateVisualModelTransform() {
+    if (m_visualMeshSSBOIndex == -1 || !m_rigidBody) {
+        return;
+    }
+
+    // Calculate angular velocity components
+    glm::dvec3 angVelAxis = m_rigidBody->getAngularVelocityWorld();
+    double angVelMagnitude = glm::length(angVelAxis);
+    if (angVelMagnitude > 0.00001) {
+        angVelAxis = angVelAxis / angVelMagnitude;
+    } else {
+        angVelAxis = glm::dvec3(0.0, 0.0, 1.0);
+        angVelMagnitude = 0.0;
+    }
+
+    uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
+
+    // Update SSBO with rigid body transform (same pattern as collision box)
+    glm::dvec3 meshPosition = m_rigidBody->m_position - m_centerOfMass;
+
+    m_graphics->m_ssboManager->updateMeshTransform(
+        m_visualMeshSSBOIndex,
+        meshPosition,
+        m_rigidBody->m_velocity,
+        m_rigidBody->m_orientation,
+        angVelAxis,
+        angVelMagnitude,
+        m_centerOfMass,
+        glm::dvec3(1.0, 1.0, 1.0),  // scale
+        -1, -1, -1,                  // no textures
+        currentPhysicsTimeStep,
+        0.0                          // emissiveScalar
     );
 }
 
