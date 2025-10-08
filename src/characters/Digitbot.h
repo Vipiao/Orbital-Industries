@@ -6,9 +6,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-class GridCollider;
-class Geometry;
-class Instance;
+class DigitbotPhysics;
+class DigitbotGraphics;
+struct DigitbotTargetPose;
 
 /**
  * @brief Bipedal robot character with reverse-articulated legs
@@ -27,22 +27,19 @@ public:
 
     void showCollisionBox() override;
     void hideCollisionBox() override;
-    bool isCollisionBoxVisible() const override { return m_collisionBoxMeshId != -1; }
+    bool isCollisionBoxVisible() const override;
 
     // Coordinate transforms
     glm::dvec3 worldToLocal(const glm::dvec3& worldPos) const override;
     glm::dvec3 localToWorld(const glm::dvec3& localPos) const override;
 
 private:
-    void createCollisionBoxMesh();
-    void updateCollisionBoxTransform();
-    void updateVisualModelTransform();
+    void updateVisualTransform();
 
-    std::weak_ptr<GridCollider> m_colliderWeak;
-    int m_collisionBoxMeshId;
+    // Subsystems
+    std::unique_ptr<DigitbotPhysics> m_digitbotPhysics;
+    std::unique_ptr<DigitbotGraphics> m_digitbotGraphics;
 
-    // Visual model (instanced rendering)
-    std::weak_ptr<Geometry> m_visualGeometry;
-    std::weak_ptr<Instance> m_visualInstance;
-    int m_visualMeshSSBOIndex;
+    // Cache GraphicsEngine pointer for convenience
+    GraphicsEngine* m_graphicsEngine;
 };
