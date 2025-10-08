@@ -33,6 +33,7 @@ std::weak_ptr<Instance> Geometry::addInstance(
     // Add to both vectors at same index
     m_instances.push_back(instance);
 
+    //instance->m_colorTextureUnit = -1;
     InstanceData data = createInstanceData(instance.get());
     m_instanceData.push_back(data);
     
@@ -99,6 +100,7 @@ void Geometry::updateInstanceInBuffer(Instance* instance) {
     
     // Update CPU data
     m_instanceData[instance->m_bufferIndex] = createInstanceData(instance);
+    //m_instanceData[instance->m_bufferIndex].colorTextureUnit = -1;
     
     // Update GPU buffer at specific offset
     glBindBuffer(GL_ARRAY_BUFFER, m_instanceVBO);
@@ -123,6 +125,8 @@ InstanceData Geometry::createInstanceData(Instance* instance) {
     data.normalTextureUnit = instance->m_normalTextureUnit;
     data.materialTextureUnit = instance->m_materialTextureUnit;
     data.padding3 = 0;
+    
+    //data.colorTextureUnit = -1;
     
     return data;
 }
@@ -277,26 +281,27 @@ void InstanceHandler::setupGeometryOpenGL(Geometry* geometry,
     glEnableVertexAttribArray(6);
     glVertexAttribDivisor(6, 1);
 
-    // Instance color
-    glVertexAttribPointer(10, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, color));
-    glEnableVertexAttribArray(10);
-    glVertexAttribDivisor(10, 1);
-    
-    // Mesh index for SSBO lookup
-    glVertexAttribIPointer(7, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, meshIndex));
+    // Instance color (location 7)
+    glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, sizeof(InstanceData), (void*)offsetof(InstanceData, color));
     glEnableVertexAttribArray(7);
     glVertexAttribDivisor(7, 1);
     
-    // Texture units
-    glVertexAttribIPointer(8, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, colorTextureUnit));
+    // Mesh index for SSBO lookup (location 8)
+    glVertexAttribIPointer(8, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, meshIndex));
     glEnableVertexAttribArray(8);
     glVertexAttribDivisor(8, 1);
     
-    glVertexAttribIPointer(9, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, normalTextureUnit));
+    // Color texture unit (location 9)
+    glVertexAttribIPointer(9, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, colorTextureUnit));
     glEnableVertexAttribArray(9);
     glVertexAttribDivisor(9, 1);
 
-    // Material texture unit
+    // Normal texture unit (location 10)
+    glVertexAttribIPointer(10, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, normalTextureUnit));
+    glEnableVertexAttribArray(10);
+    glVertexAttribDivisor(10, 1);
+    
+    // Material texture unit (location 11)
     glVertexAttribIPointer(11, 1, GL_INT, sizeof(InstanceData), (void*)offsetof(InstanceData, materialTextureUnit));
     glEnableVertexAttribArray(11);
     glVertexAttribDivisor(11, 1);
@@ -406,6 +411,11 @@ void InstanceHandler::renderGeometryHelper(
     
     // Bind all textures
     for (const auto& texture : m_textureManager.m_textures) {
+        // Debug check: ensure texture unit is within shader array bounds
+        if (texture.textureUnit >= 32) {
+            throw std::runtime_error("InstanceHandler texture unit " + std::to_string(texture.textureUnit) +
+                                   " exceeds shader array size (32) for texture: " + texture.path);
+        }
         glActiveTexture(GL_TEXTURE0 + texture.textureUnit);
         glBindTexture(GL_TEXTURE_2D, texture.textureId);
         

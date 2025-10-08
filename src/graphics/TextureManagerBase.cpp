@@ -56,6 +56,15 @@ GLuint TextureManagerBase::loadTextureFromFile(const std::string& path) {
     
     if (data) {
         GLenum format = (nrChannels == 3) ? GL_RGB : GL_RGBA;
+
+        //// Set pixel alignment to 1 to handle RGB textures correctly
+        //glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        //
+        //// For RGB textures, force alpha channel to 1.0 using swizzle mask
+        //if (nrChannels == 3) {
+        //    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, GL_ONE);
+        //}
+
         glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
         STBImageLoader::free(data);

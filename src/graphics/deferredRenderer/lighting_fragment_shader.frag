@@ -250,7 +250,7 @@ float calculateShadow(
             vec2 sampleCoords = projCoords.xy + sampleOffset;
             float pcfDepth = texture(u_shadowMap, vec3(sampleCoords, float(cascadeIndex))).r;
             shadow += pcfDepth < 1. && (currentDepth - normalizedBias > pcfDepth) ? 0.0 : 1.0;
-        }    
+        }
     }
     shadow /= 9.0; // Average the 9 samples
     //if(shadow < 0.7) debugColor.x = 1.;
@@ -263,7 +263,7 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir, vec3 lightDir) {
     vec3 reflectionDir = reflect(-viewDir, normal);
     
     // Hardcode scale as 5.0
-    float scale = 20.0 * (1.-dot(normal, reflectionDir));
+    float scale = 10.0 * (1.-dot(normal, reflectionDir));
     //float scale = 10.0;
     
     // Choose number of steps

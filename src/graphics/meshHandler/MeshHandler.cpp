@@ -647,6 +647,13 @@ void MeshHandler::renderGeometryHelper(
    // Bind textures
    for (size_t ii = 0; ii < m_textures.size(); ii++) {
       const Texture* texture = &m_textures[ii];
+
+       // Debug check: ensure texture unit is within shader array bounds
+       if (texture->m_textureUnit >= 32) {
+           throw std::runtime_error("MeshHandler texture unit " + std::to_string(texture->m_textureUnit) +
+                                  " exceeds shader array size (32)");
+       }
+
       glActiveTexture(GL_TEXTURE0 + texture->m_textureUnit);
       glBindTexture(GL_TEXTURE_2D, texture->m_texture);
       

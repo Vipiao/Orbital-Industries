@@ -27,7 +27,8 @@ layout (location = 0) in vec3 position;
 layout (location = 4) in vec3 localPosition;
 layout (location = 5) in vec4 localOrientation;
 layout (location = 6) in vec3 localScale;
-layout (location = 7) in int meshIndex;
+// layout (location = 7) is instanceColor - not needed for depth pass
+layout (location = 8) in int meshIndex;
 
 uniform uint u_frame;
 uniform uint u_time;

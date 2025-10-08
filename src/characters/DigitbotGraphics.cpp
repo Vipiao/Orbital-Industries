@@ -8,9 +8,19 @@
 DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics)
     : m_graphics(graphics)
     , m_visualMeshSSBOIndex(-1)
+    , m_colorTextureUnit(-1)
+    , m_normalTextureUnit(-1)
 {
     // Allocate SSBO index for shared world transform
     m_visualMeshSSBOIndex = m_graphics->m_ssboManager->allocateIndex();
+
+    // Load shared texture atlas
+    m_colorTextureUnit = m_graphics->getInstanceHandler()->createTexture("../media/textures/robot/atlas.png");
+    m_normalTextureUnit = m_graphics->getInstanceHandler()->createTexture("../media/textures/robot/atlas_normal.png");
+    std::cout << "Digitbot textures loaded - Color: " << m_colorTextureUnit << ", Normal: " << m_normalTextureUnit << std::endl;
+
+    //m_colorTextureUnit = -1;
+    //m_normalTextureUnit = -1;
 
     // Reserve space for all body parts
     m_bodyPartGeometries.resize(PART_COUNT);
@@ -76,11 +86,11 @@ void DigitbotGraphics::loadBodyParts() {
         // over the physics cubes (model origin is at feet, cubes at corner)
         // This offset is applied in initializeInstanceTransforms()
         m_bodyPartInstances[i] = geometry->addInstance(
-            m_visualMeshSSBOIndex,  // meshIndex - shared SSBO slot
-            -1,                      // colorTextureUnit - no texture
-            -1,                      // normalTextureUnit - no texture
+            m_visualMeshSSBOIndex,   // meshIndex - shared SSBO slot
+            m_colorTextureUnit,      // colorTextureUnit
+            m_normalTextureUnit,     // normalTextureUnit
             -1,                      // materialTextureUnit - no texture
-            glm::dvec4(1.0, 1.0, 1.0, 1.0));  // white color
+            glm::dvec4(1.0, 0.0, 0.0, 1.0));  // white color
     }
 }
 

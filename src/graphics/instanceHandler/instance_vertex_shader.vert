@@ -31,10 +31,10 @@ layout (location = 3) in vec2 uv;
 layout (location = 4) in vec3 localPosition;
 layout (location = 5) in vec4 localOrientation;
 layout (location = 6) in vec3 localScale;
-layout (location = 7) in int meshIndex;
-layout (location = 8) in int instanceColorTextureUnit;
-layout (location = 9) in int instanceNormalTextureUnit;
-layout (location = 10) in vec4 instanceColor;
+layout (location = 7) in vec4 instanceColor;
+layout (location = 8) in int meshIndex;
+layout (location = 9) in int instanceColorTextureUnit;
+layout (location = 10) in int instanceNormalTextureUnit;
 layout (location = 11) in int instanceMaterialTextureUnit;
 
 uniform uint u_frame;
@@ -175,8 +175,8 @@ void main() {
    mat3 worldTBN = buildTBNMatrix(worldOrientation, localTransformedNormal, localTransformedTangent);
    vec3 worldNormal = normalize(worldOrientation * localTransformedNormal);
 
-    // Final world position in camera space
-    vec4 worldPos = vec4(meshPositionL + worldTransformedPos, 1.0);
+   // Final world position in camera space
+   vec4 worldPos = vec4(meshPositionL + worldTransformedPos, 1.0);
 
    // Transform to view space
    vec4 viewPos = view * worldPos;

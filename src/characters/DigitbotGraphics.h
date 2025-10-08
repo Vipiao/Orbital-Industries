@@ -101,6 +101,10 @@ private:
     GraphicsEngine* m_graphics;
     int m_visualMeshSSBOIndex;
 
+    // Shared texture units for all body parts
+    int m_colorTextureUnit;
+    int m_normalTextureUnit;
+
     // One geometry and instance per body part
     std::vector<std::weak_ptr<Geometry>> m_bodyPartGeometries;
     std::vector<std::weak_ptr<Instance>> m_bodyPartInstances;
