@@ -105,4 +105,7 @@ private:
     // One geometry and instance per body part
     std::vector<std::weak_ptr<Geometry>> m_bodyPartGeometries;
     std::vector<std::weak_ptr<Instance>> m_bodyPartInstances;
+
+    // IK solver state
+    glm::dvec3 m_rightElbowPoint;
 };

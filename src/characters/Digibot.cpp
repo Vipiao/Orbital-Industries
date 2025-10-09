@@ -22,7 +22,7 @@ Digitbot::Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
 
     // Create graphics subsystem
     m_digitbotGraphics = std::make_unique<DigitbotGraphics>(graphics, resources);
- 
+
     // Perform initial transform update
     updateVisualTransform();
 }
@@ -32,7 +32,16 @@ Digitbot::~Digitbot() {
 }
 
 void Digitbot::preRenderCallback(uint64_t frameNum) {
-    // Future: animation updates, visual effects
+    // Update body part articulation every frame
+    DigitbotTargetPose targetPose;
+    targetPose.rightHand.position = glm::dvec3(0.6, 0.6, 1.4);
+    double scale = glm::cos((double)frameNum * 0.01) * 0.2 + 0.8;
+    targetPose.rightHand.position.x *= scale;
+    targetPose.rightHand.position.y *= scale;
+    //targetPose.rightHand.position = m_graphicsEngine->getCamPos() +
+    //m_graphicsEngine->getCamOri() * glm::dvec3{0,2.,0};
+    //targetPose.rightHand.position -= m_graphicsPosition;
+    m_digitbotGraphics->updateBodyPartPositions(targetPose);
 }
 
 void Digitbot::onPhysicsUpdateComplete() {
@@ -80,7 +89,8 @@ void Digitbot::updateVisualTransform() {
     uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
 
     // Calculate mesh position (rigid body position offset by center of mass)
-    glm::dvec3 meshPosition = m_rigidBody->m_position - m_centerOfMass;
+    //glm::dvec3 meshPosition = m_rigidBody->m_position - m_centerOfMass;
+    glm::dvec3 meshPosition = m_rigidBody->m_position + m_graphicsPosition;
 
     // Update graphics subsystem with current transform
     m_digitbotGraphics->updateWorldTransform(
@@ -89,7 +99,7 @@ void Digitbot::updateVisualTransform() {
         m_rigidBody->m_orientation,
         angVelAxis,
         angVelMagnitude,
-        m_centerOfMass,
+        -m_graphicsPosition,
         currentPhysicsTimeStep
     );
 }

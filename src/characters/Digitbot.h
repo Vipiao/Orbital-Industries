@@ -42,6 +42,9 @@ private:
     std::unique_ptr<DigitbotPhysics> m_digitbotPhysics;
     std::unique_ptr<DigitbotGraphics> m_digitbotGraphics;
 
+    //
+    glm::dvec3 m_graphicsPosition = {0,0,-1};
+
     // Cache GraphicsEngine pointer for convenience
     GraphicsEngine* m_graphicsEngine;
 };
