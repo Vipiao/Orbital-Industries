@@ -1,5 +1,6 @@
 // CharacterSubsystem.cpp
 #include "CharacterSubsystem.h"
+#include "DigitbotResources.h"
 #include <algorithm>
 
 CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,
@@ -9,6 +10,8 @@ CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* g
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
 {
+    // Initialize shared resources for Digitbot characters
+    m_digitbotResources = std::make_unique<DigitbotResources>(m_graphics);
 }
 
 CharacterSubsystem::~CharacterSubsystem() {
@@ -21,7 +24,8 @@ std::weak_ptr<Digitbot> CharacterSubsystem::createDigitbot() {
         m_physics,
         m_graphics,
         m_jobManager,
-        m_timeHandler
+        m_timeHandler,
+        m_digitbotResources.get()
     );
 
     std::weak_ptr<Digitbot> digitbotWeak = digitbot;

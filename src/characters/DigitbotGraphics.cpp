@@ -1,35 +1,46 @@
 // DigitbotGraphics.cpp
 #include "DigitbotGraphics.h"
+#include "DigitbotResources.h"
 #include "../graphics/GraphicsEngine.h"
 #include "../graphics/instanceHandler/InstanceHandler.h"
 #include "../graphics/SSBOManager.h"
 #include <iostream>
 
-DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics)
+DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* resources)
     : m_graphics(graphics)
+    , m_resources(resources)
     , m_visualMeshSSBOIndex(-1)
-    , m_colorTextureUnit(-1)
-    , m_normalTextureUnit(-1)
 {
+    if (!m_resources) {
+        throw std::runtime_error("DigitbotResources cannot be null");
+    }
+
     // Allocate SSBO index for shared world transform
     m_visualMeshSSBOIndex = m_graphics->m_ssboManager->allocateIndex();
 
-    // Load shared texture atlas
-    m_colorTextureUnit = m_graphics->getInstanceHandler()->createTexture("../media/textures/robot/atlas.png");
-    m_normalTextureUnit = m_graphics->getInstanceHandler()->createTexture("../media/textures/robot/atlas_normal.png");
-    std::cout << "Digitbot textures loaded - Color: " << m_colorTextureUnit << ", Normal: " << m_normalTextureUnit << std::endl;
+    // Copy shared geometries from resources
+    m_bodyPartGeometries = m_resources->getBodyPartGeometries();
 
-    //m_colorTextureUnit = -1;
-    //m_normalTextureUnit = -1;
-
-    // Reserve space for all body parts
-    m_bodyPartGeometries.resize(PART_COUNT);
+    // Reserve space for instances
     m_bodyPartInstances.resize(PART_COUNT);
 
-    // Load all body part geometries and create instances
-    loadBodyParts();
-
-    // Initialize all instances to identity transforms
+    // Create instances for all body parts using shared geometries
+    for (int i = 0; i < PART_COUNT; ++i) {
+        auto geometry = m_bodyPartGeometries[i].lock();
+        if (!geometry) {
+            throw std::runtime_error("DigitbotGraphics: Shared geometry is invalid for body part " + std::to_string(i));
+        }
+        
+        // Create instance attached to shared SSBO slot
+        m_bodyPartInstances[i] = geometry->addInstance(
+            m_visualMeshSSBOIndex,              // meshIndex - shared SSBO slot
+            m_resources->getColorTextureUnit(), // colorTextureUnit
+            m_resources->getNormalTextureUnit(),// normalTextureUnit
+            -1,                                  // materialTextureUnit - no material
+            glm::dvec4(1.0, 0.0, 0.0, 1.0));    // white color
+    }
+    
+    // Initialize all instance transforms
     initializeInstanceTransforms();
 }
 
@@ -46,51 +57,6 @@ DigitbotGraphics::~DigitbotGraphics() {
     // Deallocate SSBO index
     if (m_visualMeshSSBOIndex != -1) {
         m_graphics->m_ssboManager->deallocateIndex(m_visualMeshSSBOIndex);
-    }
-}
-
-void DigitbotGraphics::loadBodyParts() {
-    // File paths for all body parts
-    const char* filePaths[PART_COUNT] = {
-        "../media/characters/left_foot.obj",
-        "../media/characters/left_lower_arm.obj",
-        "../media/characters/left_lower_leg.obj",
-        "../media/characters/left_piston_housing.obj",
-        "../media/characters/left_piston_rod.obj",
-        "../media/characters/left_upper_arm.obj",
-        "../media/characters/left_upper_leg.obj",
-        "../media/characters/right_foot.obj",
-        "../media/characters/right_lower_arm.obj",
-        "../media/characters/right_lower_leg.obj",
-        "../media/characters/right_piston_housing.obj",
-        "../media/characters/right_piston_rod.obj",
-        "../media/characters/right_upper_arm.obj",
-        "../media/characters/right_upper_leg.obj",
-        "../media/characters/head.obj",
-        "../media/characters/body.obj"
-    };
-
-    // Load each body part and create an instance
-    for (int i = 0; i < PART_COUNT; ++i) {
-        // Load geometry
-        m_bodyPartGeometries[i] = m_graphics->getInstanceHandler()->createGeometry(filePaths[i]);
-        
-        auto geometry = m_bodyPartGeometries[i].lock();
-        if (!geometry) {
-            std::cerr << "DigitbotGraphics: Failed to load geometry: " << filePaths[i] << std::endl;
-            continue;
-        }
-
-        // Create instance attached to shared SSBO slot  
-        // Note: All body parts will share offset (0.5, 0.5, 0.0) to center them
-        // over the physics cubes (model origin is at feet, cubes at corner)
-        // This offset is applied in initializeInstanceTransforms()
-        m_bodyPartInstances[i] = geometry->addInstance(
-            m_visualMeshSSBOIndex,   // meshIndex - shared SSBO slot
-            m_colorTextureUnit,      // colorTextureUnit
-            m_normalTextureUnit,     // normalTextureUnit
-            -1,                      // materialTextureUnit - no texture
-            glm::dvec4(1.0, 0.0, 0.0, 1.0));  // white color
     }
 }
 

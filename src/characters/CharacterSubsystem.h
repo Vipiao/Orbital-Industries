@@ -3,6 +3,7 @@
 
 #include "Character.h"
 #include "Digitbot.h"
+#include "DigitbotResources.h"
 #include <memory>
 #include <vector>
 
@@ -40,6 +41,9 @@ private:
     GraphicsEngine* m_graphics;
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
+
+    // Shared resources for character types
+    std::unique_ptr<DigitbotResources> m_digitbotResources;
 
     // Character ownership
     std::vector<std::shared_ptr<Character>> m_characters;

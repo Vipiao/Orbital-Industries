@@ -9,6 +9,7 @@
 class GraphicsEngine;
 class Geometry;
 class Instance;
+class DigitbotResources;
 
 /**
  * @brief Transform for a body part in local space
@@ -56,7 +57,7 @@ struct DigitbotTargetPose {
  */
 class DigitbotGraphics {
 public:
-    explicit DigitbotGraphics(GraphicsEngine* graphics);
+    DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* resources);
     ~DigitbotGraphics();
 
     // World transform update (called each physics step)
@@ -95,15 +96,11 @@ private:
         PART_COUNT = 16
     };
 
-    void loadBodyParts();
     void initializeInstanceTransforms();
 
     GraphicsEngine* m_graphics;
+    DigitbotResources* m_resources;  // Non-owning pointer to shared resources
     int m_visualMeshSSBOIndex;
-
-    // Shared texture units for all body parts
-    int m_colorTextureUnit;
-    int m_normalTextureUnit;
 
     // One geometry and instance per body part
     std::vector<std::weak_ptr<Geometry>> m_bodyPartGeometries;

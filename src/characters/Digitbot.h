@@ -8,6 +8,7 @@
 
 class DigitbotPhysics;
 class DigitbotGraphics;
+class DigitbotResources;
 struct DigitbotTargetPose;
 
 /**
@@ -19,7 +20,8 @@ struct DigitbotTargetPose;
 class Digitbot : public Character {
 public:
     Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
-             JobManager* jobManager, TimeHandler* timeHandler);
+             JobManager* jobManager, TimeHandler* timeHandler,
+             DigitbotResources* resources);
     ~Digitbot() override;
 
     void preRenderCallback(uint64_t frameNum) override;

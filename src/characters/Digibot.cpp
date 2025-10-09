@@ -2,12 +2,14 @@
 #include "Digitbot.h"
 #include "DigitbotPhysics.h"
 #include "DigitbotGraphics.h"
+#include "DigitbotResources.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "../graphics/GraphicsEngine.h"
 
 Digitbot::Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
-                   JobManager* jobManager, TimeHandler* timeHandler)
+                   JobManager* jobManager, TimeHandler* timeHandler,
+                   DigitbotResources* resources)
     : Character(physics, graphics, jobManager, timeHandler)
     , m_graphicsEngine(graphics)
 {
@@ -19,7 +21,7 @@ Digitbot::Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
     m_centerOfMass = m_digitbotPhysics->getCenterOfMass();
 
     // Create graphics subsystem
-    m_digitbotGraphics = std::make_unique<DigitbotGraphics>(graphics);
+    m_digitbotGraphics = std::make_unique<DigitbotGraphics>(graphics, resources);
  
     // Perform initial transform update
     updateVisualTransform();
