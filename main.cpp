@@ -69,7 +69,7 @@ public:
         RigidBody* bb = initialGrid->getRigidBody();
         bb->m_position = {0,0,0};
         //bb->m_velocity = {0.0,0.0,-0.01};
-        initialGrid->addCell(glm::ivec3(0,0,0));
+        //initialGrid->addCell(glm::ivec3(0,0,0));
         //initialGrid->addCell(glm::ivec3(1,0,0));
         //bb->setAngularVelocityBody({0,0,0.1});
 
