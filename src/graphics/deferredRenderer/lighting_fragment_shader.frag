@@ -337,7 +337,7 @@ vec4 calculateSSR(vec3 fragPos, vec3 normal, vec3 viewDir, vec3 lightDir) {
             
             // Add distance fade - closer hits have more weight
             float distanceFade = float(i) / float(numSteps);
-            distanceFade = 1.0 - distanceFade*distanceFade;
+            distanceFade = 1.0 - distanceFade;
             float finalWeight = ff * distanceFade;
 
             // Diffuse shading
