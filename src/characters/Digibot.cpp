@@ -34,13 +34,15 @@ Digitbot::~Digitbot() {
 void Digitbot::preRenderCallback(uint64_t frameNum) {
     // Update body part articulation every frame
     DigitbotTargetPose targetPose;
+    
     targetPose.rightHand.position = glm::dvec3(0.6, 0.6, 1.4);
     double scale = glm::cos((double)frameNum * 0.01) * 0.2 + 0.8;
     targetPose.rightHand.position.x *= scale;
     targetPose.rightHand.position.y *= scale;
-    //targetPose.rightHand.position = m_graphicsEngine->getCamPos() +
-    //m_graphicsEngine->getCamOri() * glm::dvec3{0,2.,0};
-    //targetPose.rightHand.position -= m_graphicsPosition;
+
+    targetPose.leftHand = targetPose.rightHand;
+    targetPose.leftHand.position.x = -targetPose.leftHand.position.x;
+
     m_digitbotGraphics->updateBodyPartPositions(targetPose);
 }
 

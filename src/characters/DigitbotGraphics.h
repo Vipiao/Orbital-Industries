@@ -108,4 +108,5 @@ private:
 
     // IK solver state
     glm::dvec3 m_rightElbowPoint;
+    glm::dvec3 m_leftElbowPoint;
 };

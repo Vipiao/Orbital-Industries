@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <vector>
+#include <glm/glm.hpp>
 
 class GraphicsEngine;
 class Geometry;
@@ -29,6 +30,17 @@ public:
     int getColorTextureUnit() const { return m_colorTextureUnit; }
     int getNormalTextureUnit() const { return m_normalTextureUnit; }
 
+    // Skeleton measurements (T-pose)
+    glm::dvec3 m_naturalRightShoulderPos;
+    glm::dvec3 m_naturalRightElbowPos;
+    glm::dvec3 m_naturalRightHandPos;
+    glm::dvec3 m_naturalLeftShoulderPos;
+    glm::dvec3 m_naturalLeftElbowPos;
+    glm::dvec3 m_naturalLeftHandPos;
+    
+    double m_upperArmLength;
+    double m_lowerArmLength;
+
 private:
     GraphicsEngine* m_graphics;
     
@@ -38,4 +50,5 @@ private:
     int m_normalTextureUnit;
     
     void loadResources();
+    void initializeSkeletonMeasurements();
 };
