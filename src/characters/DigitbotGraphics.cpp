@@ -7,12 +7,42 @@
 #include "../graphics/SSBOManager.h"
 #include <iostream>
 
+// Static skeleton measurements (T-pose natural positions)
+const glm::dvec3 DigitbotGraphics::s_naturalRightShoulderPos = glm::dvec3(0.26788, -0.044638, 1.47241);
+const glm::dvec3 DigitbotGraphics::s_naturalRightElbowPos = glm::dvec3(0.687425, -0.044638, 1.47241);
+const glm::dvec3 DigitbotGraphics::s_naturalLeftShoulderPos = glm::dvec3(-0.26788, -0.044638, 1.47241);
+const glm::dvec3 DigitbotGraphics::s_naturalLeftElbowPos = glm::dvec3(-0.687425, -0.044638, 1.47241);
+
+const glm::dvec3 DigitbotGraphics::s_naturalRightHipPos = glm::dvec3(0.177658, 0.061087, 1.02951);
+const glm::dvec3 DigitbotGraphics::s_naturalRightKneePos = glm::dvec3(0.180854, -0.274169, 0.530615);
+const glm::dvec3 DigitbotGraphics::s_naturalRightFootPos = glm::dvec3(0.179225, 0.051327, 0.059608);
+const glm::dvec3 DigitbotGraphics::s_naturalLeftHipPos = glm::dvec3(-0.177658, 0.061087, 1.02951);
+const glm::dvec3 DigitbotGraphics::s_naturalLeftKneePos = glm::dvec3(-0.180854, -0.274169, 0.530615);
+const glm::dvec3 DigitbotGraphics::s_naturalLeftFootPos = glm::dvec3(-0.179225, 0.051327, 0.059608);
+const glm::dvec3 DigitbotGraphics::s_naturalRightPistonRodPos = glm::dvec3(0.180853, -0.130187, 0.67836);
+const glm::dvec3 DigitbotGraphics::s_naturalRightPistonHousingPos = glm::dvec3(0.180853, -0.130187, 0.324156);
+const glm::dvec3 DigitbotGraphics::s_naturalLeftPistonRodPos = glm::dvec3(-0.180853, -0.130187, 0.67836);
+const glm::dvec3 DigitbotGraphics::s_naturalLeftPistonHousingPos = glm::dvec3(-0.180853, -0.130187, 0.324156);
+const glm::dvec3 DigitbotGraphics::s_naturalHeadPos = glm::dvec3(0.0, 0.0, 1.39974);
+
+// Static limb lengths
+const double DigitbotGraphics::s_upperArmLength = glm::length(
+    DigitbotGraphics::s_naturalRightElbowPos - DigitbotGraphics::s_naturalRightShoulderPos);
+const double DigitbotGraphics::s_lowerArmLength = glm::length(
+    glm::dvec3(1.09582, -0.05088, 1.47241) - DigitbotGraphics::s_naturalRightElbowPos);
+const double DigitbotGraphics::s_upperLegLength = glm::length(
+    DigitbotGraphics::s_naturalRightKneePos - DigitbotGraphics::s_naturalRightHipPos);
+const double DigitbotGraphics::s_lowerLegLength = glm::length(
+    DigitbotGraphics::s_naturalRightFootPos - DigitbotGraphics::s_naturalRightKneePos);
+
 DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* resources)
     : m_graphics(graphics)
     , m_resources(resources)
     , m_visualMeshSSBOIndex(-1)
     , m_leftElbowPoint(0.0, 0.0, 0.0)
     , m_rightElbowPoint(0.0, 0.0, 0.0)
+    , m_leftKneePoint(0.0, 0.0, 0.0)
+    , m_rightKneePoint(0.0, 0.0, 0.0)
 {
     if (!m_resources) {
         throw std::runtime_error("DigitbotResources cannot be null");
@@ -114,36 +144,74 @@ void DigitbotGraphics::updateWorldTransform(
 }
 
 void DigitbotGraphics::updateBodyPartPositions(const DigitbotTargetPose& targetPose) {
-    // Arrays for both arms (right=0, left=1)
+    // ========== SETUP ARRAYS ==========
     glm::dvec3* elbows[2] = {&m_rightElbowPoint, &m_leftElbowPoint};
+    glm::dvec3* knees[2] = {&m_rightKneePoint, &m_leftKneePoint};
+    
     BodyPart upperArms[2] = {RIGHT_UPPER_ARM, LEFT_UPPER_ARM};
     BodyPart lowerArms[2] = {RIGHT_LOWER_ARM, LEFT_LOWER_ARM};
-    glm::dvec3 shoulders[2] = {m_resources->m_naturalRightShoulderPos, m_resources->m_naturalLeftShoulderPos};
-    glm::dvec3 naturalElbows[2] = {m_resources->m_naturalRightElbowPos, m_resources->m_naturalLeftElbowPos};
+    BodyPart upperLegs[2] = {RIGHT_UPPER_LEG, LEFT_UPPER_LEG};
+    BodyPart lowerLegs[2] = {RIGHT_LOWER_LEG, LEFT_LOWER_LEG};
+    BodyPart feet[2] = {RIGHT_FOOT, LEFT_FOOT};
+    BodyPart pistonRods[2] = {RIGHT_PISTON_ROD, LEFT_PISTON_ROD};
+    BodyPart pistonHousings[2] = {RIGHT_PISTON_HOUSING, LEFT_PISTON_HOUSING};
+    
+    glm::dvec3 shoulders[2] = {s_naturalRightShoulderPos, s_naturalLeftShoulderPos};
+    glm::dvec3 naturalElbows[2] = {s_naturalRightElbowPos, s_naturalLeftElbowPos};
+    glm::dvec3 hips[2] = {s_naturalRightHipPos, s_naturalLeftHipPos};
+    glm::dvec3 naturalKnees[2] = {s_naturalRightKneePos, s_naturalLeftKneePos};
+    glm::dvec3 naturalFeet[2] = {s_naturalRightFootPos, s_naturalLeftFootPos};
+    glm::dvec3 naturalPistonRods[2] = {s_naturalRightPistonRodPos, s_naturalLeftPistonRodPos};
+    glm::dvec3 naturalPistonHousings[2] = {s_naturalRightPistonHousingPos, s_naturalLeftPistonHousingPos};
+    
     glm::dvec3 handTargets[2] = {targetPose.rightHand.position, targetPose.leftHand.position};
-    glm::dvec3 preferredDirections[2] = {
+    glm::dvec3 footTargets[2] = {targetPose.rightFoot.position, targetPose.leftFoot.position};
+    
+    glm::dvec3 elbowPreferredDirections[2] = {
         glm::normalize(glm::dvec3(1.0, 0.0, -1.0)),   // Right: +X right, -Z down
         glm::normalize(glm::dvec3(-1.0, 0.0, -1.0))   // Left: -X left, -Z down
     };
     
-    // Model-specific correction: arms point along +X in model space, but we calculate along +Y
-    glm::dquat rightCorrectionQuat = glm::angleAxis(glm::radians(90.0), glm::dvec3(0.0, 0.0, 1.0));
-    glm::dquat leftCorrectionQuat = glm::conjugate(rightCorrectionQuat);
-    glm::dquat correctionQuats[2] = {rightCorrectionQuat, leftCorrectionQuat};
-   
-    // First loop: Iterative constraint solving for both arms
-    for (int ii = 0; ii < 2; ++ii) {
-        // Constraint 1: Elbow wants to be in the lower right/left direction
-        *elbows[ii] = ArticulationUtils::applyDirectionNudge(*elbows[ii], preferredDirections[ii], 0.01);
+    glm::dvec3 kneePreferredDirections[2] = {
+        glm::dvec3(0.0, -1.0, 0.0),   // Right: backward (knees bend backwards)
+        glm::dvec3(0.0, -1.0, 0.0)    // Left: backward (knees bend backwards)
+    };
+    
+    // ========== IK CONSTRAINT SOLVING ==========
+    int numIKIterations = 1;
+    for (int iteration = 0; iteration < numIKIterations; ++iteration) {
+        // Arm IK
+        for (int ii = 0; ii < 2; ++ii) {
+            // Constraint 1: Elbow wants to be in the lower right/left direction
+            *elbows[ii] = ArticulationUtils::applyDirectionNudge(*elbows[ii], elbowPreferredDirections[ii], 0.02);
 
-        // Constraint 2: Elbow must be upperArmLength from shoulder
-        *elbows[ii] = ArticulationUtils::applyDistanceConstraint(*elbows[ii], shoulders[ii], m_resources->m_upperArmLength);
+            // Constraint 2: Elbow must be upperArmLength from shoulder
+            *elbows[ii] = ArticulationUtils::applyDistanceConstraint(*elbows[ii], shoulders[ii], s_upperArmLength);
 
-        // Constraint 3: Elbow must be lowerArmLength from hand target
-        *elbows[ii] = ArticulationUtils::applyDistanceConstraint(*elbows[ii], handTargets[ii], m_resources->m_lowerArmLength);
+            // Constraint 3: Elbow must be lowerArmLength from hand target
+            *elbows[ii] = ArticulationUtils::applyDistanceConstraint(*elbows[ii], handTargets[ii], s_lowerArmLength);
+        }
+        
+        // Leg IK
+        for (int ii = 0; ii < 2; ++ii) {
+            // Constraint 1: Knee wants to be in the backward direction
+            *knees[ii] = ArticulationUtils::applyDirectionNudge(*knees[ii], kneePreferredDirections[ii], 0.02);
+
+            // Constraint 2: Knee must be upperLegLength from hip
+            *knees[ii] = ArticulationUtils::applyDistanceConstraint(*knees[ii], hips[ii], s_upperLegLength);
+
+            // Constraint 3: Knee must be lowerLegLength from foot target
+            *knees[ii] = ArticulationUtils::applyDistanceConstraint(*knees[ii], footTargets[ii], s_lowerLegLength);
+        }
     }
     
-    // Second loop: Articulation for both arms
+    // ========== ARTICULATION ==========
+    
+    // Arm articulation
+    glm::dquat rightArmCorrectionQuat = glm::angleAxis(glm::radians(90.0), glm::dvec3(0.0, 0.0, 1.0));
+    glm::dquat leftArmCorrectionQuat = glm::conjugate(rightArmCorrectionQuat);
+    glm::dquat armCorrectionQuats[2] = {rightArmCorrectionQuat, leftArmCorrectionQuat};
+    
     for (int ii = 0; ii < 2; ++ii) {
         // Calculate up vector for arm orientation (flip sign for left arm due to mirroring)
         double sign = (ii == 0 ? 1.0 : -1.0);
@@ -156,22 +224,142 @@ void DigitbotGraphics::updateBodyPartPositions(const DigitbotTargetPose& targetP
         ArticulationUtils::updateArticulatedBodyPart(
             m_bodyPartGeometries[upperArms[ii]],
             m_bodyPartInstances[upperArms[ii]],
-            shoulders[ii],      // directionFrom
-            *elbows[ii],        // directionTo
-            up,                 // upVector
-            correctionQuats[ii],     // correctionQuat
-            shoulders[ii]       // naturalPivot
+            shoulders[ii],
+            *elbows[ii] - shoulders[ii],
+            up,
+            armCorrectionQuats[ii],
+            shoulders[ii]
         );
 
         // Update lower arm
         ArticulationUtils::updateArticulatedBodyPart(
             m_bodyPartGeometries[lowerArms[ii]],
             m_bodyPartInstances[lowerArms[ii]],
-            *elbows[ii],        // directionFrom
-            handTargets[ii],    // directionTo
-            up,                 // upVector
-            correctionQuats[ii],     // correctionQuat
-            naturalElbows[ii]   // naturalPivot
+            *elbows[ii],
+            handTargets[ii] - *elbows[ii],
+            up,
+            armCorrectionQuats[ii],
+            naturalElbows[ii]
+        );
+    }
+
+    // Leg articulation
+    for (int ii = 0; ii < 2; ++ii) {
+        // Up vector for legs is simply positive Y
+        glm::dvec3 up = glm::dvec3(0.0, 1.0, 0.0);
+
+        // Calculate correction quaternions based on natural pose orientations
+        glm::dvec3 upperLegNaturalForward = glm::normalize(naturalKnees[ii] - hips[ii]);
+        glm::dquat upperLegCorrection = ArticulationUtils::quatLookAtYForward(upperLegNaturalForward, up);
+
+        glm::dvec3 lowerLegNaturalForward = glm::normalize(naturalFeet[ii] - naturalKnees[ii]);
+        glm::dquat lowerLegCorrection = ArticulationUtils::quatLookAtYForward(lowerLegNaturalForward, up);
+ 
+        glm::dquat footCorrection = glm::angleAxis(glm::radians(90.0), glm::dvec3(1.0, 0.0, 0.0));
+
+        // Update upper leg (hip to knee)
+        ArticulationUtils::updateArticulatedBodyPart(
+            m_bodyPartGeometries[upperLegs[ii]],
+            m_bodyPartInstances[upperLegs[ii]],
+            hips[ii],
+            *knees[ii] - hips[ii],
+            up,
+            upperLegCorrection,
+            hips[ii]
+        );
+
+        // Update lower leg (knee to foot)
+        ArticulationUtils::updateArticulatedBodyPart(
+            m_bodyPartGeometries[lowerLegs[ii]],
+            m_bodyPartInstances[lowerLegs[ii]],
+            *knees[ii],
+            footTargets[ii] - *knees[ii],
+            up,
+            lowerLegCorrection,
+            naturalKnees[ii]
+        );
+
+        // Update foot (at foot position, pointing down)
+        ArticulationUtils::updateArticulatedBodyPart(
+            m_bodyPartGeometries[feet[ii]],
+            m_bodyPartInstances[feet[ii]],
+            footTargets[ii],
+            glm::dvec3(0.0, 0.0, -1.0),
+            up,
+            footCorrection,
+            naturalFeet[ii]
+        );
+    }
+
+    // Piston articulation
+    for (int ii = 0; ii < 2; ++ii) {
+        // Get upper and lower leg instances to read their transforms
+        auto upperLegInstance = m_bodyPartInstances[upperLegs[ii]].lock();
+        auto lowerLegInstance = m_bodyPartInstances[lowerLegs[ii]].lock();
+
+        if (!upperLegInstance || !lowerLegInstance) {
+            continue;
+        }
+
+        // Transform natural rod position by upper leg's current transform
+        glm::dvec3 transformedRodPos = upperLegInstance->m_localOrientation * naturalPistonRods[ii] 
+                                     + upperLegInstance->m_localPosition;
+
+        // Transform natural housing position by lower leg's current transform
+        glm::dvec3 transformedHousingPos = lowerLegInstance->m_localOrientation * naturalPistonHousings[ii]
+                                         + lowerLegInstance->m_localPosition;
+
+        // Up vector for pistons
+        glm::dvec3 up = glm::dvec3(0.0, 1.0, 0.0);
+
+        // Calculate correction quaternions based on natural pose orientations
+        glm::dvec3 rodNaturalForward = glm::normalize(naturalPistonHousings[ii] - naturalPistonRods[ii]);
+        glm::dquat rodCorrection = ArticulationUtils::quatLookAtYForward(rodNaturalForward, up);
+
+        glm::dvec3 housingNaturalForward = glm::normalize(naturalPistonRods[ii] - naturalPistonHousings[ii]);
+        glm::dquat housingCorrection = ArticulationUtils::quatLookAtYForward(housingNaturalForward, up);
+
+        // Update piston rod (attached to upper leg, points toward housing)
+        ArticulationUtils::updateArticulatedBodyPart(
+            m_bodyPartGeometries[pistonRods[ii]],
+            m_bodyPartInstances[pistonRods[ii]],
+            transformedRodPos,
+            transformedHousingPos - transformedRodPos,
+            up,
+            rodCorrection,
+            naturalPistonRods[ii]
+        );
+
+        // Update piston housing (attached to lower leg, points toward rod)
+        ArticulationUtils::updateArticulatedBodyPart(
+            m_bodyPartGeometries[pistonHousings[ii]],
+            m_bodyPartInstances[pistonHousings[ii]],
+            transformedHousingPos,
+            transformedRodPos - transformedHousingPos,
+            up,
+            housingCorrection,
+            naturalPistonHousings[ii]
+        );
+    }
+
+    // Head articulation
+    {
+        // Calculate direction and up from head orientation
+        glm::dvec3 headDirection = targetPose.headOrientation * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 headUp = targetPose.headOrientation * glm::dvec3(0.0, 0.0, 1.0);
+
+        // Identity correction quaternion
+        glm::dquat headCorrection = glm::dquat(1.0, 0.0, 0.0, 0.0);
+
+        // Update head
+        ArticulationUtils::updateArticulatedBodyPart(
+            m_bodyPartGeometries[HEAD],
+            m_bodyPartInstances[HEAD],
+            s_naturalHeadPos,
+            headDirection,
+            headUp,
+            headCorrection,
+            s_naturalHeadPos
         );
     }
 }

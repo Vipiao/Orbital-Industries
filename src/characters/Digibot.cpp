@@ -32,16 +32,43 @@ Digitbot::~Digitbot() {
 }
 
 void Digitbot::preRenderCallback(uint64_t frameNum) {
+    //if (frameNum % 16 != 0)
+    //{
+    //    return;
+    //}
+    
     // Update body part articulation every frame
     DigitbotTargetPose targetPose;
     
     targetPose.rightHand.position = glm::dvec3(0.6, 0.6, 1.4);
-    double scale = glm::cos((double)frameNum * 0.01) * 0.2 + 0.8;
+    double time = (double)frameNum * 0.02;
+    double scale = glm::cos(time) * 0.2 + 0.8;
     targetPose.rightHand.position.x *= scale;
     targetPose.rightHand.position.y *= scale;
 
     targetPose.leftHand = targetPose.rightHand;
     targetPose.leftHand.position.x = -targetPose.leftHand.position.x;
+
+    // Set foot targets (for now, just at natural positions)
+    double offsetY = 0.4 * glm::cos(time);
+    double offsetZ = 0.1 * glm::sin(time);
+    targetPose.rightFoot.position =
+        glm::dvec3(0.179225, 0.051327, 0.059608) +
+        glm::dvec3(0, offsetY, glm::max(0., -offsetZ));
+    targetPose.leftFoot.position =
+        glm::dvec3(-0.179225, 0.051327, 0.059608) +
+        glm::dvec3(0, -offsetY, glm::max(0., offsetZ));
+
+    targetPose.leftFoot.position.x += glm::cos(time / 1.17) * 0.16 - 0.1;
+    targetPose.leftFoot.position.y += glm::cos(time / 1.17) * 0.16;
+
+    targetPose.rightFoot.position.x -= glm::cos(time / 1.17) * 0.16 + 0.1;
+    targetPose.rightFoot.position.y -= glm::cos(time / 1.17) * 0.16;
+
+    targetPose.headOrientation = glm::angleAxis(
+        glm::radians(glm::cos(time/1.53) * 16.),
+        glm::normalize(glm::dvec3{0,1,1})
+    );
 
     m_digitbotGraphics->updateBodyPartPositions(targetPose);
 }

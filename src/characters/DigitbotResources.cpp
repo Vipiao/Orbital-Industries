@@ -14,7 +14,6 @@ DigitbotResources::DigitbotResources(GraphicsEngine* graphics)
     }
     
     loadResources();
-    initializeSkeletonMeasurements();
 }
 
 DigitbotResources::~DigitbotResources() {
@@ -26,22 +25,6 @@ DigitbotResources::~DigitbotResources() {
     }
     
     // Textures are automatically cleaned up by TextureManager destructor
-}
-
-void DigitbotResources::initializeSkeletonMeasurements() {
-    // Right arm measurements in local space (T-pose)
-    m_naturalRightShoulderPos = glm::dvec3(0.26788, -0.044638, 1.47241);
-    m_naturalRightElbowPos = glm::dvec3(0.687425, -0.044638, 1.47241);
-    m_naturalRightHandPos = glm::dvec3(1.09582, -0.05088, 1.47241);
-    
-    // Left arm measurements (mirrored X coordinates)
-    m_naturalLeftShoulderPos = glm::dvec3(-0.26788, -0.044638, 1.47241);
-    m_naturalLeftElbowPos = glm::dvec3(-0.687425, -0.044638, 1.47241);
-    m_naturalLeftHandPos = glm::dvec3(-1.09582, -0.05088, 1.47241);
-    
-    // Limb lengths
-    m_upperArmLength = glm::length(m_naturalRightElbowPos - m_naturalRightShoulderPos);
-    m_lowerArmLength = glm::length(m_naturalRightHandPos - m_naturalRightElbowPos);
 }
 
 void DigitbotResources::loadResources() {

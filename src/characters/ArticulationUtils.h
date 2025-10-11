@@ -33,8 +33,8 @@ public:
      * @brief Update an articulated body part's transform to point from one location to another
      * @param geometry Geometry weak pointer for the body part
      * @param instance Instance weak pointer for the body part
-     * @param directionFrom Where the limb pivots from (current pivot position)
-     * @param directionTo Where the limb points toward
+     * @param pivot Where the limb pivots from (current pivot position)
+     * @param direction Direction the limb should point (normalized)
      * @param upVector Reference vector for orientation (determines twist)
      * @param correctionQuat Model-specific correction (e.g., 90° Z-rotation if model points along X instead of Y)
      * @param naturalPivot Pivot point in T-pose/rest pose
@@ -42,8 +42,8 @@ public:
     static void updateArticulatedBodyPart(
         std::weak_ptr<Geometry> geometry,
         std::weak_ptr<Instance> instance,
-        const glm::dvec3& directionFrom,
-        const glm::dvec3& directionTo,
+        const glm::dvec3& pivot,
+        const glm::dvec3& direction,
         const glm::dvec3& upVector,
         const glm::dquat& correctionQuat,
         const glm::dvec3& naturalPivot

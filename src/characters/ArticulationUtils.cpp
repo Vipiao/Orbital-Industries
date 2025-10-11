@@ -46,8 +46,8 @@ glm::dquat ArticulationUtils::quatLookAtYForward(const glm::dvec3& direction, co
 void ArticulationUtils::updateArticulatedBodyPart(
     std::weak_ptr<Geometry> geometry,
     std::weak_ptr<Instance> instance,
-    const glm::dvec3& directionFrom,
-    const glm::dvec3& directionTo,
+    const glm::dvec3& pivot,
+    const glm::dvec3& direction,
     const glm::dvec3& upVector,
     const glm::dquat& correctionQuat,
     const glm::dvec3& naturalPivot)
@@ -59,12 +59,12 @@ void ArticulationUtils::updateArticulatedBodyPart(
         return;
     }
     
-    // Calculate direction the limb should point
-    glm::dvec3 direction = glm::normalize(directionTo - directionFrom);
+    // Normalize direction vector
+    glm::dvec3 normalizedDirection = glm::normalize(direction);
     
     // Build orientation quaternion
     // quatLookAtYForward makes +Y point along direction
-    glm::dquat lookAtQuat = ArticulationUtils::quatLookAtYForward(direction, upVector);
+    glm::dquat lookAtQuat = ArticulationUtils::quatLookAtYForward(normalizedDirection, upVector);
     
     // Invert because lookAt is for cameras (inverse of object orientation)
     glm::dquat invertedLookAt = glm::inverse(lookAtQuat);
@@ -73,7 +73,7 @@ void ArticulationUtils::updateArticulatedBodyPart(
     glm::dquat finalOrientation = invertedLookAt * correctionQuat;
     
     // Calculate how much the pivot has moved from its natural position
-    glm::dvec3 pivotShift = directionFrom - naturalPivot;
+    glm::dvec3 pivotShift = pivot - naturalPivot;
     
     // Calculate rotation shift: how much the natural pivot moves when rotated
     glm::dvec3 rotationShift = finalOrientation * naturalPivot - naturalPivot;

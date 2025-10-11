@@ -76,6 +76,32 @@ public:
     int getSSBOIndex() const { return m_visualMeshSSBOIndex; }
 
 private:
+    // Static skeleton measurements (T-pose natural positions)
+    static const glm::dvec3 s_naturalRightShoulderPos;
+    static const glm::dvec3 s_naturalRightElbowPos;
+    static const glm::dvec3 s_naturalLeftShoulderPos;
+    static const glm::dvec3 s_naturalLeftElbowPos;
+    static const glm::dvec3 s_naturalRightHipPos;
+    static const glm::dvec3 s_naturalRightKneePos;
+    static const glm::dvec3 s_naturalRightFootPos;
+    static const glm::dvec3 s_naturalLeftHipPos;
+    static const glm::dvec3 s_naturalLeftKneePos;
+    static const glm::dvec3 s_naturalLeftFootPos;
+    static const glm::dvec3 s_naturalRightPistonRodPos;
+    static const glm::dvec3 s_naturalRightPistonHousingPos;
+    static const glm::dvec3 s_naturalLeftPistonRodPos;
+    static const glm::dvec3 s_naturalLeftPistonHousingPos;
+    static const glm::dvec3 s_naturalHeadPos;
+    
+    // Static limb lengths
+    static const double s_upperArmLength;
+    static const double s_lowerArmLength;
+    static const double s_upperLegLength;
+    static const double s_lowerLegLength;
+    
+    // Compute left positions from right (helper)
+    static glm::dvec3 mirrorX(const glm::dvec3& pos) { return glm::dvec3(-pos.x, pos.y, pos.z); }
+
     enum BodyPart {
         LEFT_FOOT = 0,
         LEFT_LOWER_ARM = 1,
@@ -109,4 +135,6 @@ private:
     // IK solver state
     glm::dvec3 m_rightElbowPoint;
     glm::dvec3 m_leftElbowPoint;
+    glm::dvec3 m_rightKneePoint;
+    glm::dvec3 m_leftKneePoint;
 };
