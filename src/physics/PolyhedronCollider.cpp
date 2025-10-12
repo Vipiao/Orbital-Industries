@@ -110,7 +110,18 @@ void PolyhedronCollider::updateSimpleAABB(uint64_t currentTimestep) {
     // Mark simple AABB as valid for this timestep
     m_simpleAABBValidUntilTime = currentTimestep;
 
-    // Invalidate cached data since position/orientation may have changed
+    // Invalidate cached data since position/orientation may have changed.
+    // TODO: It might seem weird that the vertices are invalidated on
+    // updateSimpleAABB instead of setting the position, but if the
+    // polyhedron is part of a grid its position will depend on local
+    // coords so checking position chance will not capture this. But when
+    // I first do collision detection using grid, this function will be
+    // called once per polyhedron before any narrow collision detection
+    // is done, so this works, but it is not intuitive and error prone
+    // so this must be fixed somehow. But I don't know how yet. After this
+    // code is made to work, it must be revisited and fixed. Maybe make
+    // grid change its subcolliders positions triggering this reset and
+    // move this to some setPosition(...) function?
     m_verticesValidUntilTime = 0;
     m_collisionAxesValidUntilTime = 0;
 }

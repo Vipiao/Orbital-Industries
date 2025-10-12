@@ -83,6 +83,10 @@ void GridCollider::updateSimpleAABB(uint64_t currentTimestep) {
         return;
     }
 
+    // TODO: Currently the simple and advanced both use and advanced calculation.
+    // Simple could be done much cheaper calculating a bigger cube shaped
+    // Collider centered around the position.
+
     // Update cached corners if needed
     if (currentTimestep > m_cornersValidUntilTime) {
         updateLocalCorners();
