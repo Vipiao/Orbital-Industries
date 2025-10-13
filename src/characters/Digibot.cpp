@@ -51,7 +51,7 @@ void Digitbot::preRenderCallback(uint64_t frameNum) {
 
     // Set foot targets (for now, just at natural positions)
     double offsetY = 0.4 * glm::cos(time);
-    double offsetZ = 0.1 * glm::sin(time);
+    double offsetZ = 0.16 * glm::sin(time);
     targetPose.rightFoot.position =
         glm::dvec3(0.179225, 0.051327, 0.059608) +
         glm::dvec3(0, offsetY, glm::max(0., -offsetZ));
@@ -59,11 +59,11 @@ void Digitbot::preRenderCallback(uint64_t frameNum) {
         glm::dvec3(-0.179225, 0.051327, 0.059608) +
         glm::dvec3(0, -offsetY, glm::max(0., offsetZ));
 
-    targetPose.leftFoot.position.x += glm::cos(time / 1.17) * 0.16 - 0.1;
-    targetPose.leftFoot.position.y += glm::cos(time / 1.17) * 0.16;
+    targetPose.leftFoot.position.x += glm::cos(time / 1.17) * 0.08 - 0.1;
+    targetPose.leftFoot.position.y += glm::cos(time / 1.17) * 0.08;
 
-    targetPose.rightFoot.position.x -= glm::cos(time / 1.17) * 0.16 + 0.1;
-    targetPose.rightFoot.position.y -= glm::cos(time / 1.17) * 0.16;
+    targetPose.rightFoot.position.x -= glm::cos(time / 1.17) * 0.08 + 0.1;
+    targetPose.rightFoot.position.y -= glm::cos(time / 1.17) * 0.08;
 
     targetPose.headOrientation = glm::angleAxis(
         glm::radians(glm::cos(time/1.53) * 16.),
