@@ -15,6 +15,7 @@ class PhysicsEngine;
 class GraphicsEngine;
 class JobManager;
 class TimeHandler;
+class SensorCollider;
 
 /**
  * @brief Subsystem managing all grid lifecycle, updates, and splitting logic
@@ -58,6 +59,13 @@ public:
     // Access
     const std::vector<std::shared_ptr<Grid>>& getGrids() const { return m_grids; }
     
+    /**
+     * @brief Convert sensor collider overlaps to Grid pointers
+     * @param sensor SensorCollider to query for overlapping grids
+     * @return Vector of Grid pointers that overlap with the sensor
+     */
+    std::vector<Grid*> getGridsFromOverlaps(const SensorCollider* sensor) const;
+
     // IHashable interface
     virtual size_t computeHash() const override;
     

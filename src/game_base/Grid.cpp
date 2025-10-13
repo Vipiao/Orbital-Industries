@@ -34,6 +34,11 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
         orientation,
         jobManager,
         timeHandler);
+
+    // Store back-reference to Grid in the collider for sensor queries
+    if (auto collider = m_colliderWeak.lock()) {
+        collider->set_pointer<Grid>(this);
+    }
     
     // Create rigid body (without collider)
     m_rigidBody = m_physics->addRigidBody(
@@ -61,6 +66,11 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
 
 Grid::~Grid() {
     // Order matters: disconnect references BEFORE destroying collider
+    if (auto collider = m_colliderWeak.lock()) {
+        collider->remove_pointer<Grid>();
+    }
+    
+    // Disconnect and remove physics components
     if (m_rigidBody) {
         m_physics->disconnectCollider(m_rigidBody);
         m_physics->removeRigidBody(m_rigidBody);

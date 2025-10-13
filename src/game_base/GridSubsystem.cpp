@@ -1,6 +1,8 @@
 // GridSubsystem.cpp
 #include "GridSubsystem.h"
 #include "../physics/PhysicsEngine.h"
+#include "../physics/SensorCollider.h"
+#include "../physics/GridCollider.h"
 #include "../graphics/GraphicsEngine.h"
 #include "../utils/JobManager.h"
 #include "../utils/TimeHandler.h"
@@ -96,6 +98,29 @@ Grid* GridSubsystem::findGridById(uint64_t gridId) {
         }
     }
     return nullptr;
+}
+ 
+std::vector<Grid*> GridSubsystem::getGridsFromOverlaps(const SensorCollider* sensor) const {
+    std::vector<Grid*> grids;
+    
+    if (!sensor) {
+        return grids;
+    }
+    
+    for (Collider* collider : sensor->getOverlappingColliders()) {
+        // Check if it's a GridCollider
+        if (collider->getTypeId() == GridCollider::TYPE_ID) {
+            GridCollider* gridCollider = static_cast<GridCollider*>(collider);
+            
+            // Try to get the Grid pointer
+            Grid* grid = gridCollider->get_pointer<Grid>();
+            if (grid) {
+                grids.push_back(grid);
+            }
+        }
+    }
+    
+    return grids;
 }
 
 size_t GridSubsystem::computeHash() const {
