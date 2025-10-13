@@ -40,6 +40,9 @@ std::weak_ptr<GridCollider> CollisionDetector::addGridCollider(
     const glm::dquat& orientation,
     JobManager* jobManager,
     TimeHandler* timeHandler) {
+    // TODO. Probably it is better if CollisionDetector just passes its own
+    // pointer to jobManager and timeHandler to the new colliders instead of
+    // this function taking it each time.
     
     auto collider = std::make_shared<GridCollider>(
         position, orientation, jobManager, timeHandler);
