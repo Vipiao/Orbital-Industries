@@ -5,6 +5,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <utility>
 #include <vector>
+#include <unordered_set>
 #include "../utils/GeometryUtils.h"
 #include "../utils/PointerStorage.h"
 
@@ -72,6 +73,13 @@ public:
         static const std::vector<glm::dvec3> empty; 
         return empty; 
     }
+
+    // Overlap tracking - maintained by CollisionDetector during sweep-and-prune
+    const std::unordered_set<Collider*>& getOverlappingColliders() const {
+        return m_overlappingColliders;
+    }
+
+    std::unordered_set<Collider*> m_overlappingColliders;
 
     // Dependent positioning system
     void updatePosition(uint64_t currentTimestep);

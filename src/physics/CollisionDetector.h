@@ -15,6 +15,7 @@ class GridCollider;
 class PolyhedronCollider;
 class BallCollider;
 class CubeCollider;
+class SensorCollider;
 
 // Forward declaration
 class TimeHandler;
@@ -57,6 +58,10 @@ public:
         const glm::dvec3& position,
         const glm::dquat& orientation,
         double halfWidth);
+
+    std::weak_ptr<SensorCollider> addSensorCollider(
+        const glm::dvec3& position,
+        const glm::dvec3& halfScale);
     
     // Remove a collider from the collision detection system (pass back what factory gave you)
     void removeCollider(std::weak_ptr<Collider> colliderWeak);

@@ -4,6 +4,7 @@
 #include "CubeCollider.h"
 #include "GridCollider.h"
 #include "PolyhedronCollider.h"
+#include "SensorCollider.h"
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
@@ -42,6 +43,8 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                         static_cast<BallCollider*>(colliderA),
                         static_cast<GridCollider*>(colliderB),
                         currentTimestep);
+                case SensorCollider::TYPE_ID:
+                    return CollisionResult(); // Sensors don't generate collisions
             }
             break;
         case CubeCollider::TYPE_ID:
@@ -62,6 +65,8 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                     return detectPolyhedronGrid(
                         static_cast<CubeCollider*>(colliderA),
                         static_cast<GridCollider*>(colliderB), currentTimestep);
+                case SensorCollider::TYPE_ID:
+                    return CollisionResult(); // Sensors don't generate collisions
             }
             break;
         case PolyhedronCollider::TYPE_ID:
@@ -82,6 +87,8 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                     return detectPolyhedronGrid(
                         static_cast<PolyhedronCollider*>(colliderA),
                         static_cast<GridCollider*>(colliderB), currentTimestep);
+                case SensorCollider::TYPE_ID:
+                    return CollisionResult(); // Sensors don't generate collisions
             }
             break;
         case GridCollider::TYPE_ID:
@@ -104,8 +111,13 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                         static_cast<GridCollider*>(colliderA),
                         static_cast<GridCollider*>(colliderB),
                         currentTimestep);
+                case SensorCollider::TYPE_ID:
+                    return CollisionResult(); // Sensors don't generate collisions
             }
             break;
+        case SensorCollider::TYPE_ID:
+            // Sensors never generate collision results
+            return CollisionResult();
     }
     
     // Default case - no collision

@@ -5,6 +5,7 @@
 #include "PolyhedronCollider.h"
 #include "BallCollider.h"
 #include "CubeCollider.h"
+#include "SensorCollider.h"
 #include <algorithm>
 #include "../utils/PairCache.h"
 #include <iostream>
@@ -88,6 +89,15 @@ std::weak_ptr<CubeCollider> CollisionDetector::addCubeCollider(
     return collider;
 }
 
+std::weak_ptr<SensorCollider> CollisionDetector::addSensorCollider(
+    const glm::dvec3& position,
+    const glm::dvec3& halfScale) {
+    
+    auto collider = std::make_shared<SensorCollider>(position, halfScale);
+    registerCollider(collider);
+    return collider;
+}
+
 void CollisionDetector::removeCollider(std::weak_ptr<Collider> colliderWeak) {
     auto collider = colliderWeak.lock();
     if (!collider) {
@@ -104,6 +114,10 @@ void CollisionDetector::removeCollider(std::weak_ptr<Collider> colliderWeak) {
     
     // Remove edges for this collider (use raw pointer for edge removal)
     Collider* rawPtr = collider.get();
+
+    // Clear overlap cache for this collider
+    rawPtr->m_overlappingColliders.clear();
+
     auto removeEdges = [rawPtr](std::vector<std::unique_ptr<Edge>>& edges) {
         edges.erase(
             std::remove_if(edges.begin(), edges.end(),
@@ -117,12 +131,18 @@ void CollisionDetector::removeCollider(std::weak_ptr<Collider> colliderWeak) {
     removeEdges(edgesX);
     removeEdges(edgesY);
     removeEdges(edgesZ);
-
     
     // Remove any active collision pairs involving this collider (use raw pointer)
     auto it = m_activeAABBS.begin();
     while (it != m_activeAABBS.end()) {
         if (it->first == rawPtr || it->second == rawPtr) {
+            // Remove from overlap caches
+            if (it->first != rawPtr) {
+                it->first->m_overlappingColliders.erase(rawPtr);
+            }
+            if (it->second != rawPtr) {
+                it->second->m_overlappingColliders.erase(rawPtr);
+            }
             it = m_activeAABBS.erase(it);
         } else {
             ++it;
@@ -158,6 +178,10 @@ Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions)
             PairCache<glm::dvec3>::clearCachedData(it->first->m_debugId, it->second->m_debugId);  // SAT axes
             PairCache<int>::clearCachedData(it->first->m_debugId, it->second->m_debugId);         // Contact counts
             
+            // Remove from overlap caches
+            it->first->m_overlappingColliders.erase(it->second);
+            it->second->m_overlappingColliders.erase(it->first);
+
             // Remove from active collisions
             it = m_activeAABBS.erase(it);
         } else {
@@ -191,6 +215,10 @@ Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions)
         if (pair.first->checkAABBCollision(pair.second)) {
             // Add to active collisions
             m_activeAABBS.insert(pair);
+
+            // Add to overlap caches
+            pair.first->m_overlappingColliders.insert(pair.second);
+            pair.second->m_overlappingColliders.insert(pair.first);
 
             // Check time every 50 successful AABB checks
             if (++processed % 50 == 0 && m_timeHandler->now() >= m_endTime) {
@@ -261,6 +289,12 @@ std::pair<Collider*, Collider*> CollisionDetector::makePair(Collider* a, Collide
 
 void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2, std::vector<CollisionResult>& collisions) {
     if (!collider1 || !collider2 || collider1 == collider2) return;
+
+    // Skip collision detection if either collider is a sensor
+    if (collider1->getTypeId() == SensorCollider::TYPE_ID || 
+        collider2->getTypeId() == SensorCollider::TYPE_ID) {
+        return;
+    }
 
     // Update advanced AABBs for precise collision detection
     collider1->updateAdvancedAABB(m_currentTimestep);

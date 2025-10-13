@@ -32,6 +32,7 @@ class BallCollider;
 class CubeCollider;
 class GridCollider;
 class PolyhedronCollider;
+class SensorCollider;
 
 // Contact point reduction thresholds
 static constexpr size_t CONTACT_REDUCTION_THRESHOLD = 12 + 8;
