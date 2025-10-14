@@ -1,4 +1,4 @@
-// Grid.cpp - Updated
+// Grid.cpp
 
 #include <set>
 #include "Grid.h"

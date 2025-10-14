@@ -43,6 +43,9 @@ GridSubsystem::GridSubsystem(
 }
 
 GridSubsystem::~GridSubsystem() {
+    // Clear collider mapping before destroying grids to avoid dangling keys
+    m_colliderToGrid.clear();
+
     // Clear all grids (will trigger Grid destructors)
     m_grids.clear();
 }
@@ -57,8 +60,18 @@ std::weak_ptr<Grid> GridSubsystem::createGrid(const glm::dvec3& position, const 
         orientation
     );
     
-    std::weak_ptr<Grid> gridPtr = grid;
     m_grids.push_back(std::move(grid));
+    std::weak_ptr<Grid> gridPtr = m_grids.back();
+    
+    // Register collider->grid mapping for O(1) sensor queries
+    if (auto gridLocked = gridPtr.lock()) {
+        if (auto collider = gridLocked->getCollider().lock()) {
+            m_colliderToGrid[collider.get()] = gridPtr;
+        } else {
+            // Should never happen - Grid just created should have valid collider
+            throw std::runtime_error("GridSubsystem::createGrid: Grid has no collider");
+        }
+    }
     
     return gridPtr;
 }
@@ -66,7 +79,17 @@ std::weak_ptr<Grid> GridSubsystem::createGrid(const glm::dvec3& position, const 
 void GridSubsystem::removeGrid(std::weak_ptr<Grid> gridWeak) {
     auto grid = gridWeak.lock();
     if (!grid) return; // Grid already destroyed
+
+    // CRITICAL: Remove from collider mapping BEFORE erasing from m_grids
+    // Order matters because Grid destructor destroys the collider
+    if (auto collider = grid->getCollider().lock()) {
+        m_colliderToGrid.erase(collider.get());
+    } else {
+        // Collider already destroyed - this shouldn't happen in normal operation
+        // but we can continue safely since the map entry is already gone or irrelevant
+    }
     
+    // Now safe to remove grid (and destroy its collider)
     auto it = std::find_if(m_grids.begin(), m_grids.end(),
         [grid](const std::shared_ptr<Grid>& item) {
             return item.get() == grid.get();
@@ -100,23 +123,19 @@ Grid* GridSubsystem::findGridById(uint64_t gridId) {
     return nullptr;
 }
  
-std::vector<Grid*> GridSubsystem::getGridsFromOverlaps(const SensorCollider* sensor) const {
-    std::vector<Grid*> grids;
+std::vector<std::weak_ptr<Grid>> GridSubsystem::getGridsFromOverlaps(const SensorCollider* sensor) const {
+    std::vector<std::weak_ptr<Grid>> grids;
     
     if (!sensor) {
         return grids;
     }
     
     for (Collider* collider : sensor->getOverlappingColliders()) {
-        // Check if it's a GridCollider
-        if (collider->getTypeId() == GridCollider::TYPE_ID) {
-            GridCollider* gridCollider = static_cast<GridCollider*>(collider);
-            
-            // Try to get the Grid pointer
-            Grid* grid = gridCollider->get_pointer<Grid>();
-            if (grid) {
-                grids.push_back(grid);
-            }
+        // O(1) lookup in hash map
+        auto it = m_colliderToGrid.find(collider);
+        if (it != m_colliderToGrid.end()) {
+            // Found a grid for this collider
+            grids.push_back(it->second);
         }
     }
     

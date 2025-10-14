@@ -70,6 +70,9 @@ public:
     
     RigidBody* getRigidBody() const { return m_rigidBody; }
 
+    // Get collider for subsystem queries
+    std::weak_ptr<Collider> getCollider() const { return m_colliderWeak; }
+
     // Get graphics mesh ID for instance rendering
     int getGraphicsMeshId() const;
 

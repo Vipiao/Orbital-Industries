@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <chrono>
+#include <unordered_map>
 
 // Forward declarations
 class PhysicsEngine;
@@ -16,6 +17,7 @@ class GraphicsEngine;
 class JobManager;
 class TimeHandler;
 class SensorCollider;
+class Collider;
 
 /**
  * @brief Subsystem managing all grid lifecycle, updates, and splitting logic
@@ -62,9 +64,9 @@ public:
     /**
      * @brief Convert sensor collider overlaps to Grid pointers
      * @param sensor SensorCollider to query for overlapping grids
-     * @return Vector of Grid pointers that overlap with the sensor
+     * @return Vector of Grid weak_ptrs that overlap with the sensor
      */
-    std::vector<Grid*> getGridsFromOverlaps(const SensorCollider* sensor) const;
+    std::vector<std::weak_ptr<Grid>> getGridsFromOverlaps(const SensorCollider* sensor) const;
 
     // IHashable interface
     virtual size_t computeHash() const override;
@@ -78,6 +80,9 @@ private:
     
     // Grid ownership
     std::vector<std::shared_ptr<Grid>> m_grids;
+
+    // Fast lookup: Collider -> Grid mapping for sensor queries
+    std::unordered_map<Collider*, std::weak_ptr<Grid>> m_colliderToGrid;
     
     // Grid splitting logic
     std::unique_ptr<GridSplitter> m_gridSplitter;
