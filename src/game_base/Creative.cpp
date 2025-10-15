@@ -19,6 +19,7 @@
 #include "BuildTool.h"
 #include "../utils/ColorUtils.h"
 #include <float.h>
+#include "../physics/SensorCollider.h"
 #include <map>
 
 Creative::Creative(GameBase* gameBase)
@@ -47,6 +48,12 @@ Creative::Creative(GameBase* gameBase)
 
     // Load crosshair geometry (instance will be managed in processInputLogic)
     m_crosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
+
+    // Create interaction sensor for spatial filtering
+    glm::dvec3 sensorHalfScale(10.0, 10.0, 10.0); // 20x20x20 box
+    glm::dvec3 initialPos = m_gameBase->m_graphicsEngine->getCamPos() + 
+        m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 10.0, 0.0);
+    m_interactionSensor = m_gameBase->m_physicsEngine->getCollisionDetector().addSensorCollider(initialPos, sensorHalfScale);
 }
 
 Creative::~Creative() {
@@ -55,6 +62,11 @@ Creative::~Creative() {
         if (auto geometry = m_crosshairGeometry.lock()) {
             geometry->removeInstance(instance.get());
         }
+    }
+
+    // Remove sensor collider
+    if (!m_interactionSensor.expired()) {
+        m_gameBase->m_physicsEngine->getCollisionDetector().removeCollider(m_interactionSensor);
     }
     // Destructor defined here where RadialMenu is complete type
 }
@@ -145,14 +157,54 @@ void Creative::physics() {
     doForce = false;
     doTrackSpeed = false;
 
+    // Apply drag forces to all grids before physics update
+    applyDragForces();
+
+    // Update interaction sensor position (after physics completes)
+    if (auto sensor = m_interactionSensor.lock()) {
+        glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+        glm::dvec3 sensorPosition = m_gameBase->m_graphicsEngine->getCamPos() + forward * 10.0;
+        
+        sensor->m_position = sensorPosition;
+        sensor->m_orientation = m_gameBase->m_graphicsEngine->getCamOri();
+    }
+
+    // Get filtered grids from sensor
+    std::vector<std::weak_ptr<Grid>> interactionGrids;
+    if (auto sensorShared = m_interactionSensor.lock()) {
+        SensorCollider* sensorPtr = static_cast<SensorCollider*>(sensorShared.get());
+        interactionGrids = m_gameBase->getGridSubsystem()->getGridsFromOverlaps(sensorPtr);
+    }
+
+    //// TEST: Press J to randomly color grids in sensor range
+    //KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
+    //if (keyboard->m_j.justPressed()) {
+    //    for (const auto& gridWeak : interactionGrids) {
+    //        if (auto grid = gridWeak.lock()) {
+    //            auto cells = grid->getCells();
+    //            // Generate random color
+    //            glm::dvec4 randomColor(
+    //                (double)rand() / RAND_MAX,
+    //                (double)rand() / RAND_MAX,
+    //                (double)rand() / RAND_MAX,
+    //                1.0
+    //            );
+    //            for (auto cell : cells) {
+    //                glm::ivec3 coord = cell.first;
+    //                grid->setColor(coord, randomColor);
+    //            }
+    //        }
+    //    }
+    //}
+
     // Call color tool physics callback
-    m_colorTool->onPhysicsUpdateComplete();
+    m_colorTool->onPhysicsUpdateComplete(interactionGrids);
 
     // Call modify tool physics callback
-    m_modifyTool->onPhysicsUpdateComplete();
+    m_modifyTool->onPhysicsUpdateComplete(interactionGrids);
 
     // Call build tool physics callback
-    m_buildTool->onPhysicsUpdateComplete();
+    m_buildTool->onPhysicsUpdateComplete(interactionGrids);
     
     // Apply drag forces to all grids before physics update
     applyDragForces();

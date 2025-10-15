@@ -4,10 +4,12 @@
 #include <memory>
 #include <functional>
 #include <glm/glm.hpp>
+#include <vector>
 #include "../graphics/MeshManager2D/GeometryData.h"
 
 // Forward declarations
 class GameBase;
+class Grid;
 class RadialMenu;
 class GeometryInstance;
 class Grid;
@@ -24,7 +26,7 @@ public:
     
     // Callback hooks
     void preRenderCallback(bool doCreate, bool doRemove);
-    void onPhysicsUpdateComplete();
+    void onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids);
     
 private:
     GameBase* m_gameBase;

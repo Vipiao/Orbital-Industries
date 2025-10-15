@@ -14,6 +14,7 @@ class GeometryInstance;
 class ColorTool;
 class ModifyTool;
 class BuildTool;
+class Collider;
 
 /**
  * @brief Creative mode implementation with block placement/removal and force application
@@ -52,6 +53,9 @@ private:
 
     // Build tool
     std::unique_ptr<BuildTool> m_buildTool;
+
+    // Interaction sensor for spatial filtering
+    std::weak_ptr<Collider> m_interactionSensor;
 
     // Regular crosshair
     std::weak_ptr<GeometryData> m_crosshairGeometry;

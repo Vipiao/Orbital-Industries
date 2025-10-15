@@ -86,7 +86,7 @@ void BuildTool::preRenderCallback(bool doCreate, bool doRemove) {
     if (doRemove) m_doRemove = true;
 }
 
-void BuildTool::onPhysicsUpdateComplete() {
+void BuildTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
     if (!m_active) {
         return;
     }
@@ -108,8 +108,9 @@ void BuildTool::onPhysicsUpdateComplete() {
     glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
     
     // Find closest ray intersection across all grids
-    for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
-        if (!gridShared) continue; // Safety check
+    for (const auto& gridWeak : availableGrids) {
+        auto gridShared = gridWeak.lock();
+        if (!gridShared) continue;
         
         // Transform world ray to grid-local space
         glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(startPos);
@@ -122,7 +123,7 @@ void BuildTool::onPhysicsUpdateComplete() {
         if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
             closestT = result.t;
             blockFound = true;
-            targetGridWeak = gridShared;
+            targetGridWeak = gridWeak;
             
             // Calculate intersection point with small epsilon to ensure we're inside the hit cell
             const double epsilon = 1e-6;

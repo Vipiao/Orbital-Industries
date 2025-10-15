@@ -102,7 +102,7 @@ void ColorTool::preRenderCallback(bool doTryCopy, bool doTryPaste) {
     if (doTryPaste) m_doPaste = doTryPaste;
 }
 
-void ColorTool::onPhysicsUpdateComplete() {
+void ColorTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
     if (!m_active) {
         return;
     }
@@ -123,8 +123,9 @@ void ColorTool::onPhysicsUpdateComplete() {
     glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
     
     // Find closest ray intersection across all grids
-    for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
-        if (!gridShared) continue; // Safety check
+    for (const auto& gridWeak : availableGrids) {
+        auto gridShared = gridWeak.lock();
+        if (!gridShared) continue;
         
         // Transform world ray to grid-local space
         glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(startPos);
