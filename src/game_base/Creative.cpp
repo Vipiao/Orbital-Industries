@@ -36,13 +36,13 @@ Creative::Creative(GameBase* gameBase)
     m_radialMenu->createNode(rootId);
 
     // Create color tool
-    m_colorTool = std::make_unique<ColorTool>(m_gameBase, m_radialMenu.get(), rootId);
+    m_colorTool = std::make_unique<ColorTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
 
     // Create modify tool
-    m_modifyTool = std::make_unique<ModifyTool>(m_gameBase, m_radialMenu.get(), rootId);
+    m_modifyTool = std::make_unique<ModifyTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
 
     // Create build tool
-    m_buildTool = std::make_unique<BuildTool>(m_gameBase, m_radialMenu.get(), rootId);
+    m_buildTool = std::make_unique<BuildTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
 
     m_radialMenu->setVisible(false);
 
@@ -50,9 +50,9 @@ Creative::Creative(GameBase* gameBase)
     m_crosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
 
     // Create interaction sensor for spatial filtering
-    glm::dvec3 sensorHalfScale(10.0, 10.0, 10.0); // 20x20x20 box
+    glm::dvec3 sensorHalfScale(m_interactionRange / 2.0, m_interactionRange / 2.0, m_interactionRange / 2.0);
     glm::dvec3 initialPos = m_gameBase->m_graphicsEngine->getCamPos() + 
-        m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 10.0, 0.0);
+        m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, m_interactionRange / 2.0, 0.0);
     m_interactionSensor = m_gameBase->m_physicsEngine->getCollisionDetector().addSensorCollider(initialPos, sensorHalfScale);
 }
 
@@ -86,7 +86,7 @@ void Creative::physics() {
         // Camera position and direction
         glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
-        glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
+        glm::dvec3 endPos = startPos + forward * m_interactionRange;
         
         // Find closest ray intersection across all grids
         for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
@@ -163,7 +163,7 @@ void Creative::physics() {
     // Update interaction sensor position (after physics completes)
     if (auto sensor = m_interactionSensor.lock()) {
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
-        glm::dvec3 sensorPosition = m_gameBase->m_graphicsEngine->getCamPos() + forward * 10.0;
+        glm::dvec3 sensorPosition = m_gameBase->m_graphicsEngine->getCamPos() + forward * (m_interactionRange / 2.0);
         
         sensor->m_position = sensorPosition;
         sensor->m_orientation = m_gameBase->m_graphicsEngine->getCamOri();

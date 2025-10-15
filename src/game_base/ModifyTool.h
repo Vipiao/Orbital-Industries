@@ -21,7 +21,7 @@ class Grid;
 
 class ModifyTool {
 public:
-    ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId);
+    ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange);
     ~ModifyTool();
     
     // Activation control
@@ -34,6 +34,9 @@ public:
     void onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids);
     
 private:
+    // Interaction range
+    double m_interactionRange;
+
     GameBase* m_gameBase;
     RadialMenu* m_radialMenu;
     

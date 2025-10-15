@@ -16,7 +16,7 @@ class Grid;
 
 class BuildTool {
 public:
-    BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId);
+    BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange);
     ~BuildTool();
     
     // Activation control
@@ -29,6 +29,9 @@ public:
     void onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids);
     
 private:
+    // Interaction range
+    double m_interactionRange;
+
     GameBase* m_gameBase;
     RadialMenu* m_radialMenu;
     

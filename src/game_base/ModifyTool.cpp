@@ -12,8 +12,8 @@
 #include <iostream>
 #include <algorithm>
 
-ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId)
-    : m_gameBase(gameBase), m_radialMenu(radialMenu) {
+ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
+    : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {
     
     if (!m_gameBase) {
         throw std::runtime_error("GameBase cannot be null");
@@ -198,7 +198,7 @@ void ModifyTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>&
     // Camera position and direction
     glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
     glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
-    glm::dvec3 endPos = startPos + forward * 20.0; // Cast ray 20 units forward
+    glm::dvec3 endPos = startPos + forward * m_interactionRange;
     
     // Find closest ray intersection across all grids
     for (const auto& gridWeak : availableGrids) {
@@ -437,7 +437,7 @@ void ModifyTool::updateMarkerPositions() {
     glm::dvec3 blockWorldPos = selectedGrid->gridToWorld(glm::dvec3(m_selectedBlockCoord) + glm::dvec3(0.5, 0.5, 0.5));
     glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
     double distanceToBlock = glm::length(blockWorldPos - cameraPos);
-    if (distanceToBlock > 10.0) {
+    if (distanceToBlock > m_interactionRange) {
         m_hasSelectedBlock = false;
         clearMarkers();
         return;

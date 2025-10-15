@@ -28,6 +28,9 @@ public:
     virtual void physics() override;
     
 private:
+    // Interaction range for tools and sensors
+    double m_interactionRange = 20.0;
+
     // Input flags
     bool doForce = false;
     bool doTrackSpeed = false;
