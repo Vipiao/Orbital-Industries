@@ -1,10 +1,10 @@
-// CharacterControlTool.cpp
-#include "CharacterControlTool.h"
+// CharacterSelectionTool.cpp
+#include "CharacterSelectionTool.h"
 #include "../game_base/GameBase.h"
 #include "RadialMenu.h"
 #include <iostream>
 
-CharacterControlTool::CharacterControlTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
+CharacterSelectionTool::CharacterSelectionTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase)
     , m_radialMenu(radialMenu)
     , m_interactionRange(interactionRange)
@@ -27,7 +27,7 @@ CharacterControlTool::CharacterControlTool(GameBase* gameBase, RadialMenu* radia
     
     // For character control, we use the same callback for activation and deactivation
     // This creates a toggle behavior instead of a submenu navigation
-    m_characterControlNodeId = m_radialMenu->createNode(
+    m_characterSelectionNodeId = m_radialMenu->createNode(
         parentNodeId, 
         m_playIconTextureIndex, 
         toggleCallback,    // Activation callback
@@ -35,7 +35,7 @@ CharacterControlTool::CharacterControlTool(GameBase* gameBase, RadialMenu* radia
     );
     
     // Set initial node colors
-    RadialMenuNode* node = m_radialMenu->getNode(m_characterControlNodeId);
+    RadialMenuNode* node = m_radialMenu->getNode(m_characterSelectionNodeId);
     if (node) {
         node->m_selectColor = m_inactiveColor;    // Initial color when selected
         node->m_unSelectColor = m_inactiveColor;  // Initial color when unselected
@@ -43,15 +43,15 @@ CharacterControlTool::CharacterControlTool(GameBase* gameBase, RadialMenu* radia
     }
 }
 
-CharacterControlTool::~CharacterControlTool() {
+CharacterSelectionTool::~CharacterSelectionTool() {
     // Nothing special to clean up
 }
 
-void CharacterControlTool::activate() {
+void CharacterSelectionTool::activate() {
     m_active = true;
     
     // Update node colors to reflect active state
-    RadialMenuNode* node = m_radialMenu->getNode(m_characterControlNodeId);
+    RadialMenuNode* node = m_radialMenu->getNode(m_characterSelectionNodeId);
     if (node) {
         node->m_selectColor = m_activeColor;
         node->m_unSelectColor = m_activeColor;
@@ -61,11 +61,11 @@ void CharacterControlTool::activate() {
     std::cout << "Character control mode activated" << std::endl;
 }
 
-void CharacterControlTool::deactivate() {
+void CharacterSelectionTool::deactivate() {
     m_active = false;
     
     // Update node colors to reflect inactive state
-    RadialMenuNode* node = m_radialMenu->getNode(m_characterControlNodeId);
+    RadialMenuNode* node = m_radialMenu->getNode(m_characterSelectionNodeId);
     if (node) {
         node->m_selectColor = m_inactiveColor;
         node->m_unSelectColor = m_inactiveColor;
@@ -75,7 +75,7 @@ void CharacterControlTool::deactivate() {
     std::cout << "Character control mode deactivated" << std::endl;
 }
 
-void CharacterControlTool::toggle() {
+void CharacterSelectionTool::toggle() {
     if (m_active) {
         deactivate();
     } else {
@@ -83,10 +83,10 @@ void CharacterControlTool::toggle() {
     }
 }
 
-void CharacterControlTool::preRenderCallback(bool doToggle) {
+void CharacterSelectionTool::preRenderCallback(bool doToggle) {
     // Will be used for handling control input in the future
 }
 
-void CharacterControlTool::onPhysicsUpdateComplete() {
+void CharacterSelectionTool::onPhysicsUpdateComplete() {
     // Will be used for character control logic in the future
 }

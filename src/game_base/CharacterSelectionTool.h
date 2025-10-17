@@ -1,4 +1,4 @@
-// CharacterControlTool.h
+// CharacterSelectionTool.h
 #pragma once
 
 #include <memory>
@@ -7,10 +7,10 @@
 class GameBase;
 class RadialMenu;
 
-class CharacterControlTool {
+class CharacterSelectionTool {
 public:
-    CharacterControlTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange);
-    ~CharacterControlTool();
+    CharacterSelectionTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange);
+    ~CharacterSelectionTool();
     
     // Activation control
     void activate();
@@ -29,7 +29,7 @@ private:
     
     // Internal state
     bool m_active{false};
-    int64_t m_characterControlNodeId{-1};
+    int64_t m_characterSelectionNodeId{-1};
     int m_playIconTextureIndex{-1};
     
     // Colors for active/inactive states

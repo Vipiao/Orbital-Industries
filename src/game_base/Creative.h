@@ -10,11 +10,12 @@ class RadialMenu;
 class GeometryData;
 class Geometry;
 class Instance;
-class CharacterControlTool;
+class CharacterSelectionTool;
 class GeometryInstance;
 class ColorTool;
 class ModifyTool;
 class BuildTool;
+class FreeCameraController;
 class Collider;
 
 /**
@@ -52,8 +53,11 @@ private:
     // Color tool
     std::unique_ptr<ColorTool> m_colorTool;
 
-    // Character control tool
-    std::unique_ptr<CharacterControlTool> m_characterControlTool;
+    // Free camera controller
+    std::unique_ptr<FreeCameraController> m_freeCameraController;
+
+    // Character selection tool
+    std::unique_ptr<CharacterSelectionTool> m_characterSelectionTool;
 
     // Modify tool
     std::unique_ptr<ModifyTool> m_modifyTool;

@@ -14,7 +14,8 @@
 #include "StructuralBlock.h"
 #include "../graphics/InstanceHandler/InstanceHandler.h"
 #include "RadialMenu.h"
-#include "CharacterControlTool.h"
+#include "CharacterSelectionTool.h"
+#include "FreeCameraController.h"
 #include "ColorTool.h"
 #include "ModifyTool.h"
 #include "BuildTool.h"
@@ -39,8 +40,11 @@ Creative::Creative(GameBase* gameBase)
     // Create color tool
     m_colorTool = std::make_unique<ColorTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
 
+    // Create free camera controller
+    m_freeCameraController = std::make_unique<FreeCameraController>(m_gameBase->m_graphicsEngine.get());
+
     // Create character control tool
-    m_characterControlTool = std::make_unique<CharacterControlTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
+    m_characterSelectionTool = std::make_unique<CharacterSelectionTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
 
     // Create modify tool
     m_modifyTool = std::make_unique<ModifyTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
@@ -204,8 +208,8 @@ void Creative::physics() {
     // Call color tool physics callback
     m_colorTool->onPhysicsUpdateComplete(interactionGrids);
 
-    // Call character control tool physics callback
-    m_characterControlTool->onPhysicsUpdateComplete();
+    // Call character selection tool physics callback
+    m_characterSelectionTool->onPhysicsUpdateComplete();
 
     // Call modify tool physics callback
     m_modifyTool->onPhysicsUpdateComplete(interactionGrids);
@@ -312,39 +316,17 @@ void Creative::processInputLogic() {
 
     // TEST END
     
-    // Camera movement speed
-    const double mouseSensitivity = 0.0014;
-
-    // Get framerate for framerate-independent movement
+    // Get frame timing for deltaTime calculation
     int frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
     double deltaTime = 1.0 / static_cast<double>(frameRate);
     
-    // Calculate movement vectors based on camera orientation
-    glm::dvec3 right = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(1.0, 0.0, 0.0);
-    glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
-    glm::dvec3 up = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 0.0, 1.0);
-
     // Structural analysis with G key
     if (keyboard->m_g.justPressed()) {
-        //std::cout << "Visualizing structural analysis on " << m_gameBase->m_grids.size() << " grids..." << std::endl;
-        
         for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
             if (gridShared) gridShared->visualizeStructuralIntegrity();
         }
     }
-    
-    // Check for input actions that require grid traversal
-    // Set flags based on input (don't execute immediately)
-    if (keyboard->m_f.isDown()) {
-        doForce = true;
-        forceMultiplier = (keyboard->m_f.timeDown() * 0.04 + 1.0);
-    } else {
-        forceMultiplier = 1.;
-    }
-    if (keyboard->m_z.justPressed()) {
-        doTrackSpeed = true;
-    }
-
+ 
     // Toggle mouse lock with M key
     if (keyboard->m_m.justPressed()) {
         bool isLocked = mouseHandler->getMouseLock();
@@ -352,89 +334,38 @@ void Creative::processInputLogic() {
         std::cout << "Mouse " << (isLocked ? "unlocked" : "locked") << std::endl;
     }
 
-    // Accelerate
-    if (keyboard->m_c.isDown()) {
-        //m_moveSpeed *= 1.05;
-        m_moveSpeed *= glm::exp(8. * deltaTime);
-    }
-    if (keyboard->m_v.isDown()) {
-        m_moveSpeed /= glm::exp(8. * deltaTime);
-    }
+    // Force application with F key
+    doForce = keyboard->m_f.isDown();
+    forceMultiplier = doForce ? (keyboard->m_f.timeDown() * 0.04 + 1.0) : 1.0;
     
-    // Mouse look (camera rotation)
-    if (mouseHandler->getMouseLock()) {
-        glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
-        
-        // Rotate around Z-axis for yaw (left/right)
-        double yawAngle = -mouseMovement.x * mouseSensitivity;
-        glm::dquat yawQuat = glm::angleAxis(yawAngle, glm::dvec3(0.0, 0.0, 1.0));
-        
-        // Rotate around X-axis for pitch (up/down)
-        double pitchAngle = -mouseMovement.y * mouseSensitivity;
-        glm::dquat pitchQuat = glm::angleAxis(pitchAngle, glm::dvec3(1.0, 0.0, 0.0));
+    // Speed tracking with Z key  
+    doTrackSpeed = keyboard->m_z.justPressed();
 
-        // Rotate around Y-axis for roll (roll right/roll left)
-        const double rollSpeed = 1.65 * deltaTime;
-        double rollAngle = keyboard->m_q.isDown()?
-            (keyboard->m_e.isDown()?
-                0.: -rollSpeed):
-            (keyboard->m_e.isDown()?
-                rollSpeed: 0.);
-        glm::dquat rollQuat = glm::angleAxis(rollAngle, glm::dvec3(0.0, 1.0, 0.0));
-        
-        // Apply rotations to camera orientation
-        m_gameBase->m_graphicsEngine->getCamOri() = m_gameBase->m_graphicsEngine->getCamOri() * yawQuat * pitchQuat * rollQuat;
-        m_gameBase->m_graphicsEngine->getCamOri() = glm::normalize(m_gameBase->m_graphicsEngine->getCamOri());
-    }
-    
-    // Normalize the vectors
-    right = glm::normalize(right);
-    forward = glm::normalize(forward);
-    up = glm::normalize(up);
-    
-    // Movement direction based on keyboard input
-    glm::dvec3 moveDirection(0.0);
-    
-    if (keyboard->m_w.isDown()) {
-        moveDirection += forward;
-    }
-    if (keyboard->m_s.isDown()) {
-        moveDirection -= forward;
-    }
-    if (keyboard->m_a.isDown()) {
-        moveDirection -= right;
-    }
-    if (keyboard->m_d.isDown()) {
-        moveDirection += right;
-    }
-    if (keyboard->m_space.isDown()) {
-        moveDirection += up;
-    }
-    if (keyboard->m_lShift.isDown()) {
-        moveDirection -= up;
-    }
-    
-    // Apply movement if any keys were pressed
-    if (glm::length(moveDirection) > 0.0) {
-        moveDirection = glm::normalize(moveDirection) * m_moveSpeed * deltaTime;
-        m_gameBase->m_graphicsEngine->getCamPos() += moveDirection;
+    // Update free camera if character control is not active
+    if (!m_characterSelectionTool->isActive()) {
+        m_freeCameraController->update(
+            deltaTime, 
+            m_gameBase->m_graphicsEngine->getCamPos(),
+            m_gameBase->m_graphicsEngine->getCamOri()
+        );
     }
 
-    // Toggle radial menu visibility with B key
+    // Toggle radial menu visibility with R key
     if (keyboard->m_r.justPressed()) {
         bool visible = m_radialMenu->isVisible();
         m_radialMenu->setVisible(!visible);
+        
+        // Position radial menu in front of camera
         glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
         m_radialMenuRelativePosition = forward * m_radialMenuDistance;
         m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);
-
     }
 
-    // Handle radial menu interaction when visible.
+    // Handle radial menu interaction when visible
     bool radialMenuConsumedMouse = false;
     if (m_radialMenu->isVisible()) {
-        //
+        // Update radial menu position to follow camera
         glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
         m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);
 
@@ -485,12 +416,12 @@ void Creative::processInputLogic() {
         bool doRemove = mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
         m_buildTool->preRenderCallback(doCreate, doRemove);
 
-        // Character control tool doesn't need input for now (toggle handled by radial menu)
-        m_characterControlTool->preRenderCallback(false);
+        // Character selection tool doesn't need input for now (toggle handled by radial menu)
+        m_characterSelectionTool->preRenderCallback(false);
     } else{
         m_colorTool->preRenderCallback(false, false);
         m_modifyTool->preRenderCallback(false, false);
         m_buildTool->preRenderCallback(false, false);
-        m_characterControlTool->preRenderCallback(false);
+        m_characterSelectionTool->preRenderCallback(false);
     }
 }
