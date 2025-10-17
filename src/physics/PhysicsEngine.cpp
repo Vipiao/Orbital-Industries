@@ -145,6 +145,14 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
     
     while (m_timeHandler->now() < endTime) {
         switch (m_runState) {
+            case RunState::HANDLE_COLLISIONS:
+                if (handleCollisionsUntil(endTime)) {
+                    return true; // Collision processing needs more time
+                }
+                m_runState = RunState::APPLY_FORCES;
+                
+                break;
+                
             case RunState::APPLY_FORCES:
                 applyForces();
                 // Set current timestep for collision detection
@@ -155,21 +163,12 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
                 
             case RunState::UPDATE_POSITIONS:
                 updatePositions();
-                m_runState = RunState::HANDLE_COLLISIONS;
-                m_collisionProcessState = CollisionProcessState::DETECT; // Reset collision state
-                
-                break;
-                
-            case RunState::HANDLE_COLLISIONS:
-                if (handleCollisionsUntil(endTime)) {
-                    return true; // Collision processing needs more time
-                }
+                m_currentPhysicsTimeStep++; // Increment physics time step immediately after position update
                 m_runState = RunState::DONE;
                 break;
                 
             case RunState::DONE:
                 // Physics step complete - reset state and increment counter
-                m_currentPhysicsTimeStep++;
                 m_runState = RunState::APPLY_FORCES;
                 m_collisionProcessState = CollisionProcessState::DETECT;
                 m_currentCollisionIndex = 0;
