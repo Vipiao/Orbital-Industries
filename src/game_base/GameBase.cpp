@@ -184,8 +184,9 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     double physicsTimeRemainder = 1.0 - (timeToNextPhysics / m_physicsTimeStep);
     
     // Set render parameters in graphics engine
+    uint64_t physicsTimeStep = m_physicsEngine->getCurrentPhysicsTimeStep();
     m_graphicsEngine->setRenderParameters(
-        m_physicsEngine->getCurrentPhysicsTimeStep(),
+        physicsTimeStep,
         physicsTimeRemainder
     );
 }
