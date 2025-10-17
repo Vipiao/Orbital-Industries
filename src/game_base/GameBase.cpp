@@ -169,8 +169,13 @@ void GameBase::postRenderCallback(uint64_t frameNum) {
     if (m_timeHandler->now() >= targetFrameEnd) {
         std::cout << "Frame drop" << std::endl;
     }
-    
-    // Calculate timing parameters for graphics engine
+}
+
+void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
+    // Call registered callbacks first
+    callRenderCallbacks(viewMatrix, projectionMatrix);
+
+    // Calculate timing parameters for graphics engine right before rendering
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
@@ -183,11 +188,6 @@ void GameBase::postRenderCallback(uint64_t frameNum) {
         m_physicsEngine->getCurrentPhysicsTimeStep(),
         physicsTimeRemainder
     );
-}
-
-void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
-    // Call registered callbacks first
-    callRenderCallbacks(viewMatrix, projectionMatrix);
 }
 
 void GameBase::framebufferSizeCallback(int width, int height) {
