@@ -8,6 +8,7 @@
 
 class DigitbotPhysics;
 class DigitbotGraphics;
+class DigitbotController;
 class DigitbotResources;
 struct DigitbotTargetPose;
 
@@ -35,6 +36,9 @@ public:
     glm::dvec3 worldToLocal(const glm::dvec3& worldPos) const override;
     glm::dvec3 localToWorld(const glm::dvec3& localPos) const override;
 
+    // Movement control
+    void setMovementDirection(const glm::ivec3& direction);
+
 private:
     void updateVisualTransform();
 
@@ -42,8 +46,11 @@ private:
     std::unique_ptr<DigitbotPhysics> m_digitbotPhysics;
     std::unique_ptr<DigitbotGraphics> m_digitbotGraphics;
 
+    // Controller for movement
+    std::unique_ptr<DigitbotController> m_digitbotController;
+
     //
-    glm::dvec3 m_graphicsPosition = {0,0,-1};
+    glm::dvec3 m_graphicsPosition = {0.0, 0.0, -1.0};
 
     // Cache GraphicsEngine pointer for convenience
     GraphicsEngine* m_graphicsEngine;

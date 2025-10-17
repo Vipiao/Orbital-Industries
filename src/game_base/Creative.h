@@ -10,6 +10,7 @@ class RadialMenu;
 class GeometryData;
 class Geometry;
 class Instance;
+class CharacterControlTool;
 class GeometryInstance;
 class ColorTool;
 class ModifyTool;
@@ -50,6 +51,9 @@ private:
 
     // Color tool
     std::unique_ptr<ColorTool> m_colorTool;
+
+    // Character control tool
+    std::unique_ptr<CharacterControlTool> m_characterControlTool;
 
     // Modify tool
     std::unique_ptr<ModifyTool> m_modifyTool;

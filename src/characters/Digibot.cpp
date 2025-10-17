@@ -2,6 +2,7 @@
 #include "Digitbot.h"
 #include "DigitbotPhysics.h"
 #include "DigitbotGraphics.h"
+#include "DigitbotController.h"
 #include "DigitbotResources.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
@@ -19,6 +20,10 @@ Digitbot::Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
     // Set Character base class members
     m_rigidBody = m_digitbotPhysics->getRigidBody();
     m_centerOfMass = m_digitbotPhysics->getCenterOfMass();
+
+    // Create controller subsystem
+    m_digitbotController = std::make_unique<DigitbotController>(
+        m_digitbotPhysics.get(), physics);
 
     // Create graphics subsystem
     m_digitbotGraphics = std::make_unique<DigitbotGraphics>(graphics, resources);
@@ -86,6 +91,9 @@ void Digitbot::onPhysicsUpdateComplete() {
         uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
         m_digitbotPhysics->updateCollisionBoxTransform(m_graphicsEngine, currentPhysicsTimeStep);
     }
+
+    // Run controller physics
+    m_digitbotController->physics();
 }
 
 void Digitbot::showCollisionBox() {
@@ -139,4 +147,8 @@ glm::dvec3 Digitbot::worldToLocal(const glm::dvec3& worldPos) const {
 
 glm::dvec3 Digitbot::localToWorld(const glm::dvec3& localPos) const {
     return m_digitbotPhysics->localToWorld(localPos);
+}
+
+void Digitbot::setMovementDirection(const glm::ivec3& direction) {
+    m_digitbotController->setMovementDirection(direction);
 }

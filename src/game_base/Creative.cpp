@@ -14,6 +14,7 @@
 #include "StructuralBlock.h"
 #include "../graphics/InstanceHandler/InstanceHandler.h"
 #include "RadialMenu.h"
+#include "CharacterControlTool.h"
 #include "ColorTool.h"
 #include "ModifyTool.h"
 #include "BuildTool.h"
@@ -37,6 +38,9 @@ Creative::Creative(GameBase* gameBase)
 
     // Create color tool
     m_colorTool = std::make_unique<ColorTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
+
+    // Create character control tool
+    m_characterControlTool = std::make_unique<CharacterControlTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
 
     // Create modify tool
     m_modifyTool = std::make_unique<ModifyTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
@@ -199,6 +203,9 @@ void Creative::physics() {
 
     // Call color tool physics callback
     m_colorTool->onPhysicsUpdateComplete(interactionGrids);
+
+    // Call character control tool physics callback
+    m_characterControlTool->onPhysicsUpdateComplete();
 
     // Call modify tool physics callback
     m_modifyTool->onPhysicsUpdateComplete(interactionGrids);
@@ -477,9 +484,13 @@ void Creative::processInputLogic() {
         bool doCreate = mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32);
         bool doRemove = mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
         m_buildTool->preRenderCallback(doCreate, doRemove);
+
+        // Character control tool doesn't need input for now (toggle handled by radial menu)
+        m_characterControlTool->preRenderCallback(false);
     } else{
         m_colorTool->preRenderCallback(false, false);
         m_modifyTool->preRenderCallback(false, false);
         m_buildTool->preRenderCallback(false, false);
+        m_characterControlTool->preRenderCallback(false);
     }
 }
