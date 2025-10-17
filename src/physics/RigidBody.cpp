@@ -2,6 +2,7 @@
 #include "RigidBody.h"
 #include "../utils/HashFunctions.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/norm.hpp>
 
 // RigidBody cached getter implementations
 const glm::dmat3& RigidBody::getOrientationMatrix() const {
@@ -49,6 +50,36 @@ const glm::dmat3& RigidBody::getWorldInvInertiaTensor() const {
         m_worldInertiaDirty = false;
     }
     return m_cachedWorldInvInertiaTensor;
+}
+
+void RigidBody::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, 
+                                        glm::dquat& outOrientation) const {
+    // Forward interpolation based on current velocity and angular velocity
+    // timeRemainder represents the fractional time since the last physics update [0-1]
+    
+    // Linear position interpolation: p' = p + v * t
+    outPosition = m_position + m_velocity * timeRemainder;
+    
+    // Angular position interpolation using angular velocity
+    // We need to construct a quaternion that represents a partial rotation
+    const glm::dvec3& angVel = getAngularVelocityWorld();
+    double angVelMagnitudeSqr = glm::length2(angVel);
+    
+    if (angVelMagnitudeSqr > 1e-10) {
+        // Create rotation quaternion based on angular velocity
+        double angVelMagnitude{ glm::sqrt(angVelMagnitudeSqr) };
+        glm::dvec3 axis = angVel / angVelMagnitude;
+        double angle = angVelMagnitude * timeRemainder;
+        
+        // Create rotation quaternion for the partial time step
+        glm::dquat partialRotation = glm::angleAxis(angle, axis);
+        
+        // Apply the partial rotation to the current orientation
+        outOrientation = partialRotation * m_orientation;
+    } else {
+        // No significant rotation, just use the current orientation
+        outOrientation = m_orientation;
+    }
 }
 
 // RigidBody invalidation methods

@@ -50,6 +50,10 @@ public:
     void setAngularVelocityBody(glm::dvec3 angularVelocity);
     const glm::dmat3& getWorldInertiaTensor() const;
     const glm::dmat3& getWorldInvInertiaTensor() const;
+
+    // Interpolation for smooth rendering
+    void getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, 
+                                 glm::dquat& outOrientation) const;
     
     // Invalidation methods
     void invalidateOrientation();
