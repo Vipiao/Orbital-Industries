@@ -11,6 +11,7 @@ class PhysicsEngine;
 class GraphicsEngine;
 class JobManager;
 class TimeHandler;
+class DigitbotPlayerController;
 
 /**
  * @brief Subsystem managing all character lifecycle and updates
@@ -35,12 +36,16 @@ public:
     // Access
     const std::vector<std::shared_ptr<Character>>& getCharacters() const { return m_characters; }
 
+    // Player controller access
+    DigitbotPlayerController* getPlayerController() const { return m_playerController.get(); }
+
 private:
     // Dependencies
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
+    std::unique_ptr<DigitbotPlayerController> m_playerController;
 
     // Shared resources for character types
     std::unique_ptr<DigitbotResources> m_digitbotResources;

@@ -18,6 +18,7 @@
 #include "FreeCameraController.h"
 #include "ColorTool.h"
 #include "ModifyTool.h"
+#include "../characters/DigitbotPlayerController.h"
 #include "BuildTool.h"
 #include "../utils/ColorUtils.h"
 #include <float.h>
@@ -341,8 +342,23 @@ void Creative::processInputLogic() {
     // Speed tracking with Z key  
     doTrackSpeed = keyboard->m_z.justPressed();
 
-    // Update free camera if character control is not active
-    if (!m_characterSelectionTool->isActive()) {
+    // Determine which camera controller to use based on character selection
+    if (m_characterSelectionTool->isActive()) {
+        // Character control mode - use player controller
+        auto playerController = m_gameBase->m_characterSubsystem->getPlayerController();
+        if (playerController) {
+            playerController->enable();
+            playerController->update(
+                deltaTime,
+                m_gameBase->m_graphicsEngine->getCamPos(),
+                m_gameBase->m_graphicsEngine->getCamOri()
+            );
+        }
+    } else {
+        // Free camera mode
+        auto playerController = m_gameBase->m_characterSubsystem->getPlayerController();
+        if (playerController) playerController->disable();
+        
         m_freeCameraController->update(
             deltaTime, 
             m_gameBase->m_graphicsEngine->getCamPos(),

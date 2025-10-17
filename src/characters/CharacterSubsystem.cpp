@@ -1,6 +1,7 @@
 // CharacterSubsystem.cpp
 #include "CharacterSubsystem.h"
 #include "DigitbotResources.h"
+#include "DigitbotPlayerController.h"
 #include <algorithm>
 
 CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,
@@ -12,6 +13,9 @@ CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* g
 {
     // Initialize shared resources for Digitbot characters
     m_digitbotResources = std::make_unique<DigitbotResources>(m_graphics);
+
+    // Create player controller
+    m_playerController = std::make_unique<DigitbotPlayerController>(m_graphics);
 }
 
 CharacterSubsystem::~CharacterSubsystem() {
@@ -30,6 +34,11 @@ std::weak_ptr<Digitbot> CharacterSubsystem::createDigitbot() {
 
     std::weak_ptr<Digitbot> digitbotWeak = digitbot;
     m_characters.push_back(std::move(digitbot));
+
+    // Set as the pilotable character if we don't already have one
+    if (m_playerController && m_playerController->getPilotableCharacter().expired()) {
+        m_playerController->setPilotableCharacter(digitbotWeak);
+    }
 
     return digitbotWeak;
 }

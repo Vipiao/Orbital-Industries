@@ -8,7 +8,7 @@ DigitbotController::DigitbotController(DigitbotPhysics* physics, PhysicsEngine* 
     : m_physics(physics)
     , m_physicsEngine(physicsEngine)
     , m_movementDirection(0, 0, 0)
-    , m_thrustStrength(10.0) // Default thrust strength
+    , m_thrustStrength(0.01) // Default thrust strength
 {
     if (!m_physics) {
         throw std::runtime_error("DigitbotController: Physics component cannot be null");
