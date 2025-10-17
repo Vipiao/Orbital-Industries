@@ -169,7 +169,7 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
                 
             case RunState::DONE:
                 // Physics step complete - reset state and increment counter
-                m_runState = RunState::APPLY_FORCES;
+                m_runState = RunState::HANDLE_COLLISIONS;
                 m_collisionProcessState = CollisionProcessState::DETECT;
                 m_currentCollisionIndex = 0;
                 m_separationIteration = 0;
