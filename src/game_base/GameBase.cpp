@@ -118,6 +118,22 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     auto deltaTime = std::chrono::duration<double>(m_currentFrameStartTime - m_lastFrameTime).count();
     m_lastFrameTime = m_currentFrameStartTime;
 
+    // Calculate timing parameters for graphics engine at beginning of frame
+    // Calculate time remainder since last physics update
+    auto currentTime = m_timeHandler->now();
+    auto timeSinceLastPhysics = std::chrono::duration<double>(currentTime - m_physicsEngine->getLastPhysicsStepTime()).count();
+    
+    // Adjust time remainder based on scheduling error
+    double adjustedTimeSincePhysics = timeSinceLastPhysics + m_physicsTimeError;
+    double timeRemainder = adjustedTimeSincePhysics / m_physicsTimeStep;
+
+    // Set render parameters in graphics engine
+    uint64_t currentTimeStep = m_physicsEngine->getCurrentPhysicsTimeStep();
+    m_graphicsEngine->setRenderParameters(
+        currentTimeStep,
+        timeRemainder
+    );
+
     // Call registered callbacks first
     callPreRenderCallbacks(frameNum);
 
@@ -180,26 +196,6 @@ void GameBase::postRenderCallback(uint64_t frameNum) {
 void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
     // Call registered callbacks first
     callRenderCallbacks(viewMatrix, projectionMatrix);
-
-    // Calculate timing parameters for graphics engine right before rendering
-    if (!m_timeHandler) {
-        throw std::runtime_error("TimeHandler cannot be null");
-    }
-
-    // Calculate time remainder since last physics update
-    auto currentTime = m_timeHandler->now();
-    auto timeSinceLastPhysics = std::chrono::duration<double>(currentTime - m_physicsEngine->getLastPhysicsStepTime()).count();
-    // Adjust time remainder based on scheduling error
-    double adjustedTimeSincePhysics = timeSinceLastPhysics + m_physicsTimeError;
-    //double physicsTimeRemainder = std::clamp(adjustedTimeSincePhysics / m_physicsTimeStep, 0.0, 1.0);
-    double physicsTimeRemainder = adjustedTimeSincePhysics / m_physicsTimeStep;
-
-    // Set render parameters in graphics engine
-    uint64_t physicsTimeStep = m_physicsEngine->getCurrentPhysicsTimeStep();
-    m_graphicsEngine->setRenderParameters(
-        physicsTimeStep,
-        physicsTimeRemainder
-    );
 }
 
 void GameBase::framebufferSizeCallback(int width, int height) {

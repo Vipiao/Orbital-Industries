@@ -21,8 +21,8 @@ public:
     DigitbotPlayerController(GraphicsEngine* graphics);
     ~DigitbotPlayerController() = default;
     
-    // Core functionality - updates camera and sends inputs to character
-    void update(double deltaTime, glm::dvec3& cameraPosition, glm::dquat& cameraOrientation);
+    // Core functionality - updates camera and sends inputs to character (timeRemainder for interpolation)
+    void update(glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder);
     
     // Character selection
     void setPilotableCharacter(std::weak_ptr<Digitbot> character);

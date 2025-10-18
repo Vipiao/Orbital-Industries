@@ -66,12 +66,12 @@
  * glm::dvec3 scale(1.0, 1.0, 1.0);
  * int32_t colorTextureUnit = -1;  // No texture
  * int32_t normalTextureUnit = -1; // No texture
- * uint64_t physicsTimeStep = 0;
+ * uint64_t interpolationTimeStep = 0;
  * 
  * ssboManager->updateMeshTransform(
  *     meshId, position, velocity, orientation, 
  *     angVelAxis, angVel, centerOfRotation, scale,
- *     colorTextureUnit, normalTextureUnit, physicsTimeStep);
+ *     colorTextureUnit, normalTextureUnit, interpolationTimeStep);
  * 
  * // In render loop:
  * glm::mat4 view = camera.getViewMatrix();

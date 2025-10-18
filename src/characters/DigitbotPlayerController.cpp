@@ -30,7 +30,7 @@ void DigitbotPlayerController::disable() {
     m_enabled = false;
 }
 
-void DigitbotPlayerController::update(double deltaTime, glm::dvec3& cameraPosition, glm::dquat& cameraOrientation) {
+void DigitbotPlayerController::update(glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder) {
     if (!m_enabled || !m_graphics) {
         return;
     }
@@ -83,11 +83,14 @@ void DigitbotPlayerController::update(double deltaTime, glm::dvec3& cameraPositi
     // Get character position and orientation
     RigidBody* rigidBody = character->getRigidBody();
     if (rigidBody) {
-        // Calculate camera position based on character orientation
-        glm::dvec3 offsetInWorld = rigidBody->m_orientation * m_cameraOffset;
-        cameraPosition = rigidBody->m_position + offsetInWorld;
+        // Get interpolated transform instead of raw position for smooth visuals
+        glm::dvec3 interpolatedPos;
+        glm::dquat interpolatedOrientation;
+        rigidBody->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOrientation);
         
-        // Set camera orientation to match character's orientation
-        cameraOrientation = rigidBody->m_orientation;
+        // Calculate camera position based on character orientation
+        glm::dvec3 offsetInWorld = interpolatedOrientation * m_cameraOffset;
+        cameraPosition = interpolatedPos + offsetInWorld;
+        cameraOrientation = interpolatedOrientation;
     }
 }

@@ -344,14 +344,17 @@ void Creative::processInputLogic() {
 
     // Determine which camera controller to use based on character selection
     if (m_characterSelectionTool->isActive()) {
+        // Get render parameters for interpolation
+        auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
+
         // Character control mode - use player controller
         auto playerController = m_gameBase->m_characterSubsystem->getPlayerController();
         if (playerController) {
             playerController->enable();
             playerController->update(
-                deltaTime,
                 m_gameBase->m_graphicsEngine->getCamPos(),
-                m_gameBase->m_graphicsEngine->getCamOri()
+                m_gameBase->m_graphicsEngine->getCamOri(),
+                timeRemainder
             );
         }
     } else {

@@ -98,8 +98,8 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     m_meshHandler->renderGeometry(
         view, projection, 
         getFrameNum(),                    // frame number
-        m_currentPhysicsTimeStep,         // physics time step
-        m_physicsTimeRemainder,           // time remainder (fractional part)
+        m_currentInterpolationTimeStep,   // interpolation time step
+        m_interpolationTimeRemainder,     // time remainder (fractional part)
         m_lightDirection,                 // light direction
         getCamPos()                       // camera position
     );
@@ -108,8 +108,8 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     m_instanceHandler->renderGeometry(
         view, projection,
         getFrameNum(),                    // frame number
-        m_currentPhysicsTimeStep,         // physics time step
-        m_physicsTimeRemainder,           // time remainder (fractional part)
+        m_currentInterpolationTimeStep,   // interpolation time step
+        m_interpolationTimeRemainder,     // time remainder (fractional part)
         m_lightDirection,                 // light direction
         getCamPos(),                      // camera position
         /*renderOpaque=*/true, /*renderTransparent=*/false
@@ -119,8 +119,8 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     m_deferredRenderer->endGeometryPassAndRenderLighting(
         viewMatrix, projectionMatrix,
         getFrameNum(),                    // frame number
-        m_currentPhysicsTimeStep,         // physics time step
-        m_physicsTimeRemainder,           // time remainder (fractional part)
+        m_currentInterpolationTimeStep,   // interpolation time step
+        m_interpolationTimeRemainder,     // time remainder (fractional part)
         m_lightDirection,                 // light direction (for directional light)
         getCamPos(),                      // camera position
         m_shadowRenderer->getNumCascades(), // number of cascades
@@ -135,8 +135,8 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     m_instanceHandler->render(
         view, projection,
         getFrameNum(),                    // frame number
-        m_currentPhysicsTimeStep,         // physics time step
-        m_physicsTimeRemainder,           // time remainder (fractional part)
+        m_currentInterpolationTimeStep,   // interpolation time step
+        m_interpolationTimeRemainder,     // time remainder (fractional part)
         m_lightDirection,                 // light direction
         getCamPos(),                      // camera position
         /*renderOpaque=*/false, /*renderTransparent=*/true
@@ -169,22 +169,22 @@ void GraphicsEngine::renderShadowPass() {
         m_meshHandler->renderDepth(
             glm::mat4(1.0), lightSpaceMatrix,  // Identity view, light projection for transform
             getFrameNum(),                     // frame number
-            m_currentPhysicsTimeStep,          // physics time step
-            m_physicsTimeRemainder,            // time remainder (fractional part)
+            m_currentInterpolationTimeStep,    // interpolation time step
+            m_interpolationTimeRemainder,      // time remainder (fractional part)
             getCamPos(),                       // camera position
             /*renderOpaque=*/true, /*renderTransparent=*/false  // Only opaque objects cast shadows
         );
 
         m_instanceHandler->renderDepth(
             glm::mat4(1.0), lightSpaceMatrix,  // Identity view, light projection for transform
-            getFrameNum(), m_currentPhysicsTimeStep, m_physicsTimeRemainder,
+            getFrameNum(), m_currentInterpolationTimeStep, m_interpolationTimeRemainder,
             getCamPos(), /*renderOpaque=*/true, /*renderTransparent=*/false);
     }
 }
 
-void GraphicsEngine::setRenderParameters(uint64_t physicsTimeStep, double timeRemainder) {
-    m_currentPhysicsTimeStep = physicsTimeStep;
-    m_physicsTimeRemainder = timeRemainder;
+void GraphicsEngine::setRenderParameters(uint64_t interpolationTimeStep, double timeRemainder) {
+    m_currentInterpolationTimeStep = interpolationTimeStep;
+    m_interpolationTimeRemainder = timeRemainder;
 }
 
 void GraphicsEngine::framebufferSizeCallback(int width, int height) {

@@ -101,9 +101,14 @@ public:
     // Instance handler access
     InstanceHandler* getInstanceHandler() { return m_instanceHandler.get(); }
 
-    // Render parameter setting
-    void setRenderParameters(uint64_t physicsTimeStep, double timeRemainder);
+    // Render parameter setting - for interpolation between states
+    void setRenderParameters(uint64_t interpolationTimeStep, double timeRemainder);
     
+    // Render parameter access
+    std::pair<uint64_t, double> getRenderParameters() const {
+        return std::make_pair(m_currentInterpolationTimeStep, m_interpolationTimeRemainder);
+    }
+
     // Shadow configuration
     void setShadowsEnabled(bool enabled) { m_shadowsEnabled = enabled; }
 
@@ -122,9 +127,9 @@ private:
     std::unique_ptr<InstanceHandler> m_instanceHandler;
     std::unique_ptr<ShadowRenderer> m_shadowRenderer;
 
-    // Render parameters
-    uint64_t m_currentPhysicsTimeStep = 0;
-    double m_physicsTimeRemainder = 0.0;
+    // Render parameters for interpolation
+    uint64_t m_currentInterpolationTimeStep = 0;
+    double m_interpolationTimeRemainder = 0.0;
 
     // Shadow parameters
     bool m_shadowsEnabled = true;
