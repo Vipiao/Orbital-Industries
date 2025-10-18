@@ -128,26 +128,15 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
     
     processInput();
     
-    // Schedule physics job if needed
-    if (m_currentFrameStartTime >= m_nextPhysicsTime) {
-        // Schedule physics as a high-priority job
-        auto jobHandle = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
-            return updatePhysics(endTime);
-        }, JobPriorities::PHYSICS_UPDATE);
-        trackJob(jobHandle);
-        //updatePhysics(currentTime + std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
-        //    std::chrono::duration<double>(9999.9)));
-        
-        m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
-            std::chrono::duration<double>(m_physicsTimeStep));
-    }
-    
     update(deltaTime);
 }
 
 void GameBase::postRenderCallback(uint64_t frameNum) {
     // Call registered callbacks first
     callPostRenderCallbacks(frameNum);
+
+    // Get current time for physics scheduling decision
+    auto currentTime = m_timeHandler->now();
     
     // Process background jobs with remaining frame time
     if (!m_timeHandler) {
@@ -159,6 +148,23 @@ void GameBase::postRenderCallback(uint64_t frameNum) {
     auto targetFrameEnd = m_currentFrameStartTime + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(targetFrameDuration));
+
+    // Schedule physics job if needed
+    if (currentTime >= m_nextPhysicsTime) {
+        // Calculate scheduling error (how late we are)
+        m_physicsTimeError = std::chrono::duration<double>(currentTime - m_nextPhysicsTime).count();
+
+        // Schedule physics as a high-priority job
+        auto jobHandle = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
+            return updatePhysics(endTime);
+        }, JobPriorities::PHYSICS_UPDATE);
+        trackJob(jobHandle);
+        //updatePhysics(currentTime + std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+        //    std::chrono::duration<double>(9999.9)));
+        
+        m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+            std::chrono::duration<double>(m_physicsTimeStep));
+    }
 
     int hh = hit_count++;
     
@@ -183,8 +189,11 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     // Calculate time remainder since last physics update
     auto currentTime = m_timeHandler->now();
     auto timeSinceLastPhysics = std::chrono::duration<double>(currentTime - m_physicsEngine->getLastPhysicsStepTime()).count();
-    double physicsTimeRemainder = std::clamp(timeSinceLastPhysics / m_physicsTimeStep, 0.0, 1.0);
-    
+    // Adjust time remainder based on scheduling error
+    double adjustedTimeSincePhysics = timeSinceLastPhysics + m_physicsTimeError;
+    //double physicsTimeRemainder = std::clamp(adjustedTimeSincePhysics / m_physicsTimeStep, 0.0, 1.0);
+    double physicsTimeRemainder = adjustedTimeSincePhysics / m_physicsTimeStep;
+
     // Set render parameters in graphics engine
     uint64_t physicsTimeStep = m_physicsEngine->getCurrentPhysicsTimeStep();
     m_graphicsEngine->setRenderParameters(

@@ -85,6 +85,7 @@ private:
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_currentFrameStartTime;
+    double m_physicsTimeError{0.0}; // Track scheduling error for interpolation
     double m_physicsTimeStep{}; // Is set in constructor.
 
     DebugRenderer* m_debugRenderer = nullptr;
