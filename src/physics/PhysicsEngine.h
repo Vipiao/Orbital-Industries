@@ -17,9 +17,9 @@ class PhysicsEngine {
 public:
     // State machine enums
     enum class RunState {
-        HANDLE_COLLISIONS,
         APPLY_FORCES,
-        UPDATE_POSITIONS, 
+        UPDATE_POSITIONS,
+        HANDLE_COLLISIONS,
         DONE
     };
     
@@ -95,7 +95,7 @@ private:
                                           const glm::dvec3* relativeVel = nullptr);
 
     // State machine variables
-    RunState m_runState = RunState::HANDLE_COLLISIONS;
+    RunState m_runState = RunState::APPLY_FORCES;
     CollisionProcessState m_collisionProcessState = CollisionProcessState::DETECT;
     std::unique_ptr<Generator<bool>> m_collisionGenerator;
     size_t m_currentCollisionIndex = 0;
