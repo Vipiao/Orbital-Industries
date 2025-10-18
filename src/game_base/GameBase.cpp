@@ -179,9 +179,11 @@ void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
+
+    // Calculate time remainder since last physics update
     auto currentTime = m_timeHandler->now();
-    auto timeToNextPhysics = std::chrono::duration<double>(m_nextPhysicsTime - currentTime).count();
-    double physicsTimeRemainder = 1.0 - (timeToNextPhysics / m_physicsTimeStep);
+    auto timeSinceLastPhysics = std::chrono::duration<double>(currentTime - m_physicsEngine->getLastPhysicsStepTime()).count();
+    double physicsTimeRemainder = std::clamp(timeSinceLastPhysics / m_physicsTimeStep, 0.0, 1.0);
     
     // Set render parameters in graphics engine
     uint64_t physicsTimeStep = m_physicsEngine->getCurrentPhysicsTimeStep();

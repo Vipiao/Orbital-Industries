@@ -71,6 +71,9 @@ public:
 
     // Access to collision detector for creating colliders
     CollisionDetector& getCollisionDetector() { return m_collisionDetector; }
+
+    // Get the timestamp of the last physics step
+    std::chrono::time_point<std::chrono::high_resolution_clock> getLastPhysicsStepTime() const { return m_lastPhysicsStepTime; }
     
 private:
     // Physics simulation steps
@@ -109,4 +112,7 @@ private:
 
     // Debug visualization
     DebugRenderer* m_debugRenderer = nullptr;
+
+    // Timestamp of the last physics step completion
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_lastPhysicsStepTime;
 };

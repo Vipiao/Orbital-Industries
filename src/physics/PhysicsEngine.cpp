@@ -8,7 +8,8 @@
 #include "../utils/TimeHandler.h"
 
 PhysicsEngine::PhysicsEngine(TimeHandler* timeHandler)
-    : m_timeHandler(timeHandler), m_collisionDetector(timeHandler)
+    : m_timeHandler(timeHandler), m_collisionDetector(timeHandler),
+      m_lastPhysicsStepTime(timeHandler->now())
 {
     if (!m_timeHandler) {
         throw std::invalid_argument("TimeHandler cannot be null");
@@ -164,6 +165,8 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
             case RunState::UPDATE_POSITIONS:
                 updatePositions();
                 m_currentPhysicsTimeStep++; // Increment physics time step immediately after position update
+                // Record exact time when the physics step completes
+                m_lastPhysicsStepTime = m_timeHandler->now();
                 m_runState = RunState::DONE;
                 break;
                 
