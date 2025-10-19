@@ -42,5 +42,5 @@ private:
     bool m_enabled{false};
     
     // Third-person camera offset (in local character space)
-    glm::dvec3 m_cameraOffset{0.0, -3.0, 2.0}; // Behind and above character
+    glm::dvec3 m_cameraOffset{0.0, -3.0, 1.0}; // Behind and above character
 };

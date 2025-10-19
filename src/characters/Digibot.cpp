@@ -152,3 +152,12 @@ glm::dvec3 Digitbot::localToWorld(const glm::dvec3& localPos) const {
 void Digitbot::setMovementDirection(const glm::ivec3& direction) {
     m_digitbotController->setMovementDirection(direction);
 }
+
+void Digitbot::setViewDirection(const glm::dvec3& direction) {
+    m_viewDirection = glm::normalize(direction);
+    m_digitbotController->setViewDirection(m_viewDirection);
+}
+
+glm::dvec3 Digitbot::getViewDirection() const {
+    return m_viewDirection;
+}

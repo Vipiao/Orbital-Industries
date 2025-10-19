@@ -39,6 +39,10 @@ public:
     // Movement control
     void setMovementDirection(const glm::ivec3& direction);
 
+    // View direction control
+    void setViewDirection(const glm::dvec3& direction);
+    glm::dvec3 getViewDirection() const;
+
 private:
     void updateVisualTransform();
 
@@ -54,4 +58,7 @@ private:
 
     // Cache GraphicsEngine pointer for convenience
     GraphicsEngine* m_graphicsEngine;
+
+    // View direction (in world space)
+    glm::dvec3 m_viewDirection{0.0, 1.0, 0.0}; // Default forward
 };

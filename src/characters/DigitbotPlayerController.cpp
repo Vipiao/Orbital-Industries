@@ -3,8 +3,10 @@
 #include "Digitbot.h"
 #include "../physics/RigidBody.h"
 #include "../graphics/GraphicsEngine.h"
+#include "../characters/ArticulationUtils.h"
 #include "../graphics/KeyboardHandler.h"
 #include "../graphics/MouseHandler.h"
+#include <iostream>
 
 DigitbotPlayerController::DigitbotPlayerController(GraphicsEngine* graphics)
     : m_graphics(graphics)
@@ -78,19 +80,53 @@ void DigitbotPlayerController::update(glm::dvec3& cameraPosition, glm::dquat& ca
     
     // Send movement to character
     character->setMovementDirection(moveDirection);
-    
-    // Position camera in third-person view
+
     // Get character position and orientation
     RigidBody* rigidBody = character->getRigidBody();
-    if (rigidBody) {
-        // Get interpolated transform instead of raw position for smooth visuals
-        glm::dvec3 interpolatedPos;
-        glm::dquat interpolatedOrientation;
-        rigidBody->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOrientation);
-        
-        // Calculate camera position based on character orientation
-        glm::dvec3 offsetInWorld = interpolatedOrientation * m_cameraOffset;
-        cameraPosition = interpolatedPos + offsetInWorld;
-        cameraOrientation = interpolatedOrientation;
+    if (!rigidBody) {
+        return;
     }
+    
+    // Get interpolated transform for the entire function
+    glm::dvec3 interpolatedPos;
+    glm::dquat interpolatedOrientation;
+    rigidBody->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOrientation);
+    
+    // Get up vector from rigid body orientation
+    glm::dvec3 upVector = interpolatedOrientation * glm::dvec3(0.0, 0.0, 1.0);
+    
+    // Process view direction from mouse input
+    if (mouseHandler->getMouseLock()) {
+        // Get current view direction
+        glm::dvec3 currentViewDir = character->getViewDirection();
+        
+        // Step 1: Create orientation quaternion using look-at function
+        glm::dquat viewQuat = glm::conjugate(ArticulationUtils::quatLookAtYForward(currentViewDir, upVector));
+        
+        // Step 2: Apply local rotations from mouse input
+        const double mouseSensitivity = 0.0014;
+        glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
+        
+        double pitchAngle = -mouseMovement.y * mouseSensitivity;
+        glm::dquat pitchQuat = glm::angleAxis(pitchAngle, glm::dvec3(1.0, 0.0, 0.0));
+        
+        double yawAngle = -mouseMovement.x * mouseSensitivity;
+        glm::dquat yawQuat = glm::angleAxis(yawAngle, glm::dvec3(0.0, 0.0, 1.0));
+
+        glm::dvec3 newViewDir = viewQuat * pitchQuat * yawQuat * glm::dvec3(0.0, 1.0, 0.0);
+        
+        // Set new view direction
+        character->setViewDirection(newViewDir);
+    }
+
+    // Position camera in third-person view using view direction
+    // Get character position and orientation
+    // Get character's view direction
+    glm::dvec3 viewDir = character->getViewDirection();
+    
+    // Create orientation quaternion from view direction and up vector
+    cameraOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(viewDir, upVector));
+    
+    // Set camera position - offset behind character in view direction with height
+    cameraPosition = interpolatedPos + viewDir * m_cameraOffset.y + upVector * m_cameraOffset.z;
 }

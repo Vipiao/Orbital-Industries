@@ -19,6 +19,11 @@ DigitbotController::DigitbotController(DigitbotPhysics* physics, PhysicsEngine* 
     }
 }
 
+void DigitbotController::setViewDirection(const glm::dvec3& viewDirection) {
+    // Normalize to ensure it's a unit direction vector
+    m_viewDirection = glm::normalize(viewDirection);
+}
+
 void DigitbotController::setMovementDirection(const glm::ivec3& direction) {
     m_movementDirection = direction;
 }
@@ -26,7 +31,7 @@ void DigitbotController::setMovementDirection(const glm::ivec3& direction) {
 void DigitbotController::physics() {
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
-    if (!rigidBody) {
+    if (!rigidBody || rigidBody->m_mass <= 0.0) {
         return;
     }
     
@@ -45,6 +50,9 @@ void DigitbotController::physics() {
     // Normalize if not zero
     if (glm::length(direction) > 0.0) {
         direction = glm::normalize(direction);
+
+        // Transform direction from local to world space using rigid body orientation
+        direction = rigidBody->m_orientation * direction;
     } else {
         return; // Skip if zero length
     }
