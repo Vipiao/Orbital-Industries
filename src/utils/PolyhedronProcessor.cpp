@@ -13,6 +13,18 @@
 #include <utility>
 #include <iostream>
 
+// Define static default vertices
+const std::array<glm::ivec3, 8> PolyhedronProcessor::DEFAULT_VERTICES = {{
+    {0, 0, 0},          // 0: bottom-back-left
+    {4, 0, 0},          // 1: bottom-back-right
+    {4, 4, 0},          // 2: bottom-front-right
+    {0, 4, 0},          // 3: bottom-front-left
+    {0, 0, 4},          // 4: top-back-left
+    {4, 0, 4},          // 5: top-back-right
+    {4, 4, 4},          // 6: top-front-right
+    {0, 4, 4}           // 7: top-front-left
+}};
+
 bool IVec3Compare::operator()(const glm::ivec3& a, const glm::ivec3& b) const {
     if (a.x != b.x) return a.x < b.x;
     if (a.y != b.y) return a.y < b.y;

@@ -14,9 +14,6 @@ public:
     // Type identifier for this block type
     static constexpr CellType TYPE = CellType::STRUCTURAL_BLOCK;
 
-    // Standard cube vertices in PolyhedronProcessor vertex order
-    static const std::array<glm::ivec3, 8> DEFAULT_VERTICES;
-    
     // Scaling factor for local coordinates
     static constexpr int MAX_SIZE = 4;
     

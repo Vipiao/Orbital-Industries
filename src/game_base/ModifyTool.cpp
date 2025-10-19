@@ -10,6 +10,7 @@
 #include "../utils/PositionSelector.h"
 #include <cmath>
 #include <iostream>
+#include "../utils/PolyhedronProcessor.h"
 #include <algorithm>
 
 ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
@@ -277,7 +278,7 @@ void ModifyTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>&
                 // Generate corner positions and directions (same as Creative logic)
                 const double offset = 0.3;
                 for (int cornerIndex = 0; cornerIndex < 8; ++cornerIndex) {
-                    glm::ivec3 defaultVertex = StructuralBlock::DEFAULT_VERTICES[cornerIndex];
+                    glm::ivec3 defaultVertex = PolyhedronProcessor::DEFAULT_VERTICES[cornerIndex];
                     glm::dvec3 normalizedVertex = glm::dvec3(defaultVertex) / double(StructuralBlock::MAX_SIZE);
                     
                     glm::ivec3 unitDirections[6] = {
@@ -478,7 +479,7 @@ void ModifyTool::updateMarkerPositions() {
     
     // Iterate through the 8 default vertices
     for (int cornerIndex = 0; cornerIndex < 8; ++cornerIndex) {
-        glm::ivec3 defaultVertex = StructuralBlock::DEFAULT_VERTICES[cornerIndex];
+        glm::ivec3 defaultVertex = PolyhedronProcessor::DEFAULT_VERTICES[cornerIndex];
         glm::dvec3 normalizedVertex = glm::dvec3(defaultVertex) / double(StructuralBlock::MAX_SIZE);
         
         // Generate all 6 cardinal directions for this corner
@@ -514,7 +515,7 @@ void ModifyTool::updateMarkerPositions() {
     std::vector<glm::dvec3> arrowLocalPositions;
     std::vector<glm::dquat> arrowOrientations;
     for (size_t i = 0; i < cornerPositions.size(); ++i) {
-        glm::dvec3 localPos = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(StructuralBlock::DEFAULT_VERTICES[cornerIndexData[i]]) / double(StructuralBlock::MAX_SIZE);
+        glm::dvec3 localPos = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(PolyhedronProcessor::DEFAULT_VERTICES[cornerIndexData[i]]) / double(StructuralBlock::MAX_SIZE);
         arrowLocalPositions.push_back(localPos);
         arrowOrientations.push_back(getArrowOrientation(directionData[i]));
     }

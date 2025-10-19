@@ -2,23 +2,11 @@
 #include "StructuralBlock.h"
 #include "../utils/MassInertiaCalculator.h"
 
-// Define static default vertices
-const std::array<glm::ivec3, 8> StructuralBlock::DEFAULT_VERTICES = {{
-    {0, 0, 0},           // 0: bottom-back-left
-    {MAX_SIZE, 0, 0},    // 1: bottom-back-right
-    {MAX_SIZE, MAX_SIZE, 0}, // 2: bottom-front-right
-    {0, MAX_SIZE, 0},    // 3: bottom-front-left
-    {0, 0, MAX_SIZE},    // 4: top-back-left
-    {MAX_SIZE, 0, MAX_SIZE},    // 5: top-back-right
-    {MAX_SIZE, MAX_SIZE, MAX_SIZE}, // 6: top-front-right
-    {0, MAX_SIZE, MAX_SIZE}     // 7: top-front-left
-}};
-
 StructuralBlock::StructuralBlock(const glm::ivec3& coords)
     : GridCell(coords, TYPE) 
 {
     // Copy from static default vertices
-    m_localVertices = DEFAULT_VERTICES;
+    m_localVertices = PolyhedronProcessor::DEFAULT_VERTICES;
 }
 
 PolyhedronProcessor::AxisResult StructuralBlock::getAxes() const {

@@ -177,6 +177,14 @@ public:
         const std::vector<int>& verticesToTest);
 
     /**
+     * @brief Default cube vertices in standard cube order
+     * Coordinate system: +X right, +Y forward, +Z up
+     * Vertices ordered: bottom (CCW from -X-Y), top (CCW from -X-Y)
+     * @return Array of 8 cube vertices in integer coordinates [0..MAX_SIZE]
+     */
+    static const std::array<glm::ivec3, 8> DEFAULT_VERTICES;
+
+    /**
      * @brief Check convexity of triangles in a specific direction
      * @param triangles Vector of triangles (each triangle is 3 vertices)
      * @param direction Direction vector to project normals onto for convexity check
