@@ -2,8 +2,8 @@
 #pragma once
 
 #include "Character.h"
-#include "Digitbot.h"
-#include "DigitbotResources.h"
+#include "Digibot.h"
+#include "DigibotResources.h"
 #include <memory>
 #include <vector>
 
@@ -11,7 +11,7 @@ class PhysicsEngine;
 class GraphicsEngine;
 class JobManager;
 class TimeHandler;
-class DigitbotPlayerController;
+class DigibotPlayerController;
 
 /**
  * @brief Subsystem managing all character lifecycle and updates
@@ -26,7 +26,7 @@ public:
     ~CharacterSubsystem();
 
     // Character lifecycle
-    std::weak_ptr<Digitbot> createDigitbot();
+    std::weak_ptr<Digibot> createDigibot();
     void removeCharacter(std::weak_ptr<Character> characterWeak);
 
     // Updates (called by GameBase each frame)
@@ -37,7 +37,7 @@ public:
     const std::vector<std::shared_ptr<Character>>& getCharacters() const { return m_characters; }
 
     // Player controller access
-    DigitbotPlayerController* getPlayerController() const { return m_playerController.get(); }
+    DigibotPlayerController* getPlayerController() const { return m_playerController.get(); }
 
 private:
     // Dependencies
@@ -45,10 +45,10 @@ private:
     GraphicsEngine* m_graphics;
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
-    std::unique_ptr<DigitbotPlayerController> m_playerController;
+    std::unique_ptr<DigibotPlayerController> m_playerController;
 
     // Shared resources for character types
-    std::unique_ptr<DigitbotResources> m_digitbotResources;
+    std::unique_ptr<DigibotResources> m_digibotResources;
 
     // Character ownership
     std::vector<std::shared_ptr<Character>> m_characters;

@@ -1,4 +1,4 @@
-// DigitbotPlayerController.h
+// DigibotPlayerController.h
 #pragma once
 
 #include <memory>
@@ -8,25 +8,25 @@
 class GraphicsEngine;
 class KeyboardHandler;
 class MouseHandler;
-class Digitbot;
+class Digibot;
 
 /**
- * @brief Controls player-driven Digitbot characters
+ * @brief Controls player-driven Digibot characters
  * 
  * Translates keyboard/mouse input into character movement commands
  * and positions the camera for third-person view.
  */
-class DigitbotPlayerController {
+class DigibotPlayerController {
 public:
-    DigitbotPlayerController(GraphicsEngine* graphics);
-    ~DigitbotPlayerController() = default;
+    DigibotPlayerController(GraphicsEngine* graphics);
+    ~DigibotPlayerController() = default;
     
     // Core functionality - updates camera and sends inputs to character (timeRemainder for interpolation)
     void update(glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder);
     
     // Character selection
-    void setPilotableCharacter(std::weak_ptr<Digitbot> character);
-    std::weak_ptr<Digitbot> getPilotableCharacter() const;
+    void setPilotableCharacter(std::weak_ptr<Digibot> character);
+    std::weak_ptr<Digibot> getPilotableCharacter() const;
     
     // Enable/disable
     void enable();
@@ -36,7 +36,7 @@ public:
 private:
     // References
     GraphicsEngine* m_graphics;
-    std::weak_ptr<Digitbot> m_pilotableCharacter;
+    std::weak_ptr<Digibot> m_pilotableCharacter;
     
     // State
     bool m_enabled{false};

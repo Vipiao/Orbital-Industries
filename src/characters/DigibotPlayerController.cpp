@@ -1,6 +1,6 @@
-// DigitbotPlayerController.cpp
-#include "DigitbotPlayerController.h"
-#include "Digitbot.h"
+// DigibotPlayerController.cpp
+#include "DigibotPlayerController.h"
+#include "Digibot.h"
 #include "../physics/RigidBody.h"
 #include "../graphics/GraphicsEngine.h"
 #include "../characters/ArticulationUtils.h"
@@ -8,31 +8,31 @@
 #include "../graphics/MouseHandler.h"
 #include <iostream>
 
-DigitbotPlayerController::DigitbotPlayerController(GraphicsEngine* graphics)
+DigibotPlayerController::DigibotPlayerController(GraphicsEngine* graphics)
     : m_graphics(graphics)
 {
     if (!m_graphics) {
-        throw std::runtime_error("DigitbotPlayerController: GraphicsEngine cannot be null");
+        throw std::runtime_error("DigibotPlayerController: GraphicsEngine cannot be null");
     }
 }
 
-void DigitbotPlayerController::setPilotableCharacter(std::weak_ptr<Digitbot> character) {
+void DigibotPlayerController::setPilotableCharacter(std::weak_ptr<Digibot> character) {
     m_pilotableCharacter = character;
 }
 
-std::weak_ptr<Digitbot> DigitbotPlayerController::getPilotableCharacter() const {
+std::weak_ptr<Digibot> DigibotPlayerController::getPilotableCharacter() const {
     return m_pilotableCharacter;
 }
 
-void DigitbotPlayerController::enable() {
+void DigibotPlayerController::enable() {
     m_enabled = true;
 }
 
-void DigitbotPlayerController::disable() {
+void DigibotPlayerController::disable() {
     m_enabled = false;
 }
 
-void DigitbotPlayerController::update(glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder) {
+void DigibotPlayerController::update(glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder) {
     if (!m_enabled || !m_graphics) {
         return;
     }

@@ -1,5 +1,5 @@
-// DigitbotPhysics.cpp
-#include "DigitbotPhysics.h"
+// DigibotPhysics.cpp
+#include "DigibotPhysics.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/GridCollider.h"
 #include "../physics/RigidBody.h"
@@ -9,7 +9,7 @@
 #include "../utils/GridGeometry.h"
 #include "../graphics/meshHandler/MeshHandler.h"
 
-DigitbotPhysics::DigitbotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler)
+DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler)
     : m_physics(physics)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
@@ -27,7 +27,7 @@ DigitbotPhysics::DigitbotPhysics(PhysicsEngine* physics, JobManager* jobManager,
 
     auto collider = m_colliderWeak.lock();
     if (!collider) {
-        throw std::runtime_error("DigitbotPhysics: Failed to lock GridCollider immediately after creation");
+        throw std::runtime_error("DigibotPhysics: Failed to lock GridCollider immediately after creation");
     }
 
     // Add two cube cells: lower body at {0,0,0}, upper body at {0,0,1}
@@ -76,7 +76,7 @@ DigitbotPhysics::DigitbotPhysics(PhysicsEngine* physics, JobManager* jobManager,
     m_physics->updateColliderTransform(m_rigidBody);
 }
 
-DigitbotPhysics::~DigitbotPhysics() {
+DigibotPhysics::~DigibotPhysics() {
     // Disconnect and cleanup physics
     if (m_rigidBody) {
         m_physics->disconnectCollider(m_rigidBody);
@@ -87,21 +87,21 @@ DigitbotPhysics::~DigitbotPhysics() {
     m_physics->getCollisionDetector().removeCollider(m_colliderWeak);
 }
 
-void DigitbotPhysics::showCollisionBox(GraphicsEngine* graphics) {
+void DigibotPhysics::showCollisionBox(GraphicsEngine* graphics) {
     if (m_collisionBoxMeshId == -1) {
         m_collisionBoxMeshId = graphics->createMesh();
     }
     createCollisionBoxMesh(graphics);
 }
 
-void DigitbotPhysics::hideCollisionBox(GraphicsEngine* graphics) {
+void DigibotPhysics::hideCollisionBox(GraphicsEngine* graphics) {
     if (m_collisionBoxMeshId != -1) {
         graphics->removeMesh(m_collisionBoxMeshId);
         m_collisionBoxMeshId = -1;
     }
 }
 
-void DigitbotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
+void DigibotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
     auto collider = m_colliderWeak.lock();
     if (!collider) {
         return;
@@ -152,7 +152,7 @@ void DigitbotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
     updateCollisionBoxTransform(graphics, m_physics->getCurrentPhysicsTimeStep());
 }
 
-void DigitbotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint64_t currentPhysicsTimeStep) {
+void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint64_t currentPhysicsTimeStep) {
     if (m_collisionBoxMeshId == -1 || !m_rigidBody) {
         return;
     }
@@ -184,7 +184,7 @@ void DigitbotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint
     );
 }
 
-glm::dvec3 DigitbotPhysics::worldToLocal(const glm::dvec3& worldPos) const {
+glm::dvec3 DigibotPhysics::worldToLocal(const glm::dvec3& worldPos) const {
     return GridGeometry::worldToGrid(
         worldPos,
         m_rigidBody->m_position,
@@ -193,7 +193,7 @@ glm::dvec3 DigitbotPhysics::worldToLocal(const glm::dvec3& worldPos) const {
     );
 }
 
-glm::dvec3 DigitbotPhysics::localToWorld(const glm::dvec3& localPos) const {
+glm::dvec3 DigibotPhysics::localToWorld(const glm::dvec3& localPos) const {
     return GridGeometry::gridToWorld(
         localPos,
         m_rigidBody->m_position,

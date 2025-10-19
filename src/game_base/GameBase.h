@@ -18,7 +18,7 @@
 // Forward declaration
 class TimeHandler;
 class DebugRenderer;
-class Digitbot;
+class Digibot;
 
 class GameBase : public IGraphicsCallbacks, public CallbackManager, public IHashable {
 public:
@@ -35,7 +35,7 @@ public:
     
     std::weak_ptr<Grid> createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     void removeGrid(std::weak_ptr<Grid> grid);
-    std::weak_ptr<Digitbot> createDigitbot();
+    std::weak_ptr<Digibot> createDigibot();
     void run();
     void addPhysicsCallback(Callback* callback);
 

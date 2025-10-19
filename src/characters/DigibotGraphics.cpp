@@ -1,6 +1,6 @@
-// DigitbotGraphics.cpp
-#include "DigitbotGraphics.h"
-#include "DigitbotResources.h"
+// DigibotGraphics.cpp
+#include "DigibotGraphics.h"
+#include "DigibotResources.h"
 #include "ArticulationUtils.h"
 #include "../graphics/GraphicsEngine.h"
 #include "../graphics/instanceHandler/InstanceHandler.h"
@@ -8,34 +8,34 @@
 #include <iostream>
 
 // Static skeleton measurements (T-pose natural positions)
-const glm::dvec3 DigitbotGraphics::s_naturalRightShoulderPos = glm::dvec3(0.26788, -0.044638, 1.47241);
-const glm::dvec3 DigitbotGraphics::s_naturalRightElbowPos = glm::dvec3(0.687425, -0.044638, 1.47241);
-const glm::dvec3 DigitbotGraphics::s_naturalLeftShoulderPos = glm::dvec3(-0.26788, -0.044638, 1.47241);
-const glm::dvec3 DigitbotGraphics::s_naturalLeftElbowPos = glm::dvec3(-0.687425, -0.044638, 1.47241);
+const glm::dvec3 DigibotGraphics::s_naturalRightShoulderPos = glm::dvec3(0.26788, -0.044638, 1.47241);
+const glm::dvec3 DigibotGraphics::s_naturalRightElbowPos = glm::dvec3(0.687425, -0.044638, 1.47241);
+const glm::dvec3 DigibotGraphics::s_naturalLeftShoulderPos = glm::dvec3(-0.26788, -0.044638, 1.47241);
+const glm::dvec3 DigibotGraphics::s_naturalLeftElbowPos = glm::dvec3(-0.687425, -0.044638, 1.47241);
 
-const glm::dvec3 DigitbotGraphics::s_naturalRightHipPos = glm::dvec3(0.177658, 0.061087, 1.02951);
-const glm::dvec3 DigitbotGraphics::s_naturalRightKneePos = glm::dvec3(0.180854, -0.274169, 0.530615);
-const glm::dvec3 DigitbotGraphics::s_naturalRightFootPos = glm::dvec3(0.179225, 0.051327, 0.059608);
-const glm::dvec3 DigitbotGraphics::s_naturalLeftHipPos = glm::dvec3(-0.177658, 0.061087, 1.02951);
-const glm::dvec3 DigitbotGraphics::s_naturalLeftKneePos = glm::dvec3(-0.180854, -0.274169, 0.530615);
-const glm::dvec3 DigitbotGraphics::s_naturalLeftFootPos = glm::dvec3(-0.179225, 0.051327, 0.059608);
-const glm::dvec3 DigitbotGraphics::s_naturalRightPistonRodPos = glm::dvec3(0.180853, -0.130187, 0.67836);
-const glm::dvec3 DigitbotGraphics::s_naturalRightPistonHousingPos = glm::dvec3(0.180853, -0.130187, 0.324156);
-const glm::dvec3 DigitbotGraphics::s_naturalLeftPistonRodPos = glm::dvec3(-0.180853, -0.130187, 0.67836);
-const glm::dvec3 DigitbotGraphics::s_naturalLeftPistonHousingPos = glm::dvec3(-0.180853, -0.130187, 0.324156);
-const glm::dvec3 DigitbotGraphics::s_naturalHeadPos = glm::dvec3(0.0, 0.0, 1.39974);
+const glm::dvec3 DigibotGraphics::s_naturalRightHipPos = glm::dvec3(0.177658, 0.061087, 1.02951);
+const glm::dvec3 DigibotGraphics::s_naturalRightKneePos = glm::dvec3(0.180854, -0.274169, 0.530615);
+const glm::dvec3 DigibotGraphics::s_naturalRightFootPos = glm::dvec3(0.179225, 0.051327, 0.059608);
+const glm::dvec3 DigibotGraphics::s_naturalLeftHipPos = glm::dvec3(-0.177658, 0.061087, 1.02951);
+const glm::dvec3 DigibotGraphics::s_naturalLeftKneePos = glm::dvec3(-0.180854, -0.274169, 0.530615);
+const glm::dvec3 DigibotGraphics::s_naturalLeftFootPos = glm::dvec3(-0.179225, 0.051327, 0.059608);
+const glm::dvec3 DigibotGraphics::s_naturalRightPistonRodPos = glm::dvec3(0.180853, -0.130187, 0.67836);
+const glm::dvec3 DigibotGraphics::s_naturalRightPistonHousingPos = glm::dvec3(0.180853, -0.130187, 0.324156);
+const glm::dvec3 DigibotGraphics::s_naturalLeftPistonRodPos = glm::dvec3(-0.180853, -0.130187, 0.67836);
+const glm::dvec3 DigibotGraphics::s_naturalLeftPistonHousingPos = glm::dvec3(-0.180853, -0.130187, 0.324156);
+const glm::dvec3 DigibotGraphics::s_naturalHeadPos = glm::dvec3(0.0, 0.0, 1.39974);
 
 // Static limb lengths
-const double DigitbotGraphics::s_upperArmLength = glm::length(
-    DigitbotGraphics::s_naturalRightElbowPos - DigitbotGraphics::s_naturalRightShoulderPos);
-const double DigitbotGraphics::s_lowerArmLength = glm::length(
-    glm::dvec3(1.09582, -0.05088, 1.47241) - DigitbotGraphics::s_naturalRightElbowPos);
-const double DigitbotGraphics::s_upperLegLength = glm::length(
-    DigitbotGraphics::s_naturalRightKneePos - DigitbotGraphics::s_naturalRightHipPos);
-const double DigitbotGraphics::s_lowerLegLength = glm::length(
-    DigitbotGraphics::s_naturalRightFootPos - DigitbotGraphics::s_naturalRightKneePos);
+const double DigibotGraphics::s_upperArmLength = glm::length(
+    DigibotGraphics::s_naturalRightElbowPos - DigibotGraphics::s_naturalRightShoulderPos);
+const double DigibotGraphics::s_lowerArmLength = glm::length(
+    glm::dvec3(1.09582, -0.05088, 1.47241) - DigibotGraphics::s_naturalRightElbowPos);
+const double DigibotGraphics::s_upperLegLength = glm::length(
+    DigibotGraphics::s_naturalRightKneePos - DigibotGraphics::s_naturalRightHipPos);
+const double DigibotGraphics::s_lowerLegLength = glm::length(
+    DigibotGraphics::s_naturalRightFootPos - DigibotGraphics::s_naturalRightKneePos);
 
-DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* resources)
+DigibotGraphics::DigibotGraphics(GraphicsEngine* graphics, DigibotResources* resources)
     : m_graphics(graphics)
     , m_resources(resources)
     , m_visualMeshSSBOIndex(-1)
@@ -45,7 +45,7 @@ DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* 
     , m_rightKneePoint(0.0, 0.0, 0.0)
 {
     if (!m_resources) {
-        throw std::runtime_error("DigitbotResources cannot be null");
+        throw std::runtime_error("DigibotResources cannot be null");
     }
 
     // Allocate SSBO index for shared world transform
@@ -61,7 +61,7 @@ DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* 
     for (int i = 0; i < PART_COUNT; ++i) {
         auto geometry = m_bodyPartGeometries[i].lock();
         if (!geometry) {
-            throw std::runtime_error("DigitbotGraphics: Shared geometry is invalid for body part " + std::to_string(i));
+            throw std::runtime_error("DigibotGraphics: Shared geometry is invalid for body part " + std::to_string(i));
         }
         
         // Create instance attached to shared SSBO slot
@@ -77,7 +77,7 @@ DigitbotGraphics::DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* 
     initializeInstanceTransforms();
 }
 
-DigitbotGraphics::~DigitbotGraphics() {
+DigibotGraphics::~DigibotGraphics() {
     // Remove all instances from their geometries
     for (size_t i = 0; i < PART_COUNT; ++i) {
         auto geometry = m_bodyPartGeometries[i].lock();
@@ -93,7 +93,7 @@ DigitbotGraphics::~DigitbotGraphics() {
     }
 }
 
-void DigitbotGraphics::initializeInstanceTransforms() {
+void DigibotGraphics::initializeInstanceTransforms() {
     // Initialize all body parts with offset to align with physics cubes
     // Model origin is at feet, cubes have origin at corner, so offset by (0.5, 0.5, 0.0)
     // to center the visual model over the cube
@@ -114,7 +114,7 @@ void DigitbotGraphics::initializeInstanceTransforms() {
     }
 }
 
-void DigitbotGraphics::updateWorldTransform(
+void DigibotGraphics::updateWorldTransform(
     const glm::dvec3& position,
     const glm::dvec3& velocity,
     const glm::dquat& orientation,
@@ -143,7 +143,7 @@ void DigitbotGraphics::updateWorldTransform(
     );
 }
 
-void DigitbotGraphics::updateBodyPartPositions(const DigitbotTargetPose& targetPose) {
+void DigibotGraphics::updateBodyPartPositions(const DigibotTargetPose& targetPose) {
     // ========== SETUP ARRAYS ==========
     glm::dvec3* elbows[2] = {&m_rightElbowPoint, &m_leftElbowPoint};
     glm::dvec3* knees[2] = {&m_rightKneePoint, &m_leftKneePoint};

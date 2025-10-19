@@ -1,34 +1,34 @@
-// DigitbotController.cpp
-#include "DigitbotController.h"
-#include "DigitbotPhysics.h"
+// DigibotController.cpp
+#include "DigibotController.h"
+#include "DigibotPhysics.h"
 #include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
 
-DigitbotController::DigitbotController(DigitbotPhysics* physics, PhysicsEngine* physicsEngine)
+DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine)
     : m_physics(physics)
     , m_physicsEngine(physicsEngine)
     , m_movementDirection(0, 0, 0)
     , m_thrustStrength(0.01) // Default thrust strength
 {
     if (!m_physics) {
-        throw std::runtime_error("DigitbotController: Physics component cannot be null");
+        throw std::runtime_error("DigibotController: Physics component cannot be null");
     }
     
     if (!m_physicsEngine) {
-        throw std::runtime_error("DigitbotController: Physics engine cannot be null");
+        throw std::runtime_error("DigibotController: Physics engine cannot be null");
     }
 }
 
-void DigitbotController::setViewDirection(const glm::dvec3& viewDirection) {
+void DigibotController::setViewDirection(const glm::dvec3& viewDirection) {
     // Normalize to ensure it's a unit direction vector
     m_viewDirection = glm::normalize(viewDirection);
 }
 
-void DigitbotController::setMovementDirection(const glm::ivec3& direction) {
+void DigibotController::setMovementDirection(const glm::ivec3& direction) {
     m_movementDirection = direction;
 }
 
-void DigitbotController::physics() {
+void DigibotController::physics() {
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
@@ -65,6 +65,6 @@ void DigitbotController::physics() {
     m_physicsEngine->applyForce(rigidBody, thrustForce);
 }
 
-void DigitbotController::setThrustStrength(double strength) {
+void DigibotController::setThrustStrength(double strength) {
     m_thrustStrength = strength;
 }

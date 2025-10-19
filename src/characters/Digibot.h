@@ -1,4 +1,4 @@
-// Digitbot.h
+// Digibot.h
 #pragma once
 
 #include "Character.h"
@@ -6,24 +6,24 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-class DigitbotPhysics;
-class DigitbotGraphics;
-class DigitbotController;
-class DigitbotResources;
-struct DigitbotTargetPose;
+class DigibotPhysics;
+class DigibotGraphics;
+class DigibotController;
+class DigibotResources;
+struct DigibotTargetPose;
 
 /**
  * @brief Bipedal robot character with reverse-articulated legs
  * 
- * Digitbot consists of two stacked cube segments forming a simple
+ * Digibot consists of two stacked cube segments forming a simple
  * robotic body. Uses GridCollider for efficient collision detection.
  */
-class Digitbot : public Character {
+class Digibot : public Character {
 public:
-    Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
+    Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
              JobManager* jobManager, TimeHandler* timeHandler,
-             DigitbotResources* resources);
-    ~Digitbot() override;
+             DigibotResources* resources);
+    ~Digibot() override;
 
     void preRenderCallback(uint64_t frameNum) override;
     void onPhysicsUpdateComplete() override;
@@ -47,11 +47,11 @@ private:
     void updateVisualTransform();
 
     // Subsystems
-    std::unique_ptr<DigitbotPhysics> m_digitbotPhysics;
-    std::unique_ptr<DigitbotGraphics> m_digitbotGraphics;
+    std::unique_ptr<DigibotPhysics> m_digibotPhysics;
+    std::unique_ptr<DigibotGraphics> m_digibotGraphics;
 
     // Controller for movement
-    std::unique_ptr<DigitbotController> m_digitbotController;
+    std::unique_ptr<DigibotController> m_digibotController;
 
     //
     glm::dvec3 m_graphicsPosition = {0.0, 0.0, -1.0};

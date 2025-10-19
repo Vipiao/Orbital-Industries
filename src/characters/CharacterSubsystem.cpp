@@ -1,7 +1,7 @@
 // CharacterSubsystem.cpp
 #include "CharacterSubsystem.h"
-#include "DigitbotResources.h"
-#include "DigitbotPlayerController.h"
+#include "DigibotResources.h"
+#include "DigibotPlayerController.h"
 #include <algorithm>
 
 CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,
@@ -11,11 +11,11 @@ CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* g
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
 {
-    // Initialize shared resources for Digitbot characters
-    m_digitbotResources = std::make_unique<DigitbotResources>(m_graphics);
+    // Initialize shared resources for Digibot characters
+    m_digibotResources = std::make_unique<DigibotResources>(m_graphics);
 
     // Create player controller
-    m_playerController = std::make_unique<DigitbotPlayerController>(m_graphics);
+    m_playerController = std::make_unique<DigibotPlayerController>(m_graphics);
 }
 
 CharacterSubsystem::~CharacterSubsystem() {
@@ -23,24 +23,24 @@ CharacterSubsystem::~CharacterSubsystem() {
     m_characters.clear();
 }
 
-std::weak_ptr<Digitbot> CharacterSubsystem::createDigitbot() {
-    auto digitbot = std::make_shared<Digitbot>(
+std::weak_ptr<Digibot> CharacterSubsystem::createDigibot() {
+    auto digibot = std::make_shared<Digibot>(
         m_physics,
         m_graphics,
         m_jobManager,
         m_timeHandler,
-        m_digitbotResources.get()
+        m_digibotResources.get()
     );
 
-    std::weak_ptr<Digitbot> digitbotWeak = digitbot;
-    m_characters.push_back(std::move(digitbot));
+    std::weak_ptr<Digibot> digibotWeak = digibot;
+    m_characters.push_back(std::move(digibot));
 
     // Set as the pilotable character if we don't already have one
     if (m_playerController && m_playerController->getPilotableCharacter().expired()) {
-        m_playerController->setPilotableCharacter(digitbotWeak);
+        m_playerController->setPilotableCharacter(digibotWeak);
     }
 
-    return digitbotWeak;
+    return digibotWeak;
 }
 
 void CharacterSubsystem::removeCharacter(std::weak_ptr<Character> characterWeak) {

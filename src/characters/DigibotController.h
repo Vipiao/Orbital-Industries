@@ -1,15 +1,15 @@
-// DigitbotController.h
+// DigibotController.h
 #pragma once
 
 #include <glm/glm.hpp>
 
-class DigitbotPhysics;
+class DigibotPhysics;
 class PhysicsEngine;
 
-class DigitbotController {
+class DigibotController {
 public:
-    DigitbotController(DigitbotPhysics* physics, PhysicsEngine* physicsEngine);
-    ~DigitbotController() = default;
+    DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine);
+    ~DigibotController() = default;
     
     // Set the desired movement direction
     void setMovementDirection(const glm::ivec3& direction);
@@ -27,7 +27,7 @@ public:
     const glm::dvec3& getViewDirection() const { return m_viewDirection; }
     
 private:
-    DigitbotPhysics* m_physics;
+    DigibotPhysics* m_physics;
     PhysicsEngine* m_physicsEngine;
     glm::ivec3 m_movementDirection;
     double m_thrustStrength;

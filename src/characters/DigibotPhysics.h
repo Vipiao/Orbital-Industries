@@ -1,4 +1,4 @@
-// DigitbotPhysics.h
+// DigibotPhysics.h
 #pragma once
 
 #include <memory>
@@ -13,14 +13,14 @@ class GridCollider;
 class RigidBody;
 
 /**
- * @brief Manages physics simulation for Digitbot character
+ * @brief Manages physics simulation for Digibot character
  * 
  * Handles collision geometry, rigid body dynamics, and mass properties.
  */
-class DigitbotPhysics {
+class DigibotPhysics {
 public:
-    DigitbotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler);
-    ~DigitbotPhysics();
+    DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler);
+    ~DigibotPhysics();
 
     // Physics state access
     RigidBody* getRigidBody() const { return m_rigidBody; }

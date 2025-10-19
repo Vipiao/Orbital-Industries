@@ -88,8 +88,8 @@ std::weak_ptr<Grid> GameBase::createGrid(const glm::dvec3& position, const glm::
     return m_gridSubsystem->createGrid(position, orientation);
 }
 
-std::weak_ptr<Digitbot> GameBase::createDigitbot() {
-    return m_characterSubsystem->createDigitbot();
+std::weak_ptr<Digibot> GameBase::createDigibot() {
+    return m_characterSubsystem->createDigibot();
 }
 
 void GameBase::removeGrid(std::weak_ptr<Grid> gridWeak) {

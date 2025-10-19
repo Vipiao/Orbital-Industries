@@ -1,4 +1,4 @@
-// DigitbotResources.h
+// DigibotResources.h
 #pragma once
 
 #include <memory>
@@ -9,21 +9,21 @@ class GraphicsEngine;
 class Geometry;
 
 /**
- * @brief Shared graphics resources for all Digitbot characters
+ * @brief Shared graphics resources for all Digibot characters
  * 
  * Loads and manages textures and geometries that are shared across
- * all Digitbot instances to avoid redundant loading.
+ * all Digibot instances to avoid redundant loading.
  */
-class DigitbotResources {
+class DigibotResources {
 public:
-    explicit DigitbotResources(GraphicsEngine* graphics);
-    ~DigitbotResources();
+    explicit DigibotResources(GraphicsEngine* graphics);
+    ~DigibotResources();
 
     // Delete copy/move to ensure single ownership
-    DigitbotResources(const DigitbotResources&) = delete;
-    DigitbotResources& operator=(const DigitbotResources&) = delete;
-    DigitbotResources(DigitbotResources&&) = delete;
-    DigitbotResources& operator=(DigitbotResources&&) = delete;
+    DigibotResources(const DigibotResources&) = delete;
+    DigibotResources& operator=(const DigibotResources&) = delete;
+    DigibotResources(DigibotResources&&) = delete;
+    DigibotResources& operator=(DigibotResources&&) = delete;
 
     // Access to shared resources
     const std::vector<std::weak_ptr<Geometry>>& getBodyPartGeometries() const { return m_bodyPartGeometries; }

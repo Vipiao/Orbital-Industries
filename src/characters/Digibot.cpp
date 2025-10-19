@@ -1,49 +1,49 @@
-// Digitbot.cpp
-#include "Digitbot.h"
-#include "DigitbotPhysics.h"
-#include "DigitbotGraphics.h"
-#include "DigitbotController.h"
-#include "DigitbotResources.h"
+// Digibot.cpp
+#include "Digibot.h"
+#include "DigibotPhysics.h"
+#include "DigibotGraphics.h"
+#include "DigibotController.h"
+#include "DigibotResources.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "../graphics/GraphicsEngine.h"
 
-Digitbot::Digitbot(PhysicsEngine* physics, GraphicsEngine* graphics,
+Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
                    JobManager* jobManager, TimeHandler* timeHandler,
-                   DigitbotResources* resources)
+                   DigibotResources* resources)
     : Character(physics, graphics, jobManager, timeHandler)
     , m_graphicsEngine(graphics)
 {
     // Create physics subsystem
-    m_digitbotPhysics = std::make_unique<DigitbotPhysics>(physics, jobManager, timeHandler);
+    m_digibotPhysics = std::make_unique<DigibotPhysics>(physics, jobManager, timeHandler);
 
     // Set Character base class members
-    m_rigidBody = m_digitbotPhysics->getRigidBody();
-    m_centerOfMass = m_digitbotPhysics->getCenterOfMass();
+    m_rigidBody = m_digibotPhysics->getRigidBody();
+    m_centerOfMass = m_digibotPhysics->getCenterOfMass();
 
     // Create controller subsystem
-    m_digitbotController = std::make_unique<DigitbotController>(
-        m_digitbotPhysics.get(), physics);
+    m_digibotController = std::make_unique<DigibotController>(
+        m_digibotPhysics.get(), physics);
 
     // Create graphics subsystem
-    m_digitbotGraphics = std::make_unique<DigitbotGraphics>(graphics, resources);
+    m_digibotGraphics = std::make_unique<DigibotGraphics>(graphics, resources);
 
     // Perform initial transform update
     updateVisualTransform();
 }
 
-Digitbot::~Digitbot() {
+Digibot::~Digibot() {
     // Subsystems clean up automatically via unique_ptr
 }
 
-void Digitbot::preRenderCallback(uint64_t frameNum) {
+void Digibot::preRenderCallback(uint64_t frameNum) {
     //if (frameNum % 16 != 0)
     //{
     //    return;
     //}
     
     // Update body part articulation every frame
-    DigitbotTargetPose targetPose;
+    DigibotTargetPose targetPose;
     
     targetPose.rightHand.position = glm::dvec3(0.6, 0.6, 1.4);
     double time = (double)frameNum * 0.02;
@@ -75,10 +75,10 @@ void Digitbot::preRenderCallback(uint64_t frameNum) {
         glm::normalize(glm::dvec3{0,1,1})
     );
 
-    m_digitbotGraphics->updateBodyPartPositions(targetPose);
+    m_digibotGraphics->updateBodyPartPositions(targetPose);
 }
 
-void Digitbot::onPhysicsUpdateComplete() {
+void Digibot::onPhysicsUpdateComplete() {
     if (!m_rigidBody) {
         return;
     }
@@ -87,28 +87,28 @@ void Digitbot::onPhysicsUpdateComplete() {
     updateVisualTransform();
 
     // Update collision box if visible
-    if (m_digitbotPhysics->isCollisionBoxVisible()) {
+    if (m_digibotPhysics->isCollisionBoxVisible()) {
         uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
-        m_digitbotPhysics->updateCollisionBoxTransform(m_graphicsEngine, currentPhysicsTimeStep);
+        m_digibotPhysics->updateCollisionBoxTransform(m_graphicsEngine, currentPhysicsTimeStep);
     }
 
     // Run controller physics
-    m_digitbotController->physics();
+    m_digibotController->physics();
 }
 
-void Digitbot::showCollisionBox() {
-    m_digitbotPhysics->showCollisionBox(m_graphicsEngine);
+void Digibot::showCollisionBox() {
+    m_digibotPhysics->showCollisionBox(m_graphicsEngine);
 }
 
-void Digitbot::hideCollisionBox() {
-    m_digitbotPhysics->hideCollisionBox(m_graphicsEngine);
+void Digibot::hideCollisionBox() {
+    m_digibotPhysics->hideCollisionBox(m_graphicsEngine);
 }
 
-bool Digitbot::isCollisionBoxVisible() const {
-    return m_digitbotPhysics->isCollisionBoxVisible();
+bool Digibot::isCollisionBoxVisible() const {
+    return m_digibotPhysics->isCollisionBoxVisible();
 }
 
-void Digitbot::updateVisualTransform() {
+void Digibot::updateVisualTransform() {
     if (!m_rigidBody) {
         return;
     }
@@ -130,7 +130,7 @@ void Digitbot::updateVisualTransform() {
     glm::dvec3 meshPosition = m_rigidBody->m_position + m_graphicsPosition;
 
     // Update graphics subsystem with current transform
-    m_digitbotGraphics->updateWorldTransform(
+    m_digibotGraphics->updateWorldTransform(
         meshPosition,
         m_rigidBody->m_velocity,
         m_rigidBody->m_orientation,
@@ -141,23 +141,23 @@ void Digitbot::updateVisualTransform() {
     );
 }
 
-glm::dvec3 Digitbot::worldToLocal(const glm::dvec3& worldPos) const {
-    return m_digitbotPhysics->worldToLocal(worldPos);
+glm::dvec3 Digibot::worldToLocal(const glm::dvec3& worldPos) const {
+    return m_digibotPhysics->worldToLocal(worldPos);
 }
 
-glm::dvec3 Digitbot::localToWorld(const glm::dvec3& localPos) const {
-    return m_digitbotPhysics->localToWorld(localPos);
+glm::dvec3 Digibot::localToWorld(const glm::dvec3& localPos) const {
+    return m_digibotPhysics->localToWorld(localPos);
 }
 
-void Digitbot::setMovementDirection(const glm::ivec3& direction) {
-    m_digitbotController->setMovementDirection(direction);
+void Digibot::setMovementDirection(const glm::ivec3& direction) {
+    m_digibotController->setMovementDirection(direction);
 }
 
-void Digitbot::setViewDirection(const glm::dvec3& direction) {
+void Digibot::setViewDirection(const glm::dvec3& direction) {
     m_viewDirection = glm::normalize(direction);
-    m_digitbotController->setViewDirection(m_viewDirection);
+    m_digibotController->setViewDirection(m_viewDirection);
 }
 
-glm::dvec3 Digitbot::getViewDirection() const {
+glm::dvec3 Digibot::getViewDirection() const {
     return m_viewDirection;
 }

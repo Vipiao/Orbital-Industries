@@ -1,4 +1,4 @@
-// DigitbotGraphics.h
+// DigibotGraphics.h
 #pragma once
 
 #include <memory>
@@ -9,7 +9,7 @@
 class GraphicsEngine;
 class Geometry;
 class Instance;
-class DigitbotResources;
+class DigibotResources;
 
 /**
  * @brief Transform for a body part in local space
@@ -30,9 +30,9 @@ struct BodyPartTransform {
 };
 
 /**
- * @brief Target pose for Digitbot IK solver
+ * @brief Target pose for Digibot IK solver
  */
-struct DigitbotTargetPose {
+struct DigibotTargetPose {
     BodyPartTransform leftHand;
     BodyPartTransform rightHand;
     BodyPartTransform leftFoot;
@@ -40,7 +40,7 @@ struct DigitbotTargetPose {
     glm::dquat headOrientation;
     
     // TODO: Define default rest pose values
-    DigitbotTargetPose()
+    DigibotTargetPose()
         : leftHand()
         , rightHand()
         , leftFoot()
@@ -50,15 +50,15 @@ struct DigitbotTargetPose {
 };
 
 /**
- * @brief Manages visual rendering for Digitbot character
+ * @brief Manages visual rendering for Digibot character
  * 
  * Loads and updates articulated body parts using instanced rendering.
  * All body parts share a single SSBO slot for efficient rendering.
  */
-class DigitbotGraphics {
+class DigibotGraphics {
 public:
-    DigitbotGraphics(GraphicsEngine* graphics, DigitbotResources* resources);
-    ~DigitbotGraphics();
+    DigibotGraphics(GraphicsEngine* graphics, DigibotResources* resources);
+    ~DigibotGraphics();
 
     // World transform update (called each physics step)
     void updateWorldTransform(
@@ -71,7 +71,7 @@ public:
         uint64_t physicsTimeStep);
 
     // Body part articulation (IK target)
-    void updateBodyPartPositions(const DigitbotTargetPose& targetPose);
+    void updateBodyPartPositions(const DigibotTargetPose& targetPose);
 
     int getSSBOIndex() const { return m_visualMeshSSBOIndex; }
 
@@ -125,7 +125,7 @@ private:
     void initializeInstanceTransforms();
 
     GraphicsEngine* m_graphics;
-    DigitbotResources* m_resources;  // Non-owning pointer to shared resources
+    DigibotResources* m_resources;  // Non-owning pointer to shared resources
     int m_visualMeshSSBOIndex;
 
     // One geometry and instance per body part
