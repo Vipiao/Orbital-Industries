@@ -31,9 +31,94 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         throw std::runtime_error("DigibotPhysics: Failed to lock GridCollider immediately after creation");
     }
 
-    // Add two cube cells: lower body at {0,0,0}, upper body at {0,0,1}
-    collider->addCubeCell(glm::ivec3(0, 0, 0), 1.0);
-    collider->addCubeCell(glm::ivec3(0, 0, 1), 1.0);
+    // Start with standard cube vertices for the base shape
+    std::vector<glm::dvec3> baseVertices = PolyhedronProcessor::generateCubeVertices(1.0);
+    
+    // Define fixed point value for integer calculations
+    const int fixedPointValue = 10;
+    
+    // Convert base vertices to integer space
+    std::vector<glm::ivec3> lowerIntVertices, upperIntVertices;
+    for (const auto& v : baseVertices) {
+        lowerIntVertices.push_back(glm::ivec3(v * double(fixedPointValue)));
+    }
+    upperIntVertices = lowerIntVertices; // Start with same vertices for upper body
+    
+    // Define vertex offsets as {vertex, x_offset, y_offset, z_offset}
+    struct VertexOffset {
+        PolyhedronProcessor::CubeVertex vertex;
+        int x, y, z;
+    };
+    
+    // TODOO:Hardcode collision box shape. Should probably not do it like this.
+    // Make it more general after adding other characters. Will become more
+    // clear at that point what would be a good interface for reading this info
+    // Define offsets for lower body (combined for each vertex)
+    const VertexOffset lowerOffsets[] = {
+        // Bottom vertices
+        {PolyhedronProcessor::BOTTOM_BACK_LEFT,    2, 0, 4},
+        {PolyhedronProcessor::BOTTOM_BACK_RIGHT,  -2, 0, 4},
+        {PolyhedronProcessor::BOTTOM_FRONT_RIGHT, -2, -3, 4},
+        {PolyhedronProcessor::BOTTOM_FRONT_LEFT,   2, -3, 4},
+        
+        // Top vertices
+        {PolyhedronProcessor::TOP_BACK_LEFT,       2, 0, 0},
+        {PolyhedronProcessor::TOP_BACK_RIGHT,     -2, 0, 0},
+        {PolyhedronProcessor::TOP_FRONT_RIGHT,    -2, -2, 0},
+        {PolyhedronProcessor::TOP_FRONT_LEFT,      2, -2, 0}
+    };
+    
+    // Define offsets for upper body (combined for each vertex)
+    const VertexOffset upperOffsets[] = {
+        // Bottom vertices
+        {PolyhedronProcessor::BOTTOM_BACK_LEFT,    2, 0, 0},
+        {PolyhedronProcessor::BOTTOM_BACK_RIGHT,  -2, 0, 0},
+        {PolyhedronProcessor::BOTTOM_FRONT_RIGHT, -2, -2, 0},
+        {PolyhedronProcessor::BOTTOM_FRONT_LEFT,   2, -2, 0},
+        
+        // Top vertices
+        {PolyhedronProcessor::TOP_BACK_LEFT,       2, 0, -3},
+        {PolyhedronProcessor::TOP_BACK_RIGHT,     -2, 0, -3},
+        {PolyhedronProcessor::TOP_FRONT_RIGHT,    -2, -2, -3},
+        {PolyhedronProcessor::TOP_FRONT_LEFT,      2, -2, -3}
+    };
+    
+    // Apply offsets to lower body
+    for (const auto& offset : lowerOffsets) {
+        lowerIntVertices[offset.vertex].x += offset.x;
+        lowerIntVertices[offset.vertex].y += offset.y;
+        lowerIntVertices[offset.vertex].z += offset.z;
+    }
+    
+    // Apply offsets to upper body
+    for (const auto& offset : upperOffsets) {
+        upperIntVertices[offset.vertex].x += offset.x;
+        upperIntVertices[offset.vertex].y += offset.y;
+        upperIntVertices[offset.vertex].z += offset.z;
+    }
+    
+    // Convert modified integer vertices back to float space for the collider
+    std::vector<glm::dvec3> lowerBodyVertices, upperBodyVertices;
+    for (const auto& v : lowerIntVertices) {
+        lowerBodyVertices.push_back(glm::dvec3(v) / double(fixedPointValue));
+    }
+    for (const auto& v : upperIntVertices) {
+        upperBodyVertices.push_back(glm::dvec3(v) / double(fixedPointValue));
+    }
+    
+    // Calculate axes for each shape
+    auto lowerAxes = PolyhedronProcessor::getAxis(lowerIntVertices, fixedPointValue);
+    auto upperAxes = PolyhedronProcessor::getAxis(upperIntVertices, fixedPointValue);
+    
+    // Add polyhedron cells
+    collider->addPolyhedronCell(glm::ivec3(0, 0, 0),
+                               lowerBodyVertices,
+                               lowerAxes.faceAxis, 
+                               lowerAxes.edgeAxis);
+    collider->addPolyhedronCell(glm::ivec3(0, 0, 1),
+                               upperBodyVertices,
+                               upperAxes.faceAxis,
+                               upperAxes.edgeAxis);
 
     // 2. Calculate mass properties
     std::vector<glm::ivec3> coords = {glm::ivec3(0, 0, 0), glm::ivec3(0, 0, 1)};

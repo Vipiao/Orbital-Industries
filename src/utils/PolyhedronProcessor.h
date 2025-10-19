@@ -185,6 +185,21 @@ public:
     static const std::array<glm::ivec3, 8> DEFAULT_VERTICES;
 
     /**
+     * @brief Enum for standard cube vertex indices
+     * Matches the ordering in generateCubeVertices: (-/+X, -/+Y, -/+Z)
+     */
+    enum CubeVertex {
+        BOTTOM_BACK_LEFT = 0,   // (-x, -y, -z)
+        BOTTOM_BACK_RIGHT = 1,  // (+x, -y, -z)
+        BOTTOM_FRONT_RIGHT = 2, // (+x, +y, -z)
+        BOTTOM_FRONT_LEFT = 3,  // (-x, +y, -z)
+        TOP_BACK_LEFT = 4,      // (-x, -y, +z)
+        TOP_BACK_RIGHT = 5,     // (+x, -y, +z)
+        TOP_FRONT_RIGHT = 6,    // (+x, +y, +z)
+        TOP_FRONT_LEFT = 7      // (-x, +y, +z)
+    };
+
+    /**
      * @brief Check convexity of triangles in a specific direction
      * @param triangles Vector of triangles (each triangle is 3 vertices)
      * @param direction Direction vector to project normals onto for convexity check
