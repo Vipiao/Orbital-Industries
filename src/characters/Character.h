@@ -64,7 +64,7 @@ protected:
 
     // Physics
     RigidBody* m_rigidBody; // Non-owning, managed by PhysicsEngine
-    glm::dvec3 m_centerOfMass; // In local/body coordinates
+    //glm::dvec3 m_centerOfMass; // In local/body coordinates
 
     // Unique ID for deterministic sorting
     int m_uniqueId;

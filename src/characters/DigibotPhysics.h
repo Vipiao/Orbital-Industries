@@ -24,7 +24,7 @@ public:
 
     // Physics state access
     RigidBody* getRigidBody() const { return m_rigidBody; }
-    glm::dvec3 getCenterOfMass() const { return m_centerOfMass; }
+    //glm::dvec3 getCenterOfMass() const { return m_centerOfMass; }
 
     // Collision box visualization
     void showCollisionBox(GraphicsEngine* graphics);
@@ -47,7 +47,7 @@ private:
     // Physics state
     std::weak_ptr<GridCollider> m_colliderWeak;
     RigidBody* m_rigidBody;
-    glm::dvec3 m_centerOfMass;
+    //glm::dvec3 m_centerOfMass;
 
     // Debug visualization
     int m_collisionBoxMeshId;

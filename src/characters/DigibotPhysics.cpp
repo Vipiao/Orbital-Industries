@@ -3,6 +3,7 @@
 #include "../physics/PhysicsEngine.h"
 #include "../physics/GridCollider.h"
 #include "../physics/RigidBody.h"
+#include "../physics/PolyhedronCollider.h"
 #include "../graphics/GraphicsEngine.h"
 #include "../utils/PolyhedronProcessor.h"
 #include "../utils/MassInertiaCalculator.h"
@@ -14,7 +15,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
     , m_rigidBody(nullptr)
-    , m_centerOfMass(0.0, 0.0, 0.0)
+    //, m_centerOfMass(0.0, 0.0, 0.0)
     , m_collisionBoxMeshId(-1)
 {
     // 1. Create GridCollider at origin
@@ -58,7 +59,8 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     totalMass *= 2.0;
     inertiaTensor *= 2.0;
 
-    m_centerOfMass = centerOfMass;
+    //m_centerOfMass = centerOfMass;
+    //m_centerOfMass = {0.5,0.5,4};
 
     // 3. Create RigidBody at origin
     m_rigidBody = m_physics->addRigidBody(
@@ -69,7 +71,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         false  // Not static, should fall
     );
 
-    m_rigidBody->m_colliderOffset = m_centerOfMass;
+    m_rigidBody->m_colliderOffset = {0.5,0.5,1};
 
     // 4. Connect collider to rigid body
     m_physics->connectCollider(m_rigidBody, m_colliderWeak);
@@ -117,28 +119,27 @@ void DigibotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
 
     // Iterate through all cells in the GridCollider
     for (const auto& [coord, polyhedron] : collider->getCells()) {
-        // Generate cube vertices
-        std::vector<glm::dvec3> vertices = PolyhedronProcessor::generateCubeVertices(1.0);
-        
-        // Translate to cell position
+        // Get the actual vertices from the polyhedron
+        PolyhedronCollider* polyCollider = static_cast<PolyhedronCollider*>(polyhedron.get());
+        std::vector<glm::dvec3> vertices = polyCollider->getLocalVertices();
+
+        // Apply cell position offset
         glm::dvec3 cellPos = glm::dvec3(coord.x, coord.y, coord.z);
         for (glm::dvec3& v : vertices) {
-            v += cellPos;
+            // Add cell position offset
+            v += cellPos + 0.5;
+        }
+        
+        // Generate triangle indices from the actual vertices
+        auto triangleIndices = PolyhedronProcessor::getTriangleIndices(vertices);
+        
+        // Create triangles from vertices and indices
+        std::vector<std::array<glm::dvec3, 3>> triangles;
+        for (const auto& indices : triangleIndices) {
+            triangles.push_back({vertices[indices[0]], vertices[indices[1]], vertices[indices[2]]});
         }
 
-        // Convert to integer vertices for triangulation
-        std::vector<glm::ivec3> verticesInt(8);
-        for (int i = 0; i < 8; ++i) {
-            verticesInt[i] = glm::ivec3(
-                (vertices[i].x + 0.5) * 4,
-                (vertices[i].y + 0.5) * 4,
-                (vertices[i].z + 0.5) * 4
-            );
-        }
-
-        auto triangles = PolyhedronProcessor::getTriangles(verticesInt, 4);
         auto meshData = PolyhedronProcessor::generateMeshData(triangles);
-
         // Create color vector
         std::vector<glm::dvec4> colors(meshData.positions.size(), collisionColor);
 
@@ -167,7 +168,7 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         angVelMagnitude = 0.0;
     }
 
-    glm::dvec3 meshPosition = m_rigidBody->m_position - m_centerOfMass;
+    glm::dvec3 meshPosition = m_rigidBody->m_position - m_rigidBody->m_colliderOffset;
 
     graphics->updateMeshTransform(
         m_collisionBoxMeshId,
@@ -176,7 +177,7 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         m_rigidBody->m_orientation,
         angVelAxis,
         angVelMagnitude,
-        m_centerOfMass,
+        m_rigidBody->m_colliderOffset,
         glm::dvec3(1.0, 1.0, 1.0),
         -1, -1, -1,
         currentPhysicsTimeStep,
@@ -189,7 +190,7 @@ glm::dvec3 DigibotPhysics::worldToLocal(const glm::dvec3& worldPos) const {
         worldPos,
         m_rigidBody->m_position,
         m_rigidBody->m_orientation,
-        m_centerOfMass
+        m_rigidBody->m_colliderOffset
     );
 }
 
@@ -198,6 +199,6 @@ glm::dvec3 DigibotPhysics::localToWorld(const glm::dvec3& localPos) const {
         localPos,
         m_rigidBody->m_position,
         m_rigidBody->m_orientation,
-        m_centerOfMass
+        m_rigidBody->m_colliderOffset
     );
 }

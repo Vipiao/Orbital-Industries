@@ -19,7 +19,7 @@ Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
 
     // Set Character base class members
     m_rigidBody = m_digibotPhysics->getRigidBody();
-    m_centerOfMass = m_digibotPhysics->getCenterOfMass();
+    //m_centerOfMass = m_digibotPhysics->getCenterOfMass();
 
     // Create controller subsystem
     m_digibotController = std::make_unique<DigibotController>(
