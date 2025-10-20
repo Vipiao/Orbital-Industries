@@ -16,6 +16,9 @@ public:
 
     // Set the view direction (world space)
     void setViewDirection(const glm::dvec3& viewDirection);
+
+    // Set the roll input (-1 for left/Q, +1 for right/E, 0 for none)
+    void setRollInput(int rollInput);
     
     // Process physics (called during physics update)
     void physics();
@@ -25,11 +28,21 @@ public:
 
     // Get the current view direction
     const glm::dvec3& getViewDirection() const { return m_viewDirection; }
+
+    // Configure roll properties
+    void setRollAcceleration(double acceleration);
+
+    // Configure maximum roll rate
+    void setMaxRollRate(double maxRate);
     
 private:
     DigibotPhysics* m_physics;
     PhysicsEngine* m_physicsEngine;
     glm::ivec3 m_movementDirection;
     double m_thrustStrength;
-    glm::dvec3 m_viewDirection{0.0, 1.0, 0.0}; // Default forward
+    double m_angularAccelerationMax;  // Maximum angular acceleration (rad/s^2)
+    double m_maxRollRate;             // Maximum roll rate (rad/s)
+    double m_rollAcceleration;        // Roll acceleration strength (rad/s^2)
+    int m_rollInput;                  // -1 for roll left, +1 for roll right, 0 for none
+    glm::dvec3 m_viewDirection;       // Current view direction in world space
 };

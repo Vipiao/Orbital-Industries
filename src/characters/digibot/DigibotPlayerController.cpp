@@ -77,6 +77,20 @@ void DigibotPlayerController::update(glm::dvec3& cameraPosition, glm::dquat& cam
     if (keyboard->m_lShift.isDown()) {
         moveDirection.z -= 1;
     }
+
+    // Roll input (Q/E keys)
+    int rollInput = 0;
+    if (keyboard->m_q.isDown()) {
+        rollInput -= 1;  // Roll left
+    }
+    if (keyboard->m_e.isDown()) {
+        rollInput += 1;  // Roll right
+    }
+    
+    // Send roll input to character
+    if (character) {
+        character->setRollInput(rollInput);
+    }
     
     // Send movement to character
     character->setMovementDirection(moveDirection);

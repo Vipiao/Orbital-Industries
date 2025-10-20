@@ -43,6 +43,9 @@ public:
     void setViewDirection(const glm::dvec3& direction);
     glm::dvec3 getViewDirection() const;
 
+    // Roll input control
+    void setRollInput(int rollInput);
+
 private:
     void updateVisualTransform();
 

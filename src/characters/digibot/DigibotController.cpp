@@ -3,12 +3,18 @@
 #include "DigibotPhysics.h"
 #include "../../physics/RigidBody.h"
 #include "../../physics/PhysicsEngine.h"
+#include <glm/gtx/vector_angle.hpp>
+#include "../ArticulationUtils.h"
 
 DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine)
     : m_physics(physics)
     , m_physicsEngine(physicsEngine)
     , m_movementDirection(0, 0, 0)
-    , m_thrustStrength(0.01) // Default thrust strength
+    , m_rollInput(0)
+    , m_thrustStrength(0.004)  // Default thrust strength
+    , m_angularAccelerationMax(0.004)  // Maximum angular acceleration (rad/s²)
+    , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
+    , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -28,43 +34,137 @@ void DigibotController::setMovementDirection(const glm::ivec3& direction) {
     m_movementDirection = direction;
 }
 
+void DigibotController::setRollInput(int rollInput) {
+    m_rollInput = rollInput;
+}
+
 void DigibotController::physics() {
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
         return;
     }
-    
-    // Skip if no movement requested
-    if (m_movementDirection == glm::ivec3(0, 0, 0)) {
-        return;
-    }
-    
-    // Convert integer direction to normalized 3D vector
-    glm::dvec3 direction = glm::dvec3(
-        static_cast<double>(m_movementDirection.x),
-        static_cast<double>(m_movementDirection.y),
-        static_cast<double>(m_movementDirection.z)
-    );
-    
-    // Normalize if not zero
-    if (glm::length(direction) > 0.0) {
-        direction = glm::normalize(direction);
 
-        // Transform direction from local to world space using rigid body orientation
-        direction = rigidBody->m_orientation * direction;
-    } else {
-        return; // Skip if zero length
-    }
+    // ========== Calculate View Orientation ==========
+    // Get body's upward direction
+    glm::dvec3 bodyUpDirection = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
     
-    // Calculate thrust force based on mass
-    double forceMagnitude = m_thrustStrength * rigidBody->m_mass;
-    glm::dvec3 thrustForce = direction * forceMagnitude;
+    // Create view orientation quaternion using view direction and body's up vector 
+    // Note: We need to conjugate/invert the quaternion to transform vectors correctly
+    glm::dquat viewOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(m_viewDirection, bodyUpDirection));
+    
+    // ========== Handle Linear Movement ==========
+    // Handle movement (thrust) if requested
+    glm::dvec3 thrustForce(0.0, 0.0, 0.0);
+    if (m_movementDirection == glm::ivec3(0, 0, 0)) {
+        // No movement, just handle rotation
+    } else {
+        // Convert integer direction to normalized 3D vector
+        glm::dvec3 direction = glm::dvec3(
+            static_cast<double>(m_movementDirection.x),
+            static_cast<double>(m_movementDirection.y),
+            static_cast<double>(m_movementDirection.z)
+        );
+        
+        // Normalize if not zero
+        if (glm::length(direction) > 0.0) {
+            direction = glm::normalize(direction);
+
+            // Transform direction from local to world space using view orientation
+            direction = viewOrientation * direction;
+            
+            // Calculate thrust force based on mass
+            double forceMagnitude = m_thrustStrength * rigidBody->m_mass;
+            thrustForce = direction * forceMagnitude;
+        }
+    }
     
     // Apply force at center of mass
-    m_physicsEngine->applyForce(rigidBody, thrustForce);
+    if (glm::length(thrustForce) > 0.0) {
+        m_physicsEngine->applyForce(rigidBody, thrustForce);
+    }
+
+    // ========== Handle Roll Input ==========
+    if (m_rollInput != 0) {
+        // Calculate roll torque around view direction
+        glm::dvec3 rollAxis = glm::normalize(m_viewDirection);
+
+        //
+        double adjustedRollAcceleration = m_rollAcceleration;
+        if(m_rollInput != 0) {
+            glm::dvec3 currentAngVel = rigidBody->getAngularVelocityWorld();
+            double currentRollRate = glm::dot(currentAngVel, rollAxis);
+            if (glm::abs(currentRollRate) < 0.01)
+            {
+                adjustedRollAcceleration *= 4.;
+            }
+            
+        }
+        
+        // Scale by roll acceleration, inertia, and input direction
+        double torqueMagnitude = adjustedRollAcceleration * static_cast<double>(m_rollInput);
+        glm::dvec3 rollTorque = rollAxis * torqueMagnitude;
+        m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * rollTorque);
+    }
+
+    // ========== View Direction Rotation Logic ==========
+    
+    // 1. Calculate local forward direction in world space
+    glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
+    currentForward = glm::normalize(currentForward);
+    
+    // 2. Calculate angle between current forward and desired view direction
+    glm::dvec3 targetForward = glm::normalize(m_viewDirection);
+    
+    double dotProduct = glm::clamp(glm::dot(currentForward, targetForward), -1.0, 1.0);
+    double deltaAngle = std::acos(dotProduct);
+    
+    // Get rotation axis using cross product
+    glm::dvec3 rotationAxis = glm::cross(currentForward, targetForward);
+    double axisLength = glm::length(rotationAxis);
+    
+    // Initialize target angular velocity
+    glm::dvec3 targetAngularVelocity(0.0, 0.0, 0.0);
+    
+    //std::cout << deltaAngle << std::endl;
+    // Adjust max angular velocity down when close to final target to be more
+    // precise.
+    double adjustedAngVelMax =
+        m_angularAccelerationMax * glm::abs(deltaAngle);
+    // Calculate target angular velocity if we need to rotate
+    if (axisLength > 1e-6) {
+        // Normalize the rotation axis
+        rotationAxis = rotationAxis / axisLength;
+        
+        // 3. Calculate maximum angular speed based on remaining angle and max acceleration
+        double margin = 0.2;
+        double maxAngularSpeed = std::sqrt(
+            2.0 * adjustedAngVelMax * (1. - margin) * deltaAngle
+        );
+        
+        // 4. Calculate target angular velocity
+        targetAngularVelocity = rotationAxis * maxAngularSpeed;
+    }
+    // else: targetAngularVelocity remains zero - we want to stop any rotation
+    
+    // 5. Calculate angular acceleration needed (always do this to handle deceleration)
+    glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
+    glm::dvec3 angularAcceleration = targetAngularVelocity - currentAngularVelocity;
+    
+    // 6. Limit acceleration and apply torque
+    double angAccMagnitude = glm::length(angularAcceleration);
+    if (angAccMagnitude > m_angularAccelerationMax) {
+        angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
+    }
+    
+    // Apply torque (I * α = τ)
+    m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 }
 
 void DigibotController::setThrustStrength(double strength) {
     m_thrustStrength = strength;
+}
+
+void DigibotController::setRollAcceleration(double acceleration) {
+    m_rollAcceleration = acceleration;
 }
