@@ -39,7 +39,7 @@ void FreeCameraController::update(double deltaTime, glm::dvec3& position, glm::d
     // Mouse look (camera rotation)
     if (mouseHandler->getMouseLock()) {
         // Calculate mouse sensitivity based on framerate
-        const double mouseSensitivity = 0.0014;
+        const double mouseSensitivity = 0.0008;
         glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
         
         // Rotate around Z-axis for yaw (left/right)

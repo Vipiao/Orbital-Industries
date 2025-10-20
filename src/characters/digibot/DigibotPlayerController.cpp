@@ -104,7 +104,7 @@ void DigibotPlayerController::update(glm::dvec3& cameraPosition, glm::dquat& cam
         glm::dquat viewQuat = glm::conjugate(ArticulationUtils::quatLookAtYForward(currentViewDir, upVector));
         
         // Step 2: Apply local rotations from mouse input
-        const double mouseSensitivity = 0.0014;
+        const double mouseSensitivity = 0.0008;
         glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
         
         double pitchAngle = -mouseMovement.y * mouseSensitivity;
