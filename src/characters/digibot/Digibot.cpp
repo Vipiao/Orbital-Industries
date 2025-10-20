@@ -4,9 +4,9 @@
 #include "DigibotGraphics.h"
 #include "DigibotController.h"
 #include "DigibotResources.h"
-#include "../physics/PhysicsEngine.h"
-#include "../physics/RigidBody.h"
-#include "../graphics/GraphicsEngine.h"
+#include "../../physics/PhysicsEngine.h"
+#include "../../physics/RigidBody.h"
+#include "../../graphics/GraphicsEngine.h"
 
 Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
                    JobManager* jobManager, TimeHandler* timeHandler,

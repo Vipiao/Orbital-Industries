@@ -1,8 +1,8 @@
 // DigibotController.cpp
 #include "DigibotController.h"
 #include "DigibotPhysics.h"
-#include "../physics/RigidBody.h"
-#include "../physics/PhysicsEngine.h"
+#include "../../physics/RigidBody.h"
+#include "../../physics/PhysicsEngine.h"
 
 DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine)
     : m_physics(physics)

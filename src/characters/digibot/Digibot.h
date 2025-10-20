@@ -1,7 +1,7 @@
 // Digibot.h
 #pragma once
 
-#include "Character.h"
+#include "../Character.h"
 #include <memory>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>

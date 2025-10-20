@@ -18,7 +18,7 @@
 #include "FreeCameraController.h"
 #include "ColorTool.h"
 #include "ModifyTool.h"
-#include "../characters/DigibotPlayerController.h"
+#include "../characters/digibot/DigibotPlayerController.h"
 #include "BuildTool.h"
 #include "../utils/ColorUtils.h"
 #include <float.h>

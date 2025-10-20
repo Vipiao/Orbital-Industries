@@ -1,7 +1,7 @@
 // CharacterSubsystem.cpp
 #include "CharacterSubsystem.h"
-#include "DigibotResources.h"
-#include "DigibotPlayerController.h"
+#include "digibot/DigibotResources.h"
+#include "digibot/DigibotPlayerController.h"
 #include <algorithm>
 
 CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,

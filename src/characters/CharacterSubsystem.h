@@ -2,8 +2,8 @@
 #pragma once
 
 #include "Character.h"
-#include "Digibot.h"
-#include "DigibotResources.h"
+#include "digibot/Digibot.h"
+#include "digibot/DigibotResources.h"
 #include <memory>
 #include <vector>
 

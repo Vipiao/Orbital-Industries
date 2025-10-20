@@ -1,14 +1,14 @@
 // DigibotPhysics.cpp
 #include "DigibotPhysics.h"
-#include "../physics/PhysicsEngine.h"
-#include "../physics/GridCollider.h"
-#include "../physics/RigidBody.h"
-#include "../physics/PolyhedronCollider.h"
-#include "../graphics/GraphicsEngine.h"
-#include "../utils/PolyhedronProcessor.h"
-#include "../utils/MassInertiaCalculator.h"
-#include "../utils/GridGeometry.h"
-#include "../graphics/meshHandler/MeshHandler.h"
+#include "../../physics/PhysicsEngine.h"
+#include "../../physics/GridCollider.h"
+#include "../../physics/RigidBody.h"
+#include "../../physics/PolyhedronCollider.h"
+#include "../../graphics/GraphicsEngine.h"
+#include "../../utils/PolyhedronProcessor.h"
+#include "../../utils/MassInertiaCalculator.h"
+#include "../../utils/GridGeometry.h"
+#include "../../graphics/meshHandler/MeshHandler.h"
 
 DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler)
     : m_physics(physics)
@@ -56,10 +56,10 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     // Define offsets for lower body (combined for each vertex)
     const VertexOffset lowerOffsets[] = {
         // Bottom vertices
-        {PolyhedronProcessor::BOTTOM_BACK_LEFT,    2, 0, 4},
-        {PolyhedronProcessor::BOTTOM_BACK_RIGHT,  -2, 0, 4},
-        {PolyhedronProcessor::BOTTOM_FRONT_RIGHT, -2, -3, 4},
-        {PolyhedronProcessor::BOTTOM_FRONT_LEFT,   2, -3, 4},
+        {PolyhedronProcessor::BOTTOM_BACK_LEFT,    2, 0, 5},
+        {PolyhedronProcessor::BOTTOM_BACK_RIGHT,  -2, 0, 5},
+        {PolyhedronProcessor::BOTTOM_FRONT_RIGHT, -2, -3, 5},
+        {PolyhedronProcessor::BOTTOM_FRONT_LEFT,   2, -3, 5},
         
         // Top vertices
         {PolyhedronProcessor::TOP_BACK_LEFT,       2, 0, 0},
