@@ -1,11 +1,11 @@
 // BuildTool.cpp
 #include "BuildTool.h"
-#include "../game_base/GameBase.h"
-#include "RadialMenu.h"
-#include "../game_base/Grid.h"
-#include "StructuralBlock.h"
-#include "../graphics/MeshManager2D/MeshManager2D.h"
-#include "../graphics/MeshManager2D/GeometryInstance.h"
+#include "../GameBase.h"
+#include "../RadialMenu.h"
+#include "../Grid.h"
+#include "../StructuralBlock.h"
+#include "../../graphics/MeshManager2D/MeshManager2D.h"
+#include "../../graphics/MeshManager2D/GeometryInstance.h"
 #include <iostream>
 
 BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)

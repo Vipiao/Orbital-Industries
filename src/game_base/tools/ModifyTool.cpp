@@ -1,16 +1,16 @@
 // ModifyTool.cpp
 #include "ModifyTool.h"
-#include "../game_base/GameBase.h"
-#include "RadialMenu.h"
-#include "../game_base/Grid.h"
-#include "StructuralBlock.h"
-#include "../graphics/MeshManager2D/MeshManager2D.h"
-#include "../graphics/MeshManager2D/GeometryInstance.h"
-#include "../graphics/InstanceHandler/InstanceHandler.h"
-#include "../utils/PositionSelector.h"
+#include "../GameBase.h"
+#include "../RadialMenu.h"
+#include "../Grid.h"
+#include "../StructuralBlock.h"
+#include "../../graphics/MeshManager2D/MeshManager2D.h"
+#include "../../graphics/MeshManager2D/GeometryInstance.h"
+#include "../../graphics/InstanceHandler/InstanceHandler.h"
+#include "../../utils/PositionSelector.h"
 #include <cmath>
 #include <iostream>
-#include "../utils/PolyhedronProcessor.h"
+#include "../../utils/PolyhedronProcessor.h"
 #include <algorithm>
 
 ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)

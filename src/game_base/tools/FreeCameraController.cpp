@@ -1,8 +1,8 @@
 // FreeCameraController.cpp
 #include "FreeCameraController.h"
-#include "../graphics/GraphicsEngine.h"
-#include "../graphics/KeyboardHandler.h"
-#include "../graphics/MouseHandler.h"
+#include "../../graphics/GraphicsEngine.h"
+#include "../../graphics/KeyboardHandler.h"
+#include "../../graphics/MouseHandler.h"
 #include <glm/gtc/quaternion.hpp>
 #include <iostream>
 

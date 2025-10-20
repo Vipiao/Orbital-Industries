@@ -1,7 +1,7 @@
 // CharacterSelectionTool.cpp
 #include "CharacterSelectionTool.h"
-#include "../game_base/GameBase.h"
-#include "RadialMenu.h"
+#include "../GameBase.h"
+#include "../RadialMenu.h"
 #include <iostream>
 
 CharacterSelectionTool::CharacterSelectionTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)

@@ -8,7 +8,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
 #include <array>
-#include "../graphics/MeshManager2D/GeometryData.h"
+#include "../../graphics/MeshManager2D/GeometryData.h"
 
 // Forward declarations
 class GameBase;
