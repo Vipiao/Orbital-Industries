@@ -75,6 +75,9 @@ public:
     // Get the timestamp of the last physics step
     std::chrono::time_point<std::chrono::high_resolution_clock> getLastPhysicsStepTime() const { return m_lastPhysicsStepTime; }
     
+    // Access to all rigid bodies for external systems
+    const std::vector<std::unique_ptr<RigidBody>>& getRigidBodies() const { return m_rigidBodies; }
+
 private:
     // Physics simulation steps
     void applyForces();

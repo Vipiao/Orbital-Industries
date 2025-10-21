@@ -224,24 +224,29 @@ void Creative::physics() {
 
 void Creative::applyDragForces() {
     // Apply drag to all objects before running physics
-    for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
-        if (!gridShared) continue;
-        RigidBody* body = gridShared->getRigidBody();
-        if (body && !body->m_isStatic && body->m_forces == glm::dvec3{0,0,0}) {
-            // Simple drag force calculation: -dragCoefficient * velocity
-            const double dragCoefficient = 0.04 * 0.4 * 2.0;
-            
-            // Apply drag to linear velocity
-            if (glm::length(body->m_velocity) > 0.0) {
-                glm::dvec3 dragForce = -dragCoefficient * body->m_velocity * body->m_mass;
-                m_gameBase->m_physicsEngine->applyForce(body, dragForce);
-            }
-            
-            // Apply drag to angular velocity
-            if (glm::length(body->m_angularMomentumBody) > 0.0) {
-                glm::dvec3 angularDrag = -dragCoefficient * body->getWorldInertiaTensor() * body->getAngularVelocityWorld();
-                m_gameBase->m_physicsEngine->applyTorque(body, angularDrag);
-            }
+    // Get all rigid bodies from the physics engine
+    const auto& rigidBodies = m_gameBase->m_physicsEngine->getRigidBodies();
+    
+    // Apply drag to each non-static rigid body
+    for (const auto& bodyPtr : rigidBodies) {
+        // Skip null or static bodies, or bodies that already have forces applied
+        if (!bodyPtr || bodyPtr->m_isStatic || bodyPtr->m_forces != glm::dvec3{0,0,0}) {
+            continue;
+        }
+        
+        // Simple drag force calculation: -dragCoefficient * velocity
+        const double dragCoefficient = 0.04 * 0.2;
+        
+        // Apply drag to linear velocity
+        if (glm::length(bodyPtr->m_velocity) > 0.0) {
+            glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->m_mass;
+            m_gameBase->m_physicsEngine->applyForce(bodyPtr.get(), dragForce);
+        }
+        
+        // Apply drag to angular velocity
+        if (glm::length(bodyPtr->m_angularMomentumBody) > 0.0) {
+            glm::dvec3 angularDrag = -dragCoefficient * bodyPtr->getWorldInertiaTensor() * bodyPtr->getAngularVelocityWorld();
+            m_gameBase->m_physicsEngine->applyTorque(bodyPtr.get(), angularDrag);
         }
     }
 }
