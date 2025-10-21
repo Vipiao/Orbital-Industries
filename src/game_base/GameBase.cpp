@@ -166,17 +166,18 @@ void GameBase::postRenderCallback(uint64_t frameNum) {
             std::chrono::duration<double>(targetFrameDuration));
 
     // Schedule physics job if needed
-    if (currentTime >= m_nextPhysicsTime) {
+    if (currentTime >= m_nextPhysicsTime && !m_physicsUpdateInProgress) {
         // Calculate scheduling error (how late we are)
         m_physicsTimeError = std::chrono::duration<double>(currentTime - m_nextPhysicsTime).count();
+
+        // Set flag indicating physics update is in progress
+        m_physicsUpdateInProgress = true;
 
         // Schedule physics as a high-priority job
         auto jobHandle = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
             return updatePhysics(endTime);
         }, JobPriorities::PHYSICS_UPDATE);
         trackJob(jobHandle);
-        //updatePhysics(currentTime + std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
-        //    std::chrono::duration<double>(9999.9)));
         
         m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(m_physicsTimeStep));
@@ -246,6 +247,9 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
         callback->onPhysicsUpdateComplete();
     }
     
+    // Clear the physics update flag
+    m_physicsUpdateInProgress = false;
+
     return false;
 }
 

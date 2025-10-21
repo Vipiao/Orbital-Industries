@@ -88,6 +88,9 @@ private:
     double m_physicsTimeError{0.0}; // Track scheduling error for interpolation
     double m_physicsTimeStep{}; // Is set in constructor.
 
+    // Flag to track if physics update is in progress
+    bool m_physicsUpdateInProgress{false};
+
     DebugRenderer* m_debugRenderer = nullptr;
 };
 
