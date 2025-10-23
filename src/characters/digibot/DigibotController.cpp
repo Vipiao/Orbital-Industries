@@ -131,7 +131,49 @@ void DigibotController::physics() {
             std::cout << "Target grid destroyed - unlocking" << std::endl;
             unlock();
         } else {
-            // TODOO: Implement full lock (translation + rotation)
+            // Get target grid's rigid body
+            auto targetGrid = m_targetGrid.lock();
+            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
+            
+            if (!targetGridRigidBody) {
+                std::cout << "Target grid has no rigid body - unlocking" << std::endl;
+                unlock();
+            } else {
+                // ========== Translation Component ==========
+                // Get character position
+                glm::dvec3 characterPos = rigidBody->m_position;
+                
+                // Get grid's center of mass position
+                glm::dvec3 gridPos = targetGridRigidBody->m_position;
+                
+                // Calculate radius vector from grid center to character
+                glm::dvec3 radiusVector = characterPos - gridPos;
+                
+                // Get grid's angular velocity
+                glm::dvec3 gridAngularVelocity = targetGridRigidBody->getAngularVelocityWorld();
+                
+                // Calculate velocity at character position due to grid rotation: v = ω × r
+                glm::dvec3 velocityFromRotation = glm::cross(gridAngularVelocity, radiusVector);
+                
+                // Total target linear velocity = grid's linear velocity + velocity from rotation
+                glm::dvec3 targetLinearVelocity = targetGridRigidBody->m_velocity + velocityFromRotation;
+                
+                // Calculate relative velocity
+                glm::dvec3 digibotVelocity = rigidBody->m_velocity;
+                glm::dvec3 relativeLinearVelocity = digibotVelocity - targetLinearVelocity;
+                
+                // Calculate correction force
+                glm::dvec3 correctionForce = -relativeLinearVelocity * m_translationLockStrength * rigidBody->m_mass;
+                
+                // Project correction force to plane orthogonal to movement force
+                if (glm::length(movementForce) > 1e-6) {
+                    glm::dvec3 movementDirection = glm::normalize(movementForce);
+                    double projectionOntoMovement = glm::dot(correctionForce, movementDirection);
+                    correctionForce = correctionForce - projectionOntoMovement * movementDirection;
+                }
+                
+                lockForce = correctionForce;
+            }
         }
     }
     
@@ -209,6 +251,18 @@ void DigibotController::physics() {
     }
     // else: targetAngularVelocity remains zero - we want to stop any rotation
     
+    // ========== Add Grid Angular Velocity for Full Lock ==========
+    if (m_lockState == LockState::FULL_LOCK && !m_targetGrid.expired()) {
+        auto targetGrid = m_targetGrid.lock();
+        if (targetGrid) {
+            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
+            if (targetGridRigidBody) {
+                // Add grid's angular velocity to our target
+                targetAngularVelocity += targetGridRigidBody->getAngularVelocityWorld();
+            }
+        }
+    }
+
     // 5. Calculate angular acceleration needed (always do this to handle deceleration)
     glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
     glm::dvec3 angularAcceleration = targetAngularVelocity - currentAngularVelocity;

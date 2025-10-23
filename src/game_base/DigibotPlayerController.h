@@ -52,4 +52,7 @@ private:
 
     // Lock state
     bool m_needsRaycast{false};
+
+    // Frame timing for view rotation
+    double m_lastTimeRemainder{0.0};
 };

@@ -2,6 +2,7 @@
 #include "DigibotPlayerController.h"
 #include "../characters/digibot/Digibot.h"
 #include "../characters/digibot/DigibotController.h"
+#include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "../game_base/Grid.h"
 #include "../graphics/GraphicsEngine.h"
@@ -120,6 +121,11 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         return;
     }
     
+    // Calculate delta time remainder since last frame
+    double deltaTimeRemainder = timeRemainder - m_lastTimeRemainder;
+    if (deltaTimeRemainder < 0.0) deltaTimeRemainder += 1.0; // Handle wraparound
+    m_lastTimeRemainder = timeRemainder;
+
     // Check if we have a valid character
     auto character = m_pilotableCharacter.lock();
     if (!character) {
@@ -192,15 +198,40 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     // Get up vector from rigid body orientation
     glm::dvec3 upVector = interpolatedOrientation * glm::dvec3(0.0, 0.0, 1.0);
     
-    // Process view direction from mouse input
+    // Get current view direction
+    glm::dvec3 currentViewDir = character->getViewDirection();
+    
+    // Apply grid rotation if in FULL_LOCK mode
+    if (controller && controller->getLockState() == DigibotController::LockState::FULL_LOCK) {
+        auto targetGrid = controller->getTargetGrid().lock();
+        if (targetGrid) {
+            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
+            if (targetGridRigidBody) {
+                // Get grid's angular velocity
+                glm::dvec3 gridAngularVelocity = targetGridRigidBody->getAngularVelocityWorld();
+                double angularVelocityMagnitude = glm::length(gridAngularVelocity);
+                
+                if (angularVelocityMagnitude > 1e-6) {
+                    // Calculate rotation for this frame
+                    double rotationAngle = angularVelocityMagnitude * deltaTimeRemainder;
+                    glm::dvec3 rotationAxis = gridAngularVelocity / angularVelocityMagnitude;
+                    
+                    // Create rotation quaternion
+                    glm::dquat gridRotationQuat = glm::angleAxis(rotationAngle, rotationAxis);
+                    
+                    // Apply grid rotation to current view direction
+                    currentViewDir = gridRotationQuat * currentViewDir;
+                }
+            }
+        }
+    }
+    
+    // Apply mouse input to view direction
     if (mouseHandler->getMouseLock()) {
-        // Get current view direction
-        glm::dvec3 currentViewDir = character->getViewDirection();
-        
         // Step 1: Create orientation quaternion using look-at function
         glm::dquat viewQuat = glm::conjugate(ArticulationUtils::quatLookAtYForward(currentViewDir, upVector));
         
-        // Step 2: Apply local rotations from mouse input
+        // Step 2: Apply mouse rotations
         const double mouseSensitivity = 0.0008;
         glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
         
@@ -210,11 +241,11 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         double yawAngle = -mouseMovement.x * mouseSensitivity;
         glm::dquat yawQuat = glm::angleAxis(yawAngle, glm::dvec3(0.0, 0.0, 1.0));
 
-        glm::dvec3 newViewDir = viewQuat * pitchQuat * yawQuat * glm::dvec3(0.0, 1.0, 0.0);
-        
-        // Set new view direction
-        character->setViewDirection(newViewDir);
+        currentViewDir = viewQuat * pitchQuat * yawQuat * glm::dvec3(0.0, 1.0, 0.0);
     }
+
+    // Always set the final view direction (after grid rotation and/or mouse input)
+    character->setViewDirection(currentViewDir);
 
     // Position camera in third-person view using view direction
     // Get character position and orientation

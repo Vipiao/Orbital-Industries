@@ -45,6 +45,7 @@ public:
     void unlock();
     void setLockState(LockState state) { m_lockState = state; }
     LockState getLockState() const { return m_lockState; }
+    std::weak_ptr<Grid> getTargetGrid() const { return m_targetGrid; }
     
 private:
     DigibotPhysics* m_physics;
