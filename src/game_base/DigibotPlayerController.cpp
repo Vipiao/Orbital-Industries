@@ -1,7 +1,9 @@
 // DigibotPlayerController.cpp
 #include "DigibotPlayerController.h"
 #include "../characters/digibot/Digibot.h"
+#include "../characters/digibot/DigibotController.h"
 #include "../physics/RigidBody.h"
+#include "../game_base/Grid.h"
 #include "../graphics/GraphicsEngine.h"
 #include "../characters/ArticulationUtils.h"
 #include "../graphics/KeyboardHandler.h"
@@ -32,7 +34,88 @@ void DigibotPlayerController::disable() {
     m_enabled = false;
 }
 
-void DigibotPlayerController::update(glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder) {
+void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange) {
+    if (!m_needsRaycast || !controller || !m_graphics) {
+        return;
+    }
+    
+    // Reset flag
+    m_needsRaycast = false;
+    
+    // Perform ray cast to find target grid
+    glm::dvec3 cameraPos = m_graphics->getCamPos();
+    glm::dvec3 forward = m_graphics->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+    glm::dvec3 rayStart = cameraPos;
+    glm::dvec3 rayEnd = cameraPos + forward * interactionRange;
+    
+    std::weak_ptr<Grid> closestGrid;
+    bool gridFound = false;
+    double closestT = -1.0;
+    
+    // Find closest ray intersection across available grids
+    for (const auto& gridWeak : availableGrids) {
+        auto gridShared = gridWeak.lock();
+        if (!gridShared) continue;
+        
+        // Transform world ray to grid-local space
+        glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(rayStart);
+        glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(rayEnd);
+        
+        // Perform ray intersection in grid-local space
+        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
+        
+        // Check if this is a closer hit than what we have so far
+        if (result.t >= 0.0 && (!gridFound || result.t < closestT)) {
+            closestT = result.t;
+            gridFound = true;
+            closestGrid = gridWeak;
+        }
+    }
+    
+    // Lock to the closest grid if found
+    if (gridFound) {
+        controller->setLockState(DigibotController::LockState::TRANSLATION_LOCK);
+        controller->setTargetGrid(closestGrid);
+    } else {
+        std::cout << "No grid found to lock to" << std::endl;
+    }
+}
+
+void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder) {
+    if (!m_enabled || !m_graphics) {
+        return;
+    }
+    
+    // Handle lock input state machine
+    if (controller) {
+        KeyboardHandler* keyboard = m_graphics->getKeyboardHandler();
+        if (keyboard) {
+            // Calculate full lock threshold (0.3 seconds worth of frames)
+            uint64_t fullLockThreshold = static_cast<uint64_t>(0.3 * static_cast<double>(m_graphics->getFrameRate()));
+            
+            // Get current lock state
+            DigibotController::LockState lockState = controller->getLockState();
+            
+            // Handle Z button press for lock/unlock
+            if (keyboard->m_z.justPressed()) {
+                if (lockState == DigibotController::LockState::UNLOCKED) {
+                    // Request raycast on next physics update
+                    m_needsRaycast = true;
+                } else {
+                    // Already locked - unlock immediately
+                    controller->unlock();
+                }
+            }
+            
+            // Handle transition to FULL_LOCK when holding Z
+            if (keyboard->m_z.isDown() && lockState == DigibotController::LockState::TRANSLATION_LOCK) {
+                if (keyboard->m_z.timeDown() > fullLockThreshold) {
+                    controller->setLockState(DigibotController::LockState::FULL_LOCK);
+                    std::cout << "Transitioning to FULL_LOCK (not yet implemented)" << std::endl;
+                }
+            }
+        }
+    }
     if (!m_enabled || !m_graphics) {
         return;
     }

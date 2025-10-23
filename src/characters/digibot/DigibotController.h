@@ -2,11 +2,16 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <memory>
 
 class DigibotPhysics;
 class PhysicsEngine;
+class Grid;
 
 class DigibotController {
+public:
+    enum class LockState { UNLOCKED, TRANSLATION_LOCK, FULL_LOCK };
+
 public:
     DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine);
     ~DigibotController() = default;
@@ -34,6 +39,12 @@ public:
 
     // Configure maximum roll rate
     void setMaxRollRate(double maxRate);
+
+    // Grid locking
+    void setTargetGrid(std::weak_ptr<Grid> grid);
+    void unlock();
+    void setLockState(LockState state) { m_lockState = state; }
+    LockState getLockState() const { return m_lockState; }
     
 private:
     DigibotPhysics* m_physics;
@@ -45,4 +56,8 @@ private:
     double m_rollAcceleration;        // Roll acceleration strength (rad/s^2)
     int m_rollInput;                  // -1 for roll left, +1 for roll right, 0 for none
     glm::dvec3 m_viewDirection;       // Current view direction in world space
+
+    // Grid locking state
+    LockState m_lockState;
+    std::weak_ptr<Grid> m_targetGrid;
 };

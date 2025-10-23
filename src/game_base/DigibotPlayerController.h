@@ -4,11 +4,14 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <vector>
 
 class Digibot;
+class DigibotController;
 class GraphicsEngine;
 class KeyboardHandler;
 class MouseHandler;
+class Grid;
 
 /**
  * @brief Controls player-driven Digibot characters
@@ -21,8 +24,8 @@ public:
     DigibotPlayerController(GraphicsEngine* graphics);
     ~DigibotPlayerController() = default;
     
-    // Core functionality - updates camera and sends inputs to character (timeRemainder for interpolation)
-    void update(glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder);
+    // Core functionality - updates camera and sends inputs to character
+    void update(DigibotController* controller, glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder);
     
     // Character selection
     void setPilotableCharacter(std::weak_ptr<Digibot> character);
@@ -32,6 +35,9 @@ public:
     void enable();
     void disable();
     bool isEnabled() const { return m_enabled; }
+
+    // Physics callback for lock raycasting
+    void onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange);
     
 private:
     // References
@@ -43,4 +49,7 @@ private:
     
     // Third-person camera offset (in local character space)
     glm::dvec3 m_cameraOffset{0.0, -3.0, 1.0}; // Behind and above character
+
+    // Lock state
+    bool m_needsRaycast{false};
 };

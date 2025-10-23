@@ -46,6 +46,9 @@ public:
     // Roll input control
     void setRollInput(int rollInput);
 
+    // Controller access
+    DigibotController* getController() { return m_digibotController.get(); }
+
 private:
     void updateVisualTransform();
 

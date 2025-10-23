@@ -4,6 +4,7 @@
 #include "../../physics/RigidBody.h"
 #include "../../physics/PhysicsEngine.h"
 #include <glm/gtx/vector_angle.hpp>
+#include <iostream>
 #include "../ArticulationUtils.h"
 
 DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine)
@@ -15,6 +16,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_angularAccelerationMax(0.004)  // Maximum angular acceleration (rad/s²)
     , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
+    , m_lockState(LockState::UNLOCKED)
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -38,7 +40,30 @@ void DigibotController::setRollInput(int rollInput) {
     m_rollInput = rollInput;
 }
 
+void DigibotController::setTargetGrid(std::weak_ptr<Grid> grid) {
+    m_targetGrid = grid;
+    std::cout << "Target grid set" << std::endl;
+}
+
+void DigibotController::unlock() {
+    m_targetGrid.reset();
+    m_lockState = LockState::UNLOCKED;
+    std::cout << "Unlocked from grid" << std::endl;
+}
+
 void DigibotController::physics() {
+    // Check if target grid is still valid
+    if (m_lockState != LockState::UNLOCKED) {
+        if (m_targetGrid.expired()) {
+            std::cout << "Target grid destroyed - unlocking" << std::endl;
+            unlock();
+            return;
+        }
+        
+        // TODOO: Implement lock force application
+        // std::cout << "Lock state: " << static_cast<int>(m_lockState) << std::endl;
+    }
+
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {

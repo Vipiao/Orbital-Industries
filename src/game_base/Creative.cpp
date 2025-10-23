@@ -220,6 +220,18 @@ void Creative::physics() {
 
     // Call build tool physics callback
     m_buildTool->onPhysicsUpdateComplete(interactionGrids);
+
+    // Call player controller physics callback if character control is active
+    if (m_characterSelectionTool->isActive()) {
+        const auto& characters = m_gameBase->m_characterSubsystem->getCharacters();
+        for (const auto& character : characters) {
+            std::shared_ptr<Digibot> digibot = std::dynamic_pointer_cast<Digibot>(character);
+            if (digibot) {
+                m_digibotPlayerController->onPhysicsUpdateComplete(digibot->getController(), interactionGrids, m_interactionRange);
+                break; // Only process first character for now
+            }
+        }
+    }
     
     // Apply drag forces to all grids before physics update
     applyDragForces();
@@ -368,9 +380,17 @@ void Creative::processInputLogic() {
             }
         }
 
+        // Get controller for update
+        DigibotController* controller = nullptr;
+        auto digibot = pilotableCharacter.lock();
+        if (digibot) {
+            controller = digibot->getController();
+        }
+
         m_digibotPlayerController->setPilotableCharacter(pilotableCharacter);
         m_digibotPlayerController->enable();
         m_digibotPlayerController->update(
+            controller,
             m_gameBase->m_graphicsEngine->getCamPos(),
             m_gameBase->m_graphicsEngine->getCamOri(),
             timeRemainder
