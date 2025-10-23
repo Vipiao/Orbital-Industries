@@ -16,6 +16,7 @@ class ColorTool;
 class ModifyTool;
 class BuildTool;
 class FreeCameraController;
+class DigibotPlayerController;
 class Collider;
 
 /**
@@ -55,6 +56,9 @@ private:
 
     // Free camera controller
     std::unique_ptr<FreeCameraController> m_freeCameraController;
+
+    // Digibot player controller
+    std::unique_ptr<DigibotPlayerController> m_digibotPlayerController;
 
     // Character selection tool
     std::unique_ptr<CharacterSelectionTool> m_characterSelectionTool;

@@ -16,9 +16,9 @@
 #include "RadialMenu.h"
 #include "tools/CharacterSelectionTool.h"
 #include "tools/FreeCameraController.h"
+#include "DigibotPlayerController.h"
 #include "tools/ColorTool.h"
 #include "tools/ModifyTool.h"
-#include "../characters/digibot/DigibotPlayerController.h"
 #include "tools/BuildTool.h"
 #include "../utils/ColorUtils.h"
 #include <float.h>
@@ -43,6 +43,9 @@ Creative::Creative(GameBase* gameBase)
 
     // Create free camera controller
     m_freeCameraController = std::make_unique<FreeCameraController>(m_gameBase->m_graphicsEngine.get());
+
+    // Create digibot player controller
+    m_digibotPlayerController = std::make_unique<DigibotPlayerController>(m_gameBase->m_graphicsEngine.get());
 
     // Create character control tool
     m_characterSelectionTool = std::make_unique<CharacterSelectionTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
@@ -353,19 +356,28 @@ void Creative::processInputLogic() {
         auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
 
         // Character control mode - use player controller
-        auto playerController = m_gameBase->m_characterSubsystem->getPlayerController();
-        if (playerController) {
-            playerController->enable();
-            playerController->update(
-                m_gameBase->m_graphicsEngine->getCamPos(),
-                m_gameBase->m_graphicsEngine->getCamOri(),
-                timeRemainder
-            );
+        // Get first available character
+        std::weak_ptr<Digibot> pilotableCharacter;
+        const auto& characters = m_gameBase->m_characterSubsystem->getCharacters();
+        for (const auto& character : characters) {
+            // Try to cast to Digibot
+            std::shared_ptr<Digibot> digibot = std::dynamic_pointer_cast<Digibot>(character);
+            if (digibot) {
+                pilotableCharacter = digibot;
+                break;
+            }
         }
+
+        m_digibotPlayerController->setPilotableCharacter(pilotableCharacter);
+        m_digibotPlayerController->enable();
+        m_digibotPlayerController->update(
+            m_gameBase->m_graphicsEngine->getCamPos(),
+            m_gameBase->m_graphicsEngine->getCamOri(),
+            timeRemainder
+        );
     } else {
         // Free camera mode
-        auto playerController = m_gameBase->m_characterSubsystem->getPlayerController();
-        if (playerController) playerController->disable();
+        m_digibotPlayerController->disable();
         
         m_freeCameraController->update(
             deltaTime, 

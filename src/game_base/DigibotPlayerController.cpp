@@ -1,11 +1,11 @@
 // DigibotPlayerController.cpp
 #include "DigibotPlayerController.h"
-#include "Digibot.h"
-#include "../../physics/RigidBody.h"
-#include "../../graphics/GraphicsEngine.h"
-#include "../ArticulationUtils.h"
-#include "../../graphics/KeyboardHandler.h"
-#include "../../graphics/MouseHandler.h"
+#include "../characters/digibot/Digibot.h"
+#include "../physics/RigidBody.h"
+#include "../graphics/GraphicsEngine.h"
+#include "../characters/ArticulationUtils.h"
+#include "../graphics/KeyboardHandler.h"
+#include "../graphics/MouseHandler.h"
 #include <iostream>
 
 DigibotPlayerController::DigibotPlayerController(GraphicsEngine* graphics)

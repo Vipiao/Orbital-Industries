@@ -5,10 +5,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+class Digibot;
 class GraphicsEngine;
 class KeyboardHandler;
 class MouseHandler;
-class Digibot;
 
 /**
  * @brief Controls player-driven Digibot characters
