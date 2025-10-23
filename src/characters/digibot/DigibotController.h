@@ -60,4 +60,5 @@ private:
     // Grid locking state
     LockState m_lockState;
     std::weak_ptr<Grid> m_targetGrid;
+    double m_translationLockStrength;
 };

@@ -3,6 +3,7 @@
 #include "DigibotPhysics.h"
 #include "../../physics/RigidBody.h"
 #include "../../physics/PhysicsEngine.h"
+#include "../../game_base/Grid.h"
 #include <glm/gtx/vector_angle.hpp>
 #include <iostream>
 #include "../ArticulationUtils.h"
@@ -17,6 +18,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
     , m_lockState(LockState::UNLOCKED)
+    , m_translationLockStrength(1.0)
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -52,18 +54,6 @@ void DigibotController::unlock() {
 }
 
 void DigibotController::physics() {
-    // Check if target grid is still valid
-    if (m_lockState != LockState::UNLOCKED) {
-        if (m_targetGrid.expired()) {
-            std::cout << "Target grid destroyed - unlocking" << std::endl;
-            unlock();
-            return;
-        }
-        
-        // TODOO: Implement lock force application
-        // std::cout << "Lock state: " << static_cast<int>(m_lockState) << std::endl;
-    }
-
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
@@ -78,12 +68,9 @@ void DigibotController::physics() {
     // Note: We need to conjugate/invert the quaternion to transform vectors correctly
     glm::dquat viewOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(m_viewDirection, bodyUpDirection));
     
-    // ========== Handle Linear Movement ==========
-    // Handle movement (thrust) if requested
-    glm::dvec3 thrustForce(0.0, 0.0, 0.0);
-    if (m_movementDirection == glm::ivec3(0, 0, 0)) {
-        // No movement, just handle rotation
-    } else {
+    // ========== Calculate Movement Force ==========
+    glm::dvec3 movementForce(0.0, 0.0, 0.0);
+    if (m_movementDirection != glm::ivec3(0, 0, 0)) {
         // Convert integer direction to normalized 3D vector
         glm::dvec3 direction = glm::dvec3(
             static_cast<double>(m_movementDirection.x),
@@ -100,13 +87,66 @@ void DigibotController::physics() {
             
             // Calculate thrust force based on mass
             double forceMagnitude = m_thrustStrength * rigidBody->m_mass;
-            thrustForce = direction * forceMagnitude;
+            movementForce = direction * forceMagnitude;
         }
     }
     
-    // Apply force at center of mass
-    if (glm::length(thrustForce) > 0.0) {
-        m_physicsEngine->applyForce(rigidBody, thrustForce);
+    // ========== Handle Translation Lock ==========
+    glm::dvec3 lockForce(0.0, 0.0, 0.0);
+    if (m_lockState == LockState::TRANSLATION_LOCK) {
+        // Check if target grid is still valid
+        if (m_targetGrid.expired()) {
+            std::cout << "Target grid destroyed - unlocking" << std::endl;
+            unlock();
+        } else {
+            // Get target grid's rigid body
+            auto targetGrid = m_targetGrid.lock();
+            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
+            
+            if (!targetGridRigidBody) {
+                std::cout << "Target grid has no rigid body - unlocking" << std::endl;
+                unlock();
+            } else {
+                // Calculate relative velocity
+                glm::dvec3 digibotVelocity = rigidBody->m_velocity;
+                glm::dvec3 gridVelocity = targetGridRigidBody->m_velocity;
+                glm::dvec3 relativeVelocity = digibotVelocity - gridVelocity;
+                
+                // Calculate correction force
+                glm::dvec3 correctionForce = -relativeVelocity * m_translationLockStrength * rigidBody->m_mass;
+                
+                // Project correction force to plane orthogonal to movement force
+                if (glm::length(movementForce) > 1e-6) {
+                    glm::dvec3 movementDirection = glm::normalize(movementForce);
+                    double projectionOntoMovement = glm::dot(correctionForce, movementDirection);
+                    correctionForce = correctionForce - projectionOntoMovement * movementDirection;
+                }
+                
+                lockForce = correctionForce;
+            }
+        }
+    } else if (m_lockState == LockState::FULL_LOCK) {
+        // Check if target grid is still valid
+        if (m_targetGrid.expired()) {
+            std::cout << "Target grid destroyed - unlocking" << std::endl;
+            unlock();
+        } else {
+            // TODOO: Implement full lock (translation + rotation)
+        }
+    }
+    
+    // ========== Combine and Clamp Forces ==========
+    glm::dvec3 totalForce = movementForce + lockForce;
+    double maxForce = m_thrustStrength * rigidBody->m_mass;
+    double totalForceMagnitude = glm::length(totalForce);
+    
+    if (totalForceMagnitude > maxForce) {
+        totalForce = totalForce * (maxForce / totalForceMagnitude);
+    }
+    
+    // Apply combined force at center of mass
+    if (totalForceMagnitude > 1e-6) {
+        m_physicsEngine->applyForce(rigidBody, totalForce);
     }
 
     // ========== Handle Roll Input ==========
@@ -114,7 +154,6 @@ void DigibotController::physics() {
         // Calculate roll torque around view direction
         glm::dvec3 rollAxis = glm::normalize(m_viewDirection);
 
-        //
         double adjustedRollAcceleration = m_rollAcceleration;
         if(m_rollInput != 0) {
             glm::dvec3 currentAngVel = rigidBody->getAngularVelocityWorld();
@@ -123,7 +162,6 @@ void DigibotController::physics() {
             {
                 adjustedRollAcceleration *= 4.;
             }
-            
         }
         
         // Scale by roll acceleration, inertia, and input direction
@@ -133,7 +171,6 @@ void DigibotController::physics() {
     }
 
     // ========== View Direction Rotation Logic ==========
-    
     // 1. Calculate local forward direction in world space
     glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
     currentForward = glm::normalize(currentForward);
