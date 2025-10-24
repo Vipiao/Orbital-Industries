@@ -38,7 +38,10 @@ public:
 
     // Physics callback for lock raycasting
     void onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange);
-    
+
+    // Get the grid rotation applied this frame (for rotating UI elements)
+    glm::dquat getLastFrameGridRotation() const { return m_lastFrameGridRotation; }
+
 private:
     // References
     GraphicsEngine* m_graphics;
@@ -55,4 +58,7 @@ private:
 
     // Frame timing for view rotation
     double m_lastTimeRemainder{0.0};
+
+    // Grid rotation applied this frame (identity if not in FULL_LOCK or no grid rotation)
+    glm::dquat m_lastFrameGridRotation{1.0, 0.0, 0.0, 0.0};
 };

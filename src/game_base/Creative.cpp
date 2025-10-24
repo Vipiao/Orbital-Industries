@@ -421,6 +421,12 @@ void Creative::processInputLogic() {
     // Handle radial menu interaction when visible
     bool radialMenuConsumedMouse = false;
     if (m_radialMenu->isVisible()) {
+        // Apply grid rotation to menu relative position if in character control mode
+        if (m_characterSelectionTool->isActive() && m_digibotPlayerController->isEnabled()) {
+            glm::dquat gridRotation = m_digibotPlayerController->getLastFrameGridRotation();
+            m_radialMenuRelativePosition = gridRotation * m_radialMenuRelativePosition;
+        }
+
         // Update radial menu position to follow camera
         glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
         m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);

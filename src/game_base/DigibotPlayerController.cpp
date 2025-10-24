@@ -121,6 +121,9 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         return;
     }
     
+    // Reset grid rotation to identity at start of frame
+    m_lastFrameGridRotation = glm::dquat(1.0, 0.0, 0.0, 0.0);
+
     // Calculate delta time remainder since last frame
     double deltaTimeRemainder = timeRemainder - m_lastTimeRemainder;
     if (deltaTimeRemainder < 0.0) deltaTimeRemainder += 1.0; // Handle wraparound
@@ -219,6 +222,9 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
                     // Create rotation quaternion
                     glm::dquat gridRotationQuat = glm::angleAxis(rotationAngle, rotationAxis);
                     
+                    // Store the rotation for external use (e.g., rotating UI elements)
+                    m_lastFrameGridRotation = gridRotationQuat;
+
                     // Apply grid rotation to current view direction
                     currentViewDir = gridRotationQuat * currentViewDir;
                 }
