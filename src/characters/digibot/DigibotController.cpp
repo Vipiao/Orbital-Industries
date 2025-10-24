@@ -178,8 +178,15 @@ void DigibotController::physics() {
     }
     
     // ========== Combine and Clamp Forces ==========
-    glm::dvec3 totalForce = movementForce + lockForce;
     double maxForce = m_thrustStrength * rigidBody->m_mass;
+    
+    double lockForceLimit = 1.0 * maxForce;
+    double lockForceMagnitude = glm::length(lockForce);
+    if (lockForceMagnitude > lockForceLimit) {
+        lockForce = lockForce * (lockForceLimit / lockForceMagnitude);
+    }
+
+    glm::dvec3 totalForce = movementForce + lockForce;
     double totalForceMagnitude = glm::length(totalForce);
     
     if (totalForceMagnitude > maxForce) {
