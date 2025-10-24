@@ -3,8 +3,6 @@
 
 #include "GraphicsEngineBase.h"
 #include "GraphicsCallbacks.h"
-#include "CallbackManager.h"
-#include "CallbackManager.h"
 #include "meshHandler/MeshHandler.h"
 #include "deferredRenderer/DeferredRenderer.h"
 #include "AssimpLoader.h"
@@ -18,7 +16,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-class GraphicsEngine : public IGraphicsCallbacks, public CallbackManager {
+class GraphicsEngine {
 public:
     GraphicsEngine(
         int screenWidth = 800,
@@ -31,13 +29,8 @@ public:
     
     ~GraphicsEngine();
 
-    // IGraphicsCallbacks implementation
-    virtual void preRenderCallback(uint64_t frameNum) override;
-    virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override;
-    virtual void postRenderCallback(uint64_t frameNum) override;
-    virtual void framebufferSizeCallback(int width, int height) override;
-    virtual void windowPosCallback(int xpos, int ypos) override;
-    
+    GraphicsEngineBase* getGraphicsEngineBase() const { return m_graphicsEngineBase.get(); }
+
     // Access to GraphicsEngineBase properties
     GLFWwindow* getWindow() { return getGraphicsEngineBase()->m_window; }
     unsigned int getScreenWidth() { return getGraphicsEngineBase()->m_screen_width; }
@@ -52,11 +45,15 @@ public:
     KeyboardHandler* getKeyboardHandler() { return getGraphicsEngineBase()->m_keyboardHandler; }
     
     // Graphics engine functionality
-    void startRenderLoop();
-    void setTriangleRenderMode(bool useTriangles);
-    bool getTriangleRenderMode();
+    void clearScreen() { m_graphicsEngineBase->clearScreen(); }
+    void renderScene();
+    void setTriangleRenderMode(bool useTriangles) { m_graphicsEngineBase->setTriangleRenderMode(useTriangles); }
+    bool getTriangleRenderMode() { return m_graphicsEngineBase->getTriangleRenderMode(); }
     
     int createMesh();
+
+    // Render parameter setting - for interpolation between states
+    void setRenderParameters(uint64_t interpolationTimeStep, double timeRemainder);
     
     void updateMeshTransform(
         int meshId,
@@ -100,16 +97,10 @@ public:
 
     // Instance handler access
     InstanceHandler* getInstanceHandler() { return m_instanceHandler.get(); }
-
-    // Render parameter setting - for interpolation between states
-    void setRenderParameters(uint64_t interpolationTimeStep, double timeRemainder);
     
     // Render parameter access
-    std::pair<uint64_t, double> getRenderParameters() const {
-        return std::make_pair(m_currentInterpolationTimeStep, m_interpolationTimeRemainder);
-    }
+    std::pair<uint64_t, double> getRenderParameters() const { return {m_currentInterpolationTimeStep, m_interpolationTimeRemainder}; }
 
-    // Shadow configuration
     void setShadowsEnabled(bool enabled) { m_shadowsEnabled = enabled; }
 
     // Shader reloading
@@ -135,8 +126,6 @@ private:
     bool m_shadowsEnabled = true;
     glm::dvec3 m_lightDirection = glm::normalize(glm::dvec3(1.0, -1.0, -1.0));
     
-    GraphicsEngineBase* getGraphicsEngineBase() const;
-
     // Helper method for shadow rendering
     void renderShadowPass();
 };

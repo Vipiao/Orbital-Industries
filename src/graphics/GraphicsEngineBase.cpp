@@ -12,11 +12,13 @@ void GraphicsEngineBase::framebufferSizeCallback(GLFWwindow* window, int width, 
    glViewport(0, 0, width, height);
    graphicsEngine->m_screen_width = width;
    graphicsEngine->m_screen_height = height;
-   graphicsEngine->callFramebufferSizeCallbacks(width, height);
    graphicsEngine->m_frameRate = graphicsEngine->getFrameRate();
    if (graphicsEngine->m_frameRate == 0) {
       std::cout << "Warning: Failed to get framerate from monitor. Guessing it is 60 fps." << std::endl;
       graphicsEngine->m_frameRate = 60;
+   }
+   for (auto& callback : graphicsEngine->m_framebufferCallbacks) {
+      callback(width, height);
    }
 }
 
@@ -28,7 +30,9 @@ void GraphicsEngineBase::windowPosCallback(GLFWwindow* window, int xpos, int ypo
       std::cout << "Warning: Failed to get framerate from monitor. Guessing it is 60 fps." << std::endl;
       graphicsEngine->m_frameRate = 60;
    }
-   graphicsEngine->callWindowPosCallbacks(xpos, ypos);
+   for (auto& callback : graphicsEngine->m_windowPosCallbacks) {
+      callback(xpos, ypos);
+   }
 }
 
 GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& filepath) {
@@ -119,68 +123,57 @@ void GraphicsEngineBase::setSwapInterval(int swapInterval) {
    glfwSwapInterval(swapInterval);
 }
 
-void GraphicsEngineBase::startRenderLoop() {
-   while (!glfwWindowShouldClose(m_window)) {
-      if (m_frameNum == 500) {
-         //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-      }
+void GraphicsEngineBase::clearScreen() {
+   glClearColor(0.6f, 0.7f, 0.8f, 1.0f);
+   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+}
 
-      // Clear.
-      glClearColor(0.6f, 0.7f, 0.8f, 1.0f);
-      //glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+void GraphicsEngineBase::updateInput() {
+   m_mouseHandler->update();
+   m_keyboardHandler->update();
+}
 
-      //
-      //handleMouse(m_frameNum);
-      m_mouseHandler->update();
-      m_keyboardHandler->update();
-
-
-      //
-      callPreRenderCallbacks(m_frameNum);
-
-      if (m_frameNum == 0) {
-         m_camVel = { 0,0,0 };
-      } else {
-         m_camVel = m_camPos - m_camPosPrev;
-      }
-      m_camPosPrev = m_camPos;
-
-      glm::dmat4 viewMatrix{ 1 };
-      double ss{ glm::sqrt(2.) / 2. };
-      viewMatrix = glm::toMat4(glm::dquat{ ss, -ss, 0., 0. } * glm::conjugate(m_camOri));
-      // View matrix is now rotation-only (L-space: camera-relative coordinate system)
-      // Camera is at origin in this space, objects are positioned relative to camera
-
-      glm::dmat4 projectionMatrix;
-      double aspectRatio{};
-      if (m_screen_width == 0) aspectRatio = 1.;
-      else if (m_screen_height == 0) aspectRatio = 1.;
-      else aspectRatio = (double)m_screen_width / (double)m_screen_height;
-      //if (m_frameNum % 60 == 0) std::cout << aspectRatio << std::endl;
-      // Set m_fieldOfView as horizontal field of view.
-      double fieldOfViewVertical = 2.0 * atan(tan(m_fieldOfView / 2.0) / aspectRatio);
-      projectionMatrix =
-         glm::perspective(fieldOfViewVertical, aspectRatio, 0.1, 10000.);
-
-      callRenderCallbacks(viewMatrix, projectionMatrix);
-
-      callPostRenderCallbacks(m_frameNum);
-
-      // Check for OpenGL errors
-      GLenum error = glGetError();
-      while (error != GL_NO_ERROR) {
-         std::cerr << "OpenGL error: " << error << std::endl;  // or however you want to report the error
-         error = glGetError();  // get next error, if any
-      }
-
-      // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-      // -------------------------------------------------------------------------------
-      glfwSwapBuffers(m_window);
-      glfwPollEvents();
-
-      m_frameNum++;
+void GraphicsEngineBase::calculateCameraVelocity() {
+   if (m_frameNum == 0) {
+      m_camVel = { 0,0,0 };
+   } else {
+      m_camVel = m_camPos - m_camPosPrev;
    }
+   m_camPosPrev = m_camPos;
+}
+
+glm::dmat4 GraphicsEngineBase::getViewMatrix() const {
+   glm::dmat4 viewMatrix{ 1 };
+   double ss{ glm::sqrt(2.) / 2. };
+   viewMatrix = glm::toMat4(glm::dquat{ ss, -ss, 0., 0. } * glm::conjugate(m_camOri));
+   return viewMatrix;
+}
+
+glm::dmat4 GraphicsEngineBase::getProjectionMatrix() const {
+   glm::dmat4 projectionMatrix;
+   double aspectRatio{};
+   if (m_screen_width == 0) aspectRatio = 1.;
+   else if (m_screen_height == 0) aspectRatio = 1.;
+   else aspectRatio = (double)m_screen_width / (double)m_screen_height;
+   
+   // Set m_fieldOfView as horizontal field of view.
+   double fieldOfViewVertical = 2.0 * atan(tan(m_fieldOfView / 2.0) / aspectRatio);
+   projectionMatrix = glm::perspective(fieldOfViewVertical, aspectRatio, 0.1, 10000.);
+   
+   return projectionMatrix;
+}
+
+void GraphicsEngineBase::checkGLErrors() {
+   GLenum error = glGetError();
+   while (error != GL_NO_ERROR) {
+      std::cerr << "OpenGL error: " << error << std::endl;
+      error = glGetError();
+   }
+}
+
+void GraphicsEngineBase::swapBuffersAndPoll() {
+   glfwSwapBuffers(m_window);
+   glfwPollEvents();
 }
 
 void GraphicsEngineBase::setTriangleRenderMode(bool useTriangles) {

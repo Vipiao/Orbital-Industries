@@ -3,8 +3,6 @@
 
 #include "../graphics/GraphicsEngine.h"
 #include "../graphics/GraphicsEngineBase.h"
-#include "../graphics/GraphicsCallbacks.h"
-#include "../graphics/CallbackManager.h"
 #include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
 #include "../utils/IHashable.h"
@@ -20,7 +18,7 @@ class TimeHandler;
 class DebugRenderer;
 class Digibot;
 
-class GameBase : public IGraphicsCallbacks, public CallbackManager, public IHashable {
+class GameBase : public IHashable {
 public:
     class Callback {
     public:
@@ -36,7 +34,10 @@ public:
     std::weak_ptr<Grid> createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     void removeGrid(std::weak_ptr<Grid> grid);
     std::weak_ptr<Digibot> createDigibot();
-    void run();
+
+    void prepareFrame();
+    void finalizeFrame();
+
     void addPhysicsCallback(Callback* callback);
 
     void scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
@@ -62,20 +63,11 @@ public:
     // Subsystem access
     GridSubsystem* getGridSubsystem() const { return m_gridSubsystem.get(); }
     
-    // IGraphicsCallbacks implementation
-    virtual void preRenderCallback(uint64_t frameNum) override;
-    virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override;
-    virtual void postRenderCallback(uint64_t frameNum) override;
-    virtual void framebufferSizeCallback(int width, int height) override;
-    virtual void windowPosCallback(int xpos, int ypos) override;
-    
     // IHashable interface
     virtual size_t computeHash() const override;
     
 protected:
-    virtual void processInput();
     virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
-    virtual void update(double deltaTime);
 
     // Helper to track job handles
     void trackJob(std::weak_ptr<Job> jobHandle);

@@ -16,9 +16,6 @@ GraphicsEngine::GraphicsEngine(
     // Create GraphicsEngineBase
     m_graphicsEngineBase = std::make_shared<GraphicsEngineBase>(mode);
     
-    // Register self as callback with GraphicsEngineBase
-    m_graphicsEngineBase->addCallback(this);
-    
     // Configure window
     m_graphicsEngineBase->m_screen_width = screenWidth;
     m_graphicsEngineBase->m_screen_height = screenHeight;
@@ -50,32 +47,20 @@ GraphicsEngine::GraphicsEngine(
     //m_shadowRenderer->setupShadowMaps(2048, 2048, 3, {50.0, 200.0, 800.0});
     //m_shadowRenderer->setupShadowMaps(1024, 1024, 3, {25.0, 100.0, 400.0});
     //m_shadowRenderer->setupShadowMaps(512, 512, 3, {12.0, 50.0, 200.0});
+
+    // Register framebuffer and window callbacks
+    m_graphicsEngineBase->registerFramebufferCallback([this](int width, int height) {
+        m_deferredRenderer->resizeGBuffer(width, height);
+    });
 }
 
 GraphicsEngine::~GraphicsEngine() {
-    // Unregister from GraphicsEngineBase
-    if (auto base = m_graphicsEngineBase.get()) {
-        base->removeCallback(this);
-    }
 }
 
-GraphicsEngineBase* GraphicsEngine::getGraphicsEngineBase() const {
-    return m_graphicsEngineBase.get();
-}
-
-void GraphicsEngine::preRenderCallback(uint64_t frameNum) {
-    // Call registered callbacks first
-    callPreRenderCallbacks(frameNum);
-    
-    // No additional logic needed here for GraphicsEngine itself
-}
-
-void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
-    // Call registered callbacks first
-    callRenderCallbacks(viewMatrix, projectionMatrix);
-    
-    // GraphicsEngine's own render logic
+void GraphicsEngine::renderScene() {
     // Convert double precision matrices to float precision
+    glm::dmat4 viewMatrix = m_graphicsEngineBase->getViewMatrix();
+    glm::dmat4 projectionMatrix = m_graphicsEngineBase->getProjectionMatrix();
     glm::mat4 view = glm::mat4(viewMatrix);
     glm::mat4 projection = glm::mat4(projectionMatrix);
 
@@ -148,11 +133,6 @@ void GraphicsEngine::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projection
     m_meshManager2D->render(projection2D);
 }
 
-void GraphicsEngine::postRenderCallback(uint64_t frameNum) {
-    // Call registered callbacks first
-    callPostRenderCallbacks(frameNum);
-}
-
 void GraphicsEngine::renderShadowPass() {
     // Render depth to each cascade layer
     unsigned int numCascades = m_shadowRenderer->getNumCascades();
@@ -185,35 +165,6 @@ void GraphicsEngine::renderShadowPass() {
 void GraphicsEngine::setRenderParameters(uint64_t interpolationTimeStep, double timeRemainder) {
     m_currentInterpolationTimeStep = interpolationTimeStep;
     m_interpolationTimeRemainder = timeRemainder;
-}
-
-void GraphicsEngine::framebufferSizeCallback(int width, int height) {
-    // Call registered callbacks first
-    callFramebufferSizeCallbacks(width, height);
-
-    // Resize G-buffer to match new screen dimensions
-    m_deferredRenderer->resizeGBuffer(width, height);
-    
-    // No additional logic needed here for GraphicsEngine itself
-}
-
-void GraphicsEngine::windowPosCallback(int xpos, int ypos) {
-    // Call registered callbacks first  
-    callWindowPosCallbacks(xpos, ypos);
-    
-    // No additional logic needed here for GraphicsEngine itself
-}
-
-void GraphicsEngine::startRenderLoop() {
-    m_graphicsEngineBase->startRenderLoop();
-}
-
-void GraphicsEngine::setTriangleRenderMode(bool useTriangles) {
-    m_graphicsEngineBase->setTriangleRenderMode(useTriangles);
-}
-
-bool GraphicsEngine::getTriangleRenderMode() {
-    return m_graphicsEngineBase->getTriangleRenderMode();
 }
 
 int GraphicsEngine::createMesh() {

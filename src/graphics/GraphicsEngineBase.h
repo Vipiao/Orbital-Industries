@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <functional>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -13,9 +14,8 @@
 
 #include "MouseHandler.h"
 #include "KeyboardHandler.h"
-#include "CallbackManager.h"
 
-class GraphicsEngineBase : public CallbackManager {
+class GraphicsEngineBase {
 public:
    enum class Mode { NONE, RECORD, PLAY };
    GraphicsEngineBase(Mode mode = Mode::NONE, const std::filesystem::path& filepath = "recording_mouse_keyboard");
@@ -24,7 +24,17 @@ public:
    GraphicsEngineBase& operator= (const GraphicsEngineBase&) = delete;
 
    void setSwapInterval(int swapInterval);
-   void startRenderLoop();
+   
+   // Frame control methods
+   bool shouldClose() const { return glfwWindowShouldClose(m_window); }
+   void clearScreen();
+   void updateInput();
+   void calculateCameraVelocity();
+   glm::dmat4 getViewMatrix() const;
+   glm::dmat4 getProjectionMatrix() const;
+   void checkGLErrors();
+   void swapBuffersAndPoll();
+   void incrementFrame() { m_frameNum++; }
    void setTriangleRenderMode(bool useTriangles);
    bool getTriangleRenderMode();
 
@@ -41,6 +51,11 @@ public:
    // Mouse.
    MouseHandler* m_mouseHandler{ nullptr };
    KeyboardHandler* m_keyboardHandler{ nullptr };
+
+   // Framebuffer and window callbacks remain for window system events
+   void registerFramebufferCallback(std::function<void(int, int)> callback) { m_framebufferCallbacks.push_back(callback); }
+   void registerWindowPosCallback(std::function<void(int, int)> callback) { m_windowPosCallbacks.push_back(callback); }
+
 protected:
    static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
    static void windowPosCallback(GLFWwindow* window, int xpos, int ypos);
@@ -50,5 +65,8 @@ protected:
    bool m_windowOnTop{ false };
 
    glm::dvec3 m_camPosPrev{};
+
+   std::vector<std::function<void(int, int)>> m_framebufferCallbacks;
+   std::vector<std::function<void(int, int)>> m_windowPosCallbacks;
 };
 

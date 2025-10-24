@@ -19,7 +19,7 @@ int debug2 = 0;
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 IHashable* DebugGlobals::g_gameBase = nullptr;
 
-class Game : public IGraphicsCallbacks, public CallbackManager, public GameBase::Callback {
+class Game : public GameBase::Callback {
 private:
     std::unique_ptr<GameBase> m_gameBase;
     std::unique_ptr<DebugVisualization> m_debugViz;
@@ -36,9 +36,6 @@ public:
         
         // Create the game base instance
         m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
-
-        // Register ourselves with GameBase
-        m_gameBase->addCallback(this);  // Graphics callback registration
 
         // Register physics callback
         m_gameBase->addPhysicsCallback(this);  // Physics callback registration
@@ -155,8 +152,45 @@ public:
     // Expose GameBase for Mode access
     GameBase* getGameBase() { return m_gameBase.get(); }
 
+    void onFrame() {
+        auto base = m_gameBase->m_graphicsEngine->getGraphicsEngineBase();
+        auto graphics = m_gameBase->m_graphicsEngine.get();
+        
+        // Clear screen
+        graphics->clearScreen();
+        
+        // Update input
+        base->updateInput();
+
+        // Prepare frame (timing, character updates) - must happen BEFORE input processing
+        m_gameBase->prepareFrame();
+        
+        // Process input
+        if (graphics->getKeyboardHandler()->m_n.justPressed()) {
+            m_shaderReloadRequested = true;
+        }
+        m_mode->processInputs();
+        
+        // Calculate camera velocity and matrices
+        base->calculateCameraVelocity();
+        
+        // Render scene
+        graphics->renderScene();
+        
+        // Finalize frame (physics scheduling, job processing)
+        m_gameBase->finalizeFrame();
+        
+        // Check errors and swap buffers
+        base->checkGLErrors();
+        base->swapBuffersAndPoll();
+        base->incrementFrame();
+    }
+
     void run() {
-        m_gameBase->run();
+        auto base = m_gameBase->m_graphicsEngine->getGraphicsEngineBase();
+        while (!base->shouldClose()) {
+            onFrame();
+        }
     }
 
     // GameBase::Callback implementation
@@ -176,49 +210,6 @@ public:
         m_debugViz = std::make_unique<DebugVisualization>(
             m_gameBase->m_graphicsEngine->getInstanceHandler(), m_gameBase->m_graphicsEngine->m_ssboManager.get());
         m_gameBase->setDebugRenderer(m_debugViz.get());
-    }
-
-    // IGraphicsCallbacks implementation
-    virtual void preRenderCallback(uint64_t frameNum) override {
-        // Call registered callbacks first
-        callPreRenderCallbacks(frameNum);
-        
-        // Game's own preRender logic
-        // Process input BEFORE calling gamebase preRenderCallback
-
-        if (m_gameBase->m_graphicsEngine->getKeyboardHandler()->m_n.justPressed()) {
-            m_shaderReloadRequested = true;
-        }
-
-        m_mode->processInputs();
-    }
-
-    virtual void renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) override {
-        // Call registered callbacks first
-        callRenderCallbacks(viewMatrix, projectionMatrix);
-        
-        // Game's own render logic
-    }
-
-    virtual void postRenderCallback(uint64_t frameNum) override {
-        // Call registered callbacks first
-        callPostRenderCallbacks(frameNum);
-    }
-
-    virtual void framebufferSizeCallback(int width, int height) override {
-        // Call registered callbacks first
-        callFramebufferSizeCallbacks(width, height);
-        
-        // Game's own framebuffer logic (none needed currently)
-        //
-    }
-
-    virtual void windowPosCallback(int xpos, int ypos) override {
-        // Call registered callbacks first
-        callWindowPosCallbacks(xpos, ypos);
-        
-        // Game's own window position logic (none needed currently)
-        //
     }
 
 private:

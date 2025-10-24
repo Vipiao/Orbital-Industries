@@ -47,8 +47,6 @@ GameBase::GameBase(
         throw std::runtime_error("TimeHandler cannot be null");
     }
     
-    m_graphicsEngine->addCallback(this);
-    
     m_lastFrameTime = m_timeHandler->now();
     m_nextPhysicsTime = m_lastFrameTime + 
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
@@ -68,10 +66,6 @@ GameBase::~GameBase() {
         if (!jobHandle.expired()) {
             m_jobManager->cancel(jobHandle);
         }
-    }
-
-    if (m_graphicsEngine) {
-        m_graphicsEngine->removeCallback(this);
     }
 }
 
@@ -104,13 +98,9 @@ void GameBase::addPhysicsCallback(Callback* callback) {
     m_callbacks.push_back(callback);
 }
 
-void GameBase::run() {
-    m_graphicsEngine->startRenderLoop();
-}
-
 int hit_count = 0;
 
-void GameBase::preRenderCallback(uint64_t frameNum) {
+void GameBase::prepareFrame() {
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
@@ -134,23 +124,11 @@ void GameBase::preRenderCallback(uint64_t frameNum) {
         timeRemainder
     );
 
-    // Call registered callbacks first
-    callPreRenderCallbacks(frameNum);
-
     // Update characters pre-render
-    m_characterSubsystem->updateAllPreRender(frameNum);
-    
-    // GameBase's own preRender logic
-    
-    processInput();
-    
-    update(deltaTime);
+    m_characterSubsystem->updateAllPreRender(m_graphicsEngine->getFrameNum());
 }
 
-void GameBase::postRenderCallback(uint64_t frameNum) {
-    // Call registered callbacks first
-    callPostRenderCallbacks(frameNum);
-
+void GameBase::finalizeFrame() {
     // Get current time for physics scheduling decision
     auto currentTime = m_timeHandler->now();
     
@@ -194,32 +172,6 @@ void GameBase::postRenderCallback(uint64_t frameNum) {
     }
 }
 
-void GameBase::renderCallback(glm::dmat4 viewMatrix, glm::dmat4 projectionMatrix) {
-    // Call registered callbacks first
-    callRenderCallbacks(viewMatrix, projectionMatrix);
-}
-
-void GameBase::framebufferSizeCallback(int width, int height) {
-    // Call registered callbacks first
-    callFramebufferSizeCallbacks(width, height);
-    
-    // GameBase's own framebuffer logic (none needed currently)
-    // Nothing specific needed
-}
-
-void GameBase::windowPosCallback(int xpos, int ypos) {
-    // Call registered callbacks first
-    callWindowPosCallbacks(xpos, ypos);
-    
-    // GameBase's own window position logic (none needed currently)
-    // Nothing specific needed
-}
-
-void GameBase::processInput() {
-    // Base implementation does nothing
-    // Override in derived classes for game-specific input handling
-}
-
 bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
     // Handle any pending grid splits before running physics
     if (m_gridSubsystem->handlePendingSplits(endTime)) {
@@ -251,11 +203,6 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
     m_physicsUpdateInProgress = false;
 
     return false;
-}
-
-void GameBase::update(double deltaTime) {
-    // Base implementation does nothing
-    // Override in derived classes for game-specific logic
 }
 
 void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
