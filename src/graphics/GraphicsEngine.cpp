@@ -57,6 +57,22 @@ GraphicsEngine::GraphicsEngine(
 GraphicsEngine::~GraphicsEngine() {
 }
 
+void GraphicsEngine::beginFrame() {
+    m_graphicsEngineBase->clearScreen();
+    m_graphicsEngineBase->updateInput();
+}
+
+void GraphicsEngine::render() {
+    m_graphicsEngineBase->calculateCameraVelocity();
+    renderScene();
+}
+
+void GraphicsEngine::endFrame() {
+    m_graphicsEngineBase->checkGLErrors();
+    m_graphicsEngineBase->swapBuffersAndPoll();
+    m_graphicsEngineBase->incrementFrame();
+}
+
 void GraphicsEngine::renderScene() {
     // Convert double precision matrices to float precision
     glm::dmat4 viewMatrix = m_graphicsEngineBase->getViewMatrix();

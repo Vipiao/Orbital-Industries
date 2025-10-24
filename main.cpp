@@ -153,42 +153,24 @@ public:
     GameBase* getGameBase() { return m_gameBase.get(); }
 
     void onFrame() {
-        auto base = m_gameBase->m_graphicsEngine->getGraphicsEngineBase();
-        auto graphics = m_gameBase->m_graphicsEngine.get();
+        // Begin frame
+        m_gameBase->beginFrame();
         
-        // Clear screen
-        graphics->clearScreen();
-        
-        // Update input
-        base->updateInput();
-
-        // Prepare frame (timing, character updates) - must happen BEFORE input processing
-        m_gameBase->prepareFrame();
-        
-        // Process input
-        if (graphics->getKeyboardHandler()->m_n.justPressed()) {
+        // Process game-specific input
+        if (m_gameBase->m_graphicsEngine->getKeyboardHandler()->m_n.justPressed()) {
             m_shaderReloadRequested = true;
         }
         m_mode->processInputs();
         
-        // Calculate camera velocity and matrices
-        base->calculateCameraVelocity();
+        // Render
+        m_gameBase->render();
         
-        // Render scene
-        graphics->renderScene();
-        
-        // Finalize frame (physics scheduling, job processing)
-        m_gameBase->finalizeFrame();
-        
-        // Check errors and swap buffers
-        base->checkGLErrors();
-        base->swapBuffersAndPoll();
-        base->incrementFrame();
+        // End frame
+        m_gameBase->endFrame();
     }
 
     void run() {
-        auto base = m_gameBase->m_graphicsEngine->getGraphicsEngineBase();
-        while (!base->shouldClose()) {
+        while (!m_gameBase->m_graphicsEngine->getGraphicsEngineBase()->shouldClose()) {
             onFrame();
         }
     }

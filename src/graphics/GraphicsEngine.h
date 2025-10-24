@@ -45,8 +45,9 @@ public:
     KeyboardHandler* getKeyboardHandler() { return getGraphicsEngineBase()->m_keyboardHandler; }
     
     // Graphics engine functionality
-    void clearScreen() { m_graphicsEngineBase->clearScreen(); }
-    void renderScene();
+    void beginFrame();
+    void render();
+    void endFrame();
     void setTriangleRenderMode(bool useTriangles) { m_graphicsEngineBase->setTriangleRenderMode(useTriangles); }
     bool getTriangleRenderMode() { return m_graphicsEngineBase->getTriangleRenderMode(); }
     
@@ -128,4 +129,7 @@ private:
     
     // Helper method for shadow rendering
     void renderShadowPass();
+
+    // Internal rendering method
+    void renderScene();
 };

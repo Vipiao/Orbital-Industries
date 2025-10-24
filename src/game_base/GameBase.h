@@ -35,8 +35,9 @@ public:
     void removeGrid(std::weak_ptr<Grid> grid);
     std::weak_ptr<Digibot> createDigibot();
 
-    void prepareFrame();
-    void finalizeFrame();
+    void beginFrame();
+    void render();
+    void endFrame();
 
     void addPhysicsCallback(Callback* callback);
 
@@ -67,6 +68,9 @@ public:
     virtual size_t computeHash() const override;
     
 protected:
+    void prepareFrame();
+    void finalizeFrame();
+
     virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 
     // Helper to track job handles

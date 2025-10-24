@@ -100,6 +100,20 @@ void GameBase::addPhysicsCallback(Callback* callback) {
 
 int hit_count = 0;
 
+void GameBase::beginFrame() {
+    m_graphicsEngine->beginFrame();
+    prepareFrame();
+}
+
+void GameBase::render() {
+    m_graphicsEngine->render();
+}
+
+void GameBase::endFrame() {
+    finalizeFrame();
+    m_graphicsEngine->endFrame();
+}
+
 void GameBase::prepareFrame() {
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
