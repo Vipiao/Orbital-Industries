@@ -83,6 +83,14 @@ public:
     glm::dvec3 gridToWorld(const glm::dvec3& gridPos) const;
 
     /**
+     * @brief Get interpolated rigid body transform for rendering/queries
+     * @param timeRemainder Interpolation parameter from graphics engine
+     * @param outPosition Output interpolated position
+     * @param outOrientation Output interpolated orientation
+     */
+    void getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, glm::dquat& outOrientation) const;
+
+    /**
      * @brief Perform ray intersection test against this grid
      * @param rayStart Ray start position in world coordinates
      * @param rayEnd Ray end position in world coordinates  

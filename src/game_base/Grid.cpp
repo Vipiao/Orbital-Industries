@@ -510,6 +510,14 @@ glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
     return GridGeometry::gridToWorld(gridPos, m_rigidBody->m_position, m_rigidBody->m_orientation, m_centerOfMass);
 }
 
+void Grid::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, glm::dquat& outOrientation) const {
+    if (!m_rigidBody) {
+        throw std::runtime_error("Grid::getInterpolatedTransform: Rigid body not found");
+    }
+    
+    m_rigidBody->getInterpolatedTransform(timeRemainder, outPosition, outOrientation);
+}
+
 RayIntersectionResult Grid::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
     auto collider = m_colliderWeak.lock();
     if (!collider) {

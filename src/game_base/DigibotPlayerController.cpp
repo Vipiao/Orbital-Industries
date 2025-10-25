@@ -10,6 +10,7 @@
 #include "../graphics/KeyboardHandler.h"
 #include "../graphics/MouseHandler.h"
 #include <iostream>
+#include "../utils/GridGeometry.h"
 
 DigibotPlayerController::DigibotPlayerController(GraphicsEngine* graphics)
     : m_graphics(graphics)
@@ -52,15 +53,23 @@ void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* control
     std::weak_ptr<Grid> closestGrid;
     bool gridFound = false;
     double closestT = -1.0;
+
+    // Get interpolation time for accurate raycasting
+    auto [_, timeRemainder] = m_graphics->getRenderParameters();
     
     // Find closest ray intersection across available grids
     for (const auto& gridWeak : availableGrids) {
         auto gridShared = gridWeak.lock();
         if (!gridShared) continue;
         
-        // Transform world ray to grid-local space
-        glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(rayStart);
-        glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(rayEnd);
+        // Get interpolated transform once per grid
+        glm::dvec3 interpolatedPos;
+        glm::dquat interpolatedOri;
+        gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
+        
+        // Transform world ray to interpolated grid-local space
+        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(rayStart, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(rayEnd, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
         
         // Perform ray intersection in grid-local space
         RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
@@ -261,6 +270,8 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     // Create orientation quaternion from view direction and up vector
     cameraOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(viewDir, upVector));
     
+    extern int hit_count;
+
     // Set camera position - offset behind character in view direction with height
     cameraPosition = interpolatedPos + viewDir * m_cameraOffset.y + upVector * m_cameraOffset.z;
 }

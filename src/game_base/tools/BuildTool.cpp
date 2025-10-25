@@ -7,6 +7,7 @@
 #include "../../graphics/MeshManager2D/MeshManager2D.h"
 #include "../../graphics/MeshManager2D/GeometryInstance.h"
 #include <iostream>
+#include "../../utils/GridGeometry.h"
 
 BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {
@@ -106,15 +107,23 @@ void BuildTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& 
     glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
     glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
     glm::dvec3 endPos = startPos + forward * m_interactionRange;
+
+    // Get interpolation time for accurate raycasting
+    auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
     
     // Find closest ray intersection across all grids
     for (const auto& gridWeak : availableGrids) {
         auto gridShared = gridWeak.lock();
         if (!gridShared) continue;
         
-        // Transform world ray to grid-local space
-        glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(startPos);
-        glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(endPos);
+        // Get interpolated transform once per grid
+        glm::dvec3 interpolatedPos;
+        glm::dquat interpolatedOri;
+        gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
+        
+        // Transform world ray to interpolated grid-local space
+        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
         
         // Perform ray intersection in grid-local space
         RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);

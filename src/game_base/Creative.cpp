@@ -23,6 +23,7 @@
 #include "../utils/ColorUtils.h"
 #include <float.h>
 #include "../physics/SensorCollider.h"
+#include "../utils/GridGeometry.h"
 #include <map>
 
 Creative::Creative(GameBase* gameBase)
@@ -99,14 +100,22 @@ void Creative::physics() {
         glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 endPos = startPos + forward * m_interactionRange;
+
+        // Get interpolation time for accurate raycasting
+        auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
         
         // Find closest ray intersection across all grids
         for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
             if (!gridShared) continue; // Safety check
             
-            // Transform world ray to grid-local space
-            glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(startPos);
-            glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(endPos);
+            // Get interpolated transform once per grid
+            glm::dvec3 interpolatedPos;
+            glm::dquat interpolatedOri;
+            gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
+            
+            // Transform world ray to interpolated grid-local space
+            glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+            glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
             
             // Perform ray intersection in grid-local space
             RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
