@@ -76,6 +76,8 @@ public:
         if (digibot) {
             //digibot->showCollisionBox();
         }
+        //digibot->getRigidBody()->m_velocity.x += 2;
+        //initialGrid->getRigidBody()->m_velocity.x += 2.;
         
         //for (int ll = 0; ll < 2; ll++) {
         //    for (int ii = -3; ii < 4; ii++)
