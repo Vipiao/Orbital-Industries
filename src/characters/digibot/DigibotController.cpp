@@ -60,6 +60,9 @@ void DigibotController::physics() {
         return;
     }
 
+    // Lock force scaling parameter
+    double lockForceScale = 0.2;
+
     // ========== Calculate View Orientation ==========
     // Get body's upward direction
     glm::dvec3 bodyUpDirection = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
@@ -123,6 +126,13 @@ void DigibotController::physics() {
                 }
                 
                 lockForce = correctionForce;
+
+                // Cap the lock force if above limit
+                double lockForceMagnitude = glm::length(lockForce);
+                double lockForceLimit = lockForceScale * m_thrustStrength * rigidBody->m_mass;
+                if (lockForceMagnitude > lockForceLimit) {
+                    lockForce = lockForce * (lockForceLimit / lockForceMagnitude);
+                }
             }
         }
     } else if (m_lockState == LockState::FULL_LOCK) {
@@ -173,6 +183,22 @@ void DigibotController::physics() {
                 }
                 
                 lockForce = correctionForce;
+
+                // Cap the lock force if above limit
+                double lockForceMagnitude = glm::length(lockForce);
+                double lockForceLimit = lockForceScale * m_thrustStrength * rigidBody->m_mass;
+                if (lockForceMagnitude > lockForceLimit) {
+                    lockForce = lockForce * (lockForceLimit / lockForceMagnitude);
+                }
+
+                // Add compensation for centrifugal and coriolis forces
+                glm::dvec3 centrifugalForce = -rigidBody->m_mass * 
+                    glm::cross(gridAngularVelocity, glm::cross(gridAngularVelocity, radiusVector));
+                glm::dvec3 coriolisForce = -2.0 * rigidBody->m_mass * 
+                    glm::cross(gridAngularVelocity, relativeLinearVelocity);
+                glm::dvec3 compensationForce = -centrifugalForce - coriolisForce;
+                
+                lockForce += compensationForce;
             }
         }
     }
@@ -180,12 +206,6 @@ void DigibotController::physics() {
     // ========== Combine and Clamp Forces ==========
     double maxForce = m_thrustStrength * rigidBody->m_mass;
     
-    double lockForceLimit = 1.0 * maxForce;
-    double lockForceMagnitude = glm::length(lockForce);
-    if (lockForceMagnitude > lockForceLimit) {
-        lockForce = lockForce * (lockForceLimit / lockForceMagnitude);
-    }
-
     glm::dvec3 totalForce = movementForce + lockForce;
     double totalForceMagnitude = glm::length(totalForce);
     
