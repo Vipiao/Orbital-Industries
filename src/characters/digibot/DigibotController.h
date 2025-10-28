@@ -24,6 +24,10 @@ public:
 
     // Set the roll input (-1 for left/Q, +1 for right/E, 0 for none)
     void setRollInput(int rollInput);
+
+    // Jetpack control
+    bool isJetpackEnabled() const { return m_jetpackEnabled; }
+    void setJetpackEnabled(bool enabled);
     
     // Process physics (called during physics update)
     void physics();
@@ -48,6 +52,10 @@ public:
     std::weak_ptr<Grid> getTargetGrid() const { return m_targetGrid; }
     
 private:
+    // Physics handlers for different movement modes
+    void handleFlying();
+    void handleWalking();
+
     DigibotPhysics* m_physics;
     PhysicsEngine* m_physicsEngine;
     glm::ivec3 m_movementDirection;
@@ -62,4 +70,7 @@ private:
     LockState m_lockState;
     std::weak_ptr<Grid> m_targetGrid;
     double m_translationLockStrength;
+
+    // Jetpack mode
+    bool m_jetpackEnabled;
 };

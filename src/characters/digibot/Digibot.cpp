@@ -83,6 +83,9 @@ void Digibot::onPhysicsUpdateComplete() {
         return;
     }
 
+    // Update physics subsystem
+    m_digibotPhysics->updatePhysics();
+
     // Update visual model transform
     updateVisualTransform();
 

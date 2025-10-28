@@ -9,6 +9,7 @@
 #include "../../utils/MassInertiaCalculator.h"
 #include "../../utils/GridGeometry.h"
 #include "../../graphics/meshHandler/MeshHandler.h"
+#include "../../physics/SensorCollider.h"
 
 DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler)
     : m_physics(physics)
@@ -161,6 +162,12 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     // 4. Connect collider to rigid body
     m_physics->connectCollider(m_rigidBody, m_colliderWeak);
     m_physics->updateColliderTransform(m_rigidBody);
+
+    // 5. Create walking sensor for ground detection
+    glm::dvec3 sensorHalfScale(3.0, 3.0, 3.0);
+    m_walkingSensor = m_physics->getCollisionDetector().addSensorCollider(
+        m_rigidBody->m_position,
+        sensorHalfScale);
 }
 
 DigibotPhysics::~DigibotPhysics() {
@@ -172,6 +179,11 @@ DigibotPhysics::~DigibotPhysics() {
 
     // Remove collider
     m_physics->getCollisionDetector().removeCollider(m_colliderWeak);
+
+    // Remove walking sensor
+    if (!m_walkingSensor.expired()) {
+        m_physics->getCollisionDetector().removeCollider(m_walkingSensor);
+    }
 }
 
 void DigibotPhysics::showCollisionBox(GraphicsEngine* graphics) {
@@ -286,4 +298,16 @@ glm::dvec3 DigibotPhysics::localToWorld(const glm::dvec3& localPos) const {
         m_rigidBody->m_orientation,
         m_rigidBody->m_colliderOffset
     );
+}
+
+void DigibotPhysics::updatePhysics() {
+    if (!m_rigidBody) {
+        return;
+    }
+
+    // Update walking sensor position to follow rigid body
+    if (auto sensor = m_walkingSensor.lock()) {
+        sensor->m_position = m_rigidBody->m_position;
+        sensor->m_orientation = m_rigidBody->m_orientation;
+    }
 }

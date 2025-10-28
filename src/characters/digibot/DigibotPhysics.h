@@ -11,6 +11,7 @@ class JobManager;
 class TimeHandler;
 class GridCollider;
 class RigidBody;
+class Collider;
 
 /**
  * @brief Manages physics simulation for Digibot character
@@ -33,6 +34,12 @@ public:
     void updateCollisionBoxTransform(GraphicsEngine* graphics, uint64_t currentPhysicsTimeStep);
 
     // Coordinate transforms
+    // Walking sensor for ground detection
+    std::weak_ptr<Collider> getWalkingSensor() const { return m_walkingSensor; }
+    
+    // Physics update (called each physics step)
+    void updatePhysics();
+
     glm::dvec3 worldToLocal(const glm::dvec3& worldPos) const;
     glm::dvec3 localToWorld(const glm::dvec3& localPos) const;
 
@@ -51,4 +58,7 @@ private:
 
     // Debug visualization
     int m_collisionBoxMeshId;
+
+    // Walking sensor
+    std::weak_ptr<Collider> m_walkingSensor;
 };

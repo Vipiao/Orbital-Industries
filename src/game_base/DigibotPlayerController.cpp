@@ -151,6 +151,11 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     if (!keyboard || !mouseHandler) {
         return;
     }
+
+    // Toggle jetpack with X key
+    if (keyboard->m_x.justPressed()) {
+        controller->setJetpackEnabled(!controller->isJetpackEnabled());
+    }
     
     // Process movement input and send to character
     glm::ivec3 moveDirection(0, 0, 0);

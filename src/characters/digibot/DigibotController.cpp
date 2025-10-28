@@ -18,6 +18,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
     , m_lockState(LockState::UNLOCKED)
+    , m_jetpackEnabled(true)
     , m_translationLockStrength(1.0)
 {
     if (!m_physics) {
@@ -42,6 +43,11 @@ void DigibotController::setRollInput(int rollInput) {
     m_rollInput = rollInput;
 }
 
+void DigibotController::setJetpackEnabled(bool enabled) {
+    m_jetpackEnabled = enabled;
+    std::cout << "Jetpack " << (m_jetpackEnabled ? "ENABLED" : "DISABLED") << std::endl;
+}
+
 void DigibotController::setTargetGrid(std::weak_ptr<Grid> grid) {
     m_targetGrid = grid;
     std::cout << "Target grid set" << std::endl;
@@ -54,6 +60,14 @@ void DigibotController::unlock() {
 }
 
 void DigibotController::physics() {
+    if (m_jetpackEnabled) {
+        handleFlying();
+    } else {
+        handleWalking();
+    }
+}
+
+void DigibotController::handleFlying() {
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
@@ -302,6 +316,12 @@ void DigibotController::physics() {
     
     // Apply torque (I * α = τ)
     m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
+}
+
+void DigibotController::handleWalking() {
+    // TODO: Implement walking logic
+    // For now, do nothing (digibot will be affected only by external forces)
+    std::cout << "Walking mode active (not yet implemented)" << std::endl;
 }
 
 void DigibotController::setThrustStrength(double strength) {
