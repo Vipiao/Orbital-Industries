@@ -11,6 +11,7 @@ class PhysicsEngine;
 class GraphicsEngine;
 class JobManager;
 class TimeHandler;
+class GridSubsystem;
 
 /**
  * @brief Subsystem managing all character lifecycle and updates
@@ -21,6 +22,7 @@ class TimeHandler;
 class CharacterSubsystem {
 public:
     CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,
+                      GridSubsystem* gridSubsystem,
                       JobManager* jobManager, TimeHandler* timeHandler);
     ~CharacterSubsystem();
 
@@ -39,6 +41,7 @@ private:
     // Dependencies
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
+    GridSubsystem* m_gridSubsystem;
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
 

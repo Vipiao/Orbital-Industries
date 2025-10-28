@@ -7,10 +7,14 @@
 #include <glm/gtx/vector_angle.hpp>
 #include <iostream>
 #include "../ArticulationUtils.h"
+#include "../../game_base/GridSubsystem.h"
+#include "../../physics/SensorCollider.h"
+#include "../../utils/GridGeometry.h"
 
-DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine)
+DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem)
     : m_physics(physics)
     , m_physicsEngine(physicsEngine)
+    , m_gridSubsystem(gridSubsystem)
     , m_movementDirection(0, 0, 0)
     , m_rollInput(0)
     , m_thrustStrength(0.004)  // Default thrust strength
@@ -18,6 +22,14 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
     , m_lockState(LockState::UNLOCKED)
+    , m_walkingNoiseCounter(0)
+    , m_hitRatio(0.0)
+    , m_averageNormal(0.0, 0.0, 1.0)
+    , m_averageGroundDistance(0.0)
+    , m_lastHitPoint(0.0, 0.0, 0.0)
+    , m_runningAverageAlpha(0.2)
+    , m_hitRatioThreshold(0.5)
+    , m_gridWeightRemovalThreshold(0.01)
     , m_jetpackEnabled(true)
     , m_translationLockStrength(1.0)
 {
@@ -27,6 +39,10 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     
     if (!m_physicsEngine) {
         throw std::runtime_error("DigibotController: Physics engine cannot be null");
+    }
+
+    if (!m_gridSubsystem) {
+        throw std::runtime_error("DigibotController: Grid subsystem cannot be null");
     }
 }
 
@@ -319,9 +335,137 @@ void DigibotController::handleFlying() {
 }
 
 void DigibotController::handleWalking() {
-    // TODO: Implement walking logic
-    // For now, do nothing (digibot will be affected only by external forces)
-    std::cout << "Walking mode active (not yet implemented)" << std::endl;
+    // Get the rigid body from physics component
+    RigidBody* rigidBody = m_physics->getRigidBody();
+    if (!rigidBody || rigidBody->m_mass <= 0.0) {
+        return;
+    }
+
+    // Get grids from walking sensor
+    std::vector<std::weak_ptr<Grid>> availableGrids;
+    if (auto sensor = m_physics->getWalkingSensor().lock()) {
+        SensorCollider* sensorPtr = static_cast<SensorCollider*>(sensor.get());
+        availableGrids = m_gridSubsystem->getGridsFromOverlaps(sensorPtr);
+    }
+
+    // Generate 2D noise for ray direction perturbation
+    double noiseX = Hash::pcgUnit(m_walkingNoiseCounter) * 0.6 - 0.3;
+    double noiseY = Hash::pcgUnit(m_walkingNoiseCounter + 1) * 0.6 - 0.3;
+    
+    // Create local ray direction: downward (-Z) with XY noise
+    glm::dvec3 localRayDir = glm::normalize(glm::dvec3(noiseX, noiseY, -1.0));
+    
+    // Transform to world space
+    glm::dvec3 worldRayDir = rigidBody->m_orientation * localRayDir;
+    
+    // Ray starts at rigid body center
+    glm::dvec3 rayStart = rigidBody->m_position;
+    glm::dvec3 rayEnd = rayStart + worldRayDir * 10.0; // 10 meter ray length
+    
+    // Perform raycasting against available grids
+    bool hitThisFrame = false;
+    double closestT = -1.0;
+    std::weak_ptr<Grid> hitGrid;
+    glm::dvec3 hitNormal(0.0, 0.0, 0.0);
+    glm::dvec3 hitPoint(0.0, 0.0, 0.0);
+    
+    for (const auto& gridWeak : availableGrids) {
+        auto gridShared = gridWeak.lock();
+        if (!gridShared) continue;
+        
+        // Transform ray to grid-local space
+        glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(rayStart);
+        glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(rayEnd);
+        
+        // Perform ray intersection
+        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
+        
+        // Check if this is a closer hit
+        if (result.t >= 0.0 && (!hitThisFrame || result.t < closestT)) {
+            closestT = result.t;
+            hitThisFrame = true;
+            hitGrid = gridWeak;
+            
+            // Transform normal back to world space
+            hitNormal = glm::normalize(gridShared->getRigidBody()->m_orientation * result.surfaceNormal);
+            
+            // Calculate hit point in world space
+            hitPoint = rayStart + closestT * (rayEnd - rayStart);
+        }
+    }
+    
+    // Update hit ratio using exponential moving average
+    double hitFlag = hitThisFrame ? 1.0 : 0.0;
+    m_hitRatio = glm::mix(m_hitRatio, hitFlag, m_runningAverageAlpha);
+    
+    // Update running averages if we hit something
+    if (hitThisFrame) {
+        // Update average normal
+        m_averageNormal = glm::normalize(glm::mix(m_averageNormal, hitNormal, m_runningAverageAlpha));
+        
+        // Calculate projected distance along body vertical direction
+        glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+        double projectedDistance = glm::dot(hitPoint - rigidBody->m_position, bodyUpVector);
+        
+        // Update average ground distance (projected)
+        m_averageGroundDistance = glm::mix(m_averageGroundDistance, projectedDistance, m_runningAverageAlpha);
+        
+        // Store last hit point for force calculation
+        m_lastHitPoint = hitPoint;
+        
+        // Update grid weights
+        auto hitGridShared = hitGrid.lock();
+        if (hitGridShared) {
+            bool foundGrid = false;
+            for (size_t i = 0; i < m_groundGrids.size(); ++i) {
+                auto gridPtr = m_groundGrids[i].lock();
+                if (gridPtr && gridPtr->uniqueId == hitGridShared->uniqueId) {
+                    // Grid already tracked - update weight towards 1.0
+                    m_gridWeights[i] = glm::mix(m_gridWeights[i], 1.0, m_runningAverageAlpha);
+                    foundGrid = true;
+                    break;
+                }
+            }
+            
+            if (!foundGrid) {
+                // New grid - add to tracking
+                m_groundGrids.push_back(hitGrid);
+                m_gridWeights.push_back(m_runningAverageAlpha);
+            }
+        }
+    }
+    
+    // Decay weights for all grids not hit this frame
+    for (size_t i = 0; i < m_groundGrids.size(); ++i) {
+        auto gridPtr = m_groundGrids[i].lock();
+        if (!gridPtr || (hitThisFrame && hitGrid.lock() && gridPtr->uniqueId == hitGrid.lock()->uniqueId)) {
+            continue; // Skip the grid we just hit or expired grids
+        }
+        
+        // Decay weight towards 0.0
+        m_gridWeights[i] = glm::mix(m_gridWeights[i], 0.0, m_runningAverageAlpha);
+    }
+    
+    // Remove grids with weight below threshold (iterate backwards for safe removal)
+    for (int i = static_cast<int>(m_groundGrids.size()) - 1; i >= 0; --i) {
+        if (m_gridWeights[i] < m_gridWeightRemovalThreshold || m_groundGrids[i].expired()) {
+            m_groundGrids.erase(m_groundGrids.begin() + i);
+            m_gridWeights.erase(m_gridWeights.begin() + i);
+        }
+    }
+    
+    // Print debug info periodically (every 60 frames)
+    if (m_walkingNoiseCounter % 60 == 0) {
+        std::cout << "Walking: hitRatio=" << m_hitRatio << " grids: ";
+        for (size_t i = 0; i < m_groundGrids.size(); ++i) {
+            auto gridPtr = m_groundGrids[i].lock();
+            std::cout << (gridPtr ? gridPtr->uniqueId : 0) << ":" << m_gridWeights[i] << " ";
+        }
+        std::cout << std::endl;
+    }
+    
+    // Increment noise counter
+    m_walkingNoiseCounter++;
 }
 
 void DigibotController::setThrustStrength(double strength) {

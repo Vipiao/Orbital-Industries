@@ -4,9 +4,11 @@
 #include <algorithm>
 
 CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,
+                                     GridSubsystem* gridSubsystem,
                                      JobManager* jobManager, TimeHandler* timeHandler)
     : m_physics(physics)
     , m_graphics(graphics)
+    , m_gridSubsystem(gridSubsystem)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
 {
@@ -25,7 +27,8 @@ std::weak_ptr<Digibot> CharacterSubsystem::createDigibot() {
         m_graphics,
         m_jobManager,
         m_timeHandler,
-        m_digibotResources.get()
+        m_digibotResources.get(),
+        m_gridSubsystem
     );
 
     std::weak_ptr<Digibot> digibotWeak = digibot;

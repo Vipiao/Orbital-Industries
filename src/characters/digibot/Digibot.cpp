@@ -10,7 +10,7 @@
 
 Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
                    JobManager* jobManager, TimeHandler* timeHandler,
-                   DigibotResources* resources)
+                   DigibotResources* resources, GridSubsystem* gridSubsystem)
     : Character(physics, graphics, jobManager, timeHandler)
     , m_graphicsEngine(graphics)
 {
@@ -23,7 +23,7 @@ Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
 
     // Create controller subsystem
     m_digibotController = std::make_unique<DigibotController>(
-        m_digibotPhysics.get(), physics);
+        m_digibotPhysics.get(), physics, gridSubsystem);
 
     // Create graphics subsystem
     m_digibotGraphics = std::make_unique<DigibotGraphics>(graphics, resources);

@@ -3,17 +3,19 @@
 
 #include <glm/glm.hpp>
 #include <memory>
+#include <vector>
 
 class DigibotPhysics;
 class PhysicsEngine;
 class Grid;
+class GridSubsystem;
 
 class DigibotController {
 public:
     enum class LockState { UNLOCKED, TRANSLATION_LOCK, FULL_LOCK };
 
 public:
-    DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine);
+    DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem);
     ~DigibotController() = default;
     
     // Set the desired movement direction
@@ -58,6 +60,7 @@ private:
 
     DigibotPhysics* m_physics;
     PhysicsEngine* m_physicsEngine;
+    GridSubsystem* m_gridSubsystem;
     glm::ivec3 m_movementDirection;
     double m_thrustStrength;
     double m_angularAccelerationMax;  // Maximum angular acceleration (rad/s^2)
@@ -73,4 +76,18 @@ private:
 
     // Jetpack mode
     bool m_jetpackEnabled;
+
+    // Walking mode state
+    uint64_t m_walkingNoiseCounter;
+    double m_hitRatio;
+    glm::dvec3 m_averageNormal;
+    double m_averageGroundDistance;
+    glm::dvec3 m_lastHitPoint;
+    std::vector<std::weak_ptr<Grid>> m_groundGrids;
+    std::vector<double> m_gridWeights;
+    
+    // Walking mode parameters
+    double m_runningAverageAlpha;
+    double m_hitRatioThreshold;
+    double m_gridWeightRemovalThreshold;
 };
