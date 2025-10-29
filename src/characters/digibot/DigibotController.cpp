@@ -30,7 +30,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_runningAverageAlpha(0.2)
     , m_hitRatioThreshold(0.5)
     , m_gridWeightRemovalThreshold(0.01)
-    , m_maxGroundAcceleration(0.01)
+    , m_maxGroundAcceleration(0.004)
     , m_targetHoverHeight(1.0)
     , m_minGridMassFraction(0.5)
     , m_jetpackEnabled(true)
@@ -354,6 +354,9 @@ void DigibotController::handleWalking() {
     // Generate 2D noise for ray direction perturbation
     double noiseX = Hash::pcgUnit(m_walkingNoiseCounter++) * 0.6 - 0.3;
     double noiseY = Hash::pcgUnit(m_walkingNoiseCounter++) * 0.6 - 0.3;
+
+    noiseX = 0.;
+    noiseY = 0.;
     
     // Create local ray direction: downward (-Z) with XY noise
     glm::dvec3 localRayDir = glm::normalize(glm::dvec3(noiseX, noiseY, -1.0));
@@ -401,13 +404,15 @@ void DigibotController::handleWalking() {
     double hitFlag = hitThisFrame ? 1.0 : 0.0;
     m_hitRatio = glm::mix(m_hitRatio, hitFlag, m_runningAverageAlpha);
     
+    // Get body up vector for hovering calculations
+    glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+    
     // Update running averages if we hit something
     if (hitThisFrame) {
         // Update average normal
         m_averageNormal = glm::normalize(glm::mix(m_averageNormal, hitNormal, m_runningAverageAlpha));
         
         // Calculate projected distance along body vertical direction
-        glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
         double projectedDistance = -glm::dot(hitPoint - rigidBody->m_position, bodyUpVector);
         
         // Update average ground distance (projected)
@@ -466,9 +471,6 @@ void DigibotController::handleWalking() {
         }
         std::cout << std::endl;
     }
-
-    // Get body up vector for hovering calculations
-    glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
 
     // Apply hovering force if hit ratio is above threshold
     if (m_hitRatio >= m_hitRatioThreshold) {
