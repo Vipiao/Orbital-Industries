@@ -30,6 +30,9 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_runningAverageAlpha(0.2)
     , m_hitRatioThreshold(0.5)
     , m_gridWeightRemovalThreshold(0.01)
+    , m_maxGroundAcceleration(0.01)
+    , m_targetHoverHeight(1.0)
+    , m_minGridMassFraction(0.5)
     , m_jetpackEnabled(true)
     , m_translationLockStrength(1.0)
 {
@@ -349,8 +352,8 @@ void DigibotController::handleWalking() {
     }
 
     // Generate 2D noise for ray direction perturbation
-    double noiseX = Hash::pcgUnit(m_walkingNoiseCounter) * 0.6 - 0.3;
-    double noiseY = Hash::pcgUnit(m_walkingNoiseCounter + 1) * 0.6 - 0.3;
+    double noiseX = Hash::pcgUnit(m_walkingNoiseCounter++) * 0.6 - 0.3;
+    double noiseY = Hash::pcgUnit(m_walkingNoiseCounter++) * 0.6 - 0.3;
     
     // Create local ray direction: downward (-Z) with XY noise
     glm::dvec3 localRayDir = glm::normalize(glm::dvec3(noiseX, noiseY, -1.0));
@@ -405,7 +408,7 @@ void DigibotController::handleWalking() {
         
         // Calculate projected distance along body vertical direction
         glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
-        double projectedDistance = glm::dot(hitPoint - rigidBody->m_position, bodyUpVector);
+        double projectedDistance = -glm::dot(hitPoint - rigidBody->m_position, bodyUpVector);
         
         // Update average ground distance (projected)
         m_averageGroundDistance = glm::mix(m_averageGroundDistance, projectedDistance, m_runningAverageAlpha);
@@ -463,9 +466,141 @@ void DigibotController::handleWalking() {
         }
         std::cout << std::endl;
     }
+
+    // Get body up vector for hovering calculations
+    glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+
+    // Apply hovering force if hit ratio is above threshold
+    if (m_hitRatio >= m_hitRatioThreshold) {
+        // Calculate instantaneous distance from rigid body to last hit point along average normal
+        double projectedDistance = -glm::dot(m_lastHitPoint - rigidBody->m_position, m_averageNormal);
+        
+        // Calculate distance error
+        double distanceError = m_targetHoverHeight - projectedDistance;
+        
+        // Calculate target velocity with safety margin
+        double margin = 0.5;
+        double targetSpeed = glm::sqrt(2.0 * m_maxGroundAcceleration * (1.0 - margin) * glm::abs(distanceError));
+        double targetVelocity = (distanceError > 0.0 ? targetSpeed : -targetSpeed);
+        
+        // Current velocity in average normal direction
+        double currentVelocity = glm::dot(rigidBody->m_velocity, m_averageNormal);
+        
+        // Needed acceleration
+        double neededAcceleration = targetVelocity - currentVelocity;
+        neededAcceleration = glm::clamp(neededAcceleration, -m_maxGroundAcceleration, m_maxGroundAcceleration);
+        
+        // Force on digibot
+        glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass * m_averageNormal;
+        m_physicsEngine->applyForce(rigidBody, hoverForce);
+        
+        // Calculate total weight for normalization
+        double totalWeight = 0.0;
+        for (double weight : m_gridWeights) {
+            totalWeight += weight;
+        }
+        
+        // Apply opposite forces to grids
+        if (totalWeight > 0.0) {
+            for (size_t i = 0; i < m_groundGrids.size(); ++i) {
+                auto gridPtr = m_groundGrids[i].lock();
+                if (!gridPtr) continue;
+                
+                RigidBody* gridBody = gridPtr->getRigidBody();
+                if (!gridBody) continue;
+                
+                // Check mass threshold - skip if grid is too light to stand on
+                if (gridBody->m_mass < m_minGridMassFraction * rigidBody->m_mass) {
+                    continue;
+                }
+                
+                // Apply weighted opposite force at digibot rigid body center
+                double weightFraction = m_gridWeights[i] / totalWeight;
+                glm::dvec3 gridForce = -hoverForce * weightFraction;
+                
+                // Apply force at digibot center position (same point for both bodies)
+                m_physicsEngine->applyForceAtPoint(gridBody, gridForce, rigidBody->m_position);
+            }
+        }
+    }
+
+    // ========== View Direction Rotation Logic ==========
+    // 1. Calculate local forward direction in world space
+    glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
+    currentForward = glm::normalize(currentForward);
     
-    // Increment noise counter
-    m_walkingNoiseCounter++;
+    // 2. Calculate angle between current forward and desired view direction
+    glm::dvec3 targetForward = glm::normalize(m_viewDirection);
+    
+    double dotProduct = glm::clamp(glm::dot(currentForward, targetForward), -1.0, 1.0);
+    double deltaAngle = std::acos(dotProduct);
+    
+    // Get rotation axis using cross product
+    glm::dvec3 rotationAxis = glm::cross(currentForward, targetForward);
+    double axisLength = glm::length(rotationAxis);
+    
+    // Initialize target angular velocity
+    glm::dvec3 targetAngularVelocity(0.0, 0.0, 0.0);
+    
+    // Adjust max angular velocity down when close to final target to be more precise
+    double adjustedAngVelMax = m_angularAccelerationMax * glm::abs(deltaAngle);
+    
+    // Calculate target angular velocity if we need to rotate
+    if (axisLength > 1e-6) {
+        // Normalize the rotation axis
+        rotationAxis = rotationAxis / axisLength;
+        
+        // 3. Calculate maximum angular speed based on remaining angle and max acceleration
+        double margin = 0.2;
+        double maxAngularSpeed = std::sqrt(2.0 * adjustedAngVelMax * (1.0 - margin) * deltaAngle);
+        
+        // 4. Calculate target angular velocity
+        targetAngularVelocity = rotationAxis * maxAngularSpeed;
+    }
+    // else: targetAngularVelocity remains zero - we want to stop any rotation
+    
+    // 5. Calculate angular acceleration needed (always do this to handle deceleration)
+    glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
+    glm::dvec3 angularAcceleration = targetAngularVelocity - currentAngularVelocity;
+    
+    // 6. Limit acceleration and apply torque
+    double angAccMagnitude = glm::length(angularAcceleration);
+    if (angAccMagnitude > m_angularAccelerationMax) {
+        angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
+    }
+    
+    // Apply torque (I * α = τ)
+    m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
+
+    // Apply movement force
+    if (m_movementDirection != glm::ivec3(0, 0, 0)) {
+        // Get body's upward direction
+        glm::dvec3 bodyUpDirection = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+        
+        // Create view orientation quaternion using view direction and body's up vector
+        glm::dquat viewOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(m_viewDirection, bodyUpDirection));
+        
+        // Convert integer direction to normalized 3D vector
+        glm::dvec3 direction = glm::dvec3(
+            static_cast<double>(m_movementDirection.x),
+            static_cast<double>(m_movementDirection.y),
+            static_cast<double>(m_movementDirection.z)
+        );
+        
+        // Normalize if not zero
+        if (glm::length(direction) > 0.0) {
+            direction = glm::normalize(direction);
+
+            // Transform direction from local to world space using view orientation
+            direction = viewOrientation * direction;
+            
+            // Calculate thrust force based on mass
+            double forceMagnitude = m_thrustStrength * rigidBody->m_mass;
+            glm::dvec3 movementForce = direction * forceMagnitude;
+            
+            m_physicsEngine->applyForce(rigidBody, movementForce);
+        }
+    }
 }
 
 void DigibotController::setThrustStrength(double strength) {

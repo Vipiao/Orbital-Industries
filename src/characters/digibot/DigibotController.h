@@ -90,4 +90,7 @@ private:
     double m_runningAverageAlpha;
     double m_hitRatioThreshold;
     double m_gridWeightRemovalThreshold;
+    double m_maxGroundAcceleration;
+    double m_targetHoverHeight;
+    double m_minGridMassFraction;
 };
