@@ -94,7 +94,7 @@ void DigibotController::handleFlying() {
     }
 
     // Lock force scaling parameter
-    double lockForceScale = 0.2;
+    double lockForceScale = 0.4;
 
     // ========== Calculate View Orientation ==========
     // Get body's upward direction
@@ -474,8 +474,8 @@ void DigibotController::handleWalking() {
 
     // Apply hovering force if hit ratio is above threshold
     if (m_hitRatio >= m_hitRatioThreshold) {
-        // Calculate instantaneous distance from rigid body to last hit point along average normal
-        double projectedDistance = -glm::dot(m_lastHitPoint - rigidBody->m_position, m_averageNormal);
+        // Calculate instantaneous distance from rigid body to last hit point along body up vector
+        double projectedDistance = -glm::dot(m_lastHitPoint - rigidBody->m_position, bodyUpVector);
         
         // Calculate distance error
         double distanceError = m_targetHoverHeight - projectedDistance;
@@ -485,15 +485,15 @@ void DigibotController::handleWalking() {
         double targetSpeed = glm::sqrt(2.0 * m_maxGroundAcceleration * (1.0 - margin) * glm::abs(distanceError));
         double targetVelocity = (distanceError > 0.0 ? targetSpeed : -targetSpeed);
         
-        // Current velocity in average normal direction
-        double currentVelocity = glm::dot(rigidBody->m_velocity, m_averageNormal);
+        // Current velocity in body up direction
+        double currentVelocity = glm::dot(rigidBody->m_velocity, bodyUpVector);
         
         // Needed acceleration
         double neededAcceleration = targetVelocity - currentVelocity;
         neededAcceleration = glm::clamp(neededAcceleration, -m_maxGroundAcceleration, m_maxGroundAcceleration);
         
         // Force on digibot
-        glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass * m_averageNormal;
+        glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass * bodyUpVector;
         m_physicsEngine->applyForce(rigidBody, hoverForce);
         
         // Calculate total weight for normalization
