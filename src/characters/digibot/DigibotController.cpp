@@ -27,7 +27,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_cachedLocalNormal(0.0, 0.0, 1.0)
     , m_targetHoverHeight(1.0)
     , m_maxGroundAcceleration(0.004)
-    , m_walkingRayLength(6.0)  // Match sensor vertical extent (2 * halfScale)
+    , m_walkingRayLength(1.4)
     , m_jetpackEnabled(true)
     , m_translationLockStrength(1.0)
 {
