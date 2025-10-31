@@ -23,6 +23,12 @@ void BallCollider::updateSimpleAABB(uint64_t currentTimestep) {
     m_simpleAABBValidUntilTime = currentTimestep;
 }
 
+void BallCollider::updateAdvancedAABB(uint64_t currentTimestep) {
+    // For spheres, simple and advanced AABB are identical
+    // Just delegate to simple AABB update
+    updateSimpleAABB(currentTimestep);
+}
+
 bool BallCollider::checkAABBCollision(const Collider* other) const {
     // Simple AABB overlap test
     return (m_AABBMin.x <= other->m_AABBMax.x && 

@@ -51,6 +51,11 @@ public:
     static CollisionResult detectBallCube(
         BallCollider* ball, CubeCollider* cube,
         uint64_t currentTimestep);
+
+    // Ball-Polyhedron collision
+    static CollisionResult detectBallPolyhedron(
+        BallCollider* ball, PolyhedronCollider* polyhedron,
+        uint64_t currentTimestep);
     
     // Polyhedron-Polyhedron collision
     static CollisionResult detectPolyhedronPolyhedron(

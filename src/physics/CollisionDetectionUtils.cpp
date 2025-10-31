@@ -34,9 +34,9 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
                         static_cast<CubeCollider*>(colliderB),
                         currentTimestep);
                 case PolyhedronCollider::TYPE_ID:
-                    return detectBallCube(
+                    return detectBallPolyhedron(
                         static_cast<BallCollider*>(colliderA),
-                        static_cast<CubeCollider*>(colliderB),
+                        static_cast<PolyhedronCollider*>(colliderB),
                         currentTimestep);
                 case GridCollider::TYPE_ID:
                     return detectBallGrid(
@@ -199,27 +199,30 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
         // Collision detected
         double distance = glm::sqrt(distanceSquared);
         
-        // Calculate normal in local space
-        glm::dvec3 localNormal;
+        // Calculate normal in local space (from ball center toward closest point on cube)
+        glm::dvec3 localNormal;  // Points from ball toward cube
         if (distance > 1e-9) {
-            localNormal = localDistanceVec / distance;
+            // localDistanceVec points from closest point toward ball center (cube→ball)
+            // We need ball→cube, so negate it
+            localNormal = -localDistanceVec / distance;
         } else {
             // Ball center is inside cube, find closest face
             glm::dvec3 distToFaces = glm::abs(localBallPos) - glm::dvec3(halfWidth);
             if (distToFaces.x >= distToFaces.y && distToFaces.x >= distToFaces.z) {
-                localNormal = glm::dvec3(glm::sign(localBallPos.x), 0.0, 0.0);
+                // Normal points from ball toward nearest face
+                localNormal = glm::dvec3(-glm::sign(localBallPos.x), 0.0, 0.0);
             } else if (distToFaces.y >= distToFaces.z) {
-                localNormal = glm::dvec3(0.0, glm::sign(localBallPos.y), 0.0);
+                localNormal = glm::dvec3(0.0, -glm::sign(localBallPos.y), 0.0);
             } else {
-                localNormal = glm::dvec3(0.0, 0.0, glm::sign(localBallPos.z));
+                localNormal = glm::dvec3(0.0, 0.0, -glm::sign(localBallPos.z));
             }
         }
         
         // Transform normal back to world space
         glm::dvec3 worldNormal = cubeOri * localNormal;
         
-        // Contact point is on ball surface in direction of normal
-        glm::dvec3 contactPoint = ballPos - worldNormal * ballRadius;
+        // Contact point is on ball surface toward cube
+        glm::dvec3 contactPoint = ballPos + worldNormal * ballRadius;
         
         // Penetration depth
         double penetration = ballRadius - distance;
@@ -229,6 +232,119 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
     }
     
     return CollisionResult();
+}
+
+CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
+    BallCollider* ball, PolyhedronCollider* polyhedron,
+    uint64_t currentTimestep) {
+
+    const glm::dvec3& ballPos = ball->m_position;
+    double ballRadius = ball->m_radius;
+    const glm::dvec3& polyPos = polyhedron->m_position;
+    const glm::dquat& polyOri = polyhedron->m_orientation;
+    
+    // Transform ball position to polyhedron's local space
+    glm::dvec3 localBallPos = glm::conjugate(polyOri) * (ballPos - polyPos);
+    
+    // Update polyhedron's advanced AABB for precise collision detection
+    polyhedron->updateAdvancedAABB(currentTimestep);
+    
+    // Get polyhedron data
+    std::vector<glm::dvec3> vertices = polyhedron->getVertices(currentTimestep);
+    auto [faceAxes, edgeAxes, filterNormals] = polyhedron->getCollisionAxes(currentTimestep);
+    
+    double minPenetration = std::numeric_limits<double>::max();
+    glm::dvec3 separatingAxis(0.0);
+    bool foundCollision = false;
+    
+    // Test face normals
+    for (const glm::dvec3& axis : faceAxes) {
+        glm::dvec3 normalizedAxis = glm::normalize(axis);
+        
+        // Project polyhedron vertices onto axis
+        GeometryUtils::ProjectionResult projPoly = GeometryUtils::projectVertices(vertices, normalizedAxis);
+        
+        // Project sphere onto axis: sphere center ± radius
+        double sphereCenter = glm::dot(localBallPos, normalizedAxis);
+        double projSphereMin = sphereCenter - ballRadius;
+        double projSphereMax = sphereCenter + ballRadius;
+        
+        // Check for separation
+        if (projSphereMax < projPoly.min || projSphereMin > projPoly.max) {
+            return CollisionResult(); // No collision
+        }
+        
+        // Calculate penetration
+        double penetration = glm::min(projSphereMax - projPoly.min, projPoly.max - projSphereMin);
+        
+        if (penetration < minPenetration) {
+            minPenetration = penetration;
+            separatingAxis = normalizedAxis;
+            foundCollision = true;
+        }
+    }
+    
+    // Test sphere-center-to-vertex directions
+    for (const glm::dvec3& vertex : vertices) {
+        glm::dvec3 axis = localBallPos - vertex;
+        double axisLengthSq = glm::length2(axis);
+        
+        // Skip if vertex is very close to sphere center
+        if (axisLengthSq < 1e-10) {
+            continue;
+        }
+        
+        glm::dvec3 normalizedAxis = axis / glm::sqrt(axisLengthSq);
+        
+        // Project polyhedron vertices onto axis
+        GeometryUtils::ProjectionResult projPoly = GeometryUtils::projectVertices(vertices, normalizedAxis);
+        
+        // Project sphere onto axis
+        double sphereCenter = glm::dot(localBallPos, normalizedAxis);
+        double projSphereMin = sphereCenter - ballRadius;
+        double projSphereMax = sphereCenter + ballRadius;
+        
+        // Check for separation
+        if (projSphereMax < projPoly.min || projSphereMin > projPoly.max) {
+            return CollisionResult(); // No collision
+        }
+        
+        // Calculate penetration
+        double penetration = glm::min(projSphereMax - projPoly.min, projPoly.max - projSphereMin);
+        
+        if (penetration < minPenetration) {
+            minPenetration = penetration;
+            separatingAxis = normalizedAxis;
+            foundCollision = true;
+        }
+    }
+    
+    if (!foundCollision) {
+        return CollisionResult(); // No collision found
+    }
+    
+    // Ensure normal points from ball toward polyhedron
+    // Calculate polyhedron geometric center
+    glm::dvec3 polyCenter(0.0);
+    for (const glm::dvec3& vertex : vertices) {
+        polyCenter += vertex;
+    }
+    polyCenter /= static_cast<double>(vertices.size());
+    
+    // Check if axis points from ball toward polyhedron
+    glm::dvec3 ballToPolyDir = polyCenter - localBallPos;
+    if (glm::dot(separatingAxis, ballToPolyDir) < 0.0) {
+        separatingAxis = -separatingAxis;
+    }
+    
+    // Transform normal back to world space
+    glm::dvec3 worldNormal = polyOri * separatingAxis;
+    
+    // Contact point is on ball surface toward polyhedron
+    glm::dvec3 contactPoint = ballPos + worldNormal * ballRadius;
+    
+    return CollisionResult(true, std::vector<ContactData>{ContactData(worldNormal, minPenetration)}, 
+                          std::vector<glm::dvec3>{contactPoint}, ball, polyhedron);
 }
 
 CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
@@ -952,8 +1068,8 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
 CollisionResult CollisionDetectionUtils::detectPolyhedronBall(
     PolyhedronCollider* polyhedron, BallCollider* ball,
     uint64_t currentTimestep) {
-    // Use ball-cube detection and flip normals
-    CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(polyhedron), currentTimestep);
+    // Use ball-polyhedron detection and flip normals
+    CollisionResult result = detectBallPolyhedron(ball, polyhedron, currentTimestep);
     
     // Flip normal direction since we called ball-cube instead of cube-ball
     for (auto& contact : result.m_contactData) {
