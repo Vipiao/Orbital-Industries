@@ -77,20 +77,14 @@ private:
     // Jetpack mode
     bool m_jetpackEnabled;
 
-    // Walking mode state
-    uint64_t m_walkingNoiseCounter;
-    double m_hitRatio;
-    glm::dvec3 m_averageNormal;
-    double m_averageGroundDistance;
-    glm::dvec3 m_lastHitPoint;
-    std::vector<std::weak_ptr<Grid>> m_groundGrids;
-    std::vector<double> m_gridWeights;
+    // Walking mode - cached ground contact
+    std::weak_ptr<Grid> m_cachedGrid;
+    glm::dvec3 m_cachedLocalPoint;
+    glm::dvec3 m_cachedLocalNormal;
+    bool m_hasCachedPoint;
     
     // Walking mode parameters
-    double m_runningAverageAlpha;
-    double m_hitRatioThreshold;
-    double m_gridWeightRemovalThreshold;
-    double m_maxGroundAcceleration;
     double m_targetHoverHeight;
-    double m_minGridMassFraction;
+    double m_maxGroundAcceleration;
+    double m_walkingRayLength;
 };
