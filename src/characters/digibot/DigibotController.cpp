@@ -339,51 +339,89 @@ void DigibotController::handleWalking() {
         return;
     }
 
-    // ========== Step 1: Raycast Straight Down ==========
+    // ========== Step 1: Raycast 4 Rays Down ==========
     std::vector<std::weak_ptr<Grid>> availableGrids;
     if (auto sensor = m_physics->getWalkingSensor().lock()) {
         SensorCollider* sensorPtr = static_cast<SensorCollider*>(sensor.get());
         availableGrids = m_gridSubsystem->getGridsFromOverlaps(sensorPtr);
     }
 
-    // Ray straight down in world space
+    // Define 4 ray offsets in local space
+    const double rayOffsetDistance = 0.35;
+    const glm::dvec3 localOffsets[4] = {
+        glm::dvec3(-rayOffsetDistance, rayOffsetDistance, 0.0),   // front-left
+        glm::dvec3(rayOffsetDistance, rayOffsetDistance, 0.0),    // front-right
+        glm::dvec3(-rayOffsetDistance, -rayOffsetDistance, 0.0),  // back-left
+        glm::dvec3(rayOffsetDistance, -rayOffsetDistance, 0.0)    // back-right
+    };
     glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
     glm::dvec3 worldRayDir = -bodyUpVector;
     
-    glm::dvec3 rayStart = rigidBody->m_position;
-    glm::dvec3 rayEnd = rayStart + worldRayDir * m_walkingRayLength;
+    // Store results from 4 rays
+    struct RayHit {
+        bool hit;
+        std::weak_ptr<Grid> grid;
+        glm::dvec3 worldPoint;
+        glm::dvec3 worldNormal;
+        double t;
+    };
+    RayHit hits[4] = {};
     
+    // Cast 4 rays
+    for (int i = 0; i < 4; ++i) {
+        glm::dvec3 worldOffset = rigidBody->m_orientation * localOffsets[i];
+        glm::dvec3 rayStart = rigidBody->m_position + worldOffset;
+        glm::dvec3 rayEnd = rayStart + worldRayDir * m_walkingRayLength;
+        
+        double bestT = -1.0;
+        
+        for (const auto& gridWeak : availableGrids) {
+            auto gridShared = gridWeak.lock();
+            if (!gridShared) continue;
+            
+            RigidBody* gridBody = gridShared->getRigidBody();
+            if (!gridBody || gridBody->m_mass < 1.0 * rigidBody->m_mass) {
+                continue;
+            }
+            
+            glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(rayStart);
+            glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(rayEnd);
+            
+            RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
+            
+            if (result.t >= 0.0 && (!hits[i].hit || result.t < bestT)) {
+                bestT = result.t;
+                hits[i].hit = true;
+                hits[i].grid = gridWeak;
+                hits[i].t = result.t;
+                hits[i].worldPoint = rayStart + result.t * (rayEnd - rayStart);
+                hits[i].worldNormal = glm::normalize(gridBody->m_orientation * result.surfaceNormal);
+            }
+        }
+    }
+    
+    // Average results
     bool hitThisFrame = false;
     double closestT = -1.0;
     std::weak_ptr<Grid> hitGrid;
     glm::dvec3 hitNormal(0.0, 0.0, 0.0);
     glm::dvec3 hitPoint(0.0, 0.0, 0.0);
     
-    // Raycast against all grids in sensor range
-    for (const auto& gridWeak : availableGrids) {
-        auto gridShared = gridWeak.lock();
-        if (!gridShared) continue;
-        
-        // Skip grids with insufficient mass
-        RigidBody* gridBody = gridShared->getRigidBody();
-        if (!gridBody || gridBody->m_mass < 1.0 * rigidBody->m_mass) {
-            continue;
+    int hitCount = 0;
+    for (int i = 0; i < 4; ++i) {
+        if (hits[i].hit) {
+            hitPoint += hits[i].worldPoint;
+            hitNormal += hits[i].worldNormal;
+            closestT = (hitCount == 0) ? hits[i].t : glm::min(closestT, hits[i].t);
+            if (hitCount == 0) hitGrid = hits[i].grid;
+            hitCount++;
         }
-        
-        // Transform ray to grid-local space
-        glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(rayStart);
-        glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(rayEnd);
-        
-        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-        
-        if (result.t >= 0.0 && (!hitThisFrame || result.t < closestT)) {
-            closestT = result.t;
-            hitThisFrame = true;
-            hitGrid = gridWeak;
-            
-            hitNormal = glm::normalize(gridShared->getRigidBody()->m_orientation * result.surfaceNormal);
-            hitPoint = rayStart + closestT * (rayEnd - rayStart);
-        }
+    }
+    
+    if (hitCount > 0) {
+        hitThisFrame = true;
+        hitPoint /= static_cast<double>(hitCount);
+        hitNormal = glm::normalize(hitNormal);
     }
     
     // ========== Step 2: Cache or Reuse Point ==========
