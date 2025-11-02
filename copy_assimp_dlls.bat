@@ -9,7 +9,7 @@ mkdir bin
 mkdir build
 
 REM Copy all required DLLs
-copy "C:\msys64\ucrt64\bin\libassimp-5.dll" bin\
+copy "C:\msys64\ucrt64\bin\libassimp*.dll" bin\
 copy "C:\msys64\ucrt64\bin\libgcc_s_seh-1.dll" bin\
 copy "C:\msys64\ucrt64\bin\libstdc++-6.dll" bin\
 copy "C:\msys64\ucrt64\bin\libwinpthread-1.dll" bin\
