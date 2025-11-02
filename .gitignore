@@ -37,6 +37,8 @@ target-*
 *.lib
 *.o
 *.obj
+# EXCEPT: Allow 3D model .obj files in media directories
+!media/**/*.obj
 
 # IDE files
 #.vscode/
