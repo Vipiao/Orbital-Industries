@@ -5,6 +5,26 @@ project(OrbitalIndustries)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Set default build type to Release if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Compiler-specific flags
+if(MSVC)
+    add_compile_options(/W4 /O2)
+    set(CMAKE_CXX_FLAGS_DEBUG "/Zi /Od /MDd")
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /MD /DNDEBUG")
+else()
+    # GCC/Clang flags
+    add_compile_options(-Wall -Wextra)
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O2 -DNDEBUG")
+endif()
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 # Specify output directory for the executable
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
