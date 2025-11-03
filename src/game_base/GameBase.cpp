@@ -182,7 +182,8 @@ void GameBase::finalizeFrame() {
     auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
     m_jobManager->work(jobEndTime);
 
-    if (m_timeHandler->now() >= targetFrameEnd) {
+    auto now = m_timeHandler->now();
+    if (now >= targetFrameEnd) {
         std::cout << "Frame drop" << std::endl;
     }
 }
