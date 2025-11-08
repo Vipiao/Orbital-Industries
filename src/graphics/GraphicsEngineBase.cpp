@@ -1,10 +1,23 @@
 #include "GraphicsEngineBase.h"
 
+#include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <iostream>
 #include <filesystem>
 #include <algorithm>
+
+// Request discrete GPU on Windows (NVIDIA Optimus / AMD PowerXpress)
+// Theoretically windows is supposed to detect this itself, but experiments
+// shows it often fails at this, especially for openGL applications.
+// This is just a hint, so does not overwrite user specification.
+// For linux I do this in the constructor.
+#ifdef _WIN32
+extern "C" {
+   __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+   __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
 
 void GraphicsEngineBase::framebufferSizeCallback(GLFWwindow* window, int width, int height) {
    GraphicsEngineBase* graphicsEngine{ static_cast<GraphicsEngineBase*>(glfwGetWindowUserPointer(window)) };
@@ -36,6 +49,28 @@ void GraphicsEngineBase::windowPosCallback(GLFWwindow* window, int xpos, int ypo
 }
 
 GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& filepath) {
+   // Force discrete GPU on Linux systems (works for NVIDIA, AMD, Intel Arc)
+   #ifdef __linux__
+   // Try to use gpu instead of integrated gpu. 0 means do not overwrite user settings.
+   // For windws see top of file.
+   setenv("DRI_PRIME", "1", 0);
+   setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 0);
+   setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 0);
+   #endif
+
+   // macOS: No action needed - automatically handled
+   #ifdef __APPLE__
+   // macOS does this automatically.
+   #endif
+   
+   // FreeBSD/OpenBSD: Same as Linux. I am not sure if my application supports FreeBSD though.
+   // Maybe will try to compile it for it in the future for fun, but keep this just in case.
+   #if defined(__FreeBSD__) || defined(__OpenBSD__)
+   setenv("DRI_PRIME", "1", 0);
+   setenv("__NV_PRIME_RENDER_OFFLOAD", "1", 0);
+   setenv("__GLX_VENDOR_LIBRARY_NAME", "nvidia", 0);
+   #endif
+
    // glfw: initialize and configure
    // ------------------------------
    glfwInit();
@@ -51,6 +86,10 @@ GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& f
 #endif
 
    glfwWindowHint(GLFW_STENCIL_BITS, 8); // Request 8 stencil bits
+
+   // Try to bypass compositor on Linux
+   //glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+   //glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 
    // glfw window creation
    // --------------------
