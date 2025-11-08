@@ -6,7 +6,7 @@
 #include "../StructuralBlock.h"
 #include "../../graphics/MeshManager2D/MeshManager2D.h"
 #include "../../graphics/MeshManager2D/GeometryInstance.h"
-#include "../../graphics/InstanceHandler/InstanceHandler.h"
+#include "../../graphics/instanceHandler/InstanceHandler.h"
 #include "../../utils/PositionSelector.h"
 #include <cmath>
 #include <iostream>

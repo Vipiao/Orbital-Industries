@@ -28,34 +28,50 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 # Specify output directory for the executable
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
-# Include directories for header files
+# Common include directories
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories("${CMAKE_SOURCE_DIR}/include")
-include_directories("C:/Users/user/OneDrive/cpp/libraries/glad/include")
-include_directories("C:/Users/user/OneDrive/cpp/libraries/glm")
-include_directories("C:/msys64/ucrt64/include")
+include_directories("${CMAKE_SOURCE_DIR}/external/glad/include")
+include_directories("${CMAKE_SOURCE_DIR}/external/glm")
 
-# Add UCRT64 library path
-link_directories("C:/msys64/ucrt64/lib")
+# Platform-specific configuration
+if(WIN32)
+    message(STATUS "Configuring for Windows")
+    include_directories("C:/msys64/ucrt64/include")
+    link_directories("C:/msys64/ucrt64/lib")
+elseif(UNIX)
+    message(STATUS "Configuring for Linux")
+    # Find packages using CMake's package finder
+    find_package(assimp REQUIRED)
+    find_package(glfw3 REQUIRED)
+    find_package(OpenGL REQUIRED)
+    include_directories(${ASSIMP_INCLUDE_DIRS})
+endif()
 
 # Manually list source files
 file(GLOB_RECURSE SRC_FILES
     "${CMAKE_SOURCE_DIR}/main.cpp"
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
-    "C:/Users/user/OneDrive/cpp/libraries/glad/src/glad.c"
+    "${CMAKE_SOURCE_DIR}/external/glad/src/glad.c"
 )
-
-# Add the GLAD source file
 
 # Add the executable
 add_executable(OrbitalIndustries ${SRC_FILES})
 
-# Link with system libraries
-target_link_libraries(OrbitalIndustries
-    "${CMAKE_SOURCE_DIR}/lib/libglfw3.a"
-    -lassimp
-    -lopengl32
-    -lgdi32
-    -luser32
-    -lshell32
-)
+# Platform-specific linking
+if(WIN32)
+    target_link_libraries(OrbitalIndustries
+        "${CMAKE_SOURCE_DIR}/lib/libglfw3.a"
+        -lassimp
+        -lopengl32
+        -lgdi32
+        -luser32
+        -lshell32
+    )
+elseif(UNIX)
+    target_link_libraries(OrbitalIndustries
+        glfw
+        ${ASSIMP_LIBRARIES}
+        ${OPENGL_LIBRARIES}
+    )
+endif()
