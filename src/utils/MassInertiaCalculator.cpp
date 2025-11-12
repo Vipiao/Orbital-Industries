@@ -102,7 +102,6 @@ glm::dmat3 MassInertiaCalculator::calculatePointMassInertia(const std::vector<gl
         glm::dvec3 r = normalizedVertex - centerOfMass;
         
         double x = r.x, y = r.y, z = r.z;
-        double rSquared = x*x + y*y + z*z;
         
         // Standard point mass inertia tensor formulation
         inertiaTensor[0][0] += pointMass * (y*y + z*z);  // Ixx

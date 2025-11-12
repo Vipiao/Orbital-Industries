@@ -42,7 +42,7 @@ public:
     template<typename T>
     void set_pointer(T* ptr) {
         int id = get_type_id<T>();
-        if (id >= pointers.size()) {
+        if (static_cast<size_t>(id) >= pointers.size()) {
             pointers.resize(id + 1, nullptr);
         }
         pointers[id] = ptr;
@@ -51,7 +51,7 @@ public:
     template<typename T>
     T* get_pointer() {
         int id = get_type_id<T>();
-        if (id >= pointers.size()) {
+        if (static_cast<size_t>(id) >= pointers.size()) {
             return nullptr;
         }
         return static_cast<T*>(pointers[id]);
@@ -66,7 +66,7 @@ public:
     template<typename T>
     void remove_pointer() {
         int id = get_type_id<T>();
-        if (id < pointers.size()) {
+        if (static_cast<size_t>(id) < pointers.size()) {
             pointers[id] = nullptr;
         }
     }

@@ -252,9 +252,6 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
     // Get or create neighborhood for this coordinate
     auto& neighborhood = m_neighborhoods[coord];
 
-    // Check if this is a new neighborhood (empty neighbors list)
-    bool isNewNeighborhood = neighborhood.m_neighbors.empty();
-
     // Insert center cell as first element
     neighborhood.m_neighbors.insert(neighborhood.m_neighbors.begin(), newCell);
     neighborhood.m_hasCenter = true;
@@ -285,9 +282,6 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
 }
 
 void GridCollider::removeCell(const glm::ivec3& coord) {
-    extern int hit_count;
-    int hh = hit_count++;
-
     auto it = m_cells.find(coord);
     if (it != m_cells.end()) {
         // Get pointer before erasing for neighborhood updates

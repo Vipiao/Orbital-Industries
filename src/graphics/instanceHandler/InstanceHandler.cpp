@@ -342,7 +342,7 @@ void InstanceHandler::render(const glm::mat4& view, const glm::mat4& projection,
 
 void InstanceHandler::renderGeometry(const glm::mat4& view, const glm::mat4& projection, 
                                    uint64_t frame, uint64_t time, double timeRemainder, 
-                                   const glm::dvec3& lightDir, const glm::dvec3& camPos,
+                                   const glm::dvec3& /* lightDir */, const glm::dvec3& camPos,
                                    bool renderOpaque, bool renderTransparent) {
     if (m_geometries.empty()) return;
     

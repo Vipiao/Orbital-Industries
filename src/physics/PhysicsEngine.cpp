@@ -184,9 +184,6 @@ void PhysicsEngine::setGravity(const glm::dvec3& gravity) {
 }
 
 bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
-    extern int hit_count;
-    int hh = hit_count;
-    
     while (m_timeHandler->now() < endTime) {
         switch (m_runState) {
             case RunState::APPLY_FORCES:
@@ -235,8 +232,6 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
 bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
     const size_t COLLISION_BATCH_SIZE = 5; // Process this many collisions before checking time
     
-    extern int hit_count;
-    int hh = hit_count;
     while (m_timeHandler->now() < endTime) {
         switch (m_collisionProcessState) {
             case CollisionProcessState::DETECT:

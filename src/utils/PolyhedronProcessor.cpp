@@ -97,7 +97,7 @@ std::array<std::array<int, 3>, 2> PolyhedronProcessor::getConvexTriangulation(
     }
 }
 
-PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<glm::ivec3>& vertices, int maxSize) {
+PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<glm::ivec3>& vertices, int /*maxSize*/) {
     if (vertices.size() != 8) {
         return {}; // Invalid input - need exactly 8 vertices for a cube
     }
@@ -255,15 +255,13 @@ std::vector<std::array<glm::dvec3, 3>> PolyhedronProcessor::getTriangles(const s
     return triangles;
 }
 
-std::vector<std::array<int, 3>> PolyhedronProcessor::getTriangleIndices(const std::vector<glm::ivec3>& vertices, int maxSize) {
+std::vector<std::array<int, 3>> PolyhedronProcessor::getTriangleIndices(const std::vector<glm::ivec3>& vertices, int /* maxSize */) {
     if (vertices.size() != 8) {
         return {}; // Invalid input
     }
     
     std::vector<std::array<int, 3>> triangles;
     triangles.reserve(12); // Maximum 12 triangles (2 per face * 6 faces)
-    
-    double halfSize = static_cast<double>(maxSize) * 0.5;
     
     // Process each face
     for (const auto& face : CUBE_FACES) {
@@ -905,8 +903,6 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
         // Convert set to vector for projection
         std::vector<int> verticesToProject(neighboringVertexIndices.begin(), neighboringVertexIndices.end());
         
-        glm::dvec3 cornerPos = vertices[vertexIdx];
-        
         // Test this vertex for convexity against each of its normals
         bool isVertexConvex = false;
         
@@ -1250,7 +1246,7 @@ bool PolyhedronProcessor::areTrianglesAdjacent(const std::array<glm::dvec3, 3>& 
 }
 
 std::vector<std::vector<int>> PolyhedronProcessor::groupTrianglesIntoIslands(
-    const std::vector<glm::dvec3>& vertices,
+    const std::vector<glm::dvec3>& /*vertices*/,
     const std::vector<std::array<int, 3>>& triangleIndices) {
     
     if (triangleIndices.empty()) {

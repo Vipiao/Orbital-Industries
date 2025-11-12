@@ -161,7 +161,7 @@ std::vector<uint32_t> MeshHandler::appendTrianglesToMesh(
 
    // Check capacity: See if adding the new triangles will exceed the maximum limit
    const int newTriangles = static_cast<int>(vertices->size() / 3);
-   if (m_totalTriangles + newTriangles > m_maxTriangles) {
+   if (m_totalTriangles + newTriangles > static_cast<size_t>(m_maxTriangles)) {
       throw std::runtime_error("Exceeded the maximum number of triangles.");
    }
 
@@ -576,7 +576,7 @@ void MeshHandler::render(
 
 void MeshHandler::renderGeometry(
    const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
-   double timeRemainder, const glm::dvec3& lightDir, glm::dvec3 camPos
+   double timeRemainder, const glm::dvec3& /* lightDir */, glm::dvec3 camPos
 ) {
    // Use G-buffer shader program
    m_gbufferShaderProgram.use();
@@ -588,7 +588,7 @@ void MeshHandler::renderGeometry(
 void MeshHandler::renderDepth(
    const glm::mat4& view, const glm::mat4& projection, uint64_t frame, uint64_t time,
    double timeRemainder, const glm::dvec3& camPos,
-   bool renderOpaque, bool renderTransparent
+   bool /* renderOpaque */, bool /* renderTransparent */
 ) {
    // Use depth-only shader program
    m_depthShaderProgram.use();

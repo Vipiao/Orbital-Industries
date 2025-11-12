@@ -77,9 +77,9 @@ RayIntersectionResult GeometryUtils::intersectRayPolyhedron(
     // Test intersection against each triangle
     for (const auto& triangle : triangleIndices) {
         // Get triangle vertices
-        if (triangle[0] >= vertices.size() || 
-            triangle[1] >= vertices.size() || 
-            triangle[2] >= vertices.size()) {
+        if (static_cast<size_t>(triangle[0]) >= vertices.size() ||
+            static_cast<size_t>(triangle[1]) >= vertices.size() ||
+            static_cast<size_t>(triangle[2]) >= vertices.size()) {
             continue; // Skip invalid triangle indices
         }
         

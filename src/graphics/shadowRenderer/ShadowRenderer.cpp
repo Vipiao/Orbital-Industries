@@ -114,7 +114,7 @@ void ShadowRenderer::cleanupShadowMap() {
     }
 }
 
-void ShadowRenderer::beginShadowPass(const glm::dvec3& lightDir, const glm::dvec3& camPos, uint64_t frameNum) {
+void ShadowRenderer::beginShadowPass(const glm::dvec3& lightDir, const glm::dvec3& /* camPos */, uint64_t frameNum) {
     if (!m_shadowMapInitialized) {
         throw std::runtime_error("Shadow map not initialized. Call setupShadowMap() first.");
     }

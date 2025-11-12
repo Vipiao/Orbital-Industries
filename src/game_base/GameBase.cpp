@@ -120,7 +120,6 @@ void GameBase::prepareFrame() {
         throw std::runtime_error("TimeHandler cannot be null");
     }
     m_currentFrameStartTime = m_timeHandler->now();
-    auto deltaTime = std::chrono::duration<double>(m_currentFrameStartTime - m_lastFrameTime).count();
     m_lastFrameTime = m_currentFrameStartTime;
 
     // Calculate timing parameters for graphics engine at beginning of frame
@@ -176,8 +175,6 @@ void GameBase::finalizeFrame() {
             std::chrono::duration<double>(m_physicsTimeStep));
     }
 
-    int hh = hit_count++;
-    
     // Calculate end time with 1ms safety margin
     auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
     m_jobManager->work(jobEndTime);
@@ -227,7 +224,10 @@ void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
     {
         if (!m_pendingJobs[ii].expired())
         {
-            if (!didPrint) didPrint=true; std::cout << "Physics frame drop" << std::endl;
+            if (!didPrint) {
+                didPrint = true;
+                std::cout << "Physics frame drop" << std::endl;
+            }
             //extern int hit_count;
             //std::cout << "hit_count" << hit_count << std::endl;
         }
