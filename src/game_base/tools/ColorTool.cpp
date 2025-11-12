@@ -130,8 +130,6 @@ void ColorTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& 
     for (const auto& gridWeak : availableGrids) {
         auto gridShared = gridWeak.lock();
         if (!gridShared) continue;
-        
-        extern int hit_count;
 
         // Get interpolated transform once per grid
         glm::dvec3 interpolatedPos;

@@ -362,9 +362,6 @@ void ModifyTool::createMenuStructure(int64_t parentNodeId) {
     auto deactivateCallback = [this]() { deactivate(); };
     
     // Create modify tool parent node
-    glm::dvec4 selectColor = glm::dvec4(0.8, 0.4, 0.2, 0.5);    // Orange
-    glm::dvec4 unSelectColor = glm::dvec4(0.4, 0.2, 0.1, 0.5);  // Dark orange
-    
     m_modifyToolParentId = m_radialMenu->createNode(parentNodeId, m_modifyIconTextureIndex, activateCallback, deactivateCallback);
     
     // Add center node so you can navigate into the modify tool
@@ -596,11 +593,6 @@ void ModifyTool::updateMarkerPositions() {
         // Store selected marker data for potential modification
         m_selectedMarkerCoordinate = glm::ivec3(cornerIndexData[m_nearestMarkerIndex], 0, 0); // Store corner index in x component
         m_selectedMarkerDirection = glm::dvec3(directionData[m_nearestMarkerIndex]);
-        
-        // Print the selected corner coordinate with index (optional debug)
-        glm::dvec3 selectedCorner = cornerPositions[m_nearestMarkerIndex];
-        // std::cout << "Near corner " << m_nearestMarkerIndex << ": (" << selectedCorner.x << ", " 
-        //          << selectedCorner.y << ", " << selectedCorner.z << ")" << std::endl;
     }
     
     // Calculate data only for visible markers

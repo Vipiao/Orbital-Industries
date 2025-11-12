@@ -22,7 +22,7 @@ uint64_t Grid::s_nextUniqueId = 0;
 // Updated - Constructor now initializes with physics and graphics references
 Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
            TimeHandler* timeHandler, const glm::dvec3& position, const glm::dquat& orientation) 
-    : uniqueId(s_nextUniqueId++), m_physics(physics), m_jobManager(jobManager), m_timeHandler(timeHandler)
+    : uniqueId(s_nextUniqueId++), m_jobManager(jobManager), m_timeHandler(timeHandler), m_physics(physics)
 {
     if (!m_jobManager || !m_timeHandler) {
         throw std::invalid_argument("JobManager and TimeHandler cannot be null");
@@ -384,9 +384,6 @@ void Grid::cancelStructuralAnalysis() {
 }
 
 bool Grid::performStructuralAnalysisUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
-    
-    extern int hit_count;
-    int hh = hit_count;
     
     // Check if analysis is complete
     if (m_currentAnalysisIteration >= MAX_ANALYSIS_ITERATIONS) {

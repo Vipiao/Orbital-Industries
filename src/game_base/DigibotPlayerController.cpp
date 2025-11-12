@@ -275,8 +275,6 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     // Create orientation quaternion from view direction and up vector
     cameraOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(viewDir, upVector));
     
-    extern int hit_count;
-
     // Set camera position - offset behind character in view direction with height
     cameraPosition = interpolatedPos + viewDir * m_cameraOffset.y + upVector * m_cameraOffset.z;
 }

@@ -11,7 +11,7 @@ int GridGraphics::s_normalTextureUnit = -1;
 bool GridGraphics::s_texturesLoaded = false;
 
 GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager) 
-    : m_graphics(graphics), m_jobManager(jobManager), m_meshId(-1) {
+    : m_graphics(graphics), m_meshId(-1), m_jobManager(jobManager) {
     
     if (!graphics) {
         throw std::runtime_error("GraphicsEngine pointer cannot be null");
