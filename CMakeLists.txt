@@ -18,6 +18,7 @@ if(MSVC)
 else()
     # GCC/Clang flags
     add_compile_options(-Wall -Wextra)
+    add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas)
     set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O2 -DNDEBUG")
