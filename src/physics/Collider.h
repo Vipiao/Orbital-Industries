@@ -30,11 +30,11 @@ public:
              const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0))
         : CoordinateSystem(position, orientation)
         , m_debugId(s_nextId++)
-        , m_AABBMin(0.0)
-        , m_AABBMax(0.0)
+        , m_positionValidUntilTime(0)
         , m_simpleAABBValidUntilTime(0)
         , m_advancedAABBValidUntilTime(0)
-        , m_positionValidUntilTime(0)
+        , m_AABBMin(0.0)
+        , m_AABBMax(0.0)
     {}
     
     virtual ~Collider() = default;
@@ -66,8 +66,12 @@ public:
     }
     
     // Filter normal management (default no-op implementations)
-    virtual void addFilterNormal(const glm::dvec3& normal) {}
-    virtual void removeFilterNormal(const glm::dvec3& normal) {}
+    virtual void addFilterNormal(const glm::dvec3& normal) {
+        (void)normal;
+    }
+    virtual void removeFilterNormal(const glm::dvec3& normal) {
+        (void)normal;
+    }
     virtual void clearFilterNormals() {}
     virtual const std::vector<glm::dvec3>& getFilterNormals() const { 
         static const std::vector<glm::dvec3> empty; 
@@ -87,7 +91,7 @@ public:
     // Dependent positioning
     CoordinateSystem* m_dependentPosition = nullptr;
     glm::dvec3 m_dependentOffset{0.0};
-    uint64_t m_positionValidUntilTime = 0;
+    uint64_t m_positionValidUntilTime;
 
     // Timestep-based validity tracking
     uint64_t m_simpleAABBValidUntilTime;

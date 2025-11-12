@@ -245,7 +245,6 @@ std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() co
             
             // Create plane transform for this face
             glm::dvec3 planeNormal = extremeNormals[extreme];
-            glm::dvec3 planePoint = extremeVertices[0]; // Use first vertex as reference point
             auto transform = GeometryUtils::createPlaneTransform(planeNormal);
             
             // Project vertices to 2D

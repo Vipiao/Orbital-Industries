@@ -127,6 +127,7 @@ CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collid
 CollisionResult CollisionDetectionUtils::detectBallBall(
     BallCollider* ballA, BallCollider* ballB,
     uint64_t currentTimestep) {
+    (void)currentTimestep;
 
     const glm::dvec3& posA = ballA->m_position;
     const glm::dvec3& posB = ballB->m_position;
@@ -172,6 +173,7 @@ CollisionResult CollisionDetectionUtils::detectBallBall(
 CollisionResult CollisionDetectionUtils::detectBallCube(
     BallCollider* ball, CubeCollider* cube,
     uint64_t currentTimestep) {
+    (void)currentTimestep;
 
     const glm::dvec3& ballPos = ball->m_position;
     double ballRadius = ball->m_radius;
