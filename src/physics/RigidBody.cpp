@@ -104,6 +104,14 @@ size_t RigidBody::computeHash() const {
     hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_torques));
     hash = Hash::combineHashes(hash, std::hash<double>{}(m_mass));
     hash = Hash::combineHashes(hash, std::hash<bool>{}(m_isStatic));
+
+    // Hash attachment count and configuration (not collider pointers themselves)
+    hash = Hash::combineHashes(hash, std::hash<size_t>{}(m_attachments.size()));
+    for (const auto& attachment : m_attachments) {
+        hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(attachment->localPosition));
+        hash = Hash::combineHashes(hash, Hash::DQuatHash{}(attachment->localOrientation));
+        hash = Hash::combineHashes(hash, std::hash<bool>{}(attachment->isTrigger));
+    }
     // Note: Don't hash cached values or pointers, only core state
     
     return hash;

@@ -16,6 +16,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
     , m_rigidBody(nullptr)
+    , m_colliderLocalPosition(-0.5, -0.5, -1.0)
     //, m_centerOfMass(0.0, 0.0, 0.0)
     , m_collisionBoxMeshId(-1)
 {
@@ -157,23 +158,34 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         false  // Not static, should fall
     );
 
-    m_rigidBody->m_colliderOffset = {0.5,0.5,1};
-
-    // 4. Connect collider to rigid body
-    m_physics->connectCollider(m_rigidBody, m_colliderWeak);
-    m_physics->updateColliderTransform(m_rigidBody);
+    // 4. Attach collider to rigid body
+    // Collider local position relative to center of mass (negative of old offset)
+    glm::dquat colliderLocalOrientation(1.0, 0.0, 0.0, 0.0);
+    m_physics->attachCollider(
+        m_rigidBody,
+        m_colliderWeak,
+        m_colliderLocalPosition,
+        glm::dquat(1.0, 0.0, 0.0, 0.0),  // Identity orientation
+        false);                           // Not a trigger
 
     // 5. Create walking sensor for ground detection
     glm::dvec3 sensorHalfScale(3.0, 3.0, 3.0);
     m_walkingSensor = m_physics->getCollisionDetector().addSensorCollider(
         m_rigidBody->m_position,
         sensorHalfScale);
+
+    // Attach sensor as a trigger (detects but doesn't respond physically)
+    m_physics->attachCollider(
+        m_rigidBody,
+        m_walkingSensor,
+        glm::dvec3(0.0),                 // At center of mass
+        glm::dquat(1.0, 0.0, 0.0, 0.0),  // Identity orientation
+        true);                            // IS a trigger
 }
 
 DigibotPhysics::~DigibotPhysics() {
     // Disconnect and cleanup physics
     if (m_rigidBody) {
-        m_physics->disconnectCollider(m_rigidBody);
         m_physics->removeRigidBody(m_rigidBody);
     }
 
@@ -264,9 +276,8 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         angVelAxis = glm::dvec3(0.0, 0.0, 1.0);
         angVelMagnitude = 0.0;
     }
-
-    glm::dvec3 meshPosition = m_rigidBody->m_position - m_rigidBody->m_colliderOffset;
-
+    
+    glm::dvec3 meshPosition = m_rigidBody->m_position + m_rigidBody->m_orientation * m_colliderLocalPosition;
     graphics->updateMeshTransform(
         m_collisionBoxMeshId,
         meshPosition,
@@ -274,7 +285,7 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         m_rigidBody->m_orientation,
         angVelAxis,
         angVelMagnitude,
-        m_rigidBody->m_colliderOffset,
+        -m_colliderLocalPosition,  // Pass negative to maintain old offset semantics for graphics
         glm::dvec3(1.0, 1.0, 1.0),
         -1, -1, -1,
         currentPhysicsTimeStep,
@@ -287,7 +298,7 @@ glm::dvec3 DigibotPhysics::worldToLocal(const glm::dvec3& worldPos) const {
         worldPos,
         m_rigidBody->m_position,
         m_rigidBody->m_orientation,
-        m_rigidBody->m_colliderOffset
+        -m_colliderLocalPosition
     );
 }
 
@@ -296,18 +307,12 @@ glm::dvec3 DigibotPhysics::localToWorld(const glm::dvec3& localPos) const {
         localPos,
         m_rigidBody->m_position,
         m_rigidBody->m_orientation,
-        m_rigidBody->m_colliderOffset
+        -m_colliderLocalPosition
     );
 }
 
 void DigibotPhysics::updatePhysics() {
     if (!m_rigidBody) {
         return;
-    }
-
-    // Update walking sensor position to follow rigid body
-    if (auto sensor = m_walkingSensor.lock()) {
-        sensor->m_position = m_rigidBody->m_position;
-        sensor->m_orientation = m_rigidBody->m_orientation;
     }
 }

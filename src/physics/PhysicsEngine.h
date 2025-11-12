@@ -35,11 +35,24 @@ public:
                            const glm::dmat3& inertiaTensor = glm::dmat3(1.0),
                            bool isStatic = false);
 
-    // Connect a collider to a rigid body
-    void connectCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak);
+    /**
+     * @brief Attach a collider to a rigid body
+     * @param body Rigid body to attach to
+     * @param colliderWeak Collider to attach
+     * @param localPosition Position of collider relative to center of mass (body space)
+     * @param localOrientation Orientation offset in body space
+     * @param isTrigger If true, collider detects but doesn't respond physically
+     * @throws std::runtime_error if collider is already attached to a body
+     */
+    void attachCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak,
+                       const glm::dvec3& localPosition = glm::dvec3(0.0),
+                       const glm::dquat& localOrientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
+                       bool isTrigger = false);
     
-    // Disconnect a collider from a rigid body
-    void disconnectCollider(RigidBody* body);
+    // Detach a specific collider from a rigid body
+    void detachCollider(RigidBody* body, Collider* collider);
+    void detachAllColliders(RigidBody* body);
+    void updateColliderTransform(RigidBody* body);
     
     //
     uint64_t getCurrentPhysicsTimeStep() const { return m_currentPhysicsTimeStep; }
@@ -59,9 +72,6 @@ public:
     // Set gravity
     void setGravity(const glm::dvec3& gravity);
 
-    // Update collider transform for a specific rigid body
-    void updateColliderTransform(RigidBody* body);
-    
     // Run physics simulation
     bool runUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 

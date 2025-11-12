@@ -54,6 +54,8 @@ private:
     // Physics state
     std::weak_ptr<GridCollider> m_colliderWeak;
     RigidBody* m_rigidBody;
+    // Store collider local transform for coordinate conversions
+    glm::dvec3 m_colliderLocalPosition;
     //glm::dvec3 m_centerOfMass;
 
     // Debug visualization

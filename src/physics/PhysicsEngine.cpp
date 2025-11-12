@@ -46,8 +46,6 @@ RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position,
         body->m_invInertiaTensor = glm::dmat3(0.0);
     }
     body->m_isStatic = isStatic;
-    body->m_collider = nullptr;
-    body->m_colliderOffset = glm::dvec3{0.0, 0.0, 0.0}; // Initialize to zero offset
 
     RigidBody* bodyPtr = body.get();
 
@@ -56,42 +54,94 @@ RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position,
     return bodyPtr;
 }
 
-void PhysicsEngine::connectCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak) {
+void PhysicsEngine::attachCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak,
+                                   const glm::dvec3& localPosition,
+                                   const glm::dquat& localOrientation,
+                                   bool isTrigger) {
+    if (!body) return;
+    
     auto collider = colliderWeak.lock();
-    if (!body || !collider) return;
+    if (!collider) return;
 
-    // Disconnect existing collider if any
-    if (body->m_collider) {
-        disconnectCollider(body);
+    // Check if collider is already attached to any body
+    if (collider->get_pointer<ColliderAttachment>() != nullptr) {
+        throw std::runtime_error("PhysicsEngine::attachCollider: Collider is already attached to a rigid body");
     }
+
+    // Create attachment
+    auto attachment = std::make_unique<ColliderAttachment>();
+    attachment->rigidBody = body;
+    attachment->collider = colliderWeak;
+    attachment->localPosition = localPosition;
+    attachment->localOrientation = glm::normalize(localOrientation);
+    attachment->isTrigger = isTrigger;
     
-    // Set forward reference (RigidBody -> Collider)
-    body->m_collider = collider.get();
+    // Set back-reference in collider via PointerStorage
+    ColliderAttachment* attachmentPtr = attachment.get();
+    collider->set_pointer<ColliderAttachment>(attachmentPtr);
     
-    // Set back reference (Collider -> RigidBody) via PointerStorage
-    collider->set_pointer<RigidBody>(body);
+    // Store attachment in body
+    body->m_attachments.push_back(std::move(attachment));
+    
+    // Update collider transform immediately
+    glm::dvec3 worldPosition = body->m_position + body->m_orientation * localPosition;
+    glm::dquat worldOrientation = body->m_orientation * localOrientation;
+    collider->m_position = worldPosition;
+    collider->m_orientation = worldOrientation;
 }
 
-void PhysicsEngine::disconnectCollider(RigidBody* body) {
-    if (!body || !body->m_collider) return;
+void PhysicsEngine::detachCollider(RigidBody* body, Collider* collider) {
+    if (!body || !collider) return;
     
-    // Clear back reference
-    body->m_collider->remove_pointer<RigidBody>();
+    // Find and remove the attachment
+    for (auto it = body->m_attachments.begin(); it != body->m_attachments.end(); ) {
+        auto attachedCollider = (*it)->collider.lock();
+        if (attachedCollider && attachedCollider.get() == collider) {
+            // Clear back-reference before removing
+            attachedCollider->remove_pointer<ColliderAttachment>();
+            it = body->m_attachments.erase(it);
+            return; // Found and removed, exit
+        } else {
+            ++it;
+        }
+    }
+}
+
+void PhysicsEngine::detachAllColliders(RigidBody* body) {
+    if (!body) return;
     
-    // Clear forward reference
-    body->m_collider = nullptr;
+    // Clear all back-references
+    for (auto& attachment : body->m_attachments) {
+        auto collider = attachment->collider.lock();
+        if (collider) {
+            collider->remove_pointer<ColliderAttachment>();
+        }
+    }
+    
+    body->m_attachments.clear();
+}
+
+void PhysicsEngine::updateColliderTransform(RigidBody* body) {
+    if (!body) return;
+    
+    for (auto& attachment : body->m_attachments) {
+        auto collider = attachment->collider.lock();
+        if (!collider) continue;
+        
+        // Transform local offset to world space
+        glm::dvec3 worldPosition = body->m_position + body->m_orientation * attachment->localPosition;
+        glm::dquat worldOrientation = body->m_orientation * attachment->localOrientation;
+        
+        collider->m_position = worldPosition;
+        collider->m_orientation = worldOrientation;
+    }
 }
 
 void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
     if (!bodyToRemove) return;
 
-    // Find the body to get its collider before removal
-    Collider* colliderToRemove = bodyToRemove->m_collider;
-
-    // Clear back reference via PointerStorage
-    if (colliderToRemove) {
-        colliderToRemove->remove_pointer<RigidBody>();
-    }
+    // Detach all colliders before removing
+    detachAllColliders(bodyToRemove);
     
     // Remove from rigid bodies
     auto removeIt = std::remove_if(m_rigidBodies.begin(), m_rigidBodies.end(),
@@ -131,13 +181,6 @@ void PhysicsEngine::applyTorque(RigidBody* body, const glm::dvec3& torque) {
 
 void PhysicsEngine::setGravity(const glm::dvec3& gravity) {
     m_gravity = gravity;
-}
-
-void PhysicsEngine::updateColliderTransform(RigidBody* body) {
-    if (body && body->m_collider) {
-        body->m_collider->m_position = body->m_position - body->m_orientation * body->m_colliderOffset;
-        body->m_collider->m_orientation = body->m_orientation;
-    }
 }
 
 bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
@@ -340,7 +383,6 @@ void PhysicsEngine::updatePositions() {
         body->m_forces = glm::dvec3{0.0, 0.0, 0.0};
         body->m_torques = glm::dvec3{0.0, 0.0, 0.0};
         
-        // Update collider position and orientation if it exists
         updateColliderTransform(body.get());
     }
 }
@@ -348,9 +390,21 @@ void PhysicsEngine::updatePositions() {
 //static int ttt = 0;
 
 void PhysicsEngine::resolveCollision(CollisionResult& collision) {
-    // Find the rigid bodies associated with these colliders
-    RigidBody* bodyA = collision.m_colliderA->get_pointer<RigidBody>();
-    RigidBody* bodyB = collision.m_colliderB->get_pointer<RigidBody>();
+    // Get attachments from colliders
+    ColliderAttachment* attachmentA = collision.m_colliderA->get_pointer<ColliderAttachment>();
+    ColliderAttachment* attachmentB = collision.m_colliderB->get_pointer<ColliderAttachment>();
+    
+    if (!attachmentA || !attachmentB) {
+        return; // Colliders not attached to bodies
+    }
+    
+    // Check if either is a trigger (triggers don't respond physically)
+    if (attachmentA->isTrigger || attachmentB->isTrigger) {
+        return; // Skip physical response for triggers
+    }
+    
+    RigidBody* bodyA = attachmentA->rigidBody;
+    RigidBody* bodyB = attachmentB->rigidBody;
 
     if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
         return; // Skip if we can't find bodies
@@ -433,9 +487,21 @@ void PhysicsEngine::resolveCollision(CollisionResult& collision) {
 }
 
 void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
-    // Find the rigid bodies associated with these colliders
-    RigidBody* bodyA = collision.m_colliderA->get_pointer<RigidBody>();
-    RigidBody* bodyB = collision.m_colliderB->get_pointer<RigidBody>();
+    // Get attachments from colliders
+    ColliderAttachment* attachmentA = collision.m_colliderA->get_pointer<ColliderAttachment>();
+    ColliderAttachment* attachmentB = collision.m_colliderB->get_pointer<ColliderAttachment>();
+    
+    if (!attachmentA || !attachmentB) {
+        return; // Colliders not attached to bodies
+    }
+    
+    // Check if either is a trigger (triggers don't separate)
+    if (attachmentA->isTrigger || attachmentB->isTrigger) {
+        return; // Skip separation for triggers
+    }
+    
+    RigidBody* bodyA = attachmentA->rigidBody;
+    RigidBody* bodyB = attachmentB->rigidBody;
     
     if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
         return; // Skip if we can't find bodies

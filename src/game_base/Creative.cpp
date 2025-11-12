@@ -306,7 +306,10 @@ void Creative::processInputLogic() {
     if (keyboard->m_h.justPressed()) {
         for (size_t ii = 0; ii < m_gameBase->getGridSubsystem()->getGrids().size(); ii++) {
             auto cells = m_gameBase->getGridSubsystem()->getGrids()[ii]->getCells();
-            GridCollider* gridCollider = static_cast<GridCollider*>(m_gameBase->getGridSubsystem()->getGrids()[ii]->getRigidBody()->m_collider);
+            // Get grid collider from the grid itself (not from rigid body)
+            auto colliderWeak = m_gameBase->getGridSubsystem()->getGrids()[ii]->getCollider();
+            auto collider = colliderWeak.lock();
+            GridCollider* gridCollider = static_cast<GridCollider*>(collider.get());
             
             for (auto cell: cells) {
                 glm::ivec3 coord = cell.first;

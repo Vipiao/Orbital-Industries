@@ -48,13 +48,14 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
         glm::dmat3(0.0),   // Inertia tensor (will be updated when cells are added)
         false);            // Not static
     
-    // Set initial collider offset and update transform
-    // Connect collider to rigid body
-    m_physics->connectCollider(m_rigidBody, m_colliderWeak);
-    
-    // Set initial collider offset
-    m_rigidBody->m_colliderOffset = m_centerOfMass;
-    m_physics->updateColliderTransform(m_rigidBody);
+    // Attach collider to rigid body
+    // localPosition is negative of center of mass (collider position relative to COM)
+    m_physics->attachCollider(
+        m_rigidBody, 
+        m_colliderWeak,
+        -m_centerOfMass,                             // localPosition (collider relative to COM)
+        glm::dquat(1.0, 0.0, 0.0, 0.0),             // localOrientation (identity)
+        false);                                      // isTrigger = false
 
     // Create graphics subsystem
     m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager);
@@ -72,7 +73,6 @@ Grid::~Grid() {
     
     // Disconnect and remove physics components
     if (m_rigidBody) {
-        m_physics->disconnectCollider(m_rigidBody);
         m_physics->removeRigidBody(m_rigidBody);
     }
 
@@ -477,6 +477,18 @@ void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
     m_rigidBody->m_velocity += glm::cross(m_rigidBody->getAngularVelocityWorld(), m_rigidBody->m_orientation * cmShift);
     
     updateRigidBodyInverses();
+
+    // Update attachment local position to match new center of mass
+    if (!m_rigidBody->m_attachments.empty()) {
+        // Find the grid collider attachment and update its local position
+        for (auto& attachment : m_rigidBody->m_attachments) {
+            auto collider = attachment->collider.lock();
+            if (collider && collider.get() == m_colliderWeak.lock().get()) {
+                attachment->localPosition = -m_centerOfMass;
+                break;
+            }
+        }
+    }
 }
 
 void Grid::updateRigidBodyInverses() {
@@ -488,8 +500,6 @@ void Grid::updateRigidBodyInverses() {
     // Update inverse inertia tensor with safety check
     double determinant = glm::determinant(m_rigidBody->m_inertiaTensor);
     m_rigidBody->m_invInertiaTensor = (determinant > 1e-15) ? glm::inverse(m_rigidBody->m_inertiaTensor) : glm::dmat3(std::numeric_limits<double>::max());
-
-    m_rigidBody->m_colliderOffset = m_centerOfMass;
 }
 
 // Convert world coordinates to grid-local coordinates

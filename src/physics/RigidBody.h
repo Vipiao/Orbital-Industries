@@ -3,10 +3,26 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
+#include <vector>
 #include "../utils/IHashable.h"
 
 // Forward declarations
+class RigidBody;
 class Collider;
+
+/**
+ * @brief Attachment configuration for a collider connected to a rigid body
+ * 
+ * Defines how a collider moves with and affects a rigid body.
+ */
+struct ColliderAttachment {
+    RigidBody* rigidBody;                // Back-reference to owning rigid body
+    std::weak_ptr<Collider> collider;    // The attached collider
+    glm::dvec3 localPosition;            // Position of collider relative to center of mass (body space)
+    glm::dquat localOrientation;         // Orientation offset in body space
+    bool isTrigger;                      // If true, detects collisions but doesn't affect momentum
+};
 
 class RigidBody : public IHashable {
 public:
@@ -37,9 +53,8 @@ public:
     
     bool m_isStatic;              // If true, this body won't move
 
-    Collider* m_collider;         // Associated collider for collision detection
-    glm::dvec3 m_colliderOffset;  // Offset from center of mass to collider origin (in local space)
-
+    std::vector<std::unique_ptr<ColliderAttachment>> m_attachments; // Attached colliders
+    
     // Constructor
     RigidBody() = default;
     
