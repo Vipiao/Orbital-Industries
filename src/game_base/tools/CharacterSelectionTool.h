@@ -23,9 +23,9 @@ public:
     void onPhysicsUpdateComplete();
     
 private:
-    double m_interactionRange;
     GameBase* m_gameBase;
     RadialMenu* m_radialMenu;
+    double m_interactionRange;
     
     // Internal state
     bool m_active{false};

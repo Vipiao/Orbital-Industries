@@ -16,9 +16,9 @@
 class GridCell : public IStochasticCell, public IHashable {
 public:
     // Basic cell data that all grid cells have
+    glm::ivec3 coordinates;
     CellType type;
     uint64_t uniqueId;
-    glm::ivec3 coordinates;
     
     // Direct neighbor pointers for fast access (Right, Left, Front, Back, Top, Bottom)
     std::array<GridCell*, 6> neighbors{nullptr};

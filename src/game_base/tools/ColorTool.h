@@ -33,10 +33,10 @@ public:
     
 private:
     // Interaction range
-    double m_interactionRange;
-
+    
     GameBase* m_gameBase;
     RadialMenu* m_radialMenu;
+    double m_interactionRange;
     
     // Internal state
     glm::dvec4 m_currentColor{0.0, 1.0, 1.0, 1.0}; // HSVA: hue=0, sat=0, val=1, alpha=1 (white)
