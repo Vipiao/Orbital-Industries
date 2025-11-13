@@ -5,14 +5,22 @@
             "name": "Debug OrbitalIndustries",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/bin/OrbitalIndustries.exe",
+            //"program": "${workspaceFolder}/bin/OrbitalIndustries.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe",
+            //"miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe",
+            "windows": {
+                "program": "${workspaceFolder}/bin/OrbitalIndustries.exe",
+                "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe"
+            },
+            "linux": {
+                "program": "${workspaceFolder}/bin/OrbitalIndustries",
+                "miDebuggerPath": "/usr/bin/gdb"
+            },
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
