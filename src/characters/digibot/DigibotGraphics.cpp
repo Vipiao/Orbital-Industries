@@ -39,10 +39,10 @@ DigibotGraphics::DigibotGraphics(GraphicsEngine* graphics, DigibotResources* res
     : m_graphics(graphics)
     , m_resources(resources)
     , m_visualMeshSSBOIndex(-1)
-    , m_leftElbowPoint(0.0, 0.0, 0.0)
     , m_rightElbowPoint(0.0, 0.0, 0.0)
-    , m_leftKneePoint(0.0, 0.0, 0.0)
+    , m_leftElbowPoint(0.0, 0.0, 0.0)
     , m_rightKneePoint(0.0, 0.0, 0.0)
+    , m_leftKneePoint(0.0, 0.0, 0.0)
 {
     if (!m_resources) {
         throw std::runtime_error("DigibotResources cannot be null");

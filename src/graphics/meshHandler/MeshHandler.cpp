@@ -161,7 +161,7 @@ std::vector<uint32_t> MeshHandler::appendTrianglesToMesh(
 
    // Check capacity: See if adding the new triangles will exceed the maximum limit
    const int newTriangles = static_cast<int>(vertices->size() / 3);
-   if (m_totalTriangles + newTriangles > static_cast<size_t>(m_maxTriangles)) {
+   if (static_cast<size_t>(m_totalTriangles) + static_cast<size_t>(newTriangles) > m_maxTriangles) {
       throw std::runtime_error("Exceeded the maximum number of triangles.");
    }
 

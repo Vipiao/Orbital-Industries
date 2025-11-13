@@ -3,7 +3,7 @@
 #include "GeometryData.h"
 
 GeometryInstance::GeometryInstance(GeometryData* parent, size_t index)
-    : m_parent(parent), m_index(index), m_color(1.0, 1.0, 1.0, 1.0) {
+    : m_color(1.0, 1.0, 1.0, 1.0), m_index(index), m_parent(parent) {
     // Initialize with default transform
     m_transform.position = glm::vec2(0.0f);
     m_transform.scale = glm::vec2(1.0f);

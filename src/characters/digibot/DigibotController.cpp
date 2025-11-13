@@ -18,17 +18,18 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_movementDirection(0, 0, 0)
     , m_thrustStrength(0.004)  // Default thrust strength
     , m_angularAccelerationMax(0.004)  // Maximum angular acceleration (rad/s²)
-    , m_rollInput(0)
+    , m_maxRollRate(0.0)  // Will be set later if needed
     , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
+    , m_rollInput(0)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
     , m_lockState(LockState::UNLOCKED)
     , m_translationLockStrength(1.0)
+    , m_jetpackEnabled(true)
     , m_cachedLocalPoint(0.0, 0.0, 0.0)
     , m_cachedLocalNormal(0.0, 0.0, 1.0)
     , m_hasCachedPoint(false)
     , m_targetHoverHeight(1.0)
     , m_maxGroundAcceleration(0.004)
-    , m_jetpackEnabled(true)
     , m_walkingRayLength(1.4)
 {
     if (!m_physics) {

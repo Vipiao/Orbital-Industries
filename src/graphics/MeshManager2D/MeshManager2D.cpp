@@ -187,7 +187,7 @@ std::weak_ptr<GeometryData> MeshManager2D::loadMesh(const std::string& geometryP
         Vertex2D vertex;
         vertex.position = glm::vec2(meshData.positionsData[idx][0], meshData.positionsData[idx][1]);
         
-        if (idx < meshData.uvsData.size()) {
+        if (idx < static_cast<int>(meshData.uvsData.size())) {
             vertex.texCoord = glm::vec2(meshData.uvsData[idx][0], meshData.uvsData[idx][1]);
         } else {
             vertex.texCoord = glm::vec2(0.0f, 0.0f);

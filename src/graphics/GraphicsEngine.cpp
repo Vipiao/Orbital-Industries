@@ -354,7 +354,7 @@ std::vector<uint32_t> GraphicsEngine::loadModelIntoMesh(
                 for (size_t i = 0; i < mesh.indices.size(); i++) {
                     int idx = mesh.indices[i];
                     
-                    if (idx < mesh.positionsData.size()) {
+                    if (idx < static_cast<int>(mesh.positionsData.size())) {
                         const auto& pos = mesh.positionsData[idx];
                         const auto& norm = mesh.normalsData[idx];
                         const auto& tang = mesh.tangentsData[idx];
