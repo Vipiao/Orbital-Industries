@@ -23,6 +23,15 @@ struct ContactData {
         : normal(norm), penetration(pen), compliantNormal(compNorm), compliantPenetration(compPen) {}
 };
 
+// Collision data stored on individual colliders
+struct CollisionData {
+    Collider* otherCollider;
+    std::vector<ContactData> contactData;
+    std::vector<glm::dvec3> contactPoints;
+    std::vector<glm::dvec3> contactPointsLocalA;
+    std::vector<glm::dvec3> contactPointsLocalB;
+};
+
 struct CollisionResult {
     bool m_hasCollision = false;
     std::vector<ContactData> m_contactData;     // Combined normal/penetration/compliant data
@@ -33,8 +42,6 @@ struct CollisionResult {
     std::vector<glm::dvec3> m_contactPointsLocalB;  // Contact points relative to collider B
 
     // For collision resolution optimization
-    std::vector<double> m_collisionMasses;      // Collision mass for each contact point
-    bool m_collisionMassesCalculated = false;   // Flag to avoid recalculation
     bool m_isFiltered = false;                  // Flag to indicate collision was filtered out
 
     // Colliders involved in collision (resolution gets RigidBody via PointerStorage)

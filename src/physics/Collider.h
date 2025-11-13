@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include "../utils/GeometryUtils.h"
 #include "../utils/PointerStorage.h"
+#include "CollisionResult.h"
 
 class CoordinateSystem {
 public:
@@ -35,6 +36,8 @@ public:
         , m_advancedAABBValidUntilTime(0)
         , m_AABBMin(0.0)
         , m_AABBMax(0.0)
+        , m_collisions()
+        , m_collisionsValidTimestamp(0)
     {}
     
     virtual ~Collider() = default;
@@ -85,6 +88,23 @@ public:
 
     std::unordered_set<Collider*> m_overlappingColliders;
 
+    // Collision data storage
+    void addCollision(const CollisionData& data, uint64_t timestamp) {
+        if (m_collisionsValidTimestamp != timestamp) {
+            m_collisions.clear();
+            m_collisionsValidTimestamp = timestamp;
+        }
+        m_collisions.push_back(data);
+    }
+
+    const std::vector<CollisionData>& getCollisions(uint64_t currentTimestamp) const {
+        if (m_collisionsValidTimestamp != currentTimestamp) {
+            static const std::vector<CollisionData> empty;
+            return empty;
+        }
+        return m_collisions;
+    }
+
     // Dependent positioning system
     void updatePosition(uint64_t currentTimestep);
 
@@ -100,6 +120,10 @@ public:
     // AABB data
     glm::dvec3 m_AABBMin;
     glm::dvec3 m_AABBMax;
+
+    // Collision data with timestamp-based validity
+    std::vector<CollisionData> m_collisions;
+    uint64_t m_collisionsValidTimestamp;
 
 private:
     static int s_nextId;

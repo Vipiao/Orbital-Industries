@@ -1503,8 +1503,4 @@ void CollisionDetectionUtils::reduceContactPoints(CollisionResult& collision, in
     collision.m_contactPoints = std::move(newContactPoints);
     collision.m_contactPointsLocalA = std::move(newContactPointsLocalA);
     collision.m_contactPointsLocalB = std::move(newContactPointsLocalB);
-    
-    // Reset collision masses calculation flag since we changed the contacts
-    collision.m_collisionMassesCalculated = false;
-    collision.m_collisionMasses.clear();
 }

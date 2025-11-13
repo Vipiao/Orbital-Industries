@@ -158,7 +158,7 @@ void CollisionDetector::setTimestep(uint64_t timestep) {
     m_currentTimestep = timestep;
 }
 
-Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions) {
+Generator<bool> CollisionDetector::run() {
     // Update all collision boxes
     updateAllCollidersAndAABB();
     if (m_timeHandler->now() >= m_endTime) {
@@ -229,7 +229,7 @@ Generator<bool> CollisionDetector::run(std::vector<CollisionResult>& collisions)
         if (m_timeHandler->now() >= m_endTime) {
             co_yield true; // Need more time
         }
-        checkCollision(pair.first, pair.second, collisions);
+        checkCollision(pair.first, pair.second);
     }
 
     co_return;
@@ -284,7 +284,7 @@ std::pair<Collider*, Collider*> CollisionDetector::makePair(Collider* a, Collide
     return (a->m_debugId < b->m_debugId) ? std::make_pair(a, b) : std::make_pair(b, a);
 }
 
-void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2, std::vector<CollisionResult>& collisions) {
+void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2) {
     if (!collider1 || !collider2 || collider1 == collider2) return;
 
     // Skip collision detection if either collider is a sensor
@@ -306,12 +306,26 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2,
     CollisionResult result = CollisionDetectionUtils::collideWith(collider1, collider2, m_currentTimestep);
     
     if (result.m_hasCollision) {
-        //std::cout << "Collision detected between two colliders!" << std::endl;
-        // Set collider references for resolution
-        result.m_colliderA = collider1;
-        result.m_colliderB = collider2;
+        // Store collision data on BOTH colliders
         
-        // Store collision for resolution
-        collisions.push_back(result);
+        // Data for collider1 (from collider1's perspective)
+        CollisionData data1;
+        data1.otherCollider = collider2;
+        data1.contactData = result.m_contactData;
+        data1.contactPoints = result.m_contactPoints;
+        data1.contactPointsLocalA = result.m_contactPointsLocalA;
+        data1.contactPointsLocalB = result.m_contactPointsLocalB;
+        
+        // Data for collider2 (from collider2's perspective - swap A/B)
+        CollisionData data2;
+        data2.otherCollider = collider1;
+        data2.contactData = result.m_contactData;
+        data2.contactPoints = result.m_contactPoints;
+        data2.contactPointsLocalA = result.m_contactPointsLocalB;  // Swap
+        data2.contactPointsLocalB = result.m_contactPointsLocalA;  // Swap
+        
+        // Write to colliders with current timestamp
+        collider1->addCollision(data1, m_currentTimestep);
+        collider2->addCollision(data2, m_currentTimestep);
     }
 }

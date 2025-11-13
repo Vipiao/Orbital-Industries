@@ -67,7 +67,7 @@ public:
     void removeCollider(std::weak_ptr<Collider> colliderWeak);
     
     // Run collision detection
-    Generator<bool> run(std::vector<CollisionResult>& collisions);
+    Generator<bool> run();
     
     // Set the end time for the current collision detection run
     void setEndTime(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
@@ -98,7 +98,7 @@ private:
     void sortAndDetectPotentialCollisions(
         std::vector<std::unique_ptr<Edge>>& edges,
         std::set<std::pair<Collider*, Collider*>, ColliderPairComparator>& potentialCollisions);
-    void checkCollision(Collider* collider1, Collider* collider2, std::vector<CollisionResult>& collisions);
+    void checkCollision(Collider* collider1, Collider* collider2);
     void insertionSort(
         std::vector<std::unique_ptr<Edge>>& edges,
         std::set<std::pair<Collider*, Collider*>, ColliderPairComparator>& potentialCollisions);

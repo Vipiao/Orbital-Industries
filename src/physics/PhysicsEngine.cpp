@@ -219,9 +219,7 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
                 // Physics step complete - reset state and increment counter
                 m_runState = RunState::APPLY_FORCES;
                 m_collisionProcessState = CollisionProcessState::DETECT;
-                m_currentCollisionIndex = 0;
                 m_separationIteration = 0;
-                m_activeCollisions.clear();
                 return false; // No more work needed
         }
     }
@@ -236,8 +234,7 @@ bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::h
         switch (m_collisionProcessState) {
             case CollisionProcessState::DETECT:
                 if (!m_collisionGenerator) {
-                    m_activeCollisions.clear();
-                    m_collisionGenerator = std::make_unique<Generator<bool>>(m_collisionDetector.run(m_activeCollisions));
+                    m_collisionGenerator = std::make_unique<Generator<bool>>(m_collisionDetector.run());
                 }
                 
                 // Update end time (for new calls or resuming)
@@ -249,7 +246,6 @@ bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::h
                 if (!*m_collisionGenerator) {
                     // Collision detection complete
                     m_collisionGenerator.reset();
-                    m_currentCollisionIndex = 0;
                     m_collisionProcessState = CollisionProcessState::RESOLVE;
                 } else {
                     // Generator yielded - needs more time
@@ -258,23 +254,32 @@ bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::h
                 break;
                 
             case CollisionProcessState::RESOLVE:
-                // Process collision resolution in batches
-                for (size_t i = 0; i < COLLISION_BATCH_SIZE && m_currentCollisionIndex < m_activeCollisions.size(); i++) {
-                    resolveCollision(m_activeCollisions[m_currentCollisionIndex]);
-                    m_currentCollisionIndex++;
+                // Process rigid bodies in batches
+                {
+                    static size_t currentBodyIndex = 0;
+                    if (currentBodyIndex == 0) {
+                        // Starting resolution phase
+                        currentBodyIndex = 0;
+                    }
+                    
+                    for (size_t i = 0; i < COLLISION_BATCH_SIZE && currentBodyIndex < m_rigidBodies.size(); i++) {
+                        resolveCollision(m_rigidBodies[currentBodyIndex].get());
+                        currentBodyIndex++;
+                    }
+                    
+                    if (currentBodyIndex >= m_rigidBodies.size()) {
+                        currentBodyIndex = 0;
+                        m_collisionProcessState = CollisionProcessState::SEPARATE;
+                        m_separationIteration = 0;
+                    }
                 }
                 
-                if (m_currentCollisionIndex >= m_activeCollisions.size()) {
-                    // All collisions resolved, move to separation
-                    m_collisionProcessState = CollisionProcessState::SEPARATE;
-                    m_separationIteration = 0;
-                }
                 break;
                 
             case CollisionProcessState::SEPARATE:
-                // Process separation iterations (originally 8 iterations)
-                for (const auto& collision : m_activeCollisions) {
-                    separateOverlaps(const_cast<CollisionResult&>(collision));
+                // Process separation iterations
+                for (auto& body : m_rigidBodies) {
+                    separateOverlaps(body.get());
                 }
                 m_separationIteration++;
                 
@@ -384,229 +389,237 @@ void PhysicsEngine::updatePositions() {
 
 //static int ttt = 0;
 
-void PhysicsEngine::resolveCollision(CollisionResult& collision) {
-    // Get attachments from colliders
-    ColliderAttachment* attachmentA = collision.m_colliderA->get_pointer<ColliderAttachment>();
-    ColliderAttachment* attachmentB = collision.m_colliderB->get_pointer<ColliderAttachment>();
-    
-    if (!attachmentA || !attachmentB) {
-        return; // Colliders not attached to bodies
+void PhysicsEngine::resolveCollision(RigidBody* body) {
+    if (!body || body->m_isStatic) {
+        return;
     }
-    
-    // Check if either is a trigger (triggers don't respond physically)
-    if (attachmentA->isTrigger || attachmentB->isTrigger) {
-        return; // Skip physical response for triggers
-    }
-    
-    RigidBody* bodyA = attachmentA->rigidBody;
-    RigidBody* bodyB = attachmentB->rigidBody;
-
-    if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
-        return; // Skip if we can't find bodies
-    }
-    
-    if (bodyA->m_isStatic && bodyB->m_isStatic) {
-        return; // Skip if both bodies are static
-    }
-    //ttt += collision.m_normals.size();
-
-    // Calculate collision masses if not already done
-    if (!collision.m_collisionMassesCalculated) {
-        collision.m_collisionMasses.reserve(collision.m_contactData.size());
-        for (size_t i = 0; i < collision.m_contactData.size(); ++i) {
-            double collisionMass = getCollisionMass(bodyA, bodyB, collision.m_contactPoints[i], collision.m_contactData[i].normal);
-            collision.m_collisionMasses.push_back(collisionMass);
+ 
+    // Iterate through all attached colliders
+    for (auto& attachment : body->m_attachments) {
+        if (attachment->isTrigger) {
+            continue; // Skip triggers
         }
-        collision.m_collisionMassesCalculated = true;
-    }
-
-    // Process each contact point
-    for (size_t i = 0; i < collision.m_contactData.size(); ++i) {
-        const ContactData& contact = collision.m_contactData[i];
-        glm::dvec3 normal = contact.normal;
-        glm::dvec3 contactPoint = collision.m_contactPoints[i];
         
-        // Calculate relative position vectors from center of mass to contact point
-        glm::dvec3 rA = contactPoint - bodyA->m_position;
-        glm::dvec3 rB = contactPoint - bodyB->m_position;
-
-        // Calculate relative velocity at contact point
-        glm::dvec3 velA = bodyA->m_velocity + glm::cross(bodyA->getAngularVelocityWorld(), rA);
-        glm::dvec3 velB = bodyB->m_velocity + glm::cross(bodyB->getAngularVelocityWorld(), rB);
-        glm::dvec3 relativeVel = velA - velB;
-        
-        // Project relative velocity onto collision normal
-        double relativeVelNormal = glm::dot(relativeVel, normal);
-        
-        // Do not resolve if velocities are separating
-        if (relativeVelNormal < 0) {
+        auto collider = attachment->collider.lock();
+        if (!collider) {
             continue;
         }
         
-        // Get pre-calculated collision mass and calculate impulse
-        double collisionMass = collision.m_collisionMasses[i];
-        // Calculate impulse magnitude: -(1+e)*v_rel_normal * collision_mass
-        double impulseMagnitude = -(1.0 + 0.0) * relativeVelNormal * collisionMass; // restitution = 0.0
-
-        // Apply impulse
-        glm::dvec3 impulse = normal * impulseMagnitude;
-
-        // Apply compliant collision handling for corner softness
-        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantNormal, 
-                                      contact.compliantPenetration, &relativeVel)) {
-            glm::dvec3 compliantNormal = contact.compliantNormal;
-            double normalAlignment = glm::dot(normal, compliantNormal);
-            double scaleFactor = 1.;
-            if (true || normalAlignment > 0)
-            {
-                scaleFactor = normalAlignment * normalAlignment;
+        // Get all collisions for this collider
+        const auto& collisions = collider->getCollisions(m_currentPhysicsTimeStep);
+        
+        for (const auto& collision : collisions) {
+            // Avoid processing same collision twice - only process if our ID is lower
+            if (collider->m_debugId >= collision.otherCollider->m_debugId) {
+                continue;
             }
-            impulse *= scaleFactor;
-        }
-        
-        // Apply impulse only to non-static bodies
-        if (!bodyA->m_isStatic) {
-            bodyA->m_velocity += impulse * bodyA->m_invMass;
-            glm::dvec3 angularImpulseBody = glm::transpose(bodyA->getOrientationMatrix()) * glm::cross(rA, impulse);
-            bodyA->m_angularMomentumBody += angularImpulseBody;
-            bodyA->invalidateAngularMomentum();
-        }
-        
-        if (!bodyB->m_isStatic) {
-            bodyB->m_velocity -= impulse * bodyB->m_invMass;
-            glm::dvec3 angularImpulseBody = glm::transpose(bodyB->getOrientationMatrix()) * glm::cross(rB, impulse);
-            bodyB->m_angularMomentumBody -= angularImpulseBody;
-            bodyB->invalidateAngularMomentum();
+            
+            // Get other collider's attachment
+            ColliderAttachment* otherAttachment = 
+                collision.otherCollider->get_pointer<ColliderAttachment>();
+            if (!otherAttachment || otherAttachment->isTrigger) {
+                continue; // Other is trigger or not attached
+            }
+            
+            RigidBody* otherBody = otherAttachment->rigidBody;
+            if (!otherBody || otherBody->m_mass == 0.0) {
+                continue;
+            }
+            
+            if (otherBody->m_isStatic) {
+                continue;
+            }
+            
+            // Process each contact point
+            for (size_t i = 0; i < collision.contactData.size(); ++i) {
+                const ContactData& contact = collision.contactData[i];
+                glm::dvec3 normal = contact.normal;
+                glm::dvec3 contactPoint = collision.contactPoints[i];
+                
+                // Calculate relative position vectors
+                glm::dvec3 rA = contactPoint - body->m_position;
+                glm::dvec3 rB = contactPoint - otherBody->m_position;
+                
+                // Calculate relative velocity at contact point
+                glm::dvec3 velA = body->m_velocity + glm::cross(body->getAngularVelocityWorld(), rA);
+                glm::dvec3 velB = otherBody->m_velocity + glm::cross(otherBody->getAngularVelocityWorld(), rB);
+                glm::dvec3 relativeVel = velA - velB;
+                
+                // Project relative velocity onto collision normal
+                double relativeVelNormal = glm::dot(relativeVel, normal);
+                
+                // Do not resolve if velocities are separating
+                if (relativeVelNormal < 0) {
+                    continue;
+                }
+                
+                // Calculate collision mass and impulse
+                double collisionMass = getCollisionMass(body, otherBody, contactPoint, normal);
+                double impulseMagnitude = -(1.0 + 0.0) * relativeVelNormal * collisionMass;
+                
+                glm::dvec3 impulse = normal * impulseMagnitude;
+                
+                // Apply compliant collision handling
+                if (shouldUseCompliantHandling(body, otherBody, contactPoint, normal, 
+                    contact.compliantNormal, contact.compliantPenetration, &relativeVel)) {
+                    glm::dvec3 compliantNormal = contact.compliantNormal;
+                    double normalAlignment = glm::dot(normal, compliantNormal);
+                    double scaleFactor = 1.0;
+                    if (true || normalAlignment > 0) {
+                        scaleFactor = normalAlignment * normalAlignment;
+                    }
+                    impulse *= scaleFactor;
+                }
+                
+                // Apply impulse to both bodies
+                body->m_velocity += impulse * body->m_invMass;
+                glm::dvec3 angularImpulseBodyA = glm::transpose(body->getOrientationMatrix()) * 
+                    glm::cross(rA, impulse);
+                body->m_angularMomentumBody += angularImpulseBodyA;
+                body->invalidateAngularMomentum();
+                
+                if (!otherBody->m_isStatic) {
+                    otherBody->m_velocity -= impulse * otherBody->m_invMass;
+                    glm::dvec3 angularImpulseBodyB = glm::transpose(otherBody->getOrientationMatrix()) * 
+                        glm::cross(rB, impulse);
+                    otherBody->m_angularMomentumBody -= angularImpulseBodyB;
+                    otherBody->invalidateAngularMomentum();
+                }
+            }
         }
     }
 }
 
-void PhysicsEngine::separateOverlaps(CollisionResult& collision) {
-    // Get attachments from colliders
-    ColliderAttachment* attachmentA = collision.m_colliderA->get_pointer<ColliderAttachment>();
-    ColliderAttachment* attachmentB = collision.m_colliderB->get_pointer<ColliderAttachment>();
-    
-    if (!attachmentA || !attachmentB) {
-        return; // Colliders not attached to bodies
+void PhysicsEngine::separateOverlaps(RigidBody* body) {
+    if (!body || body->m_isStatic) {
+        return;
     }
     
-    // Check if either is a trigger (triggers don't separate)
-    if (attachmentA->isTrigger || attachmentB->isTrigger) {
-        return; // Skip separation for triggers
-    }
-    
-    RigidBody* bodyA = attachmentA->rigidBody;
-    RigidBody* bodyB = attachmentB->rigidBody;
-    
-    if (!bodyA || !bodyB || bodyA->m_mass == 0.0 || bodyA->m_mass == 0.0) {
-        return; // Skip if we can't find bodies
-    }
-    
-    if (bodyA->m_isStatic && bodyB->m_isStatic) {
-        return; // Skip if both bodies are static
-    }
-
-    // Use pre-calculated collision masses
-    if (!collision.m_collisionMassesCalculated) {
-        // This should already be calculated in resolveCollision, but just in case
-        collision.m_collisionMasses.reserve(collision.m_contactData.size());
-        for (size_t i = 0; i < collision.m_contactData.size(); ++i) {
-            double collisionMass = getCollisionMass(bodyA, bodyB, collision.m_contactPoints[i], collision.m_contactData[i].normal);
-            collision.m_collisionMasses.push_back(collisionMass);
+    // Iterate through all attached colliders
+    for (auto& attachment : body->m_attachments) {
+        if (attachment->isTrigger) {
+            continue; // Skip triggers
         }
-        collision.m_collisionMassesCalculated = true;
-    }
-
-    // Process each contact point for position correction with dynamic overlap calculation
-    for (size_t ii = 0; ii < collision.m_contactData.size(); ++ii) {
-        const ContactData& contact = collision.m_contactData[ii];
-        glm::dvec3 normal = contact.normal;
-        glm::dvec3 contactPoint = collision.m_contactPoints[ii];
-
-        // Skip overlap correction for contacts that would use compliant handling
-        if (shouldUseCompliantHandling(bodyA, bodyB, contactPoint, normal, contact.compliantNormal,
-                                      contact.compliantPenetration)) {
-            continue; // Skip overlap correction for this contact
-        }
-
-        // Calculate current overlap using dynamic contact point positions
-        // Transform local contact points back to current world space using collider methods
-        glm::dvec3 currentContactA = collision.m_colliderA->localToWorld(collision.m_contactPointsLocalA[ii]);
-        glm::dvec3 currentContactB = collision.m_colliderB->localToWorld(collision.m_contactPointsLocalB[ii]);
         
-        // Calculate how much the contact points have separated since collision detection
-        glm::dvec3 separation = currentContactA - currentContactB;
-        double separationAlongNormal = glm::dot(separation, normal);
-        
-        // Adjust the overlap: positive separation means objects moved apart, so reduce overlap
-        double overlap = contact.penetration + separationAlongNormal;
-        
-        // Only separate if there's positive overlap
-        if (overlap <= 0) {
+        auto collider = attachment->collider.lock();
+        if (!collider) {
             continue;
         }
-        
-        // Get collision mass and calculate position correction "impulse"
-        double collisionMass = collision.m_collisionMasses[ii];
 
-        // Calculate position correction magnitude: overlap * collision_mass
-        double margin = 0.01;
-        double correctionMagnitude = (overlap - margin) * collisionMass;
-        if (correctionMagnitude < 0.) {
-            correctionMagnitude *= 0.08 / collision.m_contactData.size();
-        }
-
-        // Calculate relative position vectors from center of mass to contact point
-        glm::dvec3 rA = contactPoint - bodyA->m_position;
-        glm::dvec3 rB = contactPoint - bodyB->m_position;
-
-        // Apply position correction
-        double scale = 0.2;
-        glm::dvec3 correction = normal * correctionMagnitude * scale;
-
-        // Apply linear position corrections only to non-static bodies
-        if (!bodyA->m_isStatic) {
-            bodyA->m_position -= correction * bodyA->m_invMass;
-        }
-        if (!bodyB->m_isStatic) {
-            bodyB->m_position += correction * bodyB->m_invMass;
-        }
+         // Get all collisions for this collider
+        const auto& collisions = collider->getCollisions(m_currentPhysicsTimeStep);
         
-        // Apply angular position corrections (to orientation)
-        glm::dvec3 angularCorrectionA = -bodyA->getWorldInvInertiaTensor() * glm::cross(rA, correction);
-        glm::dvec3 angularCorrectionB = +bodyB->getWorldInvInertiaTensor() * glm::cross(rB, correction);
-        
-        // Convert angular corrections to quaternion rotations and apply
-        double angularCorrectionALengthSq = glm::dot(angularCorrectionA, angularCorrectionA);
-        if (!bodyA->m_isStatic && angularCorrectionALengthSq > 1e-18) { // 1e-9 squared
-            double angleA = glm::length(angularCorrectionA);
-            glm::dvec3 axisA = angularCorrectionA / angleA;
-            glm::dquat rotationA = glm::angleAxis(angleA, axisA);
-            bodyA->m_orientation = rotationA * bodyA->m_orientation;
-            bodyA->m_orientation = glm::normalize(bodyA->m_orientation);
-            bodyA->invalidateOrientation();
-        }
-        
-        double angularCorrectionBLengthSq = glm::dot(angularCorrectionB, angularCorrectionB);
-        if (!bodyB->m_isStatic && angularCorrectionBLengthSq > 1e-18) { // 1e-9 squared
-            double angleB = glm::sqrt(angularCorrectionBLengthSq);
-           glm::dvec3 axisB = angularCorrectionB / angleB;
-            glm::dquat rotationB = glm::angleAxis(angleB, axisB);
-            bodyB->m_orientation = rotationB * bodyB->m_orientation;
-            bodyB->m_orientation = glm::normalize(bodyB->m_orientation);
-            bodyB->invalidateOrientation();
-        }
-        
-        // Update collider transforms after position changes
-        if (!bodyA->m_isStatic) {
-            updateColliderTransform(bodyA);
-        }
-        if (!bodyB->m_isStatic) {
-            updateColliderTransform(bodyB);
+        for (const auto& collision : collisions) {
+            // Avoid processing same collision twice
+            if (collider->m_debugId >= collision.otherCollider->m_debugId) {
+                continue;
+            }
+            
+            // Get other collider's attachment
+            ColliderAttachment* otherAttachment = 
+                collision.otherCollider->get_pointer<ColliderAttachment>();
+            if (!otherAttachment || otherAttachment->isTrigger) {
+                continue;
+            }
+            
+            RigidBody* otherBody = otherAttachment->rigidBody;
+            if (!otherBody || otherBody->m_mass == 0.0) {
+                continue;
+            }
+            
+            if (otherBody->m_isStatic) {
+                continue;
+            }
+            
+            // Process each contact point for position correction
+            for (size_t ii = 0; ii < collision.contactData.size(); ++ii) {
+                const ContactData& contact = collision.contactData[ii];
+                glm::dvec3 normal = contact.normal;
+                glm::dvec3 contactPoint = collision.contactPoints[ii];
+                
+                // Skip overlap correction for contacts that would use compliant handling
+                if (shouldUseCompliantHandling(body, otherBody, contactPoint, normal, 
+                    contact.compliantNormal, contact.compliantPenetration)) {
+                    continue;
+                }
+                
+                // Calculate current overlap using dynamic contact point positions
+                glm::dvec3 currentContactA = collider->localToWorld(collision.contactPointsLocalA[ii]);
+                glm::dvec3 currentContactB = collision.otherCollider->localToWorld(collision.contactPointsLocalB[ii]);
+                
+                // Calculate separation
+                glm::dvec3 separation = currentContactA - currentContactB;
+                double separationAlongNormal = glm::dot(separation, normal);
+                
+                // Adjust the overlap
+                double overlap = contact.penetration + separationAlongNormal;
+                
+                // Only separate if there's positive overlap
+                if (overlap <= 0) {
+                    continue;
+                }
+                
+                // Calculate collision mass
+                double collisionMass = getCollisionMass(body, otherBody, contactPoint, normal);
+                
+                // Calculate position correction magnitude
+                double margin = 0.01;
+                double correctionMagnitude = (overlap - margin) * collisionMass;
+                if (correctionMagnitude < 0.0) {
+                    correctionMagnitude *= 0.08 / collision.contactData.size();
+                }
+                
+                // Calculate relative position vectors
+                glm::dvec3 rA = contactPoint - body->m_position;
+                glm::dvec3 rB = contactPoint - otherBody->m_position;
+                
+                // Apply position correction
+                double scale = 0.2;
+                glm::dvec3 correction = normal * correctionMagnitude * scale;
+                
+                // Apply linear position corrections
+                body->m_position -= correction * body->m_invMass;
+                
+                if (!otherBody->m_isStatic) {
+                    otherBody->m_position += correction * otherBody->m_invMass;
+                }
+                
+                // Apply angular position corrections
+                glm::dvec3 angularCorrectionA = -body->getWorldInvInertiaTensor() * glm::cross(rA, correction);
+                glm::dvec3 angularCorrectionB = +otherBody->getWorldInvInertiaTensor() * glm::cross(rB, correction);
+                
+                // Convert to quaternion rotations
+                double angularCorrectionALengthSq = glm::dot(angularCorrectionA, angularCorrectionA);
+                if (angularCorrectionALengthSq > 1e-18) {
+                    double angleA = glm::length(angularCorrectionA);
+                    glm::dvec3 axisA = angularCorrectionA / angleA;
+                    glm::dquat rotationA = glm::angleAxis(angleA, axisA);
+                    body->m_orientation = rotationA * body->m_orientation;
+                    body->m_orientation = glm::normalize(body->m_orientation);
+                    body->invalidateOrientation();
+                }
+                
+                if (!otherBody->m_isStatic) {
+                    double angularCorrectionBLengthSq = glm::dot(angularCorrectionB, angularCorrectionB);
+                    if (angularCorrectionBLengthSq > 1e-18) {
+                        double angleB = glm::sqrt(angularCorrectionBLengthSq);
+                        glm::dvec3 axisB = angularCorrectionB / angleB;
+                        glm::dquat rotationB = glm::angleAxis(angleB, axisB);
+                        otherBody->m_orientation = rotationB * otherBody->m_orientation;
+                        otherBody->m_orientation = glm::normalize(otherBody->m_orientation);
+                        otherBody->invalidateOrientation();
+                    }
+                }
+                
+                // Update collider transforms after position changes
+                updateColliderTransform(body);
+                if (!otherBody->m_isStatic) {
+                    updateColliderTransform(otherBody);
+                }
+            }
         }
     }
 }
-
 
 double PhysicsEngine::getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
                                       const glm::dvec3& contactPoint, const glm::dvec3& normal) {

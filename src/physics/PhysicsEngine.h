@@ -93,8 +93,8 @@ private:
     void applyForces();
     void updatePositions();
     bool handleCollisionsUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
-    void resolveCollision(CollisionResult& collision);
-    void separateOverlaps(CollisionResult& collision);
+    void resolveCollision(RigidBody* body);
+    void separateOverlaps(RigidBody* body);
     
     // Static helper functions for collision resolution
     static double getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
@@ -111,9 +111,7 @@ private:
     RunState m_runState = RunState::APPLY_FORCES;
     CollisionProcessState m_collisionProcessState = CollisionProcessState::DETECT;
     std::unique_ptr<Generator<bool>> m_collisionGenerator;
-    size_t m_currentCollisionIndex = 0;
     int m_separationIteration = 0;
-    std::vector<CollisionResult> m_activeCollisions;
     
     TimeHandler* m_timeHandler;
 
