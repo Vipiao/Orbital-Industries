@@ -1202,8 +1202,6 @@ std::vector<bool> PolyhedronProcessor::checkPolyhedronBorderIntersection(
     // Check each border vertex of A against the polygon formed by B's border vertices
     const double margin = 0.01; // Small margin for intersection tolerance
     
-    extern int test;
-    test++;
     for (size_t i = 0; i < borderVerticesA.size(); ++i) {
         int vertexIndex = borderVertexIndicesA[i];
         const glm::dvec2& vertex = borderVerticesA[i];
@@ -1214,8 +1212,6 @@ std::vector<bool> PolyhedronProcessor::checkPolyhedronBorderIntersection(
     
     return result;
 }
-
-int test = 0;
 
 bool PolyhedronProcessor::areTrianglesAdjacent(const std::array<glm::dvec3, 3>& triangleA, const std::array<glm::dvec3, 3>& triangleB, double tolerance) {
     // Find shared vertices between the triangles
