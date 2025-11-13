@@ -5,7 +5,7 @@
             "name": "Debug OrbitalIndustries",
             "type": "cppdbg",
             "request": "launch",
-            //"program": "${workspaceFolder}/bin/OrbitalIndustries.exe",
+            //"program": "${workspaceFolder}/bin/OrbitalIndustries.exe", # Will be overwritten by windows/linux
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/bin",
