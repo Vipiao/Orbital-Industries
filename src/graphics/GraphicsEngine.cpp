@@ -55,6 +55,14 @@ GraphicsEngine::GraphicsEngine(
 }
 
 GraphicsEngine::~GraphicsEngine() {
+    // CRITICAL: Destroy OpenGL resources before GraphicsEngineBase destroys the context
+    // These must be destroyed in reverse dependency order
+    m_meshManager2D.reset();
+    m_instanceHandler.reset();
+    m_shadowRenderer.reset();
+    m_deferredRenderer.reset();
+    m_meshHandler.reset();
+    m_ssboManager.reset();
 }
 
 void GraphicsEngine::beginFrame() {
