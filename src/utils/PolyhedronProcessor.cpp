@@ -601,6 +601,8 @@ bool PolyhedronProcessor::isPointInConvexPolygon(
         return false; // Not a valid polygon
     }
     
+    bool hasValidEdge = false;
+
     // For each edge of the polygon, check if point is on the "inside" side
     for (size_t i = 0; i < polygon.size(); ++i) {
         size_t j = (i + 1) % polygon.size();
@@ -608,9 +610,17 @@ bool PolyhedronProcessor::isPointInConvexPolygon(
         glm::dvec2 edgeStart = polygon[i];
         glm::dvec2 edgeEnd = polygon[j];
         glm::dvec2 edge = edgeEnd - edgeStart;
+
+        // Skip zero-length edges to avoid normalization of zero vector
+        double edgeLengthSq = edge.x * edge.x + edge.y * edge.y;
+        if (edgeLengthSq < 1e-18) {
+            continue;
+        }
+
+        hasValidEdge = true;
         
         // Calculate inward normal (rotate edge 90 degrees clockwise for counter-clockwise polygon)
-        glm::dvec2 inwardNormal = glm::normalize(glm::dvec2(edge.y, -edge.x));
+        glm::dvec2 inwardNormal = glm::dvec2(edge.y, -edge.x) / glm::sqrt(edgeLengthSq);
         
         // Move edge inward by margin distance
         glm::dvec2 adjustedEdgeStart = edgeStart + inwardNormal * margin;
@@ -625,6 +635,14 @@ bool PolyhedronProcessor::isPointInConvexPolygon(
         if (cross < 0.0) {
             return false; // Point is outside this edge
         }
+    }
+
+    // If no valid edges exist, polygon is degenerate (all vertices at same point)
+    // Point is only "inside" if it coincides with that point
+    if (!hasValidEdge) {
+        glm::dvec2 diff = point - polygon[0];
+        double distSq = diff.x * diff.x + diff.y * diff.y;
+        return distSq < 1e-18;
     }
     
     return true; // Point is inside all edges
@@ -1184,6 +1202,8 @@ std::vector<bool> PolyhedronProcessor::checkPolyhedronBorderIntersection(
     // Check each border vertex of A against the polygon formed by B's border vertices
     const double margin = 0.01; // Small margin for intersection tolerance
     
+    extern int test;
+    test++;
     for (size_t i = 0; i < borderVerticesA.size(); ++i) {
         int vertexIndex = borderVertexIndicesA[i];
         const glm::dvec2& vertex = borderVerticesA[i];
@@ -1194,6 +1214,8 @@ std::vector<bool> PolyhedronProcessor::checkPolyhedronBorderIntersection(
     
     return result;
 }
+
+int test = 0;
 
 bool PolyhedronProcessor::areTrianglesAdjacent(const std::array<glm::dvec3, 3>& triangleA, const std::array<glm::dvec3, 3>& triangleB, double tolerance) {
     // Find shared vertices between the triangles
