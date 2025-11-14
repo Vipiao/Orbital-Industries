@@ -415,6 +415,7 @@ const Collider* GridCollider::getCell(const glm::ivec3& coord) const {
 }
 
 void GridCollider::updateSubColliderTransformsAndAABB(uint64_t currentTimestep) {
+    // TODOO: I think this function is never called. Maybe it can be removed?
     // Update position and orientation of all sub-colliders
     for (const auto& pair : m_cells) {
         const glm::ivec3& coord = pair.first;
