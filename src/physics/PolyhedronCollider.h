@@ -33,6 +33,9 @@ public:
     std::vector<std::array<int, 3>> generateTriangleIndices() const;
     std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes(uint64_t currentTimestep = 0) const;
     
+    // Get half of the maximum dimension
+    double getHalfMaxWidth() const { return m_halfMaxWidth; }
+
     // Filter normal management
     void addFilterNormal(const glm::dvec3& normal);
     void removeFilterNormal(const glm::dvec3& normal);

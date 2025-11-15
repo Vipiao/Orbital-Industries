@@ -15,9 +15,6 @@ public:
     // Override type identification
     virtual int getTypeId() const override { return TYPE_ID; }
     
-    // Public member variable
-    double m_width;
-
     // Type identification
     static constexpr int TYPE_ID = Hash::hashColliderName("CubeCollider");
 

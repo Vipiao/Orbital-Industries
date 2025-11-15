@@ -9,7 +9,6 @@ CubeCollider::CubeCollider(const glm::dvec3& position,
                          PolyhedronProcessor::generateCubeVertices(width),
                          PolyhedronProcessor::generateCubeAxes(),
                          PolyhedronProcessor::generateCubeAxes()) // For cubes, face axes and edge axes are the same
-    , m_width(width)
 {
 }
 
