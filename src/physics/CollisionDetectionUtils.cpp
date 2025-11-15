@@ -179,13 +179,12 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
     double ballRadius = ball->m_radius;
     const glm::dvec3& cubePos = cube->m_position;
     const glm::dquat& cubeOri = cube->m_orientation;
-    double cubeWidth = cube->m_width;
     
     // Transform ball position to cube's local space
     glm::dvec3 localBallPos = glm::conjugate(cubeOri) * (ballPos - cubePos);
     
     // Half width of cube
-    double halfWidth = cubeWidth * 0.5;
+    double halfWidth = cube->getHalfMaxWidth();
     
     // Find closest point on cube to ball center
     glm::dvec3 closestPoint = glm::clamp(localBallPos, 
@@ -223,8 +222,8 @@ CollisionResult CollisionDetectionUtils::detectBallCube(
         // Transform normal back to world space
         glm::dvec3 worldNormal = cubeOri * localNormal;
         
-        // Contact point is on ball surface toward cube
-        glm::dvec3 contactPoint = ballPos + worldNormal * ballRadius;
+        // Contact point is the closest point on the cube (transform back to world space)
+        glm::dvec3 contactPoint = cubePos + cubeOri * closestPoint;
         
         // Penetration depth
         double penetration = ballRadius - distance;
@@ -242,16 +241,11 @@ CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
 
     const glm::dvec3& ballPos = ball->m_position;
     double ballRadius = ball->m_radius;
-    const glm::dvec3& polyPos = polyhedron->m_position;
-    const glm::dquat& polyOri = polyhedron->m_orientation;
-    
-    // Transform ball position to polyhedron's local space
-    glm::dvec3 localBallPos = glm::conjugate(polyOri) * (ballPos - polyPos);
     
     // Update polyhedron's advanced AABB for precise collision detection
     polyhedron->updateAdvancedAABB(currentTimestep);
     
-    // Get polyhedron data
+    // Get polyhedron data in world space
     std::vector<glm::dvec3> vertices = polyhedron->getVertices(currentTimestep);
     auto [faceAxes, edgeAxes, filterNormals] = polyhedron->getCollisionAxes(currentTimestep);
     
@@ -267,7 +261,7 @@ CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
         GeometryUtils::ProjectionResult projPoly = GeometryUtils::projectVertices(vertices, normalizedAxis);
         
         // Project sphere onto axis: sphere center ± radius
-        double sphereCenter = glm::dot(localBallPos, normalizedAxis);
+        double sphereCenter = glm::dot(ballPos, normalizedAxis);
         double projSphereMin = sphereCenter - ballRadius;
         double projSphereMax = sphereCenter + ballRadius;
         
@@ -288,7 +282,7 @@ CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
     
     // Test sphere-center-to-vertex directions
     for (const glm::dvec3& vertex : vertices) {
-        glm::dvec3 axis = localBallPos - vertex;
+        glm::dvec3 axis = ballPos - vertex;
         double axisLengthSq = glm::length2(axis);
         
         // Skip if vertex is very close to sphere center
@@ -302,7 +296,7 @@ CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
         GeometryUtils::ProjectionResult projPoly = GeometryUtils::projectVertices(vertices, normalizedAxis);
         
         // Project sphere onto axis
-        double sphereCenter = glm::dot(localBallPos, normalizedAxis);
+        double sphereCenter = glm::dot(ballPos, normalizedAxis);
         double projSphereMin = sphereCenter - ballRadius;
         double projSphereMax = sphereCenter + ballRadius;
         
@@ -334,16 +328,16 @@ CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
     polyCenter /= static_cast<double>(vertices.size());
     
     // Check if axis points from ball toward polyhedron
-    glm::dvec3 ballToPolyDir = polyCenter - localBallPos;
+    glm::dvec3 ballToPolyDir = polyCenter - ballPos;
     if (glm::dot(separatingAxis, ballToPolyDir) < 0.0) {
         separatingAxis = -separatingAxis;
     }
     
-    // Transform normal back to world space
-    glm::dvec3 worldNormal = polyOri * separatingAxis;
+    // Normal is already in world space
+    glm::dvec3 worldNormal = separatingAxis;
     
-    // Contact point is on ball surface toward polyhedron
-    glm::dvec3 contactPoint = ballPos + worldNormal * ballRadius;
+    // Contact point is on polyhedron surface (closest point to ball center)
+    glm::dvec3 contactPoint = ballPos + worldNormal * (ballRadius - minPenetration);
     
     return CollisionResult(true, std::vector<ContactData>{ContactData(worldNormal, minPenetration)}, 
                           std::vector<glm::dvec3>{contactPoint}, ball, polyhedron);
@@ -593,6 +587,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     return result;
 }
 
+int test = 0;
 
 CollisionResult CollisionDetectionUtils::detectBallGrid(
     BallCollider* ball, GridCollider* grid,
@@ -614,13 +609,21 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     
     // Test collision with each found collider
     for (Collider* gridCell : nearbyColliders) {
+        // Update cell's transform and AABB
+        gridCell->updatePosition(currentTimestep);
+        gridCell->updateAdvancedAABB(currentTimestep);
+        // No need to update the ball AABB as it is already updated in the broad phase.
+
         // Quick AABB check first
         if (!gridCell->checkAABBCollision(ball)) {
             continue;
         }
+
+        extern int test;
+        test++;
         
         // Perform detailed collision detection
-        CollisionResult result = detectBallCube(ball, static_cast<CubeCollider*>(gridCell), currentTimestep);
+        CollisionResult result = collideWith(ball, gridCell, currentTimestep);
         
         if (result.m_hasCollision) {
             // Add all collision data to our result
