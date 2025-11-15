@@ -77,14 +77,7 @@ private:
     // Jetpack mode
     bool m_jetpackEnabled;
 
-    // Walking mode - cached ground contact
-    std::weak_ptr<Grid> m_cachedGrid;
-    glm::dvec3 m_cachedLocalPoint;
-    glm::dvec3 m_cachedLocalNormal;
-    bool m_hasCachedPoint;
-    
     // Walking mode parameters
     double m_targetHoverHeight;
     double m_maxGroundAcceleration;
-    double m_walkingRayLength;
 };

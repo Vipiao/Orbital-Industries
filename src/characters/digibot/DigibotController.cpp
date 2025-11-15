@@ -9,7 +9,10 @@
 #include "../ArticulationUtils.h"
 #include "../../game_base/GridSubsystem.h"
 #include "../../physics/SensorCollider.h"
+#include "../../physics/BallCollider.h"
 #include "../../utils/GridGeometry.h"
+#include "../../debug/DebugGlobals.h"
+#include "../../debug/DebugRenderer.h"
 
 DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem)
     : m_physics(physics)
@@ -25,12 +28,8 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_lockState(LockState::UNLOCKED)
     , m_translationLockStrength(1.0)
     , m_jetpackEnabled(true)
-    , m_cachedLocalPoint(0.0, 0.0, 0.0)
-    , m_cachedLocalNormal(0.0, 0.0, 1.0)
-    , m_hasCachedPoint(false)
     , m_targetHoverHeight(1.0)
     , m_maxGroundAcceleration(0.004)
-    , m_walkingRayLength(1.4)
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -340,232 +339,125 @@ void DigibotController::handleWalking() {
         return;
     }
 
-    // ========== Step 1: Raycast 4 Rays Down ==========
-    std::vector<std::weak_ptr<Grid>> availableGrids;
-    if (auto sensor = m_physics->getWalkingSensor().lock()) {
-        SensorCollider* sensorPtr = static_cast<SensorCollider*>(sensor.get());
-        availableGrids = m_gridSubsystem->getGridsFromOverlaps(sensorPtr);
+    // ========== Step 1: Find Closest Contact Point ==========
+    auto sensor = m_physics->getWalkingSensor().lock();
+    if (!sensor) {
+        return;
     }
-
-    // Define 4 ray offsets in local space
-    const double rayOffsetDistance = 0.35;
-    const glm::dvec3 localOffsets[4] = {
-        glm::dvec3(-rayOffsetDistance, rayOffsetDistance, 0.0),   // front-left
-        glm::dvec3(rayOffsetDistance, rayOffsetDistance, 0.0),    // front-right
-        glm::dvec3(-rayOffsetDistance, -rayOffsetDistance, 0.0),  // back-left
-        glm::dvec3(rayOffsetDistance, -rayOffsetDistance, 0.0)    // back-right
-    };
-    glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
-    glm::dvec3 worldRayDir = -bodyUpVector;
     
-    // Store results from 4 rays
-    struct RayHit {
-        bool hit;
-        std::weak_ptr<Grid> grid;
-        glm::dvec3 worldPoint;
-        glm::dvec3 worldNormal;
-        double t;
-    };
-    RayHit hits[4] = {};
+    // Cast to BallCollider to access collision data
+    BallCollider* ballSensor = static_cast<BallCollider*>(sensor.get());
     
-    // Cast 4 rays
-    for (int i = 0; i < 4; ++i) {
-        glm::dvec3 worldOffset = rigidBody->m_orientation * localOffsets[i];
-        glm::dvec3 rayStart = rigidBody->m_position + worldOffset;
-        glm::dvec3 rayEnd = rayStart + worldRayDir * m_walkingRayLength;
-        
-        double bestT = -1.0;
-        
-        for (const auto& gridWeak : availableGrids) {
-            auto gridShared = gridWeak.lock();
-            if (!gridShared) continue;
-            
-            RigidBody* gridBody = gridShared->getRigidBody();
-            if (!gridBody || gridBody->m_mass < 1.0 * rigidBody->m_mass) {
-                continue;
-            }
-            
-            glm::dvec3 gridLocalRayStart = gridShared->worldToGrid(rayStart);
-            glm::dvec3 gridLocalRayEnd = gridShared->worldToGrid(rayEnd);
-            
-            RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-            
-            if (result.t >= 0.0 && (!hits[i].hit || result.t < bestT)) {
-                bestT = result.t;
-                hits[i].hit = true;
-                hits[i].grid = gridWeak;
-                hits[i].t = result.t;
-                hits[i].worldPoint = rayStart + result.t * (rayEnd - rayStart);
-                hits[i].worldNormal = glm::normalize(gridBody->m_orientation * result.surfaceNormal);
+    const auto& collisions = ballSensor->getCollisions(m_physicsEngine->getCurrentPhysicsTimeStep());
+    
+    // Find the closest contact point to the rigid body
+    bool foundContact = false;
+    glm::dvec3 closestPoint(0.0);
+    double closestDistanceSq = std::numeric_limits<double>::max();
+    
+    for (const auto& collision : collisions) {
+        // Skip collisions with the robot's own body
+        ColliderAttachment* otherAttachment = 
+            collision.otherCollider->get_pointer<ColliderAttachment>();
+        if (otherAttachment && otherAttachment->rigidBody == rigidBody) {
+            continue;
+        }
+        for (const auto& contactPoint : collision.contactPoints) {
+            double distSq = glm::length2(contactPoint - rigidBody->m_position);
+            if (distSq < closestDistanceSq) {
+                closestDistanceSq = distSq;
+                closestPoint = contactPoint;
+                foundContact = true;
             }
         }
     }
     
-    // Average results
-    bool hitThisFrame = false;
-    double closestT = -1.0;
-    std::weak_ptr<Grid> hitGrid;
-    glm::dvec3 hitNormal(0.0, 0.0, 0.0);
-    glm::dvec3 hitPoint(0.0, 0.0, 0.0);
-    
-    int hitCount = 0;
-    for (int i = 0; i < 4; ++i) {
-        if (hits[i].hit) {
-            hitPoint += hits[i].worldPoint;
-            hitNormal += hits[i].worldNormal;
-            closestT = (hitCount == 0) ? hits[i].t : glm::min(closestT, hits[i].t);
-            if (hitCount == 0) hitGrid = hits[i].grid;
-            hitCount++;
-        }
+    if (!foundContact) {
+        return; // No ground contact
     }
     
-    if (hitCount > 0) {
-        hitThisFrame = true;
-        hitPoint /= static_cast<double>(hitCount);
-        hitNormal = glm::normalize(hitNormal);
+    // Debug visualization of closest contact point
+    if (DebugGlobals::getDebugRenderer()) {
+        DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
+        DebugGlobals::getDebugRenderer()->createSphere(
+            "closest_contact", closestPoint, 0.1);
     }
-    
-    // ========== Step 2: Cache or Reuse Point ==========
-    bool hasSurfaceNormal = false;
-    glm::dvec3 surfaceNormal(0.0, 0.0, 1.0);
-    if (hitThisFrame) {
-        // Store in grid's local coordinate system
-        auto hitGridShared = hitGrid.lock();
-        if (hitGridShared) {
-            m_cachedGrid = hitGrid;
-            m_cachedLocalPoint = hitGridShared->worldToGrid(hitPoint);
-            m_cachedLocalNormal = glm::normalize(
-                glm::conjugate(hitGridShared->getRigidBody()->m_orientation) * hitNormal
-            );
-            m_hasCachedPoint = true;
+    //return;
 
-            surfaceNormal = hitNormal;
-            hasSurfaceNormal = true;
-        }
-    } else if (m_hasCachedPoint) {
-        // Check if cached grid is still valid and in range
-        auto cachedGridShared = m_cachedGrid.lock();
-        if (!cachedGridShared) {
-            m_hasCachedPoint = false;
-        } else {
-            // Check if cached point is still in sensor range
-            glm::dvec3 cachedWorldPoint = cachedGridShared->gridToWorld(m_cachedLocalPoint);
-            double distanceToCache = glm::length(cachedWorldPoint - rigidBody->m_position);
-            
-            if (distanceToCache > m_walkingRayLength) {
-                m_hasCachedPoint = false;
-                m_cachedGrid.reset();
-            } else {
-                // Cache is valid - extract surface normal
-                RigidBody* gridBody = cachedGridShared->getRigidBody();
-                surfaceNormal = glm::normalize(gridBody->m_orientation * m_cachedLocalNormal);
-                hasSurfaceNormal = true;
-            }
-        }
+    // ========== Step 2: Calculate Normal ==========
+    glm::dvec3 normal = glm::normalize(rigidBody->m_position - closestPoint);
+    
+    // ========== Step 3: Rotate Body Toward Surface Normal ==========
+    glm::dvec3 currentUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+    currentUpVector = glm::normalize(currentUpVector);
+    
+    glm::dvec3 targetUpVector = normal;
+    
+    double upDotProduct = glm::clamp(glm::dot(currentUpVector, targetUpVector), -1.0, 1.0);
+    double upDeltaAngle = std::acos(upDotProduct);
+    
+    glm::dvec3 upRotationAxis = glm::cross(currentUpVector, targetUpVector);
+    double upAxisLength = glm::length(upRotationAxis);
+    
+    glm::dvec3 upTargetAngularVelocity(0.0, 0.0, 0.0);
+    double upAdjustedAngVelMax = m_angularAccelerationMax * glm::abs(upDeltaAngle);
+    
+    if (upAxisLength > 1e-6) {
+        upRotationAxis = upRotationAxis / upAxisLength;
+        double upMargin = 0.2;
+        double upMaxAngularSpeed = std::sqrt(2.0 * upAdjustedAngVelMax * (1.0 - upMargin) * upDeltaAngle);
+        upTargetAngularVelocity = upRotationAxis * upMaxAngularSpeed;
     }
     
-    // ========== Step 3: Position Control with Grid Velocity ==========
-    if (m_hasCachedPoint) {
-        auto cachedGridShared = m_cachedGrid.lock();
-        if (cachedGridShared) {
-            RigidBody* gridBody = cachedGridShared->getRigidBody();
-            if (gridBody) {
-                // Transform cached point and normal to world space
-                glm::dvec3 cachedWorldPoint = cachedGridShared->gridToWorld(m_cachedLocalPoint);
-                glm::dvec3 cachedWorldNormal = glm::normalize(gridBody->m_orientation * m_cachedLocalNormal);
-                
-                // Calculate target position
-                glm::dvec3 targetPosition = cachedWorldPoint + cachedWorldNormal * m_targetHoverHeight;
-                
-                // Calculate position error
-                glm::dvec3 positionError = targetPosition - rigidBody->m_position;
-                double distance = glm::length(positionError);
-                
-                // Calculate target speed
-                double margin = 0.5;
-                double targetSpeed = std::sqrt(2.0 * m_maxGroundAcceleration * (1.0 - margin) * distance);
-                glm::dvec3 targetVelocityDirection = (distance > 1e-6) ? (positionError / distance) : glm::dvec3(0.0);
-                
-                // Add grid velocity at contact point
-                glm::dvec3 radiusVector = cachedWorldPoint - gridBody->m_position;
-                glm::dvec3 gridVelocityAtPoint = gridBody->m_velocity + 
-                    glm::cross(gridBody->getAngularVelocityWorld(), radiusVector);
-                
-                glm::dvec3 targetVelocity = targetVelocityDirection * targetSpeed + gridVelocityAtPoint;
-                
-                // Calculate needed acceleration
-                glm::dvec3 velocityError = targetVelocity - rigidBody->m_velocity;
-                glm::dvec3 neededAcceleration = velocityError;
-                
-                // Clamp acceleration
-                double accelMagnitude = glm::length(neededAcceleration);
-                if (accelMagnitude > m_maxGroundAcceleration) {
-                    neededAcceleration = neededAcceleration * (m_maxGroundAcceleration / accelMagnitude);
-                }
-                
-                // Apply force to character
-                glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass;
+    // Apply up-vector alignment torque
+    glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
+    glm::dvec3 angularAcceleration = upTargetAngularVelocity - currentAngularVelocity;
+    
+    // Remove any component around the body's up axis (z-axis)
+    glm::dvec3 bodyUpAxis = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+    glm::dvec3 aroundUpComponent = glm::dot(angularAcceleration, bodyUpAxis) * bodyUpAxis;
+    angularAcceleration = angularAcceleration - aroundUpComponent;
 
-                // Reduce force perpendicular to surface normal by 0.1 factor
-                glm::dvec3 parallelForce = glm::dot(hoverForce, cachedWorldNormal) * cachedWorldNormal;
-                glm::dvec3 perpendicularForce = hoverForce - parallelForce;
-                hoverForce = parallelForce + 0.8 * perpendicularForce;
-
-                m_physicsEngine->applyForce(rigidBody, hoverForce);
-                
-                // Apply opposite force to grid at contact point
-                m_physicsEngine->applyForceAtPoint(gridBody, -hoverForce, cachedWorldPoint);
-            }
-        }
+    double angAccMagnitude = glm::length(angularAcceleration);
+    if (angAccMagnitude > m_angularAccelerationMax) {
+        angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
     }
     
-    // ========== Step 4: Orient Body to Surface Normal ==========
-    if (m_hasCachedPoint) {
-        auto cachedGridShared = m_cachedGrid.lock();
-        if (cachedGridShared) {
-            RigidBody* gridBody = cachedGridShared->getRigidBody();
-            if (gridBody) {
-                glm::dvec3 cachedWorldNormal = glm::normalize(gridBody->m_orientation * m_cachedLocalNormal);
-                
-                glm::dvec3 currentUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
-                currentUpVector = glm::normalize(currentUpVector);
-                
-                glm::dvec3 targetUpVector = cachedWorldNormal;
-                
-                double upDotProduct = glm::clamp(glm::dot(currentUpVector, targetUpVector), -1.0, 1.0);
-                double upDeltaAngle = std::acos(upDotProduct);
-                
-                glm::dvec3 upRotationAxis = glm::cross(currentUpVector, targetUpVector);
-                double upAxisLength = glm::length(upRotationAxis);
-                
-                glm::dvec3 upTargetAngularVelocity(0.0, 0.0, 0.0);
-                double upAdjustedAngVelMax = m_angularAccelerationMax * glm::abs(upDeltaAngle);
-                
-                if (upAxisLength > 1e-6) {
-                    upRotationAxis = upRotationAxis / upAxisLength;
-                    double upMargin = 0.2;
-                    double upMaxAngularSpeed = std::sqrt(2.0 * upAdjustedAngVelMax * (1.0 - upMargin) * upDeltaAngle);
-                    upTargetAngularVelocity = upRotationAxis * upMaxAngularSpeed;
-                }
-                
-                // Apply up-vector alignment torque
-                glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
-                glm::dvec3 angularAcceleration = upTargetAngularVelocity - currentAngularVelocity;
-                
-                // Remove any component around the body's up axis (z-axis)
-                glm::dvec3 bodyUpAxis = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
-                glm::dvec3 aroundUpComponent = glm::dot(angularAcceleration, bodyUpAxis) * bodyUpAxis;
-                angularAcceleration = angularAcceleration - aroundUpComponent;
-
-                double angAccMagnitude = glm::length(angularAcceleration);
-                if (angAccMagnitude > m_angularAccelerationMax) {
-                    angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
-                }
-                
-                m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
-            }
-        }
+    m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
+    
+    // ========== Step 4: Position Control Along Normal ==========
+    // Calculate target position
+    glm::dvec3 targetPosition = closestPoint + normal * m_targetHoverHeight;
+    
+    // Calculate position error
+    glm::dvec3 positionError = targetPosition - rigidBody->m_position;
+    double distance = glm::length(positionError);
+    
+    // Calculate target speed using sqrt(2ad)
+    double margin = 0.5;
+    double targetSpeed = std::sqrt(2.0 * m_maxGroundAcceleration * (1.0 - margin) * distance);
+    glm::dvec3 targetVelocityDirection = (distance > 1e-6) ? (positionError / distance) : glm::dvec3(0.0);
+    glm::dvec3 targetVelocity = targetVelocityDirection * targetSpeed;
+    
+    // Calculate needed acceleration
+    glm::dvec3 velocityError = targetVelocity - rigidBody->m_velocity;
+    glm::dvec3 neededAcceleration = velocityError;
+    
+    // Clamp acceleration
+    double accelMagnitude = glm::length(neededAcceleration);
+    if (accelMagnitude > m_maxGroundAcceleration) {
+        neededAcceleration = neededAcceleration * (m_maxGroundAcceleration / accelMagnitude);
     }
+    
+    // Apply force to character
+    glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass;
+
+    // Split force into parallel and perpendicular components relative to surface normal
+    glm::dvec3 parallelForce = glm::dot(hoverForce, normal) * normal;
+    glm::dvec3 perpendicularForce = hoverForce - parallelForce;
+    hoverForce = parallelForce + 0.5 * perpendicularForce;
+
+    m_physicsEngine->applyForce(rigidBody, hoverForce);
     
     // ========== Step 5: View Direction Rotation ==========
     glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
@@ -590,16 +482,14 @@ void DigibotController::handleWalking() {
     }
     
     // Apply view direction torque
-    glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
-    glm::dvec3 angularAcceleration = forwardTargetAngularVelocity - currentAngularVelocity;
+    currentAngularVelocity = rigidBody->getAngularVelocityWorld();
+    angularAcceleration = forwardTargetAngularVelocity - currentAngularVelocity;
     
-    // Keep only rotation around the surface normal if we have one
-    if (hasSurfaceNormal) {
-        glm::dvec3 parallelComponent = glm::dot(angularAcceleration, surfaceNormal) * surfaceNormal;
-        angularAcceleration = parallelComponent;
-    }
+    // Keep only rotation around the surface normal
+    glm::dvec3 parallelComponent = glm::dot(angularAcceleration, normal) * normal;
+    angularAcceleration = parallelComponent;
 
-    double angAccMagnitude = glm::length(angularAcceleration);
+    angAccMagnitude = glm::length(angularAcceleration);
     if (angAccMagnitude > m_angularAccelerationMax) {
         angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
     }
@@ -608,6 +498,7 @@ void DigibotController::handleWalking() {
 
     // ========== Step 6: Apply Movement Force ==========
     if (m_movementDirection != glm::ivec3(0, 0, 0)) {
+        glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
         glm::dquat viewOrientation = glm::conjugate(
             ArticulationUtils::quatLookAtYForward(m_viewDirection, bodyUpVector)
         );

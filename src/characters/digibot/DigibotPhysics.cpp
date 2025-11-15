@@ -10,6 +10,7 @@
 #include "../../utils/GridGeometry.h"
 #include "../../graphics/meshHandler/MeshHandler.h"
 #include "../../physics/SensorCollider.h"
+#include "../../physics/BallCollider.h"
 
 DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler)
     : m_physics(physics)
@@ -169,10 +170,9 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         false);                           // Not a trigger
 
     // 5. Create walking sensor for ground detection
-    glm::dvec3 sensorHalfScale(3.0, 3.0, 3.0);
-    m_walkingSensor = m_physics->getCollisionDetector().addSensorCollider(
+    m_walkingSensor = m_physics->getCollisionDetector().addBallCollider(
         m_rigidBody->m_position,
-        sensorHalfScale);
+        2.0);  // 2 meter radius
 
     // Attach sensor as a trigger (detects but doesn't respond physically)
     m_physics->attachCollider(
