@@ -56,10 +56,11 @@ std::weak_ptr<PolyhedronCollider> CollisionDetector::addPolyhedronCollider(
     const glm::dquat& orientation,
     const std::vector<glm::dvec3>& localVertices,
     const std::vector<glm::dvec3>& localFaceAxes,
-    const std::vector<glm::dvec3>& localEdgeAxes) {
+    const std::vector<glm::dvec3>& localEdgeAxes,
+    const std::vector<std::array<int, 2>>& localEdges) {
     
     auto collider = std::make_shared<PolyhedronCollider>(
-        position, orientation, localVertices, localFaceAxes, localEdgeAxes);
+        position, orientation, localVertices, localFaceAxes, localEdgeAxes, localEdges);
     registerCollider(collider);
     return collider;
 }

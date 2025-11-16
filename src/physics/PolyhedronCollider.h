@@ -11,7 +11,8 @@ public:
                        const glm::dquat& orientation,
                        const std::vector<glm::dvec3>& localVertices,
                        const std::vector<glm::dvec3>& localFaceAxes,
-                       const std::vector<glm::dvec3>& localEdgeAxes);
+                       const std::vector<glm::dvec3>& localEdgeAxes,
+                       const std::vector<std::array<int, 2>>& localEdges);
     
     virtual ~PolyhedronCollider() = default;
     
@@ -33,6 +34,10 @@ public:
     std::vector<std::array<int, 3>> generateTriangleIndices() const;
     std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes(uint64_t currentTimestep = 0) const;
     
+    // Edge connectivity access
+    const std::vector<std::array<int, 2>>& getLocalEdges() const { return m_localEdges; }
+    int getEdgeCount() const { return static_cast<int>(m_localEdges.size()); }
+
     // Get half of the maximum dimension
     double getHalfMaxWidth() const { return m_halfMaxWidth; }
 
@@ -49,6 +54,7 @@ protected:
     std::vector<glm::dvec3> m_localVertices;
     std::vector<glm::dvec3> m_localFaceAxes;
     std::vector<glm::dvec3> m_localEdgeAxes;
+    std::vector<std::array<int, 2>> m_localEdges;
     double m_halfMaxWidth;
 
     // Protected access for derived class optimizations

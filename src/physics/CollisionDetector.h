@@ -48,7 +48,8 @@ public:
         const glm::dquat& orientation,
         const std::vector<glm::dvec3>& localVertices,
         const std::vector<glm::dvec3>& localFaceAxes,
-        const std::vector<glm::dvec3>& localEdgeAxes);
+        const std::vector<glm::dvec3>& localEdgeAxes,
+        const std::vector<std::array<int, 2>>& localEdges);
     
     std::weak_ptr<BallCollider> addBallCollider(
         const glm::dvec3& position,

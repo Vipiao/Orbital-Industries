@@ -34,6 +34,7 @@ public:
     struct AxisResult {
         std::vector<glm::dvec3> faceAxis;
         std::vector<glm::dvec3> edgeAxis;
+        std::vector<std::array<int, 2>> edges;  // Edge connectivity: pairs of vertex indices
     };
 
     /**
@@ -128,6 +129,12 @@ public:
      * @return Vector of 3 orthogonal unit axes
      */
     static std::vector<glm::dvec3> generateCubeAxes();
+
+    /**
+     * @brief Get standard cube edge connectivity
+     * @return Vector of 12 edge pairs (vertex index pairs)
+     */
+    static std::vector<std::array<int, 2>> generateCubeEdges();
 
     /**
      * @brief Check if a 2D point is inside a convex polygon with margin

@@ -72,7 +72,8 @@ public:
     void addPolyhedronCell(const glm::ivec3& coord,
                           const std::vector<glm::dvec3>& localVertices,
                           const std::vector<glm::dvec3>& localFaceAxes,
-                          const std::vector<glm::dvec3>& localEdgeAxes);
+                          const std::vector<glm::dvec3>& localEdgeAxes,
+                          const std::vector<std::array<int, 2>>& localEdges);
     
     void removeCell(const glm::ivec3& coord);
     bool hasCell(const glm::ivec3& coord) const;

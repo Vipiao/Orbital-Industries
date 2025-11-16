@@ -8,7 +8,8 @@ CubeCollider::CubeCollider(const glm::dvec3& position,
     : PolyhedronCollider(position, orientation, 
                          PolyhedronProcessor::generateCubeVertices(width),
                          PolyhedronProcessor::generateCubeAxes(),
-                         PolyhedronProcessor::generateCubeAxes()) // For cubes, face axes and edge axes are the same
+                         PolyhedronProcessor::generateCubeAxes(), // For cubes, face axes and edge axes are the same
+                         PolyhedronProcessor::generateCubeEdges()) // Standard cube edge topology
 {
 }
 

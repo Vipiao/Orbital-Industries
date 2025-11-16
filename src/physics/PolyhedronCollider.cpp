@@ -9,24 +9,16 @@ PolyhedronCollider::PolyhedronCollider(const glm::dvec3& position,
                                        const glm::dquat& orientation,
                                        const std::vector<glm::dvec3>& localVertices,
                                        const std::vector<glm::dvec3>& localFaceAxes,
-                                       const std::vector<glm::dvec3>& localEdgeAxes)
+                                       const std::vector<glm::dvec3>& localEdgeAxes,
+                                       const std::vector<std::array<int, 2>>& localEdges)
     : Collider(position, orientation)
 {
-    // Filter duplicate vertices
-    const double vertexTolerance = 1e-9;
-    m_localVertices.reserve(localVertices.size());
-    for (const auto& vertex : localVertices) {
-        bool isDuplicate = false;
-        for (const auto& existing : m_localVertices) {
-            if (glm::length(vertex - existing) < vertexTolerance) {
-                isDuplicate = true;
-                break;
-            }
-        }
-        if (!isDuplicate) {
-            m_localVertices.push_back(vertex);
-        }
-    }
+    // Store edge connectivity before any processing
+    m_localEdges = localEdges;
+
+    // Store vertices directly without filtering to preserve indices for edge connectivity.
+    // TODO: Add filter here or elsewhere in a way that works with the edge indices.
+    m_localVertices = localVertices;
     
     // Filter duplicate face axes
     const double axisTolerance = 1e-9;

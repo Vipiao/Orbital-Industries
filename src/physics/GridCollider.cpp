@@ -28,13 +28,15 @@ GridCollider::GridCollider(const glm::dvec3& position,
 void GridCollider::addCubeCell(const glm::ivec3& coord, double width) {
     std::vector<glm::dvec3> vertices = PolyhedronProcessor::generateCubeVertices(width);
     std::vector<glm::dvec3> axes = PolyhedronProcessor::generateCubeAxes();
+    std::vector<std::array<int, 2>> edges = PolyhedronProcessor::generateCubeEdges();
     
     auto collider = std::make_unique<PolyhedronCollider>(
         glm::dvec3(0.0),
         glm::dquat(1.0, 0.0, 0.0, 0.0),
         vertices,
         axes,
-        axes); // For cubes, face axes and edge axes are the same
+        axes, // For cubes, face axes and edge axes are the same
+        edges); // Standard cube edge topology
     
     addCell(coord, std::move(collider));
 }
@@ -42,13 +44,15 @@ void GridCollider::addCubeCell(const glm::ivec3& coord, double width) {
 void GridCollider::addPolyhedronCell(const glm::ivec3& coord,
                                      const std::vector<glm::dvec3>& localVertices,
                                      const std::vector<glm::dvec3>& localFaceAxes,
-                                     const std::vector<glm::dvec3>& localEdgeAxes) {
+                                     const std::vector<glm::dvec3>& localEdgeAxes,
+                                     const std::vector<std::array<int, 2>>& localEdges) {
     auto collider = std::make_unique<PolyhedronCollider>(
         glm::dvec3(0.0),
         glm::dquat(1.0, 0.0, 0.0, 0.0),
         localVertices,
         localFaceAxes,
-        localEdgeAxes);
+        localEdgeAxes,
+        localEdges);
     
     addCell(coord, std::move(collider));
 }

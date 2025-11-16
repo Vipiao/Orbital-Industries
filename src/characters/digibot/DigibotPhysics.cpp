@@ -117,11 +117,13 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     collider->addPolyhedronCell(glm::ivec3(0, 0, 0),
                                lowerBodyVertices,
                                lowerAxes.faceAxis, 
-                               lowerAxes.edgeAxis);
+                               lowerAxes.edgeAxis,
+                               lowerAxes.edges);
     collider->addPolyhedronCell(glm::ivec3(0, 0, 1),
                                upperBodyVertices,
                                upperAxes.faceAxis,
-                               upperAxes.edgeAxis);
+                               upperAxes.edgeAxis,
+                               upperAxes.edges);
 
     // 2. Calculate mass properties
     std::vector<glm::ivec3> coords = {glm::ivec3(0, 0, 0), glm::ivec3(0, 0, 1)};

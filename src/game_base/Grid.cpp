@@ -216,7 +216,7 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
         throw std::runtime_error("Grid::modifyCell: Collider has been destroyed");
     }
     collider->removeCell(coord);
-    collider->addPolyhedronCell(coord, vertices, axes.faceAxis, axes.edgeAxis);
+    collider->addPolyhedronCell(coord, vertices, axes.faceAxis, axes.edgeAxis, axes.edges);
     
     // Schedule mesh updates for this cell and neighbors
     scheduleMeshUpdatesForCellAndNeighbors(coord);

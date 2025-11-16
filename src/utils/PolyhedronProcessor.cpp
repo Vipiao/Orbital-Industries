@@ -191,6 +191,17 @@ PolyhedronProcessor::AxisResult PolyhedronProcessor::getAxis(const std::vector<g
     for (const auto& axis : uniqueEdgeAxisInts) {
         result.edgeAxis.push_back(glm::normalize(glm::dvec3(axis)));
     }
+
+    // Build actual edge connectivity list (preserve all edges, not just unique directions)
+    result.edges.reserve(12);
+    for (const auto& edge : CUBE_EDGES) {
+        glm::ivec3 edgeVec = vertices[edge[1]] - vertices[edge[0]];
+        
+        // Only add edges with non-zero length
+        if (IntegerVectorMath::length2(edgeVec) > 0) {
+            result.edges.push_back({edge[0], edge[1]});
+        }
+    }
     
     return result;
 }
@@ -589,6 +600,16 @@ std::vector<glm::dvec3> PolyhedronProcessor::generateCubeAxes() {
         glm::dvec3(1.0, 0.0, 0.0),  // X-axis
         glm::dvec3(0.0, 1.0, 0.0),  // Y-axis
         glm::dvec3(0.0, 0.0, 1.0)   // Z-axis
+    };
+}
+
+std::vector<std::array<int, 2>> PolyhedronProcessor::generateCubeEdges() {
+    // Return standard cube edge connectivity (12 edges)
+    // Uses same vertex ordering as generateCubeVertices and CUBE_EDGES
+    return {
+        {0, 1}, {1, 2}, {2, 3}, {3, 0},  // Bottom face edges
+        {4, 5}, {5, 6}, {6, 7}, {7, 4},  // Top face edges
+        {0, 4}, {1, 5}, {2, 6}, {3, 7}   // Vertical edges
     };
 }
 
