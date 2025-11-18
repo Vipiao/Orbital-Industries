@@ -31,7 +31,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_targetHoverHeight(1.0)
     , m_maxGroundAcceleration(0.004)
     , m_targetWalkSpeed(0.05)
-    , m_walkingThrustStrength(0.1)
+    , m_walkingThrustStrength(0.002)
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -578,7 +578,13 @@ void DigibotController::handleWalking() {
     
     glm::dvec3 velocityError = targetVelocityDirection - relativeVelocityTangent;
     double forceMagnitude = m_walkingThrustStrength * rigidBody->m_mass;
-    glm::dvec3 movementForce = velocityError * forceMagnitude;
+    glm::dvec3 movementForce = velocityError * 1.0 * rigidBody->m_mass;
+    double movementForceLength = glm::length(movementForce);
+    if (movementForceLength > forceMagnitude)
+    {
+        movementForce = movementForce / movementForceLength * forceMagnitude;
+    }
+    
     m_physicsEngine->applyForce(rigidBody, movementForce);
 }
 
