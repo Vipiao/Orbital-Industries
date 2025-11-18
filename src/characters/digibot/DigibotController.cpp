@@ -30,8 +30,10 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_jetpackEnabled(true)
     , m_targetHoverHeight(1.0)
     , m_maxGroundAcceleration(0.004)
-    , m_targetWalkSpeed(0.05)
-    , m_walkingThrustStrength(0.002)
+    , m_targetWalkSpeed(0.08)
+    , m_walkingThrustStrength(0.007)
+    , m_groundSelectionBias(0.5)
+    , m_maxGroundAngle(glm::radians(45.0))
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -335,13 +337,20 @@ void DigibotController::handleFlying() {
 }
 
 void DigibotController::handleWalking() {
+    // DEBUG
+    if (DebugGlobals::getDebugRenderer()) {
+        DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
+    }
+
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
         return;
     }
 
-    // ========== Step 1: Find Closest Contact Point ==========
+    // ========== Step 1: Find Best Ground Contact Point ==========
+    // Calculate reference down direction from body orientation
+    glm::dvec3 downDirection = -(rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0));
     auto sensor = m_physics->getWalkingSensor().lock();
     if (!sensor) {
         return;
@@ -352,10 +361,13 @@ void DigibotController::handleWalking() {
     
     const auto& collisions = ballSensor->getCollisions(m_physicsEngine->getCurrentPhysicsTimeStep());
     
-    // Find the closest contact point to the rigid body
+    // Calculate angle threshold for ground surface filtering
+    double angleThreshold = glm::cos(m_maxGroundAngle);
+
+    // Find the best ground contact point using biased selection
     bool foundContact = false;
     glm::dvec3 closestPoint(0.0);
-    double closestDistanceSq = std::numeric_limits<double>::max();
+    double bestScore = std::numeric_limits<double>::max();
     const CollisionData* closestCollision = nullptr;
     
     for (const auto& collision : collisions) {
@@ -366,9 +378,28 @@ void DigibotController::handleWalking() {
             continue;
         }
         for (const auto& contactPoint : collision.contactPoints) {
-            double distSq = glm::length2(contactPoint - rigidBody->m_position);
-            if (distSq < closestDistanceSq) {
-                closestDistanceSq = distSq;
+            // Calculate surface normal (points from surface toward body)
+            glm::dvec3 toBody = rigidBody->m_position - contactPoint;
+            double distance = glm::length(toBody);
+            
+            if (distance < 1e-6) {
+                continue; // Skip degenerate case
+            }
+            
+            glm::dvec3 normal = toBody / distance;
+            
+            // Filter: only consider surfaces within 90 degrees of "below"
+            double alignment = glm::dot(-normal, downDirection);
+            if (alignment < angleThreshold) {
+                continue; // Surface angle exceeds maximum ground angle
+            }
+            
+            // Calculate biased score: lower is better
+            // Surfaces aligned with down get a distance advantage
+            double score = distance - m_groundSelectionBias * alignment;
+            
+            if (score < bestScore) {
+                bestScore = score;
                 closestPoint = contactPoint;
                 foundContact = true;
                 closestCollision = &collision;
@@ -392,7 +423,6 @@ void DigibotController::handleWalking() {
     
     // Debug visualization of closest contact point
     if (DebugGlobals::getDebugRenderer()) {
-        DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
         DebugGlobals::getDebugRenderer()->createSphere(
             "closest_contact", closestPoint, 0.1);
     }

@@ -82,4 +82,6 @@ private:
     double m_maxGroundAcceleration;
     double m_targetWalkSpeed;
     double m_walkingThrustStrength;
+    double m_groundSelectionBias;
+    double m_maxGroundAngle;
 };
