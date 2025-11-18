@@ -587,8 +587,6 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
     return result;
 }
 
-int test = 0;
-
 CollisionResult CollisionDetectionUtils::detectBallGrid(
     BallCollider* ball, GridCollider* grid,
     uint64_t currentTimestep) {
@@ -619,9 +617,6 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
             continue;
         }
 
-        extern int test;
-        test++;
-        
         // Perform detailed collision detection
         CollisionResult result = collideWith(ball, gridCell, currentTimestep);
         
