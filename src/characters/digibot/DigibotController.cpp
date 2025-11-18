@@ -30,6 +30,8 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_jetpackEnabled(true)
     , m_targetHoverHeight(1.0)
     , m_maxGroundAcceleration(0.004)
+    , m_targetWalkSpeed(0.05)
+    , m_walkingThrustStrength(0.1)
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -354,6 +356,7 @@ void DigibotController::handleWalking() {
     bool foundContact = false;
     glm::dvec3 closestPoint(0.0);
     double closestDistanceSq = std::numeric_limits<double>::max();
+    const CollisionData* closestCollision = nullptr;
     
     for (const auto& collision : collisions) {
         // Skip collisions with the robot's own body
@@ -368,12 +371,23 @@ void DigibotController::handleWalking() {
                 closestDistanceSq = distSq;
                 closestPoint = contactPoint;
                 foundContact = true;
+                closestCollision = &collision;
             }
         }
     }
     
     if (!foundContact) {
         return; // No ground contact
+    }
+
+    // Get target rigid body from closest collision
+    RigidBody* targetRigidBody = nullptr;
+    if (closestCollision) {
+        ColliderAttachment* closestAttachment = 
+            closestCollision->otherCollider->get_pointer<ColliderAttachment>();
+        if (closestAttachment) {
+            targetRigidBody = closestAttachment->rigidBody;
+        }
     }
     
     // Debug visualization of closest contact point
@@ -382,7 +396,6 @@ void DigibotController::handleWalking() {
         DebugGlobals::getDebugRenderer()->createSphere(
             "closest_contact", closestPoint, 0.1);
     }
-    //return;
 
     // ========== Step 2: Calculate Normal ==========
     glm::dvec3 normal = glm::normalize(rigidBody->m_position - closestPoint);
@@ -408,6 +421,11 @@ void DigibotController::handleWalking() {
         double upMaxAngularSpeed = std::sqrt(2.0 * upAdjustedAngVelMax * (1.0 - upMargin) * upDeltaAngle);
         upTargetAngularVelocity = upRotationAxis * upMaxAngularSpeed;
     }
+
+    // Add target rigid body's angular velocity if available
+    if (targetRigidBody) {
+        upTargetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
+    }
     
     // Apply up-vector alignment torque
     glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
@@ -426,36 +444,50 @@ void DigibotController::handleWalking() {
     m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
     
     // ========== Step 4: Position Control Along Normal ==========
-    // Calculate target position
+    // Calculate target position along normal
     glm::dvec3 targetPosition = closestPoint + normal * m_targetHoverHeight;
     
-    // Calculate position error
+    // Calculate position error along normal only
     glm::dvec3 positionError = targetPosition - rigidBody->m_position;
-    double distance = glm::length(positionError);
+    double distanceAlongNormal = glm::dot(positionError, normal);
     
-    // Calculate target speed using sqrt(2ad)
+    // Calculate target speed along normal using sqrt(2ad)
     double margin = 0.5;
-    double targetSpeed = std::sqrt(2.0 * m_maxGroundAcceleration * (1.0 - margin) * distance);
-    glm::dvec3 targetVelocityDirection = (distance > 1e-6) ? (positionError / distance) : glm::dvec3(0.0);
-    glm::dvec3 targetVelocity = targetVelocityDirection * targetSpeed;
-    
-    // Calculate needed acceleration
-    glm::dvec3 velocityError = targetVelocity - rigidBody->m_velocity;
-    glm::dvec3 neededAcceleration = velocityError;
-    
-    // Clamp acceleration
-    double accelMagnitude = glm::length(neededAcceleration);
-    if (accelMagnitude > m_maxGroundAcceleration) {
-        neededAcceleration = neededAcceleration * (m_maxGroundAcceleration / accelMagnitude);
+    double targetSpeedAlongNormal = std::sqrt(2.0 * m_maxGroundAcceleration * (1.0 - margin) * glm::abs(distanceAlongNormal));
+    if (distanceAlongNormal < 0.0) {
+        targetSpeedAlongNormal = -targetSpeedAlongNormal;
     }
     
-    // Apply force to character
-    glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass;
-
-    // Split force into parallel and perpendicular components relative to surface normal
-    glm::dvec3 parallelForce = glm::dot(hoverForce, normal) * normal;
-    glm::dvec3 perpendicularForce = hoverForce - parallelForce;
-    hoverForce = parallelForce + 0.5 * perpendicularForce;
+    // Calculate surface velocity at contact point
+    double surfaceVelocityAlongNormal = 0.0;
+    if (targetRigidBody) {
+        // Linear velocity of surface
+        glm::dvec3 surfaceLinearVelocity = targetRigidBody->m_velocity;
+        
+        // Velocity from rotation: v = ω × r
+        glm::dvec3 radiusVector = closestPoint - targetRigidBody->m_position;
+        glm::dvec3 velocityFromRotation = glm::cross(targetRigidBody->getAngularVelocityWorld(), radiusVector);
+        
+        glm::dvec3 surfaceVelocityAtContact = surfaceLinearVelocity + velocityFromRotation;
+        surfaceVelocityAlongNormal = glm::dot(surfaceVelocityAtContact, normal);
+    }
+    
+    // Add surface velocity to target speed
+    double targetVelocityAlongNormal = targetSpeedAlongNormal + surfaceVelocityAlongNormal;
+    
+    // Calculate needed acceleration along normal
+    double currentVelocityAlongNormal = glm::dot(rigidBody->m_velocity, normal);
+    double accelerationAlongNormal = targetVelocityAlongNormal - currentVelocityAlongNormal;
+    
+    // Clamp acceleration
+    if (glm::abs(accelerationAlongNormal) > m_maxGroundAcceleration) {
+        accelerationAlongNormal = (accelerationAlongNormal > 0.0 ? 1.0 : -1.0) * m_maxGroundAcceleration;
+    }
+     
+    glm::dvec3 neededAcceleration = normal * accelerationAlongNormal;
+    
+     // Apply force to character
+     glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass;
 
     m_physicsEngine->applyForce(rigidBody, hoverForce);
     
@@ -480,6 +512,11 @@ void DigibotController::handleWalking() {
         double forwardMaxAngularSpeed = std::sqrt(2.0 * forwardAdjustedAngVelMax * (1.0 - forwardMargin) * forwardDeltaAngle);
         forwardTargetAngularVelocity = forwardRotationAxis * forwardMaxAngularSpeed;
     }
+
+    // Add target rigid body's angular velocity if available
+    if (targetRigidBody) {
+        forwardTargetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
+    }
     
     // Apply view direction torque
     currentAngularVelocity = rigidBody->getAngularVelocityWorld();
@@ -497,27 +534,52 @@ void DigibotController::handleWalking() {
     m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 
     // ========== Step 6: Apply Movement Force ==========
-    if (m_movementDirection != glm::ivec3(0, 0, 0)) {
-        glm::dvec3 bodyUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
-        glm::dquat viewOrientation = glm::conjugate(
-            ArticulationUtils::quatLookAtYForward(m_viewDirection, bodyUpVector)
-        );
-        
-        glm::dvec3 direction = glm::dvec3(
-            static_cast<double>(m_movementDirection.x),
-            static_cast<double>(m_movementDirection.y),
-            static_cast<double>(m_movementDirection.z)
-        );
-        
-        if (glm::length(direction) > 0.0) {
-            direction = glm::normalize(direction);
-            direction = viewOrientation * direction;
-            
-            double forceMagnitude = m_thrustStrength * rigidBody->m_mass;
-            glm::dvec3 movementForce = direction * forceMagnitude;
-            m_physicsEngine->applyForce(rigidBody, movementForce);
+    // Create 2D tangent space on the surface using cross products
+    glm::dvec3 tangentX = glm::cross(m_viewDirection, normal);
+    double tangentXLengthSq = glm::length2(tangentX);
+    
+    // If view direction is too aligned with normal, use a fallback
+    if (tangentXLengthSq < 1e-12) {
+        // View is aligned with normal, pick arbitrary tangent direction
+        glm::dvec3 arbitrary = glm::dvec3(1.0, 0.0, 0.0);
+        if (glm::abs(glm::dot(normal, arbitrary)) > 0.9) {
+            arbitrary = glm::dvec3(0.0, 1.0, 0.0);
         }
+        tangentX = glm::cross(arbitrary, normal);
+        tangentXLengthSq = glm::length2(tangentX);
     }
+    
+    tangentX = tangentX / glm::sqrt(tangentXLengthSq);
+    // Cross product of two perpendicular unit vectors is already unit length
+    glm::dvec3 tangentY = glm::cross(normal, tangentX);
+    
+    // Calculate surface velocity at body position
+    glm::dvec3 surfaceVelocityAtBody(0.0);
+    if (targetRigidBody) {
+        glm::dvec3 radiusVector = rigidBody->m_position - targetRigidBody->m_position;
+        glm::dvec3 velocityFromRotation = glm::cross(targetRigidBody->getAngularVelocityWorld(), radiusVector);
+        surfaceVelocityAtBody = targetRigidBody->m_velocity + velocityFromRotation;
+    }
+    
+    // Calculate relative velocity in tangent plane (remove normal component)
+    glm::dvec3 relativeVelocity3D = rigidBody->m_velocity - surfaceVelocityAtBody;
+    glm::dvec3 relativeVelocityTangent = relativeVelocity3D - glm::dot(relativeVelocity3D, normal) * normal;
+    
+    // Create target velocity from movement input in world space
+    glm::dvec3 targetVelocityDirection = 
+        static_cast<double>(m_movementDirection.x) * tangentX + 
+        static_cast<double>(m_movementDirection.y) * tangentY;
+    
+    // Scale by target walk speed
+    double targetVelocityMagnitude = glm::length(targetVelocityDirection);
+    if (targetVelocityMagnitude > 1e-6) {
+        targetVelocityDirection = (targetVelocityDirection / targetVelocityMagnitude) * m_targetWalkSpeed;
+    }
+    
+    glm::dvec3 velocityError = targetVelocityDirection - relativeVelocityTangent;
+    double forceMagnitude = m_walkingThrustStrength * rigidBody->m_mass;
+    glm::dvec3 movementForce = velocityError * forceMagnitude;
+    m_physicsEngine->applyForce(rigidBody, movementForce);
 }
 
 void DigibotController::setThrustStrength(double strength) {

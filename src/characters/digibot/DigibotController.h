@@ -80,4 +80,6 @@ private:
     // Walking mode parameters
     double m_targetHoverHeight;
     double m_maxGroundAcceleration;
+    double m_targetWalkSpeed;
+    double m_walkingThrustStrength;
 };
