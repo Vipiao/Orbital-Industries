@@ -186,14 +186,14 @@ void GameBase::finalizeFrame() {
 }
 
 bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
-    // Call physics callbacks FIRST (before physics invalidates timeRemainder)
-    for (auto* callback : m_callbacks) {
-        callback->onPhysicsUpdateComplete();
-    }
-
     // Handle any pending grid splits before running physics
     if (m_gridSubsystem->handlePendingSplits(endTime)) {
         return true; // Grid splitting needs more time
+    }
+
+    // Call physics callbacks FIRST (before physics invalidates timeRemainder)
+    for (auto* callback : m_callbacks) {
+        callback->onPhysicsUpdateComplete();
     }
 
     // Apply drag to all objects before running physics
