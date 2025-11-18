@@ -35,7 +35,7 @@ public:
     std::tuple<std::vector<glm::dvec3>, std::vector<glm::dvec3>, std::vector<glm::dvec3>> getCollisionAxes(uint64_t currentTimestep = 0) const;
     
     // Edge connectivity access
-    const std::vector<std::array<int, 2>>& getLocalEdges() const { return m_localEdges; }
+    const std::vector<std::array<int, 2>>& getEdgeIndices() const { return m_localEdges; }
     int getEdgeCount() const { return static_cast<int>(m_localEdges.size()); }
 
     // Get half of the maximum dimension

@@ -280,14 +280,32 @@ CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
         }
     }
     
-    // Test sphere-center-to-vertex directions
-    for (const glm::dvec3& vertex : vertices) {
-        glm::dvec3 axis = ballPos - vertex;
+    // Test sphere-center-to-closest-point-on-edge directions
+    const auto& edgeIndices = polyhedron->getEdgeIndices();
+    
+    for (const auto& edge : edgeIndices) {
+        // Get the two vertices of this edge in world space
+        glm::dvec3 v0 = vertices[edge[0]];
+        glm::dvec3 v1 = vertices[edge[1]];
+        
+        // Find closest point on edge to ball center
+        glm::dvec3 edgeVec = v1 - v0;
+        glm::dvec3 toBall = ballPos - v0;
+        
+        double edgeLengthSq = glm::length2(edgeVec);
+        if (edgeLengthSq < 1e-10) {
+            continue; // Degenerate edge
+        }
+        
+        double t = glm::dot(toBall, edgeVec) / edgeLengthSq;
+        t = glm::clamp(t, 0.0, 1.0);
+        
+        glm::dvec3 closestPoint = v0 + t * edgeVec;
+        glm::dvec3 axis = ballPos - closestPoint;
         double axisLengthSq = glm::length2(axis);
         
-        // Skip if vertex is very close to sphere center
         if (axisLengthSq < 1e-10) {
-            continue;
+            continue; // Ball center is on the edge
         }
         
         glm::dvec3 normalizedAxis = axis / glm::sqrt(axisLengthSq);
@@ -295,7 +313,7 @@ CollisionResult CollisionDetectionUtils::detectBallPolyhedron(
         // Project polyhedron vertices onto axis
         GeometryUtils::ProjectionResult projPoly = GeometryUtils::projectVertices(vertices, normalizedAxis);
         
-        // Project sphere onto axis
+        // Project sphere onto axis: sphere center ± radius
         double sphereCenter = glm::dot(ballPos, normalizedAxis);
         double projSphereMin = sphereCenter - ballRadius;
         double projSphereMax = sphereCenter + ballRadius;
