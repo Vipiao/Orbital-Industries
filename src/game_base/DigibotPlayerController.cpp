@@ -214,6 +214,7 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     
     // Get up vector from rigid body orientation
     glm::dvec3 upVector = interpolatedOrientation * glm::dvec3(0.0, 0.0, 1.0);
+    glm::dvec3 rightVector = interpolatedOrientation * glm::dvec3(1.0, 0.0, 0.0);
     
     // Get current view direction
     glm::dvec3 currentViewDir = character->getViewDirection();
@@ -276,5 +277,8 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     cameraOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(viewDir, upVector));
     
     // Set camera position - offset behind character in view direction with height
-    cameraPosition = interpolatedPos + viewDir * m_cameraOffset.y + upVector * m_cameraOffset.z;
+    cameraPosition = interpolatedPos +
+        m_cameraOffset.x * rightVector +
+        viewDir * m_cameraOffset.y +
+        upVector * m_cameraOffset.z;
 }
