@@ -608,6 +608,12 @@ void DigibotController::handleWalking() {
     
     glm::dvec3 velocityError = targetVelocityDirection - relativeVelocityTangent;
     double forceMagnitude = m_walkingThrustStrength * rigidBody->m_mass;
+    
+    // Double force when trying to change direction (opposite velocities)
+    if (glm::dot(targetVelocityDirection, relativeVelocityTangent) < 0.0) {
+        forceMagnitude *= 2.0;
+    }
+
     glm::dvec3 movementForce = velocityError * 1.0 * rigidBody->m_mass;
     double movementForceLength = glm::length(movementForce);
     if (movementForceLength > forceMagnitude)
