@@ -4,10 +4,10 @@
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
+#include "../../game_base/Grid.h"
 
 class DigibotPhysics;
 class PhysicsEngine;
-class Grid;
 class GridSubsystem;
 
 class DigibotController {
@@ -84,4 +84,9 @@ private:
     double m_walkingThrustStrength;
     double m_groundSelectionBias;
     double m_maxGroundAngle;
+
+    // Ground normal cache for walking stability
+    std::weak_ptr<Grid> m_cachedGroundGrid;
+    glm::dvec3 m_cachedGroundNormal;  // Stored in grid's rigid body local frame
+    bool m_hasGroundCache;
 };

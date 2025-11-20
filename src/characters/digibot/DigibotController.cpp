@@ -32,8 +32,10 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_maxGroundAcceleration(0.004)
     , m_targetWalkSpeed(0.08)
     , m_walkingThrustStrength(0.007)
-    , m_groundSelectionBias(0.5)
+    , m_groundSelectionBias(0.1)
     , m_maxGroundAngle(glm::radians(45.0))
+    , m_cachedGroundNormal(0.0, 0.0, 1.0)
+    , m_hasGroundCache(false)
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -364,6 +366,24 @@ void DigibotController::handleWalking() {
     // Calculate angle threshold for ground surface filtering
     double angleThreshold = glm::cos(m_maxGroundAngle);
 
+    // ========== Validate Cache ==========
+    glm::dvec3 worldCachedNormal(0.0);
+    if (m_hasGroundCache) {
+        if (m_cachedGroundGrid.expired()) {
+            // Cached grid was destroyed
+            m_hasGroundCache = false;
+        } else {
+            // Transform cached normal from rigid body local space to world space
+            auto cachedGrid = m_cachedGroundGrid.lock();
+            RigidBody* cachedRigidBody = cachedGrid->getRigidBody();
+            if (cachedRigidBody) {
+                worldCachedNormal = cachedRigidBody->m_orientation * m_cachedGroundNormal;
+            } else {
+                m_hasGroundCache = false;
+            }
+        }
+    }
+
     // Find the best ground contact point using biased selection
     bool foundContact = false;
     glm::dvec3 closestPoint(0.0);
@@ -394,9 +414,16 @@ void DigibotController::handleWalking() {
                 continue; // Surface angle exceeds maximum ground angle
             }
             
-            // Calculate biased score: lower is better
-            // Surfaces aligned with down get a distance advantage
-            double score = distance - m_groundSelectionBias * alignment;
+            // Calculate score based on cache validity
+            double score;
+            if (m_hasGroundCache) {
+                // Use cached normal for scoring
+                double cacheAlignment = glm::dot(normal, worldCachedNormal);
+                score = distance - m_groundSelectionBias * cacheAlignment;
+            } else {
+                // No cache - use pure distance
+                score = distance;
+            }
             
             if (score < bestScore) {
                 bestScore = score;
@@ -408,6 +435,7 @@ void DigibotController::handleWalking() {
     }
     
     if (!foundContact) {
+        m_hasGroundCache = false;
         return; // No ground contact
     }
 
@@ -420,6 +448,25 @@ void DigibotController::handleWalking() {
             targetRigidBody = closestAttachment->rigidBody;
         }
     }
+
+    // ========== Update Cache and Calculate Normal ==========
+    glm::dvec3 normal = glm::normalize(rigidBody->m_position - closestPoint);
+    
+    // Get Grid from the collision to store as cache
+    if (closestCollision) {
+        Grid* contactGrid = closestCollision->otherCollider->get_pointer<Grid>();
+        if (contactGrid && targetRigidBody) {
+            // Find the shared_ptr for this Grid from GridSubsystem
+            for (const auto& gridShared : m_gridSubsystem->getGrids()) {
+                if (gridShared.get() == contactGrid) {
+                    m_cachedGroundGrid = gridShared;
+                    m_cachedGroundNormal = glm::conjugate(targetRigidBody->m_orientation) * normal;
+                    m_hasGroundCache = true;
+                    break;
+                }
+            }
+        }
+    }
     
     // Debug visualization of closest contact point
     if (DebugGlobals::getDebugRenderer()) {
@@ -427,10 +474,7 @@ void DigibotController::handleWalking() {
             "closest_contact", closestPoint, 0.1);
     }
 
-    // ========== Step 2: Calculate Normal ==========
-    glm::dvec3 normal = glm::normalize(rigidBody->m_position - closestPoint);
-    
-    // ========== Step 3: Rotate Body Toward Surface Normal ==========
+    // ========== Step 2: Rotate Body Toward Surface Normal ==========
     glm::dvec3 currentUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
     currentUpVector = glm::normalize(currentUpVector);
     
@@ -473,7 +517,7 @@ void DigibotController::handleWalking() {
     
     m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
     
-    // ========== Step 4: Position Control Along Normal ==========
+    // ========== Step 3: Position Control Along Normal ==========
     // Calculate target position along normal
     glm::dvec3 targetPosition = closestPoint + normal * m_targetHoverHeight;
     
@@ -521,7 +565,7 @@ void DigibotController::handleWalking() {
 
     m_physicsEngine->applyForce(rigidBody, hoverForce);
     
-    // ========== Step 5: View Direction Rotation ==========
+    // ========== Step 4: View Direction Rotation ==========
     glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
     currentForward = glm::normalize(currentForward);
     
@@ -563,7 +607,7 @@ void DigibotController::handleWalking() {
     
     m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 
-    // ========== Step 6: Apply Movement Force ==========
+    // ========== Step 5: Apply Movement Force ==========
     // Create 2D tangent space on the surface using cross products
     glm::dvec3 tangentX = glm::cross(m_viewDirection, normal);
     double tangentXLengthSq = glm::length2(tangentX);
