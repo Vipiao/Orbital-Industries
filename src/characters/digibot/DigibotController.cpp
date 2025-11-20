@@ -22,7 +22,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_thrustStrength(0.004)  // Default thrust strength
     , m_angularAccelerationMax(0.008)  // Maximum angular acceleration (rad/s²)
     , m_maxRollRate(0.0)  // Will be set later if needed
-    , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
+    , m_rollAcceleration(0.01)  // Roll acceleration strength (rad/s^2)
     , m_rollInput(0)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
     , m_lockState(LockState::UNLOCKED)
@@ -263,7 +263,7 @@ void DigibotController::handleFlying() {
             double currentRollRate = glm::dot(currentAngVel, rollAxis);
             if (glm::abs(currentRollRate) < 0.01)
             {
-                adjustedRollAcceleration *= 4.;
+                adjustedRollAcceleration *= 2.;
             }
         }
         
@@ -571,7 +571,15 @@ void DigibotController::handleWalking() {
     glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
     currentForward = glm::normalize(currentForward);
     
-    glm::dvec3 targetForward = glm::normalize(m_viewDirection);
+    // Project view direction onto tangent plane before normalizing
+    glm::dvec3 targetForward = m_viewDirection - glm::dot(m_viewDirection, normal) * normal;
+    double targetForwardLengthSq = glm::length2(targetForward);
+    if (targetForwardLengthSq < 1e-12) {
+        // View is aligned with normal - no meaningful tangent direction, keep current
+        targetForward = currentForward;
+    } else {
+        targetForward = targetForward / glm::sqrt(targetForwardLengthSq);
+    }
     
     double forwardDotProduct = glm::clamp(glm::dot(currentForward, targetForward), -1.0, 1.0);
     double forwardDeltaAngle = std::acos(forwardDotProduct);
@@ -580,12 +588,13 @@ void DigibotController::handleWalking() {
     double forwardAxisLength = glm::length(forwardRotationAxis);
     
     glm::dvec3 forwardTargetAngularVelocity(0.0, 0.0, 0.0);
-    double forwardAdjustedAngVelMax = m_angularAccelerationMax * glm::abs(forwardDeltaAngle);
     
     if (forwardAxisLength > 1e-6) {
         forwardRotationAxis = forwardRotationAxis / forwardAxisLength;
         double forwardMargin = 0.2;
-        double forwardMaxAngularSpeed = std::sqrt(2.0 * forwardAdjustedAngVelMax * (1.0 - forwardMargin) * forwardDeltaAngle);
+        double effectiveACC = m_angularAccelerationMax;
+        effectiveACC *= glm::min(glm::abs(forwardDeltaAngle) / 1.0, 1.);
+        double forwardMaxAngularSpeed = std::sqrt(2.0 * effectiveACC * (1.0 - forwardMargin) * forwardDeltaAngle);
         forwardTargetAngularVelocity = forwardRotationAxis * forwardMaxAngularSpeed;
     }
 
