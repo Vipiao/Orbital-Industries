@@ -20,7 +20,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_gridSubsystem(gridSubsystem)
     , m_movementDirection(0, 0, 0)
     , m_thrustStrength(0.004)  // Default thrust strength
-    , m_angularAccelerationMax(0.004)  // Maximum angular acceleration (rad/s²)
+    , m_angularAccelerationMax(0.008)  // Maximum angular acceleration (rad/s²)
     , m_maxRollRate(0.0)  // Will be set later if needed
     , m_rollAcceleration(0.005)  // Roll acceleration strength (rad/s^2)
     , m_rollInput(0)
@@ -526,8 +526,10 @@ void DigibotController::handleWalking() {
     double distanceAlongNormal = glm::dot(positionError, normal);
     
     // Calculate target speed along normal using sqrt(2ad)
-    double margin = 0.5;
-    double targetSpeedAlongNormal = std::sqrt(2.0 * m_maxGroundAcceleration * (1.0 - margin) * glm::abs(distanceAlongNormal));
+    double margin = 0.2;
+    double effectiveACC = m_maxGroundAcceleration;
+    effectiveACC *= glm::min(glm::abs(distanceAlongNormal) / 0.1, 1.);
+    double targetSpeedAlongNormal = std::sqrt(2.0 * effectiveACC * (1.0 - margin) * glm::abs(distanceAlongNormal));
     if (distanceAlongNormal < 0.0) {
         targetSpeedAlongNormal = -targetSpeedAlongNormal;
     }
