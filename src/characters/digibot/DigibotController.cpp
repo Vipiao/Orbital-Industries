@@ -32,8 +32,8 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_maxGroundAcceleration(0.004)
     , m_targetWalkSpeed(0.08)
     , m_walkingThrustStrength(0.007)
-    , m_groundSelectionBias(0.1)
-    , m_maxGroundAngle(glm::radians(45.0))
+    , m_groundSelectionBias(1.0)
+    , m_maxGroundAngle(glm::radians(90.0))
     , m_cachedGroundNormal(0.0, 0.0, 1.0)
     , m_hasGroundCache(false)
 {
@@ -363,33 +363,19 @@ void DigibotController::handleWalking() {
     
     const auto& collisions = ballSensor->getCollisions(m_physicsEngine->getCurrentPhysicsTimeStep());
     
+    // ========== Step 1: Collect All Contact Candidates ==========
+    struct ContactCandidate {
+        glm::dvec3 position;
+        glm::dvec3 normal;
+        double distance;
+        const CollisionData* collision;
+    };
+    
+    std::vector<ContactCandidate> candidates;
+    
     // Calculate angle threshold for ground surface filtering
     double angleThreshold = glm::cos(m_maxGroundAngle);
 
-    // ========== Validate Cache ==========
-    glm::dvec3 worldCachedNormal(0.0);
-    if (m_hasGroundCache) {
-        if (m_cachedGroundGrid.expired()) {
-            // Cached grid was destroyed
-            m_hasGroundCache = false;
-        } else {
-            // Transform cached normal from rigid body local space to world space
-            auto cachedGrid = m_cachedGroundGrid.lock();
-            RigidBody* cachedRigidBody = cachedGrid->getRigidBody();
-            if (cachedRigidBody) {
-                worldCachedNormal = cachedRigidBody->m_orientation * m_cachedGroundNormal;
-            } else {
-                m_hasGroundCache = false;
-            }
-        }
-    }
-
-    // Find the best ground contact point using biased selection
-    bool foundContact = false;
-    glm::dvec3 closestPoint(0.0);
-    double bestScore = std::numeric_limits<double>::max();
-    const CollisionData* closestCollision = nullptr;
-    
     for (const auto& collision : collisions) {
         // Skip collisions with the robot's own body
         ColliderAttachment* otherAttachment = 
@@ -408,29 +394,99 @@ void DigibotController::handleWalking() {
             
             glm::dvec3 normal = toBody / distance;
             
-            // Filter: only consider surfaces within 90 degrees of "below"
+            // Filter: only consider surfaces within maxGroundAngle of "below"
             double alignment = glm::dot(-normal, downDirection);
             if (alignment < angleThreshold) {
                 continue; // Surface angle exceeds maximum ground angle
             }
             
-            // Calculate score based on cache validity
-            double score;
-            if (m_hasGroundCache) {
-                // Use cached normal for scoring
-                double cacheAlignment = glm::dot(normal, worldCachedNormal);
-                score = distance - m_groundSelectionBias * cacheAlignment;
-            } else {
-                // No cache - use pure distance
-                score = distance;
-            }
+            candidates.push_back({contactPoint, normal, distance, &collision});
+        }
+    }
+    
+    // ========== Step 2: Plane-Based Filtering ==========
+    // Filter out points that are recessed relative to other points
+    const double planeBias = 0.05;
+    std::vector<bool> filtered(candidates.size(), false);
+
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        if (filtered[i]) continue;
+        
+        for (size_t j = i + 1; j < candidates.size(); ++j) {
+            if (filtered[j]) continue;
             
-            if (score < bestScore) {
-                bestScore = score;
-                closestPoint = contactPoint;
-                foundContact = true;
-                closestCollision = &collision;
+            // Check if i would filter j (j behind i's plane)
+            glm::dvec3 toJ = candidates[j].position - candidates[i].position;
+            double signedDistItoJ = glm::dot(toJ, candidates[i].normal);
+            bool iFiltersJ = (signedDistItoJ < planeBias);
+            
+            // Check if j would filter i (i behind j's plane)
+            glm::dvec3 toI = candidates[i].position - candidates[j].position;
+            double signedDistJtoI = glm::dot(toI, candidates[j].normal);
+            bool jFiltersI = (signedDistJtoI < planeBias);
+            
+            if (iFiltersJ && jFiltersI) {
+                // Mutual filtering - keep the closer one
+                if (candidates[i].distance < candidates[j].distance) {
+                    filtered[j] = true;
+                } else {
+                    filtered[i] = true;
+                }
+            } else if (iFiltersJ) {
+                filtered[j] = true;
+            } else if (jFiltersI) {
+                filtered[i] = true;
             }
+        }
+    }
+
+    // ========== Step 3: Validate Cache ==========
+    glm::dvec3 worldCachedNormal(0.0);
+    if (m_hasGroundCache) {
+        if (m_cachedGroundGrid.expired()) {
+            // Cached grid was destroyed
+            m_hasGroundCache = false;
+        } else {
+            // Transform cached normal from rigid body local space to world space
+            auto cachedGrid = m_cachedGroundGrid.lock();
+            RigidBody* cachedRigidBody = cachedGrid->getRigidBody();
+            if (cachedRigidBody) {
+                worldCachedNormal = cachedRigidBody->m_orientation * m_cachedGroundNormal;
+            } else {
+                m_hasGroundCache = false;
+            }
+        }
+    }
+
+    // ========== Step 4: Find Best Ground Contact Point ==========
+    bool foundContact = false;
+    glm::dvec3 closestPoint(0.0);
+    double bestScore = std::numeric_limits<double>::max();
+    const CollisionData* closestCollision = nullptr;
+    
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        if (filtered[i]) continue;
+        
+        const glm::dvec3& contactPoint = candidates[i].position;
+        const glm::dvec3& normal = candidates[i].normal;
+        double distance = candidates[i].distance;
+        
+        // Calculate score based on cache validity
+        double score;
+        if (m_hasGroundCache) {
+            // Use cached normal for scoring
+            double cacheAlignment = glm::dot(normal, worldCachedNormal);
+            score = distance - m_groundSelectionBias * cacheAlignment;
+        } else {
+            // No cache - use pure distance
+            score = distance;
+        }
+        
+        if (score < bestScore) {
+            bestScore = score;
+            closestPoint = contactPoint;
+            foundContact = true;
+            closestCollision = candidates[i].collision;
         }
     }
     
@@ -439,7 +495,7 @@ void DigibotController::handleWalking() {
         return; // No ground contact
     }
 
-    // Get target rigid body from closest collision
+    // ========== Step 5: Get Target Rigid Body ==========
     RigidBody* targetRigidBody = nullptr;
     if (closestCollision) {
         ColliderAttachment* closestAttachment = 
@@ -449,7 +505,7 @@ void DigibotController::handleWalking() {
         }
     }
 
-    // ========== Update Cache and Calculate Normal ==========
+    // ========== Step 6: Update Cache and Calculate Normal ==========
     glm::dvec3 normal = glm::normalize(rigidBody->m_position - closestPoint);
     
     // Get Grid from the collision to store as cache
@@ -474,7 +530,7 @@ void DigibotController::handleWalking() {
             "closest_contact", closestPoint, 0.1);
     }
 
-    // ========== Step 2: Rotate Body Toward Surface Normal ==========
+    // ========== Step 7: Rotate Body Toward Surface Normal ==========
     glm::dvec3 currentUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
     currentUpVector = glm::normalize(currentUpVector);
     
@@ -517,7 +573,7 @@ void DigibotController::handleWalking() {
     
     m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
     
-    // ========== Step 3: Position Control Along Normal ==========
+    // ========== Step 8: Position Control Along Normal ==========
     // Calculate target position along normal
     glm::dvec3 targetPosition = closestPoint + normal * m_targetHoverHeight;
     
@@ -567,7 +623,7 @@ void DigibotController::handleWalking() {
 
     m_physicsEngine->applyForce(rigidBody, hoverForce);
     
-    // ========== Step 4: View Direction Rotation ==========
+    // ========== Step 9: View Direction Rotation ==========
     glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
     currentForward = glm::normalize(currentForward);
     
@@ -618,7 +674,7 @@ void DigibotController::handleWalking() {
     
     m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 
-    // ========== Step 5: Apply Movement Force ==========
+    // ========== Step 10: Apply Movement Force ==========
     // Create 2D tangent space on the surface using cross products
     glm::dvec3 tangentX = glm::cross(m_viewDirection, normal);
     double tangentXLengthSq = glm::length2(tangentX);
