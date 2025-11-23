@@ -254,7 +254,7 @@ void Creative::applyDragForces() {
     // Apply drag to each non-static rigid body
     for (const auto& bodyPtr : rigidBodies) {
         // Skip null or static bodies, or bodies that already have forces applied
-        if (!bodyPtr || bodyPtr->m_isStatic || bodyPtr->m_forces != glm::dvec3{0,0,0}) {
+        if (!bodyPtr || bodyPtr->m_isStatic) {
             continue;
         }
         
