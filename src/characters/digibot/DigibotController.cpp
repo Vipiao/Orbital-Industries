@@ -499,6 +499,10 @@ void DigibotController::handleWalking() {
             "closest_contact", closestPoint, 0.1);
     }
 
+    // ========== Accumulators for Force/Torque ==========
+    glm::dvec3 netForceOnDigibot(0.0);
+    glm::dvec3 netTorqueOnDigibot(0.0);
+
     // ========== Step 6: Rotate Body Toward Surface Normal ==========
     glm::dvec3 currentUpVector = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
     currentUpVector = glm::normalize(currentUpVector);
@@ -540,7 +544,7 @@ void DigibotController::handleWalking() {
         angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
     }
     
-    m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
+    netTorqueOnDigibot += rigidBody->getWorldInertiaTensor() * angularAcceleration;
     
     // ========== Step 7: Position Control Along Normal ==========
     // Calculate target position along normal
@@ -553,7 +557,7 @@ void DigibotController::handleWalking() {
     // Calculate target speed along normal using sqrt(2ad)
     double margin = 0.2;
     double effectiveACC = m_maxGroundAcceleration;
-    effectiveACC *= glm::min(glm::abs(distanceAlongNormal) / 0.1, 1.);
+    effectiveACC *= glm::min(glm::abs(distanceAlongNormal) / 0.2, 1.);
     double targetSpeedAlongNormal = std::sqrt(2.0 * effectiveACC * (1.0 - margin) * glm::abs(distanceAlongNormal));
     if (distanceAlongNormal < 0.0) {
         targetSpeedAlongNormal = -targetSpeedAlongNormal;
@@ -590,7 +594,7 @@ void DigibotController::handleWalking() {
      // Apply force to character
      glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass;
 
-    m_physicsEngine->applyForce(rigidBody, hoverForce);
+    netForceOnDigibot += hoverForce;
     
     // ========== Step 8: View Direction Rotation ==========
     glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
@@ -641,7 +645,7 @@ void DigibotController::handleWalking() {
         angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
     }
     
-    m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
+    netTorqueOnDigibot += rigidBody->getWorldInertiaTensor() * angularAcceleration;
 
     // ========== Step 9: Apply Movement Force ==========
     // Create 2D tangent space on the surface using cross products
@@ -701,7 +705,18 @@ void DigibotController::handleWalking() {
         movementForce = movementForce / movementForceLength * forceMagnitude;
     }
     
-    m_physicsEngine->applyForce(rigidBody, movementForce);
+    netForceOnDigibot += movementForce;
+
+    // ========== Apply All Accumulated Forces/Torques ==========
+    // Apply to Digibot at center of mass
+    m_physicsEngine->applyForce(rigidBody, netForceOnDigibot);
+    m_physicsEngine->applyTorque(rigidBody, netTorqueOnDigibot);
+
+    // Apply equal and opposite reactions to grid at contact point
+    if (targetRigidBody) {
+        m_physicsEngine->applyForceAtPoint(targetRigidBody, -netForceOnDigibot, rigidBody->m_position);
+        m_physicsEngine->applyTorque(targetRigidBody, -netTorqueOnDigibot);
+    }
 }
 
 void DigibotController::setThrustStrength(double strength) {
