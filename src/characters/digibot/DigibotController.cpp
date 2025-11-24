@@ -516,12 +516,13 @@ void DigibotController::handleWalking() {
     double upAxisLength = glm::length(upRotationAxis);
     
     glm::dvec3 upTargetAngularVelocity(0.0, 0.0, 0.0);
-    double upAdjustedAngVelMax = m_angularAccelerationMax * glm::abs(upDeltaAngle);
+    double effectiveAngAccUp = m_angularAccelerationMax;
+    effectiveAngAccUp *= glm::min(glm::abs(upDeltaAngle) / 0.1, 1.);
     
     if (upAxisLength > 1e-6) {
         upRotationAxis = upRotationAxis / upAxisLength;
-        double upMargin = 0.2;
-        double upMaxAngularSpeed = std::sqrt(2.0 * upAdjustedAngVelMax * (1.0 - upMargin) * upDeltaAngle);
+        double upMargin = 0.5;
+        double upMaxAngularSpeed = std::sqrt(2.0 * effectiveAngAccUp * (1.0 - upMargin) * upDeltaAngle);
         upTargetAngularVelocity = upRotationAxis * upMaxAngularSpeed;
     }
 
@@ -540,11 +541,23 @@ void DigibotController::handleWalking() {
     angularAcceleration = angularAcceleration - aroundUpComponent;
 
     double angAccMagnitude = glm::length(angularAcceleration);
-    if (angAccMagnitude > m_angularAccelerationMax) {
-        angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
+    if (angAccMagnitude > effectiveAngAccUp) {
+        angularAcceleration = angularAcceleration * (effectiveAngAccUp / angAccMagnitude);
     }
     
-    netTorqueOnDigibot += rigidBody->getWorldInertiaTensor() * angularAcceleration;
+    // Calculate effective inertia for up-vector alignment
+    glm::dvec3 upAlignmentTorque;
+    if (targetRigidBody && !targetRigidBody->m_isStatic) {
+        glm::dmat3 invInertiaSum = rigidBody->getWorldInvInertiaTensor() + 
+                                    targetRigidBody->getWorldInvInertiaTensor();
+        glm::dmat3 effectiveInertia = glm::inverse(invInertiaSum);
+        upAlignmentTorque = effectiveInertia * angularAcceleration;
+    } else {
+        // No ground or static ground - use only Digibot's inertia
+        upAlignmentTorque = rigidBody->getWorldInertiaTensor() * angularAcceleration;
+    }
+    
+    netTorqueOnDigibot += upAlignmentTorque;
     
     // ========== Step 7: Position Control Along Normal ==========
     // Calculate target position along normal
@@ -555,9 +568,9 @@ void DigibotController::handleWalking() {
     double distanceAlongNormal = glm::dot(positionError, normal);
     
     // Calculate target speed along normal using sqrt(2ad)
-    double margin = 0.2;
+    double margin = 0.5;
     double effectiveACC = m_maxGroundAcceleration;
-    effectiveACC *= glm::min(glm::abs(distanceAlongNormal) / 0.2, 1.);
+    effectiveACC *= glm::min(glm::abs(distanceAlongNormal) / 0.1, 1.);
     double targetSpeedAlongNormal = std::sqrt(2.0 * effectiveACC * (1.0 - margin) * glm::abs(distanceAlongNormal));
     if (distanceAlongNormal < 0.0) {
         targetSpeedAlongNormal = -targetSpeedAlongNormal;
@@ -585,14 +598,31 @@ void DigibotController::handleWalking() {
     double accelerationAlongNormal = targetVelocityAlongNormal - currentVelocityAlongNormal;
     
     // Clamp acceleration
-    if (glm::abs(accelerationAlongNormal) > m_maxGroundAcceleration) {
-        accelerationAlongNormal = (accelerationAlongNormal > 0.0 ? 1.0 : -1.0) * m_maxGroundAcceleration;
+    if (glm::abs(accelerationAlongNormal) > effectiveACC) {
+        accelerationAlongNormal = (accelerationAlongNormal > 0.0 ? 1.0 : -1.0) * effectiveACC;
     }
      
     glm::dvec3 neededAcceleration = normal * accelerationAlongNormal;
     
      // Apply force to character
-     glm::dvec3 hoverForce = neededAcceleration * rigidBody->m_mass;
+     // Calculate effective mass for hover control
+     double effectiveMass;
+     if (targetRigidBody) {
+         // Calculate effective mass between Digibot and ground
+         glm::dvec3 rDigibot = glm::dvec3(0.0); // Force at COM, so r = 0
+         glm::dvec3 rGround = rigidBody->m_position - targetRigidBody->m_position;
+         
+         glm::dvec3 rGround_cross_n = glm::cross(rGround, normal);
+         glm::dvec3 rotContribGround = targetRigidBody->getWorldInvInertiaTensor() * rGround_cross_n;
+         double rotTermGround = glm::dot(rGround_cross_n, rotContribGround);
+         
+         double invEffectiveMass = rigidBody->m_invMass + targetRigidBody->m_invMass + rotTermGround;
+         effectiveMass = 1.0 / invEffectiveMass;
+     } else {
+         effectiveMass = rigidBody->m_mass;
+     }
+     
+     glm::dvec3 hoverForce = neededAcceleration * effectiveMass;
 
     netForceOnDigibot += hoverForce;
     
@@ -618,18 +648,18 @@ void DigibotController::handleWalking() {
     
     glm::dvec3 forwardTargetAngularVelocity(0.0, 0.0, 0.0);
     
+    double effectiveAngAcc = m_angularAccelerationMax;
     if (forwardAxisLength > 1e-6) {
         forwardRotationAxis = forwardRotationAxis / forwardAxisLength;
-        double forwardMargin = 0.2;
-        double effectiveACC = m_angularAccelerationMax;
-        effectiveACC *= glm::min(glm::abs(forwardDeltaAngle) / 1.0, 1.);
-        double forwardMaxAngularSpeed = std::sqrt(2.0 * effectiveACC * (1.0 - forwardMargin) * forwardDeltaAngle);
+        double forwardMargin = 0.5;
+        effectiveAngAcc *= glm::min(glm::abs(forwardDeltaAngle) / 0.1, 1.0);
+        double forwardMaxAngularSpeed = std::sqrt(2.0 * effectiveAngAcc * (1.0 - forwardMargin) * forwardDeltaAngle);
         forwardTargetAngularVelocity = forwardRotationAxis * forwardMaxAngularSpeed;
     }
 
     // Add target rigid body's angular velocity if available
     if (targetRigidBody) {
-        forwardTargetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
+        //forwardTargetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
     }
     
     // Apply view direction torque
@@ -641,8 +671,8 @@ void DigibotController::handleWalking() {
     angularAcceleration = parallelComponent;
 
     angAccMagnitude = glm::length(angularAcceleration);
-    if (angAccMagnitude > m_angularAccelerationMax) {
-        angularAcceleration = angularAcceleration * (m_angularAccelerationMax / angAccMagnitude);
+    if (angAccMagnitude > effectiveAngAcc) {
+        angularAcceleration = angularAcceleration * (effectiveAngAcc / angAccMagnitude);
     }
     
     netTorqueOnDigibot += rigidBody->getWorldInertiaTensor() * angularAcceleration;
@@ -691,14 +721,32 @@ void DigibotController::handleWalking() {
     }
     
     glm::dvec3 velocityError = targetVelocityDirection - relativeVelocityTangent;
-    double forceMagnitude = m_walkingThrustStrength * rigidBody->m_mass;
-    
-    // Double force when trying to change direction (opposite velocities)
-    if (glm::dot(targetVelocityDirection, relativeVelocityTangent) < 0.0) {
-        forceMagnitude *= 2.0;
+    // Calculate effective mass for movement control in the direction of velocity error
+    double effectiveMassForMovement;
+    if (targetRigidBody && glm::length(velocityError) > 1e-6) {
+        glm::dvec3 movementDirection = glm::normalize(velocityError);
+        
+        // Force at Digibot COM, so no rotational contribution for Digibot
+        glm::dvec3 rGround = rigidBody->m_position - targetRigidBody->m_position;
+        
+        glm::dvec3 rGround_cross_dir = glm::cross(rGround, movementDirection);
+        glm::dvec3 rotContribGround = targetRigidBody->getWorldInvInertiaTensor() * rGround_cross_dir;
+        double rotTermGround = glm::dot(rGround_cross_dir, rotContribGround);
+        
+        double invEffectiveMass = rigidBody->m_invMass + targetRigidBody->m_invMass + rotTermGround;
+        effectiveMassForMovement = 1.0 / invEffectiveMass;
+    } else {
+        effectiveMassForMovement = rigidBody->m_mass;
     }
+    
+    double forceMagnitude = m_walkingThrustStrength * effectiveMassForMovement;
+    
+    //// Double force when trying to change direction (opposite velocities)
+    //if (glm::dot(targetVelocityDirection, relativeVelocityTangent) < 0.0) {
+    //    forceMagnitude *= 2.0;
+    //}
 
-    glm::dvec3 movementForce = velocityError * 1.0 * rigidBody->m_mass;
+    glm::dvec3 movementForce = velocityError * effectiveMassForMovement;
     double movementForceLength = glm::length(movementForce);
     if (movementForceLength > forceMagnitude)
     {
