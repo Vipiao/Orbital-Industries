@@ -20,7 +20,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_gridSubsystem(gridSubsystem)
     , m_movementDirection(0, 0, 0)
     , m_thrustStrength(0.004)  // Default thrust strength
-    , m_angularAccelerationMax(0.008)  // Maximum angular acceleration (rad/s²)
+    , m_angularAccelerationMax(0.016)  // Maximum angular acceleration (rad/s²)
     , m_maxRollRate(0.0)  // Will be set later if needed
     , m_rollAcceleration(0.01)  // Roll acceleration strength (rad/s^2)
     , m_rollInput(0)
@@ -29,7 +29,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_translationLockStrength(1.0)
     , m_jetpackEnabled(true)
     , m_targetHoverHeight(1.0)
-    , m_maxGroundAcceleration(0.004)
+    , m_maxGroundAcceleration(0.008)
     , m_targetWalkSpeed(0.08)
     , m_walkingThrustStrength(0.007)
     , m_groundSelectionBias(1.0)
