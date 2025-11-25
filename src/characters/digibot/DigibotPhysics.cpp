@@ -145,9 +145,10 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     MassInertiaCalculator::calculateInertiaForCoords(
         coords, getProperties, &totalMass, &centerOfMass, &inertiaTensor);
 
-    // Double mass and inertia as requested
-    totalMass *= 2.0;
-    inertiaTensor *= 2.0;
+    // Double mass and inertia
+    double scalingFactor = 80. / totalMass;
+    totalMass = 80.;
+    inertiaTensor *= scalingFactor;
 
     //m_centerOfMass = centerOfMass;
     //m_centerOfMass = {0.5,0.5,4};

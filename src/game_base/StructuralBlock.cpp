@@ -64,8 +64,8 @@ std::tuple<double, glm::dvec3, glm::dmat3> StructuralBlock::getMassProperties() 
     // Convert vertices array to vector for MassInertiaCalculator
     std::vector<glm::ivec3> verticesVec(m_localVertices.begin(), m_localVertices.end());
     
-    // Use density = 1.0 for now
-    const double density = 1.0;
+    // Steel panels about 5cm. If cube 1x1x1 1.5e3 tons.
+    const double density = 1.5e3;
     
     // Calculate mass properties using the new polyhedron calculation
     auto massProps = MassInertiaCalculator::calculatePolyhedronMassProperties(verticesVec, MAX_SIZE, density);
