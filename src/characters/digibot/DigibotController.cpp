@@ -261,7 +261,7 @@ void DigibotController::handleFlying() {
             double currentRollRate = glm::dot(currentAngVel, rollAxis);
             if (glm::abs(currentRollRate) < 0.01)
             {
-                adjustedRollAcceleration *= 2.;
+                //adjustedRollAcceleration *= 2.;
             }
         }
         
