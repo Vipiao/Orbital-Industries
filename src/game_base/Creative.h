@@ -51,6 +51,9 @@ private:
     double m_radialMenuDistance = 4.0; // Distance from camera when visible
     glm::dvec3 m_radialMenuRelativePosition = {0,0,0};
 
+    // Frame timing for surface rotation
+    double m_lastTimeRemainder{0.0};
+
     // Color tool
     std::unique_ptr<ColorTool> m_colorTool;
 

@@ -430,13 +430,25 @@ void Creative::processInputLogic() {
         m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);
     }
 
+    // Calculate delta time remainder for surface rotation
+    auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
+    double deltaTimeRemainder = timeRemainder - m_lastTimeRemainder;
+    if (deltaTimeRemainder < 0.0) deltaTimeRemainder += 1.0; // Handle wraparound
+    m_lastTimeRemainder = timeRemainder;
+
     // Handle radial menu interaction when visible
     bool radialMenuConsumedMouse = false;
     if (m_radialMenu->isVisible()) {
         // Apply grid rotation to menu relative position if in character control mode
         if (m_characterSelectionTool->isActive() && m_digibotPlayerController->isEnabled()) {
-            glm::dquat gridRotation = m_digibotPlayerController->getSurfaceRotation();
-            m_radialMenuRelativePosition = gridRotation * m_radialMenuRelativePosition;
+            glm::dvec3 angularVelocity = m_digibotPlayerController->getSurfaceAngularVelocity();
+            double angularVelocityMagnitude = glm::length(angularVelocity);
+            if (angularVelocityMagnitude > 1e-6) {
+                double rotationAngle = angularVelocityMagnitude * deltaTimeRemainder;
+                glm::dvec3 rotationAxis = angularVelocity / angularVelocityMagnitude;
+                glm::dquat surfaceRotation = glm::angleAxis(rotationAngle, rotationAxis);
+                m_radialMenuRelativePosition = surfaceRotation * m_radialMenuRelativePosition;
+            }
         }
 
         // Update radial menu position to follow camera

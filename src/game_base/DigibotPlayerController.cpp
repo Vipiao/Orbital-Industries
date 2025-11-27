@@ -36,16 +36,16 @@ void DigibotPlayerController::disable() {
     m_enabled = false;
 }
 
-glm::dquat DigibotPlayerController::getSurfaceRotation() const {
+glm::dvec3 DigibotPlayerController::getSurfaceAngularVelocity() const {
     auto character = m_pilotableCharacter.lock();
     if (!character) {
-        return glm::dquat(1.0, 0.0, 0.0, 0.0);
+        return glm::dvec3(0.0, 0.0, 0.0);
     }
     DigibotController* controller = character->getController();
     if (!controller) {
-        return glm::dquat(1.0, 0.0, 0.0, 0.0);
+        return glm::dvec3(0.0, 0.0, 0.0);
     }
-    return controller->getSurfaceRotation();
+    return controller->getSurfaceAngularVelocity();
 }
 
 void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange) {

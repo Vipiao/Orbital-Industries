@@ -78,8 +78,8 @@ void DigibotController::unlock() {
 }
 
 void DigibotController::updatePerFrame(double deltaTimeRemainder) {
-    // Reset to identity at start of frame
-    m_surfaceRotation = glm::dquat(1.0, 0.0, 0.0, 0.0);
+    // Reset to zero at start of frame
+    m_surfaceAngularVelocity = glm::dvec3(0.0, 0.0, 0.0);
     
     // Determine which rigid body to use for rotation
     RigidBody* targetRigidBody = nullptr;
@@ -102,16 +102,16 @@ void DigibotController::updatePerFrame(double deltaTimeRemainder) {
     }
     
     // Get angular velocity and apply rotation
-    glm::dvec3 angularVelocity = targetRigidBody->getAngularVelocityWorld();
-    double angularVelocityMagnitude = glm::length(angularVelocity);
+    m_surfaceAngularVelocity = targetRigidBody->getAngularVelocityWorld();
+    double angularVelocityMagnitude = glm::length(m_surfaceAngularVelocity);
     
     if (angularVelocityMagnitude > 1e-6) {
         double rotationAngle = angularVelocityMagnitude * deltaTimeRemainder;
-        glm::dvec3 rotationAxis = angularVelocity / angularVelocityMagnitude;
+        glm::dvec3 rotationAxis = m_surfaceAngularVelocity / angularVelocityMagnitude;
         
-        m_surfaceRotation = glm::angleAxis(rotationAngle, rotationAxis);
+        glm::dquat surfaceRotation = glm::angleAxis(rotationAngle, rotationAxis);
         
-        m_viewDirection = m_surfaceRotation * m_viewDirection;
+        m_viewDirection = surfaceRotation * m_viewDirection;
         m_viewDirection = glm::normalize(m_viewDirection);
     }
 }
