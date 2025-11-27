@@ -66,9 +66,6 @@ private:
     // Cache GraphicsEngine pointer for convenience
     GraphicsEngine* m_graphicsEngine;
 
-    // View direction (in world space)
-    glm::dvec3 m_viewDirection{0.0, 1.0, 0.0}; // Default forward
-
     // Frame timing for per-frame updates
     double m_lastTimeRemainder{0.0};
 };

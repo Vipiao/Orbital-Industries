@@ -164,12 +164,11 @@ void Digibot::setMovementDirection(const glm::ivec3& direction) {
 }
 
 void Digibot::setViewDirection(const glm::dvec3& direction) {
-    m_viewDirection = glm::normalize(direction);
-    m_digibotController->setViewDirection(m_viewDirection);
+    m_digibotController->setViewDirection(direction);
 }
 
 glm::dvec3 Digibot::getViewDirection() const {
-    return m_viewDirection;
+    return m_digibotController->getViewDirection();
 }
 
 void Digibot::setRollInput(int rollInput) {

@@ -142,11 +142,6 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         return;
     }
     
-    // Calculate delta time remainder since last frame
-    double deltaTimeRemainder = timeRemainder - m_lastTimeRemainder;
-    if (deltaTimeRemainder < 0.0) deltaTimeRemainder += 1.0; // Handle wraparound
-    m_lastTimeRemainder = timeRemainder;
-
     // Check if we have a valid character
     auto character = m_pilotableCharacter.lock();
     if (!character) {
