@@ -259,7 +259,7 @@ void Creative::applyDragForces() {
         }
         
         // Simple drag force calculation: -dragCoefficient * velocity
-        const double dragCoefficient = 0.04 * 0.2;
+        const double dragCoefficient = 0.04 * 0.2*0.;
         
         // Apply drag to linear velocity
         if (glm::length(bodyPtr->m_velocity) > 0.0) {
@@ -435,7 +435,7 @@ void Creative::processInputLogic() {
     if (m_radialMenu->isVisible()) {
         // Apply grid rotation to menu relative position if in character control mode
         if (m_characterSelectionTool->isActive() && m_digibotPlayerController->isEnabled()) {
-            glm::dquat gridRotation = m_digibotPlayerController->getLastFrameGridRotation();
+            glm::dquat gridRotation = m_digibotPlayerController->getSurfaceRotation();
             m_radialMenuRelativePosition = gridRotation * m_radialMenuRelativePosition;
         }
 

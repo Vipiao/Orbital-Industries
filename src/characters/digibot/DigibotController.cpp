@@ -77,6 +77,45 @@ void DigibotController::unlock() {
     std::cout << "Unlocked from grid" << std::endl;
 }
 
+void DigibotController::updatePerFrame(double deltaTimeRemainder) {
+    // Reset to identity at start of frame
+    m_surfaceRotation = glm::dquat(1.0, 0.0, 0.0, 0.0);
+    
+    // Determine which rigid body to use for rotation
+    RigidBody* targetRigidBody = nullptr;
+    
+    if (m_jetpackEnabled) {
+        // Flying mode: use FULL_LOCK target grid
+        if (m_lockState == LockState::FULL_LOCK) {
+            auto targetGrid = m_targetGrid.lock();
+            if (targetGrid) {
+                targetRigidBody = targetGrid->getRigidBody();
+            }
+        }
+    } else {
+        // Walking mode: use the grid we're standing on
+        targetRigidBody = m_walkingTargetRigidBody;
+    }
+    
+    if (!targetRigidBody) {
+        return;
+    }
+    
+    // Get angular velocity and apply rotation
+    glm::dvec3 angularVelocity = targetRigidBody->getAngularVelocityWorld();
+    double angularVelocityMagnitude = glm::length(angularVelocity);
+    
+    if (angularVelocityMagnitude > 1e-6) {
+        double rotationAngle = angularVelocityMagnitude * deltaTimeRemainder;
+        glm::dvec3 rotationAxis = angularVelocity / angularVelocityMagnitude;
+        
+        m_surfaceRotation = glm::angleAxis(rotationAngle, rotationAxis);
+        
+        m_viewDirection = m_surfaceRotation * m_viewDirection;
+        m_viewDirection = glm::normalize(m_viewDirection);
+    }
+}
+
 void DigibotController::physics() {
     if (m_jetpackEnabled) {
         handleFlying();
@@ -342,6 +381,9 @@ void DigibotController::handleWalking() {
         DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
     }
 
+    // Clear walking target at start (will be set if we find ground contact)
+    m_walkingTargetRigidBody = nullptr;
+
     // Get the rigid body from physics component
     RigidBody* rigidBody = m_physics->getRigidBody();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
@@ -481,12 +523,11 @@ void DigibotController::handleWalking() {
     }
 
     // ========== Step 4: Get Target Rigid Body ==========
-    RigidBody* targetRigidBody = nullptr;
     if (closestCollision) {
         ColliderAttachment* closestAttachment = 
             closestCollision->otherCollider->get_pointer<ColliderAttachment>();
         if (closestAttachment) {
-            targetRigidBody = closestAttachment->rigidBody;
+            m_walkingTargetRigidBody = closestAttachment->rigidBody;
         }
     }
 
@@ -498,6 +539,9 @@ void DigibotController::handleWalking() {
         DebugGlobals::getDebugRenderer()->createSphere(
             "closest_contact", closestPoint, 0.1);
     }
+
+    // Local alias for readability
+    RigidBody* targetRigidBody = m_walkingTargetRigidBody;
 
     // ========== Accumulators for Force/Torque ==========
     glm::dvec3 netForceOnDigibot(0.0);

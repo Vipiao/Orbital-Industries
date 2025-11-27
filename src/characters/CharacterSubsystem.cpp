@@ -53,9 +53,9 @@ void CharacterSubsystem::removeCharacter(std::weak_ptr<Character> characterWeak)
     }
 }
 
-void CharacterSubsystem::updateAllPreRender(uint64_t frameNum) {
+void CharacterSubsystem::updateAllPreRender(uint64_t frameNum, double timeRemainder) {
     for (auto& character : m_characters) {
-        character->preRenderCallback(frameNum);
+        character->preRenderCallback(frameNum, timeRemainder);
     }
 }
 

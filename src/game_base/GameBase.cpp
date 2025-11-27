@@ -139,7 +139,7 @@ void GameBase::prepareFrame() {
     );
 
     // Update characters pre-render
-    m_characterSubsystem->updateAllPreRender(m_graphicsEngine->getFrameNum());
+    m_characterSubsystem->updateAllPreRender(m_graphicsEngine->getFrameNum(), timeRemainder);
 }
 
 void GameBase::finalizeFrame() {

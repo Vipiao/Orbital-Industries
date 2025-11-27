@@ -24,6 +24,13 @@ public:
     // Set the view direction (world space)
     void setViewDirection(const glm::dvec3& viewDirection);
 
+    // Per-frame update for view direction rotation when locked to grid
+    // Returns the rotation quaternion applied this frame (for UI elements)
+    void updatePerFrame(double deltaTimeRemainder);
+
+    // Get the surface rotation applied this frame
+    glm::dquat getSurfaceRotation() const { return m_surfaceRotation; }
+
     // Set the roll input (-1 for left/Q, +1 for right/E, 0 for none)
     void setRollInput(int rollInput);
 
@@ -84,4 +91,10 @@ private:
     double m_walkingThrustStrength;
     double m_groundSelectionBias;
     double m_maxGroundAngle;
+
+    // Target rigid body from walking (set in handleWalking, nullptr if not walking or no contact)
+    RigidBody* m_walkingTargetRigidBody{nullptr};
+
+    // Surface rotation applied this frame (identity if not on rotating surface)
+    glm::dquat m_surfaceRotation{1.0, 0.0, 0.0, 0.0};
 };

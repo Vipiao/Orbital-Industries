@@ -36,6 +36,18 @@ void DigibotPlayerController::disable() {
     m_enabled = false;
 }
 
+glm::dquat DigibotPlayerController::getSurfaceRotation() const {
+    auto character = m_pilotableCharacter.lock();
+    if (!character) {
+        return glm::dquat(1.0, 0.0, 0.0, 0.0);
+    }
+    DigibotController* controller = character->getController();
+    if (!controller) {
+        return glm::dquat(1.0, 0.0, 0.0, 0.0);
+    }
+    return controller->getSurfaceRotation();
+}
+
 void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange) {
     if (!m_needsRaycast || !controller || !m_graphics) {
         return;
@@ -130,9 +142,6 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         return;
     }
     
-    // Reset grid rotation to identity at start of frame
-    m_lastFrameGridRotation = glm::dquat(1.0, 0.0, 0.0, 0.0);
-
     // Calculate delta time remainder since last frame
     double deltaTimeRemainder = timeRemainder - m_lastTimeRemainder;
     if (deltaTimeRemainder < 0.0) deltaTimeRemainder += 1.0; // Handle wraparound
@@ -216,37 +225,9 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     glm::dvec3 upVector = interpolatedOrientation * glm::dvec3(0.0, 0.0, 1.0);
     glm::dvec3 rightVector = interpolatedOrientation * glm::dvec3(1.0, 0.0, 0.0);
     
-    // Get current view direction
-    glm::dvec3 currentViewDir = character->getViewDirection();
-    
-    // Apply grid rotation if in FULL_LOCK mode
-    if (controller && controller->getLockState() == DigibotController::LockState::FULL_LOCK) {
-        auto targetGrid = controller->getTargetGrid().lock();
-        if (targetGrid) {
-            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
-            if (targetGridRigidBody) {
-                // Get grid's angular velocity
-                glm::dvec3 gridAngularVelocity = targetGridRigidBody->getAngularVelocityWorld();
-                double angularVelocityMagnitude = glm::length(gridAngularVelocity);
-                
-                if (angularVelocityMagnitude > 1e-6) {
-                    // Calculate rotation for this frame
-                    double rotationAngle = angularVelocityMagnitude * deltaTimeRemainder;
-                    glm::dvec3 rotationAxis = gridAngularVelocity / angularVelocityMagnitude;
-                    
-                    // Create rotation quaternion
-                    glm::dquat gridRotationQuat = glm::angleAxis(rotationAngle, rotationAxis);
-                    
-                    // Store the rotation for external use (e.g., rotating UI elements)
-                    m_lastFrameGridRotation = gridRotationQuat;
+    // Get current view direction (already includes surface rotation from preRenderCallback)
+    glm::dvec3 currentViewDir = controller->getViewDirection();
 
-                    // Apply grid rotation to current view direction
-                    currentViewDir = gridRotationQuat * currentViewDir;
-                }
-            }
-        }
-    }
-    
     // Apply mouse input to view direction
     if (mouseHandler->getMouseLock()) {
         // Step 1: Create orientation quaternion using look-at function

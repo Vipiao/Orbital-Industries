@@ -36,7 +36,7 @@ Digibot::~Digibot() {
     // Subsystems clean up automatically via unique_ptr
 }
 
-void Digibot::preRenderCallback(uint64_t frameNum) {
+void Digibot::preRenderCallback(uint64_t frameNum, double timeRemainder) {
     //if (frameNum % 16 != 0)
     //{
     //    return;
@@ -76,6 +76,13 @@ void Digibot::preRenderCallback(uint64_t frameNum) {
     );
 
     m_digibotGraphics->updateBodyPartPositions(targetPose);
+
+    // Calculate delta time remainder and apply surface rotation to view
+    double deltaTimeRemainder = timeRemainder - m_lastTimeRemainder;
+    if (deltaTimeRemainder < 0.0) deltaTimeRemainder += 1.0; // Handle wraparound
+    m_lastTimeRemainder = timeRemainder;
+
+    m_digibotController->updatePerFrame(deltaTimeRemainder);
 }
 
 void Digibot::onPhysicsUpdateComplete() {

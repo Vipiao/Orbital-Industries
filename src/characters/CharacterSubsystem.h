@@ -31,7 +31,7 @@ public:
     void removeCharacter(std::weak_ptr<Character> characterWeak);
 
     // Updates (called by GameBase each frame)
-    void updateAllPreRender(uint64_t frameNum);
+    void updateAllPreRender(uint64_t frameNum, double timeRemainder);
     void updateAllPhysicsComplete();
 
     // Access

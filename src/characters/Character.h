@@ -34,8 +34,9 @@ public:
     /**
      * @brief Called before rendering each frame
      * @param frameNum Current frame number
+     * @param timeRemainder Interpolation parameter [0-1] since last physics step
      */
-    virtual void preRenderCallback(uint64_t frameNum) = 0;
+    virtual void preRenderCallback(uint64_t frameNum, double timeRemainder) = 0;
     
     /**
      * @brief Called after physics update completes
