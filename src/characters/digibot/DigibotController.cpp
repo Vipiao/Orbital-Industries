@@ -97,22 +97,19 @@ void DigibotController::updatePerFrame(double deltaTimeRemainder) {
         targetRigidBody = m_walkingTargetRigidBody;
     }
     
-    if (!targetRigidBody) {
-        return;
-    }
-    
-    // Get angular velocity and apply rotation
-    m_surfaceAngularVelocity = targetRigidBody->getAngularVelocityWorld();
-    double angularVelocityMagnitude = glm::length(m_surfaceAngularVelocity);
-    
-    if (angularVelocityMagnitude > 1e-6) {
-        double rotationAngle = angularVelocityMagnitude * deltaTimeRemainder;
-        glm::dvec3 rotationAxis = m_surfaceAngularVelocity / angularVelocityMagnitude;
+    if (targetRigidBody) {
+        m_surfaceAngularVelocity = targetRigidBody->getAngularVelocityWorld();
+        double angularVelocityMagnitude = glm::length(m_surfaceAngularVelocity);
         
-        glm::dquat surfaceRotation = glm::angleAxis(rotationAngle, rotationAxis);
-        
-        m_viewDirection = surfaceRotation * m_viewDirection;
-        m_viewDirection = glm::normalize(m_viewDirection);
+        if (angularVelocityMagnitude > 1e-6) {
+            double rotationAngle = angularVelocityMagnitude * deltaTimeRemainder;
+            glm::dvec3 rotationAxis = m_surfaceAngularVelocity / angularVelocityMagnitude;
+            
+            glm::dquat surfaceRotation = glm::angleAxis(rotationAngle, rotationAxis);
+            
+            m_viewDirection = surfaceRotation * m_viewDirection;
+            m_viewDirection = glm::normalize(m_viewDirection);
+        }
     }
 
     // Clamp view direction to prevent near-vertical angles
