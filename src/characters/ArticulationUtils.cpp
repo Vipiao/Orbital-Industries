@@ -24,7 +24,20 @@ glm::dquat ArticulationUtils::quatLookAtYForward(const glm::dvec3& direction, co
     glm::dvec3 forward = direction;
     
     // Calculate right vector (perpendicular to forward and up)
-    glm::dvec3 right = glm::normalize(glm::cross(forward, up));
+    glm::dvec3 right = glm::cross(forward, up);
+    double rightLengthSq = glm::length2(right);
+    
+    // If right vector is too small, forward and up are nearly parallel
+    // Pick an arbitrary orthogonal vector based on which axis is most different from up
+    if (rightLengthSq < 1e-18) {
+        glm::dvec3 arbitrary = (glm::abs(up.x) < 0.9) 
+                                ? glm::dvec3(1.0, 0.0, 0.0) 
+                                : glm::dvec3(0.0, 1.0, 0.0);
+        right = glm::cross(arbitrary, up);
+        rightLengthSq = glm::length2(right);
+    }
+    
+    right = right / glm::sqrt(rightLengthSq);
     
     // Recalculate up to ensure orthogonality
     glm::dvec3 upAdjusted = glm::cross(right, forward);
