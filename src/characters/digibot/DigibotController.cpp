@@ -114,6 +114,43 @@ void DigibotController::updatePerFrame(double deltaTimeRemainder) {
         m_viewDirection = surfaceRotation * m_viewDirection;
         m_viewDirection = glm::normalize(m_viewDirection);
     }
+
+    // Clamp view direction to prevent near-vertical angles
+    RigidBody* rigidBody = m_physics->getRigidBody();
+    if (!rigidBody) {
+        return;
+    }
+    
+    glm::dvec3 bodyUp = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+    
+    // Decompose view direction into planar and up components
+    glm::dvec3 upComponent = glm::dot(m_viewDirection, bodyUp) * bodyUp;
+    glm::dvec3 planarComponent = m_viewDirection - upComponent;
+    
+    // Calculate minimum planar length for maximum allowed angle
+    // minAngle = x degrees from vertical
+    const double minAngle = glm::radians(10.0);
+    const double minPlanarLength = glm::sin(minAngle);
+    
+    double planarLengthSq = glm::length2(planarComponent);
+    
+    if (planarLengthSq < minPlanarLength * minPlanarLength) {
+        // Handle edge case: if planar is near-zero, add small offset
+        double planarLength{};
+        if (planarLengthSq < 1e-9) {
+            glm::dvec3 bodyForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
+            planarComponent += 0.01 * bodyForward;
+            planarLength = glm::length(planarComponent);
+        } else {
+            planarLength = glm::sqrt(planarLengthSq);
+        }
+        
+        // Scale planar component to minimum length
+        planarComponent = (planarComponent / planarLength) * minPlanarLength;
+        
+        // Reconstruct and normalize
+        m_viewDirection = glm::normalize(planarComponent + upComponent);
+    }
 }
 
 void DigibotController::physics() {
