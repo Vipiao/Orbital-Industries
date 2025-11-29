@@ -235,8 +235,10 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         double pitchAngle = -mouseMovement.y * mouseSensitivity;
         glm::dquat pitchQuat = glm::angleAxis(pitchAngle, glm::dvec3(1.0, 0.0, 0.0));
         
+        // Transform upVector into viewQuat's coordinate frame for yaw axis
+        glm::dvec3 yawAxis = glm::conjugate(viewQuat) * upVector;
         double yawAngle = -mouseMovement.x * mouseSensitivity;
-        glm::dquat yawQuat = glm::angleAxis(yawAngle, glm::dvec3(0.0, 0.0, 1.0));
+        glm::dquat yawQuat = glm::angleAxis(yawAngle, yawAxis);
 
         currentViewDir = viewQuat * pitchQuat * yawQuat * glm::dvec3(0.0, 1.0, 0.0);
     }
