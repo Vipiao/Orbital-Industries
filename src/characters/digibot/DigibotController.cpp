@@ -126,7 +126,7 @@ void DigibotController::updatePerFrame(double deltaTimeRemainder) {
     
     // Calculate minimum planar length for maximum allowed angle
     // minAngle = x degrees from vertical
-    const double minAngle = glm::radians(10.0);
+    const double minAngle = glm::radians(5.0);
     const double minPlanarLength = glm::sin(minAngle);
     
     double planarLengthSq = glm::length2(planarComponent);
