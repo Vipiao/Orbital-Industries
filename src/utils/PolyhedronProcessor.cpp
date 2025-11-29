@@ -700,6 +700,15 @@ bool PolyhedronProcessor::areTrianglesConvex(
     //    }
     //}
 
+    // Identify degenerate triangles (triangles without 3 distinct vertices)
+    std::vector<bool> isDegenerateTriangle(triangleIndices.size(), false);
+    for (size_t i = 0; i < triangleIndices.size(); ++i) {
+        const auto& tri = triangleIndices[i];
+        if (tri[0] == tri[1] || tri[1] == tri[2] || tri[0] == tri[2]) {
+            isDegenerateTriangle[i] = true;
+        }
+    }
+
     // Build a map of edges to triangles for efficient lookup
     struct Edge {
         int v1, v2;
@@ -714,6 +723,8 @@ bool PolyhedronProcessor::areTrianglesConvex(
     
     // Build edge map
     for (size_t triIdx = 0; triIdx < triangleIndices.size(); ++triIdx) {
+        if (isDegenerateTriangle[triIdx]) continue;
+        
         const auto& triangle = triangleIndices[triIdx];
         
         // Add all three edges of this triangle
