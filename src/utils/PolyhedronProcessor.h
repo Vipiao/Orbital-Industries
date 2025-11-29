@@ -149,16 +149,6 @@ public:
         double margin = 0.0);
 
     /**
-     * @brief Check convexity of a set of triangles
-     * @param triangles Vector of triangles (each triangle is 3 vertices)
-     * @param counterClockwise Whether triangles use counter-clockwise winding for outward normals
-     * @return true if the triangles form a convex shape, false otherwise
-     */
-    static bool areTrianglesConvex(
-        const std::vector<std::array<glm::dvec3, 3>>& triangles,
-        bool counterClockwise = true);
-
-    /**
      * @brief Check convexity of a set of triangles using vertex indices
      * @param vertices Vector of vertices
      * @param triangleIndices Vector of triangles (each triangle is 3 indices into vertices)
