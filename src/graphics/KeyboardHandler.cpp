@@ -5,6 +5,16 @@
 
 
 #include "KeyboardHandler.h"
+#include <algorithm>
+#include <iostream>
+
+#ifdef PLATFORM_LINUX
+#include <GLFW/glfw3native.h>
+#endif
+
+// Initialize static members
+std::vector<KeyboardHandler*> KeyboardHandler::s_allHandlers;
+bool KeyboardHandler::s_callbackRegistered = false;
 
 KeyboardHandler::KeyboardHandler(GLFWwindow* window, Mode mode, const std::filesystem::path& filepath)
    : m_mode(mode) {
@@ -66,11 +76,54 @@ KeyboardHandler::KeyboardHandler(GLFWwindow* window, Mode mode, const std::files
    m_buttons.push_back(&m_down);
 
    m_buttons.push_back(&m_esc);
+
+   // Register this handler in the static list
+   s_allHandlers.push_back(this);
+   
+   // Register callback once for all handlers
+   if (!s_callbackRegistered) {
+      glfwSetKeyCallback(m_window, capsLockCallback);
+      s_callbackRegistered = true;
+   }
 }
 
 KeyboardHandler::~KeyboardHandler() {
    if (m_mode != Mode::NONE) {
       m_file.close();
+   }
+   
+   // Remove this handler from the static list
+   auto it = std::find(s_allHandlers.begin(), s_allHandlers.end(), this);
+   if (it != s_allHandlers.end()) {
+      s_allHandlers.erase(it);
+   }
+}
+
+void KeyboardHandler::setSuppressCapsLock(bool suppress) {
+   m_suppressCapsLock = suppress;
+}
+
+void KeyboardHandler::capsLockCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+   (void)scancode; // Unused
+   (void)mods;     // Unused
+   
+   // Only handle Caps Lock press events
+   if (key != GLFW_KEY_CAPS_LOCK || action != GLFW_PRESS) {
+      return;
+   }
+   
+   // Check if any handler for this window has suppression enabled
+   bool shouldSuppress = false;
+   for (KeyboardHandler* handler : s_allHandlers) {
+      if (handler->m_window == window && handler->m_suppressCapsLock) {
+         shouldSuppress = true;
+         break;
+      }
+   }
+   
+   // If any handler wants to suppress, toggle Caps Lock back
+   if (shouldSuppress) {
+      toggleCapsLock();
    }
 }
 
@@ -93,4 +146,44 @@ void KeyboardHandler::update() {
       }
       bb->m_isDownPrevious = bb->m_isDown;
    }
+}
+
+void KeyboardHandler::toggleCapsLock() {
+#ifdef PLATFORM_WINDOWS
+   // Check if the physical Caps Lock key is currently pressed
+   // GetAsyncKeyState returns the key's state: high-order bit is 1 if key is down
+   bool keyIsPhysicallyDown = (GetAsyncKeyState(VK_CAPITAL) & 0x8000) != 0;
+   
+   if (keyIsPhysicallyDown) {
+      // Key is down - simulate UP first, then DOWN to toggle
+      // This prevents conflict with the physical key state
+      keybd_event(VK_CAPITAL, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
+      keybd_event(VK_CAPITAL, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
+   } else {
+      // Key is up - normal DOWN then UP sequence
+      keybd_event(VK_CAPITAL, 0x45, KEYEVENTF_EXTENDEDKEY, 0);
+      keybd_event(VK_CAPITAL, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
+   }
+#elif defined(PLATFORM_LINUX)
+   Display* display = glfwGetX11Display();
+   if (!display) {
+      return;
+   }
+   
+   // Get current state
+   unsigned int state = 0;
+   XkbGetIndicatorState(display, XkbUseCoreKbd, &state);
+   bool currentState = (state & 0x01) != 0;
+   
+   // Toggle to opposite state
+   unsigned int mask = LockMask;
+   if (currentState) {
+      XkbLockModifiers(display, XkbUseCoreKbd, mask, 0);
+   } else {
+      XkbLockModifiers(display, XkbUseCoreKbd, mask, mask);
+   }
+   XFlush(display);
+#else
+   // Platform not supported - do nothing
+#endif
 }

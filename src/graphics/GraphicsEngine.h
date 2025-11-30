@@ -44,6 +44,14 @@ public:
     MouseHandler* getMouseHandler() { return getGraphicsEngineBase()->m_mouseHandler; }
     KeyboardHandler* getKeyboardHandler() { return getGraphicsEngineBase()->m_keyboardHandler; }
     
+    // Caps Lock suppression control
+    void setSuppressCapsLock(bool suppress) {
+        getGraphicsEngineBase()->setSuppressCapsLock(suppress);
+    }
+    bool getSuppressCapsLock() const {
+        return getGraphicsEngineBase()->getSuppressCapsLock();
+    }
+
     // Graphics engine functionality
     void beginFrame();
     void render();
