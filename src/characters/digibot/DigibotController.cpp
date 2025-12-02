@@ -32,7 +32,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_maxGroundAcceleration(0.008)
     , m_targetWalkSpeed(0.08)
     , m_walkingThrustStrength(0.007)
-    , m_groundSelectionBias(1.0)
+    , m_groundSelectionBias(2.0)
     , m_maxGroundAngle(glm::radians(90.0))
 {
     if (!m_physics) {
@@ -173,7 +173,7 @@ void DigibotController::handleFlying() {
     glm::dvec3 bodyUpDirection = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
     
     // Create view orientation quaternion using view direction and body's up vector 
-    // Note: We need to conjugate/invert the quaternion to transform vectors correctly
+    // Note: We need to conjugate/invert the quaternion as lookAt gives inverse of orientation from vectors.
     glm::dquat viewOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(m_viewDirection, bodyUpDirection));
     
     // ========== Calculate Movement Force ==========
@@ -427,16 +427,52 @@ void DigibotController::handleWalking() {
     // Calculate reference down direction from body orientation
     glm::dvec3 downDirection = -(rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0));
     
-    // Calculate modified up direction for scoring (combines robot orientation and view direction)
-    glm::dvec3 bodyUpDirection = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
-    glm::dvec3 robotRight = rigidBody->m_orientation * glm::dvec3(1.0, 0.0, 0.0);
-    glm::dvec3 modifiedUp = glm::cross(robotRight, m_viewDirection);
-    double modifiedUpLengthSq = glm::length2(modifiedUp);
-    if (modifiedUpLengthSq < 1e-12) {
-        // View direction parallel to robot right - fall back to body up
-        modifiedUp = bodyUpDirection;
+    // Handle cached modified up direction
+    glm::dvec3 modifiedUp(0.,0.,0.);
+    bool needsFreshCalculation = false;
+    
+    if (!m_upDirectionLocked) {
+        // Direction is free to change - clear cache
+        m_cachedRigidBody = nullptr;
+        needsFreshCalculation = true;
     } else {
-        modifiedUp = modifiedUp / glm::sqrt(modifiedUpLengthSq);
+        // Direction is locked - try to use cache
+        if (m_cachedRigidBody != nullptr) {
+            // Verify cached rigid body still exists
+            bool isValid = false;
+            for (const auto& bodyPtr : m_physicsEngine->getRigidBodies()) {
+                if (bodyPtr.get() == m_cachedRigidBody) {
+                    isValid = true;
+                    break;
+                }
+            }
+            
+            if (isValid) {
+                // Transform cached direction from rigid body local to world
+                modifiedUp = m_cachedRigidBody->m_orientation * m_cachedModifiedUp;
+            } else {
+                // Cached rigid body was destroyed - clear cache and recalculate
+                m_cachedRigidBody = nullptr;
+                needsFreshCalculation = true;
+            }
+        } else {
+            // Cache is empty - calculate fresh
+            needsFreshCalculation = true;
+        }
+    }
+
+    // Calculate fresh modifiedUp if needed
+    if (needsFreshCalculation) {
+        glm::dvec3 bodyUpDirection = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+        glm::dvec3 robotRight = rigidBody->m_orientation * glm::dvec3(1.0, 0.0, 0.0);
+        modifiedUp = glm::cross(robotRight, m_viewDirection);
+        double modifiedUpLengthSq = glm::length2(modifiedUp);
+        if (modifiedUpLengthSq < 1e-12) {
+            // View direction parallel to robot right - fall back to body up
+            modifiedUp = bodyUpDirection;
+        } else {
+            modifiedUp = modifiedUp / glm::sqrt(modifiedUpLengthSq);
+        }
     }
 
     auto sensor = m_physics->getWalkingSensor().lock();
@@ -566,7 +602,15 @@ void DigibotController::handleWalking() {
     }
 
     // ========== Step 5: Calculate Normal ==========
-    glm::dvec3 normal = glm::normalize(rigidBody->m_position - closestPoint);
+    glm::dvec3 toBody = rigidBody->m_position - closestPoint;
+    double toBodyLengthSq = glm::length2(toBody);
+    glm::dvec3 normal;
+    if (toBodyLengthSq < 1e-12) {
+        // Degenerate case - pick arbitrary up direction
+        normal = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
+    } else {
+        normal = toBody / glm::sqrt(toBodyLengthSq);
+    }
     
     // Debug visualization of closest contact point
     if (DebugGlobals::getDebugRenderer()) {
@@ -576,6 +620,16 @@ void DigibotController::handleWalking() {
 
     // Local alias for readability
     RigidBody* targetRigidBody = m_walkingTargetRigidBody;
+
+    // Cache the modifiedUp direction if locked and we have a valid target
+    if (m_upDirectionLocked && targetRigidBody) {
+        constexpr double halfTime{ 64.*0.1 }; // 0.1 seconds.
+        constexpr double ff{ 1. - glm::pow(0.5, 1./halfTime) };
+        m_cachedRigidBody = targetRigidBody;
+        glm::dvec3 blendedUp = glm::mix(modifiedUp, normal, ff);
+        blendedUp = glm::normalize(blendedUp);
+        m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * blendedUp;
+    }
 
     // ========== Accumulators for Force/Torque ==========
     glm::dvec3 netForceOnDigibot(0.0);

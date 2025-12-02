@@ -156,6 +156,12 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         return;
     }
 
+    // Send up direction lock state to controller
+    // When caps lock is DOWN, direction is FREE (not locked)
+    if (controller) {
+        controller->setLockUpDirection(!keyboard->m_capsLock.isDown());
+    }
+
     // Toggle jetpack with X key
     if (keyboard->m_x.justPressed()) {
         controller->setJetpackEnabled(!controller->isJetpackEnabled());

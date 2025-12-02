@@ -53,6 +53,9 @@ public:
     // Configure maximum roll rate
     void setMaxRollRate(double maxRate);
 
+    // Set up direction lock state (true = locked, false = free to change)
+    void setLockUpDirection(bool locked) { m_upDirectionLocked = locked; }
+
     // Grid locking
     void setTargetGrid(std::weak_ptr<Grid> grid);
     void unlock();
@@ -97,4 +100,9 @@ private:
 
     // Angular velocity of surface we're on/locked to (zero if not on rotating surface)
     glm::dvec3 m_surfaceAngularVelocity{0.0, 0.0, 0.0};
+
+    // Up direction lock state
+    bool m_upDirectionLocked{false};
+    glm::dvec3 m_cachedModifiedUp{0.0, 0.0, 0.0};  // In rigid body local coordinates
+    RigidBody* m_cachedRigidBody{nullptr};  // Rigid body the cache is relative to
 };
