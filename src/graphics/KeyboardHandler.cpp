@@ -77,6 +77,8 @@ KeyboardHandler::KeyboardHandler(GLFWwindow* window, Mode mode, const std::files
 
    m_buttons.push_back(&m_esc);
 
+   m_buttons.push_back(&m_capsLock);
+
    // Register this handler in the static list
    s_allHandlers.push_back(this);
    

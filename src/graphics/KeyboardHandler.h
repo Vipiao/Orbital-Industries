@@ -146,6 +146,7 @@ public:
    Button m_down{ GLFW_KEY_DOWN, this };
 
    Button m_esc{ GLFW_KEY_ESCAPE, this };
+   Button m_capsLock{ GLFW_KEY_CAPS_LOCK, this };
 protected:
    Mode m_mode{};
    std::fstream m_file{};
