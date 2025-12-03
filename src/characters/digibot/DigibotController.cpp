@@ -34,6 +34,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_walkingThrustStrength(0.007)
     , m_groundSelectionBias(2.0)
     , m_maxGroundAngle(glm::radians(90.0))
+    , m_maxLockedGroundAngle(glm::radians(45.0))
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -429,12 +430,11 @@ void DigibotController::handleWalking() {
     
     // Handle cached modified up direction
     glm::dvec3 modifiedUp(0.,0.,0.);
-    bool needsFreshCalculation = false;
+    bool usingCache = false;
     
     if (!m_upDirectionLocked) {
         // Direction is free to change - clear cache
         m_cachedRigidBody = nullptr;
-        needsFreshCalculation = true;
     } else {
         // Direction is locked - try to use cache
         if (m_cachedRigidBody != nullptr) {
@@ -450,19 +450,16 @@ void DigibotController::handleWalking() {
             if (isValid) {
                 // Transform cached direction from rigid body local to world
                 modifiedUp = m_cachedRigidBody->m_orientation * m_cachedModifiedUp;
+                usingCache = true;
             } else {
                 // Cached rigid body was destroyed - clear cache and recalculate
                 m_cachedRigidBody = nullptr;
-                needsFreshCalculation = true;
             }
-        } else {
-            // Cache is empty - calculate fresh
-            needsFreshCalculation = true;
         }
     }
-
+    
     // Calculate fresh modifiedUp if needed
-    if (needsFreshCalculation) {
+    if (!usingCache) {
         glm::dvec3 bodyUpDirection = rigidBody->m_orientation * glm::dvec3(0.0, 0.0, 1.0);
         glm::dvec3 robotRight = rigidBody->m_orientation * glm::dvec3(1.0, 0.0, 0.0);
         modifiedUp = glm::cross(robotRight, m_viewDirection);
@@ -621,14 +618,14 @@ void DigibotController::handleWalking() {
     // Local alias for readability
     RigidBody* targetRigidBody = m_walkingTargetRigidBody;
 
-    // Cache the modifiedUp direction if locked and we have a valid target
-    if (m_upDirectionLocked && targetRigidBody) {
-        constexpr double halfTime{ 64.*0.1 }; // 0.1 seconds.
-        constexpr double ff{ 1. - glm::pow(0.5, 1./halfTime) };
-        m_cachedRigidBody = targetRigidBody;
-        glm::dvec3 blendedUp = glm::mix(modifiedUp, normal, ff);
-        blendedUp = glm::normalize(blendedUp);
-        m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * blendedUp;
+    // Calculate alignment between surface normal and locked up direction
+    // Used for orientation control, hover force, and movement force gating
+    double surfaceAlignment = 1.0; // Default to full alignment when not using cache
+    bool surfaceAlignedEnough = true;
+    if (usingCache) {
+        surfaceAlignment = glm::dot(normal, modifiedUp);
+        double angleThreshold = glm::cos(m_maxLockedGroundAngle);
+        surfaceAlignedEnough = (surfaceAlignment >= angleThreshold);
     }
 
     // ========== Accumulators for Force/Torque ==========
@@ -637,104 +634,116 @@ void DigibotController::handleWalking() {
 
     // ========== Step 6: Unified Orientation Control ==========
     // Calculate target orientation that aligns:
-    // - Local z-axis with surface normal
+    // - Local z-axis with surface normal (or cached up when using cache)
     // - Local y-axis with view direction (projected onto tangent plane)
     
-    // Project view direction onto tangent plane
-    glm::dvec3 projectedViewDirection = m_viewDirection - glm::dot(m_viewDirection, normal) * normal;
-    double projectedViewLengthSq = glm::length2(projectedViewDirection);
+    // Determine target up direction based on whether we're using cache
+    glm::dvec3 targetUpDirection = usingCache ? modifiedUp : normal;
     
-    glm::dvec3 targetForward;
-    if (projectedViewLengthSq < 1e-12) {
-        // View is aligned with normal - keep current forward direction
-        targetForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
-        targetForward = targetForward - glm::dot(targetForward, normal) * normal;
-        double targetForwardLengthSq = glm::length2(targetForward);
-        if (targetForwardLengthSq < 1e-12) {
-            // Current forward also aligned with normal - pick arbitrary tangent
-            glm::dvec3 arbitrary = glm::dvec3(1.0, 0.0, 0.0);
-            if (glm::abs(glm::dot(normal, arbitrary)) > 0.9) {
-                arbitrary = glm::dvec3(0.0, 1.0, 0.0);
-            }
-            targetForward = arbitrary - glm::dot(arbitrary, normal) * normal;
-            targetForward = glm::normalize(targetForward);
-        } else {
-            targetForward = targetForward / glm::sqrt(targetForwardLengthSq);
-        }
-    } else {
-        targetForward = projectedViewDirection / glm::sqrt(projectedViewLengthSq);    
-    }
-
-    // Construct target orientation from orthonormal basis
-    glm::dvec3 targetRight = glm::cross(targetForward, normal);
-    glm::dvec3 targetUp = normal;
-    
-    // Build rotation matrix and convert to quaternion
-    glm::dmat3 targetRotationMatrix;
-    targetRotationMatrix[0] = targetRight;   // x-axis
-    targetRotationMatrix[1] = targetForward; // y-axis
-    targetRotationMatrix[2] = targetUp;      // z-axis
-    glm::dquat targetOrientation = glm::quat_cast(targetRotationMatrix);
-
-    // Ensure we take the short path: negate target if dot product is negative
-    // (q and -q represent the same rotation, so pick the closer one)
-    if (glm::dot(targetOrientation, rigidBody->m_orientation) < 0.0) {
-        targetOrientation = -targetOrientation;
-    }
-    
-    // Calculate rotation from current to target orientation
-    glm::dquat rotationDelta = targetOrientation * glm::conjugate(rigidBody->m_orientation);
-    //rotationDelta = glm::normalize(rotationDelta);
-    
-    // Extract axis-angle from rotation delta
-    double deltaAngle = 2.0 * std::acos(glm::clamp(rotationDelta.w, -1.0, 1.0));
-    glm::dvec3 rotationAxis(rotationDelta.x, rotationDelta.y, rotationDelta.z);
-    double axisLength = glm::length(rotationAxis);
-    
-    glm::dvec3 targetAngularVelocity(0.0);
-    
-    // Scale acceleration based on remaining angle
-    double effectiveAngAcc = m_angularAccelerationMax;
-    effectiveAngAcc *= glm::min(glm::abs(deltaAngle) / 0.1, 1.0);
-    
-    if (axisLength > 1e-6 && deltaAngle > 1e-6) {
-        rotationAxis = rotationAxis / axisLength;
+    // Only apply orientation control if surface is aligned enough with locked up direction
+    if (surfaceAlignedEnough) {
+        // Project view direction onto tangent plane
+        glm::dvec3 projectedViewDirection = m_viewDirection - glm::dot(m_viewDirection, targetUpDirection) * targetUpDirection;
+        double projectedViewLengthSq = glm::length2(projectedViewDirection);
         
-        // Calculate target angular speed using sqrt(2ad) with margin
-        double margin = 0.5;
-        double maxAngularSpeed = std::sqrt(2.0 * effectiveAngAcc * (1.0 - margin) * deltaAngle);
-        targetAngularVelocity = rotationAxis * maxAngularSpeed;
+        glm::dvec3 targetForward;
+        if (projectedViewLengthSq < 1e-12) {
+            // View is aligned with normal - keep current forward direction
+            targetForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
+            targetForward = targetForward - glm::dot(targetForward, targetUpDirection) * targetUpDirection;
+            double targetForwardLengthSq = glm::length2(targetForward);
+            if (targetForwardLengthSq < 1e-12) {
+                // Current forward also aligned with normal - pick arbitrary tangent
+                glm::dvec3 arbitrary = glm::dvec3(1.0, 0.0, 0.0);
+                if (glm::abs(glm::dot(targetUpDirection, arbitrary)) > 0.9) {
+                    arbitrary = glm::dvec3(0.0, 1.0, 0.0);
+                }
+                targetForward = arbitrary - glm::dot(arbitrary, targetUpDirection) * targetUpDirection;
+                targetForward = glm::normalize(targetForward);
+            } else {
+                targetForward = targetForward / glm::sqrt(targetForwardLengthSq);
+            }
+        } else {
+            targetForward = projectedViewDirection / glm::sqrt(projectedViewLengthSq);    
+        }
+
+        // Construct target orientation from orthonormal basis
+        glm::dvec3 targetRight = glm::cross(targetForward, targetUpDirection);
+        glm::dvec3 targetUp = targetUpDirection;
+        
+        // Build rotation matrix and convert to quaternion
+        glm::dmat3 targetRotationMatrix;
+        targetRotationMatrix[0] = targetRight;   // x-axis
+        targetRotationMatrix[1] = targetForward; // y-axis
+        targetRotationMatrix[2] = targetUp;      // z-axis
+        glm::dquat targetOrientation = glm::quat_cast(targetRotationMatrix);
+
+        // Ensure we take the short path: negate target if dot product is negative
+        // (q and -q represent the same rotation, so pick the closer one)
+        if (glm::dot(targetOrientation, rigidBody->m_orientation) < 0.0) {
+            targetOrientation = -targetOrientation;
+        }
+        
+        // Calculate rotation from current to target orientation
+        glm::dquat rotationDelta = targetOrientation * glm::conjugate(rigidBody->m_orientation);
+        //rotationDelta = glm::normalize(rotationDelta);
+        
+        // Extract axis-angle from rotation delta
+        double deltaAngle = 2.0 * std::acos(glm::clamp(rotationDelta.w, -1.0, 1.0));
+        glm::dvec3 rotationAxis(rotationDelta.x, rotationDelta.y, rotationDelta.z);
+        double axisLength = glm::length(rotationAxis);
+        
+        glm::dvec3 targetAngularVelocity(0.0);
+        
+        // Scale acceleration based on remaining angle
+        double effectiveAngAcc = m_angularAccelerationMax;
+        effectiveAngAcc *= glm::min(glm::abs(deltaAngle) / 0.1, 1.0);
+        
+        if (axisLength > 1e-6 && deltaAngle > 1e-6) {
+            rotationAxis = rotationAxis / axisLength;
+            
+            // Calculate target angular speed using sqrt(2ad) with margin
+            double margin = 0.5;
+            double maxAngularSpeed = std::sqrt(2.0 * effectiveAngAcc * (1.0 - margin) * deltaAngle);
+            targetAngularVelocity = rotationAxis * maxAngularSpeed;
+        }
+        
+        // Add grid's angular velocity if walking on moving surface
+        if (targetRigidBody) {
+            targetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
+        }
+        
+        // Calculate needed angular acceleration
+        glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
+        glm::dvec3 angularAcceleration = targetAngularVelocity - currentAngularVelocity;
+        
+        // Limit angular acceleration
+        double angAccMagnitude = glm::length(angularAcceleration);
+        if (angAccMagnitude > effectiveAngAcc) {
+            angularAcceleration = angularAcceleration * (effectiveAngAcc / angAccMagnitude);
+        }
+         
+        // Calculate torque using effective inertia
+        glm::dvec3 orientationTorque;
+        if (targetRigidBody && !targetRigidBody->m_isStatic) {
+            // Calculate effective inertia between Digibot and moving ground
+            glm::dmat3 invInertiaSum = rigidBody->getWorldInvInertiaTensor() + 
+                                        targetRigidBody->getWorldInvInertiaTensor();
+            glm::dmat3 effectiveInertia = glm::inverse(invInertiaSum);
+            orientationTorque = effectiveInertia * angularAcceleration;
+        } else {
+            // Static ground or no ground - use only Digibot's inertia
+            orientationTorque = rigidBody->getWorldInertiaTensor() * angularAcceleration;
+        }
+        
+        netTorqueOnDigibot += orientationTorque;
     }
     
-    // Add grid's angular velocity if walking on moving surface
-    if (targetRigidBody) {
-        targetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
+    // Cache the surface normal when unlocked or first contact while locked
+    if (targetRigidBody && (!m_upDirectionLocked || m_cachedRigidBody == nullptr)) {
+        m_cachedRigidBody = targetRigidBody;
+        m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * normal;
     }
-    
-    // Calculate needed angular acceleration
-    glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
-    glm::dvec3 angularAcceleration = targetAngularVelocity - currentAngularVelocity;
-    
-    // Limit angular acceleration
-    double angAccMagnitude = glm::length(angularAcceleration);
-    if (angAccMagnitude > effectiveAngAcc) {
-        angularAcceleration = angularAcceleration * (effectiveAngAcc / angAccMagnitude);
-    }
-     
-    // Calculate torque using effective inertia
-    glm::dvec3 orientationTorque;
-    if (targetRigidBody && !targetRigidBody->m_isStatic) {
-        // Calculate effective inertia between Digibot and moving ground
-        glm::dmat3 invInertiaSum = rigidBody->getWorldInvInertiaTensor() + 
-                                    targetRigidBody->getWorldInvInertiaTensor();
-        glm::dmat3 effectiveInertia = glm::inverse(invInertiaSum);
-        orientationTorque = effectiveInertia * angularAcceleration;
-    } else {
-        // Static ground or no ground - use only Digibot's inertia
-        orientationTorque = rigidBody->getWorldInertiaTensor() * angularAcceleration;
-    }
-    
-    netTorqueOnDigibot += orientationTorque;
     
     // ========== Step 7: Position Control Along Normal ==========
     // Calculate target position along normal
@@ -801,7 +810,12 @@ void DigibotController::handleWalking() {
      
      glm::dvec3 hoverForce = neededAcceleration * effectiveMass;
 
-    netForceOnDigibot += hoverForce;
+    // Only apply hover force if surface is aligned enough
+    bool applyHoverForce = surfaceAlignedEnough;
+    
+    if (applyHoverForce) {
+        netForceOnDigibot += hoverForce;
+    }
 
     // ========== Step 8: Apply Movement Force ==========
     // Create 2D tangent space on the surface using cross products
@@ -881,7 +895,17 @@ void DigibotController::handleWalking() {
         movementForce = movementForce / movementForceLength * forceMagnitude;
     }
     
-    netForceOnDigibot += movementForce;
+    // Apply movement force only if surface is aligned enough, and scale by alignment
+    if (surfaceAlignedEnough) {
+        if (usingCache) {
+            double scaleFactor = glm::max(0.0, surfaceAlignment);
+            movementForce *= scaleFactor;
+        }
+        
+        if (glm::length(movementForce) > 1e-6) {
+            netForceOnDigibot += movementForce;
+        }
+    }
 
     // ========== Apply All Accumulated Forces/Torques ==========
     // Apply to Digibot at center of mass

@@ -94,6 +94,7 @@ private:
     double m_walkingThrustStrength;
     double m_groundSelectionBias;
     double m_maxGroundAngle;
+    double m_maxLockedGroundAngle;
 
     // Target rigid body from walking (set in handleWalking, nullptr if not walking or no contact)
     RigidBody* m_walkingTargetRigidBody{nullptr};
