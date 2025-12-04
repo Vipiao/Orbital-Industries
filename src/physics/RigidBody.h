@@ -17,7 +17,7 @@ class Collider;
  * Defines how a collider moves with and affects a rigid body.
  */
 struct ColliderAttachment {
-    RigidBody* rigidBody;                // Back-reference to owning rigid body
+    std::weak_ptr<RigidBody> rigidBody;  // Back-reference to owning rigid body
     std::weak_ptr<Collider> collider;    // The attached collider
     glm::dvec3 localPosition;            // Position of collider relative to center of mass (body space)
     glm::dquat localOrientation;         // Orientation offset in body space

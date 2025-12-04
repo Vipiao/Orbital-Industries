@@ -72,7 +72,7 @@ Grid::~Grid() {
     }
     
     // Disconnect and remove physics components
-    if (m_rigidBody) {
+    if (!m_rigidBody.expired()) {
         m_physics->removeRigidBody(m_rigidBody);
     }
 
@@ -118,12 +118,17 @@ void Grid::addCell(const glm::ivec3& coord) {
     updateNeighborConnections(coord);
     
     // Preserve angular velocity across mass change
-    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("Grid::addCell: RigidBody has been destroyed");
+    }
+    
+    glm::dvec3 originalAngularVelocity = rigidBody->getAngularVelocityBody();
     
     // Add mass contribution
     updateCellMassContribution(coord, 1.0);
     
-    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
+    rigidBody->setAngularVelocityBody(originalAngularVelocity);
 
     // Schedule mesh updates for this cell and neighbors
     scheduleMeshUpdatesForCellAndNeighbors(coord);
@@ -143,12 +148,17 @@ void Grid::removeCell(const glm::ivec3& coord) {
     removeNeighborConnections(coord);
 
     // Preserve angular velocity across mass change
-    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
+    }
+    
+    glm::dvec3 originalAngularVelocity = rigidBody->getAngularVelocityBody();
     
     // Remove mass contribution before removing the cell
     updateCellMassContribution(coord, -1.0);
     
-    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
+    rigidBody->setAngularVelocityBody(originalAngularVelocity);
     
     // Remove from collider
     auto collider = m_colliderWeak.lock();
@@ -189,7 +199,12 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     cancelStructuralAnalysis();
 
     // Preserve angular velocity across entire modification
-    glm::dvec3 originalAngularVelocity = m_rigidBody->getAngularVelocityBody();
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("Grid::modifyCell: RigidBody has been destroyed");
+    }
+    
+    glm::dvec3 originalAngularVelocity = rigidBody->getAngularVelocityBody();
 
     // Remove old mass contribution
     updateCellMassContribution(coord, -1.0);
@@ -225,7 +240,7 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     updateCellMassContribution(coord, 1.0);
      
     // Restore angular velocity after entire modification
-    m_rigidBody->setAngularVelocityBody(originalAngularVelocity);
+    rigidBody->setAngularVelocityBody(originalAngularVelocity);
 
     // Update neighbor connections since geometry changed
     updateNeighborConnections(coord);
@@ -449,7 +464,10 @@ bool Grid::isEmpty() const {
 }
 
 void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
-    if (!m_rigidBody) return;
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("Grid::updateCellMassContribution: RigidBody has been destroyed");
+    }
     
     glm::dvec3 oldCM = m_centerOfMass;
     
@@ -466,19 +484,19 @@ void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
     // Update mass contribution using coordinate-based calculation
     MassInertiaCalculator::calculateInertiaForCoords(
         {coord}, getProperties,
-        &m_rigidBody->m_mass, &m_centerOfMass, &m_rigidBody->m_inertiaTensor);
+        &rigidBody->m_mass, &m_centerOfMass, &rigidBody->m_inertiaTensor);
     
     // Update physics body with momentum conservation
     glm::dvec3 cmShift = m_centerOfMass - oldCM;
-    m_rigidBody->m_position += m_rigidBody->m_orientation * cmShift;
-    m_rigidBody->m_velocity += glm::cross(m_rigidBody->getAngularVelocityWorld(), m_rigidBody->m_orientation * cmShift);
+    rigidBody->m_position += rigidBody->m_orientation * cmShift;
+    rigidBody->m_velocity += glm::cross(rigidBody->getAngularVelocityWorld(), rigidBody->m_orientation * cmShift);
     
     updateRigidBodyInverses();
 
     // Update attachment local position to match new center of mass
-    if (!m_rigidBody->m_attachments.empty()) {
+    if (!rigidBody->m_attachments.empty()) {
         // Find the grid collider attachment and update its local position
-        for (auto& attachment : m_rigidBody->m_attachments) {
+        for (auto& attachment : rigidBody->m_attachments) {
             auto collider = attachment->collider.lock();
             if (collider && collider.get() == m_colliderWeak.lock().get()) {
                 attachment->localPosition = -m_centerOfMass;
@@ -489,40 +507,46 @@ void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
 }
 
 void Grid::updateRigidBodyInverses() {
-    if (!m_rigidBody) return;
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("Grid::updateRigidBodyInverses: RigidBody has been destroyed");
+    }
 
     // Update inverse values with safety checks
-    m_rigidBody->m_invMass = (m_rigidBody->m_mass > 1e-15) ? (1.0 / m_rigidBody->m_mass) : std::numeric_limits<double>::max();
+    rigidBody->m_invMass = (rigidBody->m_mass > 1e-15) ? (1.0 / rigidBody->m_mass) : std::numeric_limits<double>::max();
 
     // Update inverse inertia tensor with safety check
-    double determinant = glm::determinant(m_rigidBody->m_inertiaTensor);
-    m_rigidBody->m_invInertiaTensor = (determinant > 1e-15) ? glm::inverse(m_rigidBody->m_inertiaTensor) : glm::dmat3(std::numeric_limits<double>::max());
+    double determinant = glm::determinant(rigidBody->m_inertiaTensor);
+    rigidBody->m_invInertiaTensor = (determinant > 1e-15) ? glm::inverse(rigidBody->m_inertiaTensor) : glm::dmat3(std::numeric_limits<double>::max());
 }
 
 // Convert world coordinates to grid-local coordinates
 glm::dvec3 Grid::worldToGrid(const glm::dvec3& worldPos) const {
-    if (!m_rigidBody) {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
         throw std::runtime_error("ERROR: Failed to convert world to grid coordinates: Rigid body not found");
     }
     
-    return GridGeometry::worldToGrid(worldPos, m_rigidBody->m_position, m_rigidBody->m_orientation, m_centerOfMass);
+    return GridGeometry::worldToGrid(worldPos, rigidBody->m_position, rigidBody->m_orientation, m_centerOfMass);
 }
 
 // Convert grid-local coordinates to world coordinates
 glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
-    if (!m_rigidBody) {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
         throw std::runtime_error("ERROR: Failed to convert grid to world coordinates: Rigid body not found");
     }
     
-    return GridGeometry::gridToWorld(gridPos, m_rigidBody->m_position, m_rigidBody->m_orientation, m_centerOfMass);
+    return GridGeometry::gridToWorld(gridPos, rigidBody->m_position, rigidBody->m_orientation, m_centerOfMass);
 }
 
 void Grid::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, glm::dquat& outOrientation) const {
-    if (!m_rigidBody) {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
         throw std::runtime_error("Grid::getInterpolatedTransform: Rigid body not found");
     }
     
-    m_rigidBody->getInterpolatedTransform(timeRemainder, outPosition, outOrientation);
+    rigidBody->getInterpolatedTransform(timeRemainder, outPosition, outOrientation);
 }
 
 RayIntersectionResult Grid::intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const {
@@ -555,13 +579,12 @@ int Grid::getGraphicsMeshId() const {
 
 // Updated - Update mesh transform based on physics state
 void Grid::updateGraphics(const glm::dvec3& cameraPos) {
-    if (!m_rigidBody) {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
         return;
     }
     
-    RigidBody* body = m_rigidBody;
-
-    glm::dvec3 angVelAxis = body->getAngularVelocityWorld();
+    glm::dvec3 angVelAxis = rigidBody->getAngularVelocityWorld();
     double angVelMagnitude = glm::length(angVelAxis);
     if (angVelMagnitude > 0.00001) {
         angVelAxis = angVelAxis / angVelMagnitude;
@@ -575,10 +598,10 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
     
     m_gridGraphics->updateGraphics(
         cameraPos,
-        body->m_position,
-        body->m_orientation,
-        body->m_velocity,
-        body->getAngularVelocityWorld(),
+        rigidBody->m_position,
+        rigidBody->m_orientation,
+        rigidBody->m_velocity,
+        rigidBody->getAngularVelocityWorld(),
         m_centerOfMass,
         currentPhysicsTimeStep,
         getApproximateRadius()
@@ -589,8 +612,9 @@ size_t Grid::computeHash() const {
     size_t hash = 0;
     
     // Hash rigid body state (most important)
-    if (m_rigidBody) {
-        hash = Hash::combineHashes(hash, m_rigidBody->computeHash());
+    auto rigidBody = m_rigidBody.lock();
+    if (rigidBody) {
+        hash = Hash::combineHashes(hash, rigidBody->computeHash());
     }
     
     // Hash center of mass

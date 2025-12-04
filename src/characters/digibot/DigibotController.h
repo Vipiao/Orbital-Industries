@@ -96,8 +96,8 @@ private:
     double m_maxGroundAngle;
     double m_maxLockedGroundAngle;
 
-    // Target rigid body from walking (set in handleWalking, nullptr if not walking or no contact)
-    RigidBody* m_walkingTargetRigidBody{nullptr};
+    // Target rigid body from walking (set in handleWalking, empty if not walking or no contact)
+    std::weak_ptr<RigidBody> m_walkingTargetRigidBody;
 
     // Angular velocity of surface we're on/locked to (zero if not on rotating surface)
     glm::dvec3 m_surfaceAngularVelocity{0.0, 0.0, 0.0};
@@ -105,5 +105,5 @@ private:
     // Up direction lock state
     bool m_upDirectionLocked{false};
     glm::dvec3 m_cachedModifiedUp{0.0, 0.0, 0.0};  // In rigid body local coordinates
-    RigidBody* m_cachedRigidBody{nullptr};  // Rigid body the cache is relative to
+    std::weak_ptr<RigidBody> m_cachedRigidBody;  // Rigid body the cache is relative to
 };

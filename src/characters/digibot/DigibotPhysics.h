@@ -24,7 +24,7 @@ public:
     ~DigibotPhysics();
 
     // Physics state access
-    RigidBody* getRigidBody() const { return m_rigidBody; }
+    std::weak_ptr<RigidBody> getRigidBody() const { return m_rigidBody; }
     //glm::dvec3 getCenterOfMass() const { return m_centerOfMass; }
 
     // Collision box visualization
@@ -53,7 +53,7 @@ private:
 
     // Physics state
     std::weak_ptr<GridCollider> m_colliderWeak;
-    RigidBody* m_rigidBody;
+    std::weak_ptr<RigidBody> m_rigidBody;
     // Store collider local transform for coordinate conversions
     glm::dvec3 m_colliderLocalPosition;
     //glm::dvec3 m_centerOfMass;

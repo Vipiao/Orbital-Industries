@@ -86,7 +86,8 @@ void Digibot::preRenderCallback(uint64_t frameNum, double timeRemainder) {
 }
 
 void Digibot::onPhysicsUpdateComplete() {
-    if (!m_rigidBody) {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
         return;
     }
 
@@ -119,12 +120,13 @@ bool Digibot::isCollisionBoxVisible() const {
 }
 
 void Digibot::updateVisualTransform() {
-    if (!m_rigidBody) {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
         return;
     }
     
     // Calculate angular velocity components
-    glm::dvec3 angVelAxis = m_rigidBody->getAngularVelocityWorld();
+    glm::dvec3 angVelAxis = rigidBody->getAngularVelocityWorld();
     double angVelMagnitude = glm::length(angVelAxis);
     if (angVelMagnitude > 0.00001) {
         angVelAxis = angVelAxis / angVelMagnitude;
@@ -136,14 +138,14 @@ void Digibot::updateVisualTransform() {
     uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
 
     // Calculate mesh position (rigid body position offset by center of mass)
-    //glm::dvec3 meshPosition = m_rigidBody->m_position - m_centerOfMass;
-    glm::dvec3 meshPosition = m_rigidBody->m_position + m_graphicsPosition;
+    //glm::dvec3 meshPosition = rigidBody->m_position - m_centerOfMass;
+    glm::dvec3 meshPosition = rigidBody->m_position + m_graphicsPosition;
 
     // Update graphics subsystem with current transform
     m_digibotGraphics->updateWorldTransform(
         meshPosition,
-        m_rigidBody->m_velocity,
-        m_rigidBody->m_orientation,
+        rigidBody->m_velocity,
+        rigidBody->m_orientation,
         angVelAxis,
         angVelMagnitude,
         -m_graphicsPosition,

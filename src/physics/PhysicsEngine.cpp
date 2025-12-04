@@ -20,13 +20,13 @@ PhysicsEngine::~PhysicsEngine() {
     // Vector of unique_ptr will handle cleanup automatically
 }
 
-RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position,
-                               const glm::dquat& orientation,
-                               double mass, 
-                               const glm::dmat3& inertiaTensor,
-                               bool isStatic) {
+std::weak_ptr<RigidBody> PhysicsEngine::addRigidBody(const glm::dvec3& position,
+                                                      const glm::dquat& orientation,
+                                                      double mass, 
+                                                      const glm::dmat3& inertiaTensor,
+                                                      bool isStatic) {
     
-    auto body = std::make_unique<RigidBody>();
+    auto body = std::make_shared<RigidBody>();
     body->m_position = position;
     body->m_velocity = glm::dvec3{0.0, 0.0, 0.0};
     body->m_forces = glm::dvec3{0.0, 0.0, 0.0};
@@ -47,17 +47,16 @@ RigidBody* PhysicsEngine::addRigidBody(const glm::dvec3& position,
     }
     body->m_isStatic = isStatic;
 
-    RigidBody* bodyPtr = body.get();
-
     m_rigidBodies.push_back(std::move(body));
     
-    return bodyPtr;
+    return m_rigidBodies.back();
 }
 
-void PhysicsEngine::attachCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak,
+void PhysicsEngine::attachCollider(std::weak_ptr<RigidBody> bodyWeak, std::weak_ptr<Collider> colliderWeak,
                                    const glm::dvec3& localPosition,
                                    const glm::dquat& localOrientation,
                                    bool isTrigger) {
+    auto body = bodyWeak.lock();
     if (!body) return;
     
     auto collider = colliderWeak.lock();
@@ -70,7 +69,7 @@ void PhysicsEngine::attachCollider(RigidBody* body, std::weak_ptr<Collider> coll
 
     // Create attachment
     auto attachment = std::make_unique<ColliderAttachment>();
-    attachment->rigidBody = body;
+    attachment->rigidBody = bodyWeak;
     attachment->collider = colliderWeak;
     attachment->localPosition = localPosition;
     attachment->localOrientation = glm::normalize(localOrientation);
@@ -90,7 +89,8 @@ void PhysicsEngine::attachCollider(RigidBody* body, std::weak_ptr<Collider> coll
     collider->m_orientation = worldOrientation;
 }
 
-void PhysicsEngine::detachCollider(RigidBody* body, Collider* collider) {
+void PhysicsEngine::detachCollider(std::weak_ptr<RigidBody> bodyWeak, Collider* collider) {
+    auto body = bodyWeak.lock();
     if (!body || !collider) return;
     
     // Find and remove the attachment
@@ -107,7 +107,8 @@ void PhysicsEngine::detachCollider(RigidBody* body, Collider* collider) {
     }
 }
 
-void PhysicsEngine::detachAllColliders(RigidBody* body) {
+void PhysicsEngine::detachAllColliders(std::weak_ptr<RigidBody> bodyWeak) {
+    auto body = bodyWeak.lock();
     if (!body) return;
     
     // Clear all back-references
@@ -121,7 +122,8 @@ void PhysicsEngine::detachAllColliders(RigidBody* body) {
     body->m_attachments.clear();
 }
 
-void PhysicsEngine::updateColliderTransform(RigidBody* body) {
+void PhysicsEngine::updateColliderTransform(std::weak_ptr<RigidBody> bodyWeak) {
+    auto body = bodyWeak.lock();
     if (!body) return;
     
     for (auto& attachment : body->m_attachments) {
@@ -137,16 +139,17 @@ void PhysicsEngine::updateColliderTransform(RigidBody* body) {
     }
 }
 
-void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
+void PhysicsEngine::removeRigidBody(std::weak_ptr<RigidBody> bodyWeak) {
+    auto bodyToRemove = bodyWeak.lock();
     if (!bodyToRemove) return;
 
     // Detach all colliders before removing
-    detachAllColliders(bodyToRemove);
+    detachAllColliders(bodyWeak);
     
     // Remove from rigid bodies
     auto removeIt = std::remove_if(m_rigidBodies.begin(), m_rigidBodies.end(),
-        [bodyToRemove](const std::unique_ptr<RigidBody>& body) {
-            return body.get() == bodyToRemove;
+        [bodyToRemove](const std::shared_ptr<RigidBody>& body) {
+            return body.get() == bodyToRemove.get();
     });
      
     if (removeIt != m_rigidBodies.end()) {
@@ -154,13 +157,15 @@ void PhysicsEngine::removeRigidBody(RigidBody* bodyToRemove) {
     }
 }
 
-void PhysicsEngine::applyForce(RigidBody* body, const glm::dvec3& force) {
+void PhysicsEngine::applyForce(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force) {
+    auto body = bodyWeak.lock();
     if (body && !body->m_isStatic) {
         body->m_forces += force;
     }
 }
 
-void PhysicsEngine::applyForceAtPoint(RigidBody* body, const glm::dvec3& force, const glm::dvec3& point) {
+void PhysicsEngine::applyForceAtPoint(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force, const glm::dvec3& point) {
+    auto body = bodyWeak.lock();
     if (body && !body->m_isStatic) {
         // Add the force to overall forces
         body->m_forces += force;
@@ -173,7 +178,8 @@ void PhysicsEngine::applyForceAtPoint(RigidBody* body, const glm::dvec3& force, 
     }
 }
 
-void PhysicsEngine::applyTorque(RigidBody* body, const glm::dvec3& torque) {
+void PhysicsEngine::applyTorque(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& torque) {
+    auto body = bodyWeak.lock();
     if (body && !body->m_isStatic) {
         body->m_torques += torque;
     }
@@ -263,7 +269,7 @@ bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::h
                     }
                     
                     for (size_t i = 0; i < COLLISION_BATCH_SIZE && currentBodyIndex < m_rigidBodies.size(); i++) {
-                        resolveCollision(m_rigidBodies[currentBodyIndex].get());
+                        resolveCollision(m_rigidBodies[currentBodyIndex]);
                         currentBodyIndex++;
                     }
                     
@@ -279,7 +285,7 @@ bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::h
             case CollisionProcessState::SEPARATE:
                 // Process separation iterations
                 for (auto& body : m_rigidBodies) {
-                    separateOverlaps(body.get());
+                    separateOverlaps(body);
                 }
                 m_separationIteration++;
                 
@@ -383,13 +389,14 @@ void PhysicsEngine::updatePositions() {
         body->m_forces = glm::dvec3{0.0, 0.0, 0.0};
         body->m_torques = glm::dvec3{0.0, 0.0, 0.0};
         
-        updateColliderTransform(body.get());
+        updateColliderTransform(body);
     }
 }
 
 //static int ttt = 0;
 
-void PhysicsEngine::resolveCollision(RigidBody* body) {
+void PhysicsEngine::resolveCollision(std::shared_ptr<RigidBody> bodyShared) {
+    RigidBody* body = bodyShared.get();
     if (!body || body->m_isStatic) {
         return;
     }
@@ -421,12 +428,12 @@ void PhysicsEngine::resolveCollision(RigidBody* body) {
                 continue; // Other is trigger or not attached
             }
             
-            RigidBody* otherBody = otherAttachment->rigidBody;
+            auto otherBody = otherAttachment->rigidBody.lock();
             if (!otherBody || otherBody->m_mass == 0.0) {
                 continue;
             }
             
-            if (otherBody->m_isStatic) {
+            if (otherBody && otherBody->m_isStatic) {
                 continue;
             }
             
@@ -454,13 +461,13 @@ void PhysicsEngine::resolveCollision(RigidBody* body) {
                 }
                 
                 // Calculate collision mass and impulse
-                double collisionMass = getCollisionMass(body, otherBody, contactPoint, normal);
+                double collisionMass = getCollisionMass(body, otherBody.get(), contactPoint, normal);
                 double impulseMagnitude = -(1.0 + 0.0) * relativeVelNormal * collisionMass;
                 
                 glm::dvec3 impulse = normal * impulseMagnitude;
                 
                 // Apply compliant collision handling
-                if (shouldUseCompliantHandling(body, otherBody, contactPoint, normal, 
+                if (shouldUseCompliantHandling(body, otherBody.get(), contactPoint, normal, 
                     contact.compliantNormal, contact.compliantPenetration, &relativeVel)) {
                     glm::dvec3 compliantNormal = contact.compliantNormal;
                     double normalAlignment = glm::dot(normal, compliantNormal);
@@ -490,7 +497,8 @@ void PhysicsEngine::resolveCollision(RigidBody* body) {
     }
 }
 
-void PhysicsEngine::separateOverlaps(RigidBody* body) {
+void PhysicsEngine::separateOverlaps(std::shared_ptr<RigidBody> bodyShared) {
+    RigidBody* body = bodyShared.get();
     if (!body || body->m_isStatic) {
         return;
     }
@@ -522,12 +530,12 @@ void PhysicsEngine::separateOverlaps(RigidBody* body) {
                 continue;
             }
             
-            RigidBody* otherBody = otherAttachment->rigidBody;
+            auto otherBody = otherAttachment->rigidBody.lock();
             if (!otherBody || otherBody->m_mass == 0.0) {
                 continue;
             }
             
-            if (otherBody->m_isStatic) {
+            if (otherBody && otherBody->m_isStatic) {
                 continue;
             }
             
@@ -538,7 +546,7 @@ void PhysicsEngine::separateOverlaps(RigidBody* body) {
                 glm::dvec3 contactPoint = collision.contactPoints[ii];
                 
                 // Skip overlap correction for contacts that would use compliant handling
-                if (shouldUseCompliantHandling(body, otherBody, contactPoint, normal, 
+                if (shouldUseCompliantHandling(body, otherBody.get(), contactPoint, normal,
                     contact.compliantNormal, contact.compliantPenetration)) {
                     continue;
                 }
@@ -560,7 +568,7 @@ void PhysicsEngine::separateOverlaps(RigidBody* body) {
                 }
                 
                 // Calculate collision mass
-                double collisionMass = getCollisionMass(body, otherBody, contactPoint, normal);
+                double collisionMass = getCollisionMass(body, otherBody.get(), contactPoint, normal);
                 
                 // Calculate position correction magnitude
                 double margin = 0.01;
@@ -612,9 +620,9 @@ void PhysicsEngine::separateOverlaps(RigidBody* body) {
                 }
                 
                 // Update collider transforms after position changes
-                updateColliderTransform(body);
+                updateColliderTransform(bodyShared);
                 if (!otherBody->m_isStatic) {
-                    updateColliderTransform(otherBody);
+                    updateColliderTransform(otherAttachment->rigidBody);
                 }
             }
         }

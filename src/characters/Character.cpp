@@ -9,7 +9,6 @@ Character::Character(PhysicsEngine* physics, GraphicsEngine* graphics,
     , m_graphics(graphics)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
-    , m_rigidBody(nullptr)
     //, m_centerOfMass(0.0, 0.0, 0.0)
     , m_uniqueId(s_nextId++)
 {

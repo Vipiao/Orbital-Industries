@@ -212,7 +212,8 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     character->setMovementDirection(moveDirection);
 
     // Get character position and orientation
-    RigidBody* rigidBody = character->getRigidBody();
+    auto rigidBodyWeak = character->getRigidBody();
+    auto rigidBody = rigidBodyWeak.lock();
     if (!rigidBody) {
         return;
     }

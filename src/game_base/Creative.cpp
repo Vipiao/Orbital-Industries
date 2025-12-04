@@ -139,10 +139,13 @@ void Creative::physics() {
         if (doTrackSpeed) {
             if (blockFound) {
                 auto targetGrid = targetGridWeak.lock();
-                RigidBody* body = targetGrid ? targetGrid->getRigidBody() : nullptr;
-                if (body) {
-                    // Set camera velocity to match the rigid body's velocity
-                    //m_cameraVelocity = body->m_velocity;
+                if (targetGrid) {
+                    auto bodyWeak = targetGrid->getRigidBody();
+                    auto body = bodyWeak.lock();
+                    if (body) {
+                        // Set camera velocity to match the rigid body's velocity
+                        //m_cameraVelocity = body->m_velocity;
+                    }
                 }
             } else {
                 // No target found, stop tracking
@@ -154,19 +157,22 @@ void Creative::physics() {
         if (doForce) {
             if (blockFound) {
                 auto targetGrid = targetGridWeak.lock();
-                RigidBody* body = targetGrid ? targetGrid->getRigidBody() : nullptr;
-                if (body) {
-                    // Apply force in the view direction
-                    const double forceStrength = 0.001 * body->m_mass * forceMultiplier;
-                    glm::dvec3 force = forward * forceStrength;
-                    
-                    // Apply the force at the camera position
-                    glm::dvec3 applicationPoint = m_gameBase->m_graphicsEngine->getCamPos();
-                    
-                    // Apply force at the point
-                    m_gameBase->m_physicsEngine->applyForceAtPoint(body, force, applicationPoint);
-                    
-                    //std::cout << "Applied force to grid at t: " << closestT << std::endl;
+                if (targetGrid) {
+                    auto bodyWeak = targetGrid->getRigidBody();
+                    auto body = bodyWeak.lock();
+                    if (body) {
+                        // Apply force in the view direction
+                        const double forceStrength = 0.001 * body->m_mass * forceMultiplier;
+                        glm::dvec3 force = forward * forceStrength;
+                        
+                        // Apply the force at the camera position
+                        glm::dvec3 applicationPoint = m_gameBase->m_graphicsEngine->getCamPos();
+                        
+                        // Apply force at the point
+                        m_gameBase->m_physicsEngine->applyForceAtPoint(bodyWeak, force, applicationPoint);
+                        
+                        //std::cout << "Applied force to grid at t: " << closestT << std::endl;
+                    }
                 }
             } else {
                 //std::cout << "No target found for force application" << std::endl;
@@ -264,13 +270,13 @@ void Creative::applyDragForces() {
         // Apply drag to linear velocity
         if (glm::length(bodyPtr->m_velocity) > 0.0) {
             glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->m_mass;
-            m_gameBase->m_physicsEngine->applyForce(bodyPtr.get(), dragForce);
+            m_gameBase->m_physicsEngine->applyForce(bodyPtr, dragForce);
         }
         
         // Apply drag to angular velocity
         if (glm::length(bodyPtr->m_angularMomentumBody) > 0.0) {
             glm::dvec3 angularDrag = -dragCoefficient * bodyPtr->getWorldInertiaTensor() * bodyPtr->getAngularVelocityWorld();
-            m_gameBase->m_physicsEngine->applyTorque(bodyPtr.get(), angularDrag);
+            m_gameBase->m_physicsEngine->applyTorque(bodyPtr, angularDrag);
         }
     }
 }

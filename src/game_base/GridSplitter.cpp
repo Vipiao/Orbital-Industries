@@ -130,7 +130,12 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
     std::cout << "Grid split detected! " << result.partitions.size() << " partitions found." << std::endl;
     
     // Step 3: Pre-calculate physics properties for each partition
-    RigidBody* sourceBody = sourceGrid->getRigidBody();
+    auto sourceBodyWeak = sourceGrid->getRigidBody();
+    auto sourceBody = sourceBodyWeak.lock();
+    if (!sourceBody) {
+        std::cout << "Source grid has no rigid body - cannot split" << std::endl;
+        co_return;
+    }
     glm::dvec3 originalCenterOfMass = sourceBody->m_position;
     glm::dvec3 originalVelocity = sourceBody->m_velocity;
     
@@ -234,7 +239,8 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
         }
 
         // Set physics properties using pre-calculated values
-        RigidBody* newBody = newGrid->getRigidBody();
+        auto newBodyWeak = newGrid->getRigidBody();
+        auto newBody = newBodyWeak.lock();
         if (newBody) {
             // Transform center of mass to world space and set position
             glm::dvec3 worldCenterOfMass = partitionPhysics[i].centerOfMass;

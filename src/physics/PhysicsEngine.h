@@ -29,11 +29,11 @@ public:
     ~PhysicsEngine();
     
     // Add a rigid body to the simulation
-    RigidBody* addRigidBody(const glm::dvec3& position, 
-                           const glm::dquat& orientation,
-                           double mass = 1.0, 
-                           const glm::dmat3& inertiaTensor = glm::dmat3(1.0),
-                           bool isStatic = false);
+    std::weak_ptr<RigidBody> addRigidBody(const glm::dvec3& position, 
+                                          const glm::dquat& orientation,
+                                          double mass = 1.0, 
+                                          const glm::dmat3& inertiaTensor = glm::dmat3(1.0),
+                                          bool isStatic = false);
 
     /**
      * @brief Attach a collider to a rigid body
@@ -44,30 +44,30 @@ public:
      * @param isTrigger If true, collider detects but doesn't respond physically
      * @throws std::runtime_error if collider is already attached to a body
      */
-    void attachCollider(RigidBody* body, std::weak_ptr<Collider> colliderWeak,
+    void attachCollider(std::weak_ptr<RigidBody> bodyWeak, std::weak_ptr<Collider> colliderWeak,
                        const glm::dvec3& localPosition = glm::dvec3(0.0),
                        const glm::dquat& localOrientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
                        bool isTrigger = false);
     
     // Detach a specific collider from a rigid body
-    void detachCollider(RigidBody* body, Collider* collider);
-    void detachAllColliders(RigidBody* body);
-    void updateColliderTransform(RigidBody* body);
+    void detachCollider(std::weak_ptr<RigidBody> bodyWeak, Collider* collider);
+    void detachAllColliders(std::weak_ptr<RigidBody> bodyWeak);
+    void updateColliderTransform(std::weak_ptr<RigidBody> bodyWeak);
     
     //
     uint64_t getCurrentPhysicsTimeStep() const { return m_currentPhysicsTimeStep; }
     
     // Remove a rigid body from the simulation
-    void removeRigidBody(RigidBody* body);
+    void removeRigidBody(std::weak_ptr<RigidBody> bodyWeak);
     
     // Apply a force at the center of mass
-    void applyForce(RigidBody* body, const glm::dvec3& force);
+    void applyForce(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force);
     
     // Apply a force at a specific point (will generate torque)
-    void applyForceAtPoint(RigidBody* body, const glm::dvec3& force, const glm::dvec3& point);
+    void applyForceAtPoint(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force, const glm::dvec3& point);
     
     // Apply a torque directly
-    void applyTorque(RigidBody* body, const glm::dvec3& torque);
+    void applyTorque(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& torque);
     
     // Set gravity
     void setGravity(const glm::dvec3& gravity);
@@ -86,15 +86,15 @@ public:
     std::chrono::time_point<std::chrono::high_resolution_clock> getLastPhysicsStepTime() const { return m_lastPhysicsStepTime; }
     
     // Access to all rigid bodies for external systems
-    const std::vector<std::unique_ptr<RigidBody>>& getRigidBodies() const { return m_rigidBodies; }
+    const std::vector<std::shared_ptr<RigidBody>>& getRigidBodies() const { return m_rigidBodies; }
 
 private:
     // Physics simulation steps
     void applyForces();
     void updatePositions();
     bool handleCollisionsUntil(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
-    void resolveCollision(RigidBody* body);
-    void separateOverlaps(RigidBody* body);
+    void resolveCollision(std::shared_ptr<RigidBody> bodyShared);
+    void separateOverlaps(std::shared_ptr<RigidBody> bodyShared);
     
     // Static helper functions for collision resolution
     static double getCollisionMass(RigidBody* bodyA, RigidBody* bodyB, 
@@ -115,7 +115,7 @@ private:
     
     TimeHandler* m_timeHandler;
 
-    std::vector<std::unique_ptr<RigidBody>> m_rigidBodies;
+    std::vector<std::shared_ptr<RigidBody>> m_rigidBodies;
     glm::dvec3 m_gravity{0.0, 0.0, 0.0}; // Default zero gravity
     uint64_t m_currentPhysicsTimeStep{0};
 

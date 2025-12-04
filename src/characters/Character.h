@@ -3,6 +3,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
 
 class PhysicsEngine;
 class GraphicsEngine;
@@ -49,7 +50,7 @@ public:
     virtual bool isCollisionBoxVisible() const = 0;
 
     // Access
-    RigidBody* getRigidBody() const { return m_rigidBody; }
+    std::weak_ptr<RigidBody> getRigidBody() const { return m_rigidBody; }
     int getUniqueId() const { return m_uniqueId; }
 
     // Coordinate transforms
@@ -64,7 +65,7 @@ protected:
     TimeHandler* m_timeHandler;
 
     // Physics
-    RigidBody* m_rigidBody; // Non-owning, managed by PhysicsEngine
+    std::weak_ptr<RigidBody> m_rigidBody;
     //glm::dvec3 m_centerOfMass; // In local/body coordinates
 
     // Unique ID for deterministic sorting

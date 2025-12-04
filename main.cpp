@@ -63,9 +63,12 @@ public:
         // Create a center grid that will be our player object
         auto initialGridWeak = m_gameBase->createGrid(glm::dvec3(0, 0, 0));
         auto initialGrid = initialGridWeak.lock();
-        RigidBody* bb = initialGrid->getRigidBody();
-        bb->m_position = {0,0,0};
-        //bb->m_velocity = {0.0,0.0,-0.01};
+        auto rigidBodyWeak = initialGrid->getRigidBody();
+        auto bb = rigidBodyWeak.lock();
+        if (bb) {
+            bb->m_position = {0,0,0};
+            //bb->m_velocity = {0.0,0.0,-0.01};
+        }
         //initialGrid->addCell(glm::ivec3(0,0,0));
         //initialGrid->addCell(glm::ivec3(1,0,0));
         //bb->setAngularVelocityBody({0,0,0.1});
@@ -76,8 +79,12 @@ public:
         if (digibot) {
             //digibot->showCollisionBox();
         }
-        //digibot->getRigidBody()->m_velocity.x += 2;
-        //initialGrid->getRigidBody()->m_velocity.x += 2.;
+        //if (auto digibotRb = digibot->getRigidBody().lock()) {
+        //    digibotRb->m_velocity.x += 2;
+        //}
+        //if (auto gridRb = initialGrid->getRigidBody().lock()) {
+        //    gridRb->m_velocity.x += 2.;
+        //}
         
         //for (int ll = 0; ll < 2; ll++) {
         //    for (int ii = -3; ii < 4; ii++)

@@ -16,7 +16,6 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     : m_physics(physics)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
-    , m_rigidBody(nullptr)
     , m_colliderLocalPosition(-0.5, -0.5, -1.0)
     //, m_centerOfMass(0.0, 0.0, 0.0)
     , m_collisionBoxMeshId(-1)
@@ -173,8 +172,12 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         false);                           // Not a trigger
 
     // 5. Create walking sensor for ground detection
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("DigibotPhysics: Failed to lock RigidBody immediately after creation");
+    }
     m_walkingSensor = m_physics->getCollisionDetector().addBallCollider(
-        m_rigidBody->m_position,
+        rigidBody->m_position,
         2.0);  // 2 meter radius
 
     // Attach sensor as a trigger (detects but doesn't respond physically)
@@ -188,7 +191,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
 
 DigibotPhysics::~DigibotPhysics() {
     // Disconnect and cleanup physics
-    if (m_rigidBody) {
+    if (!m_rigidBody.expired()) {
         m_physics->removeRigidBody(m_rigidBody);
     }
 
@@ -266,12 +269,13 @@ void DigibotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
 }
 
 void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint64_t currentPhysicsTimeStep) {
-    if (m_collisionBoxMeshId == -1 || !m_rigidBody) {
+    auto rigidBody = m_rigidBody.lock();
+    if (m_collisionBoxMeshId == -1 || !rigidBody) {
         return;
     }
 
     // Update collision box mesh transform
-    glm::dvec3 angVelAxis = m_rigidBody->getAngularVelocityWorld();
+    glm::dvec3 angVelAxis = rigidBody->getAngularVelocityWorld();
     double angVelMagnitude = glm::length(angVelAxis);
     if (angVelMagnitude > 0.00001) {
         angVelAxis = angVelAxis / angVelMagnitude;
@@ -280,12 +284,12 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         angVelMagnitude = 0.0;
     }
     
-    glm::dvec3 meshPosition = m_rigidBody->m_position + m_rigidBody->m_orientation * m_colliderLocalPosition;
+    glm::dvec3 meshPosition = rigidBody->m_position + rigidBody->m_orientation * m_colliderLocalPosition;
     graphics->updateMeshTransform(
         m_collisionBoxMeshId,
         meshPosition,
-        m_rigidBody->m_velocity,
-        m_rigidBody->m_orientation,
+        rigidBody->m_velocity,
+        rigidBody->m_orientation,
         angVelAxis,
         angVelMagnitude,
         -m_colliderLocalPosition,  // Pass negative to maintain old offset semantics for graphics
@@ -297,25 +301,33 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
 }
 
 glm::dvec3 DigibotPhysics::worldToLocal(const glm::dvec3& worldPos) const {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("DigibotPhysics::worldToLocal: RigidBody has been destroyed");
+    }
     return GridGeometry::worldToGrid(
         worldPos,
-        m_rigidBody->m_position,
-        m_rigidBody->m_orientation,
+        rigidBody->m_position,
+        rigidBody->m_orientation,
         -m_colliderLocalPosition
     );
 }
 
 glm::dvec3 DigibotPhysics::localToWorld(const glm::dvec3& localPos) const {
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) {
+        throw std::runtime_error("DigibotPhysics::localToWorld: RigidBody has been destroyed");
+    }
     return GridGeometry::gridToWorld(
         localPos,
-        m_rigidBody->m_position,
-        m_rigidBody->m_orientation,
+        rigidBody->m_position,
+        rigidBody->m_orientation,
         -m_colliderLocalPosition
     );
 }
 
 void DigibotPhysics::updatePhysics() {
-    if (!m_rigidBody) {
+    if (m_rigidBody.expired()) {
         return;
     }
 }

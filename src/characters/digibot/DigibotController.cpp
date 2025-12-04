@@ -83,19 +83,19 @@ void DigibotController::updatePerFrame(double deltaTimeRemainder) {
     m_surfaceAngularVelocity = glm::dvec3(0.0, 0.0, 0.0);
     
     // Determine which rigid body to use for rotation
-    RigidBody* targetRigidBody = nullptr;
+    std::shared_ptr<RigidBody> targetRigidBody;
     
     if (m_jetpackEnabled) {
         // Flying mode: use FULL_LOCK target grid
         if (m_lockState == LockState::FULL_LOCK) {
             auto targetGrid = m_targetGrid.lock();
             if (targetGrid) {
-                targetRigidBody = targetGrid->getRigidBody();
+                targetRigidBody = targetGrid->getRigidBody().lock();
             }
         }
     } else {
         // Walking mode: use the grid we're standing on
-        targetRigidBody = m_walkingTargetRigidBody;
+        targetRigidBody = m_walkingTargetRigidBody.lock();
     }
     
     if (targetRigidBody) {
@@ -114,7 +114,8 @@ void DigibotController::updatePerFrame(double deltaTimeRemainder) {
     }
 
     // Clamp view direction to prevent near-vertical angles
-    RigidBody* rigidBody = m_physics->getRigidBody();
+    auto rigidBodyWeak = m_physics->getRigidBody();
+    auto rigidBody = rigidBodyWeak.lock();
     if (!rigidBody) {
         return;
     }
@@ -161,7 +162,8 @@ void DigibotController::physics() {
 
 void DigibotController::handleFlying() {
     // Get the rigid body from physics component
-    RigidBody* rigidBody = m_physics->getRigidBody();
+    auto rigidBodyWeak = m_physics->getRigidBody();
+    auto rigidBody = rigidBodyWeak.lock();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
         return;
     }
@@ -210,7 +212,8 @@ void DigibotController::handleFlying() {
         } else {
             // Get target grid's rigid body
             auto targetGrid = m_targetGrid.lock();
-            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
+            auto targetGridRigidBodyWeak = targetGrid->getRigidBody();
+            auto targetGridRigidBody = targetGridRigidBodyWeak.lock();
             
             if (!targetGridRigidBody) {
                 std::cout << "Target grid has no rigid body - unlocking" << std::endl;
@@ -249,7 +252,8 @@ void DigibotController::handleFlying() {
         } else {
             // Get target grid's rigid body
             auto targetGrid = m_targetGrid.lock();
-            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
+            auto targetGridRigidBodyWeak = targetGrid->getRigidBody();
+            auto targetGridRigidBody = targetGridRigidBodyWeak.lock();
             
             if (!targetGridRigidBody) {
                 std::cout << "Target grid has no rigid body - unlocking" << std::endl;
@@ -321,7 +325,7 @@ void DigibotController::handleFlying() {
     
     // Apply combined force at center of mass
     if (totalForceMagnitude > 1e-6) {
-        m_physicsEngine->applyForce(rigidBody, totalForce);
+        m_physicsEngine->applyForce(rigidBodyWeak, totalForce);
     }
 
     // ========== Handle Roll Input ==========
@@ -342,7 +346,7 @@ void DigibotController::handleFlying() {
         // Scale by roll acceleration, inertia, and input direction
         double torqueMagnitude = adjustedRollAcceleration * static_cast<double>(m_rollInput);
         glm::dvec3 rollTorque = rollAxis * torqueMagnitude;
-        m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * rollTorque);
+        m_physicsEngine->applyTorque(rigidBodyWeak, rigidBody->getWorldInertiaTensor() * rollTorque);
     }
 
     // ========== View Direction Rotation Logic ==========
@@ -388,7 +392,8 @@ void DigibotController::handleFlying() {
     if (m_lockState == LockState::FULL_LOCK && !m_targetGrid.expired()) {
         auto targetGrid = m_targetGrid.lock();
         if (targetGrid) {
-            RigidBody* targetGridRigidBody = targetGrid->getRigidBody();
+            auto targetGridRigidBodyWeak = targetGrid->getRigidBody();
+            auto targetGridRigidBody = targetGridRigidBodyWeak.lock();
             if (targetGridRigidBody) {
                 // Add grid's angular velocity to our target
                 targetAngularVelocity += targetGridRigidBody->getAngularVelocityWorld();
@@ -407,7 +412,7 @@ void DigibotController::handleFlying() {
     }
     
     // Apply torque (I * α = τ)
-    m_physicsEngine->applyTorque(rigidBody, rigidBody->getWorldInertiaTensor() * angularAcceleration);
+    m_physicsEngine->applyTorque(rigidBodyWeak, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 }
 
 void DigibotController::handleWalking() {
@@ -417,10 +422,11 @@ void DigibotController::handleWalking() {
     }
 
     // Clear walking target at start (will be set if we find ground contact)
-    m_walkingTargetRigidBody = nullptr;
+    m_walkingTargetRigidBody.reset();
 
     // Get the rigid body from physics component
-    RigidBody* rigidBody = m_physics->getRigidBody();
+    auto rigidBodyWeak = m_physics->getRigidBody();
+    auto rigidBody = rigidBodyWeak.lock();
     if (!rigidBody || rigidBody->m_mass <= 0.0) {
         return;
     }
@@ -434,14 +440,15 @@ void DigibotController::handleWalking() {
     
     if (!m_upDirectionLocked) {
         // Direction is free to change - clear cache
-        m_cachedRigidBody = nullptr;
+        m_cachedRigidBody.reset();
     } else {
         // Direction is locked - try to use cache
-        if (m_cachedRigidBody != nullptr) {
+        if (!m_cachedRigidBody.expired()) {
+            auto cachedRigidBody = m_cachedRigidBody.lock();
             // Verify cached rigid body still exists
             bool isValid = false;
             for (const auto& bodyPtr : m_physicsEngine->getRigidBodies()) {
-                if (bodyPtr.get() == m_cachedRigidBody) {
+                if (bodyPtr.get() == cachedRigidBody.get()) {
                     isValid = true;
                     break;
                 }
@@ -449,11 +456,11 @@ void DigibotController::handleWalking() {
             
             if (isValid) {
                 // Transform cached direction from rigid body local to world
-                modifiedUp = m_cachedRigidBody->m_orientation * m_cachedModifiedUp;
+                modifiedUp = cachedRigidBody->m_orientation * m_cachedModifiedUp;
                 usingCache = true;
             } else {
                 // Cached rigid body was destroyed - clear cache and recalculate
-                m_cachedRigidBody = nullptr;
+                m_cachedRigidBody.reset();
             }
         }
     }
@@ -499,8 +506,11 @@ void DigibotController::handleWalking() {
         // Skip collisions with the robot's own body
         ColliderAttachment* otherAttachment = 
             collision.otherCollider->get_pointer<ColliderAttachment>();
-        if (otherAttachment && otherAttachment->rigidBody == rigidBody) {
-            continue;
+        if (otherAttachment) {
+            auto otherRigidBody = otherAttachment->rigidBody.lock();
+            if (otherRigidBody && otherRigidBody.get() == rigidBody.get()) {
+                continue;
+            }
         }
         for (const auto& contactPoint : collision.contactPoints) {
             // Calculate surface normal (points from surface toward body)
@@ -616,7 +626,7 @@ void DigibotController::handleWalking() {
     }
 
     // Local alias for readability
-    RigidBody* targetRigidBody = m_walkingTargetRigidBody;
+    auto targetRigidBody = m_walkingTargetRigidBody.lock();
 
     // Calculate alignment between surface normal and locked up direction
     // Used for orientation control, hover force, and movement force gating
@@ -740,7 +750,7 @@ void DigibotController::handleWalking() {
     }
     
     // Cache the surface normal when unlocked or first contact while locked
-    if (targetRigidBody && (!m_upDirectionLocked || m_cachedRigidBody == nullptr)) {
+    if (targetRigidBody && (!m_upDirectionLocked || m_cachedRigidBody.expired())) {
         m_cachedRigidBody = targetRigidBody;
         m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * normal;
     }
@@ -909,13 +919,13 @@ void DigibotController::handleWalking() {
 
     // ========== Apply All Accumulated Forces/Torques ==========
     // Apply to Digibot at center of mass
-    m_physicsEngine->applyForce(rigidBody, netForceOnDigibot);
-    m_physicsEngine->applyTorque(rigidBody, netTorqueOnDigibot);
+    m_physicsEngine->applyForce(rigidBodyWeak, netForceOnDigibot);
+    m_physicsEngine->applyTorque(rigidBodyWeak, netTorqueOnDigibot);
 
     // Apply equal and opposite reactions to grid at contact point
     if (targetRigidBody) {
-        m_physicsEngine->applyForceAtPoint(targetRigidBody, -netForceOnDigibot, rigidBody->m_position);
-        m_physicsEngine->applyTorque(targetRigidBody, -netTorqueOnDigibot);
+        m_physicsEngine->applyForceAtPoint(m_walkingTargetRigidBody, -netForceOnDigibot, rigidBody->m_position);
+        m_physicsEngine->applyTorque(m_walkingTargetRigidBody, -netTorqueOnDigibot);
     }
 }
 

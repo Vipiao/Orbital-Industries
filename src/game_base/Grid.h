@@ -68,7 +68,7 @@ public:
     // Graphics updates
     void updateGraphics(const glm::dvec3& cameraPos);
     
-    RigidBody* getRigidBody() const { return m_rigidBody; }
+    std::weak_ptr<RigidBody> getRigidBody() const { return m_rigidBody; }
 
     // Get collider for subsystem queries
     std::weak_ptr<Collider> getCollider() const { return m_colliderWeak; }
@@ -136,7 +136,7 @@ private:
     std::unordered_set<glm::ivec3, Hash::IVec3Hash> m_pendingMeshUpdates;
 
     PhysicsEngine* m_physics;
-    RigidBody* m_rigidBody{nullptr};
+    std::weak_ptr<RigidBody> m_rigidBody;
 
     std::weak_ptr<GridCollider> m_colliderWeak;
     // Graphics subsystem
