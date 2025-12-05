@@ -95,6 +95,7 @@ private:
     double m_groundSelectionBias;
     double m_maxGroundAngle;
     double m_maxLockedGroundAngle;
+    double m_walkingSensorRadius;
 
     // Target rigid body from walking (set in handleWalking, empty if not walking or no contact)
     std::weak_ptr<RigidBody> m_walkingTargetRigidBody;
@@ -106,4 +107,8 @@ private:
     bool m_upDirectionLocked{false};
     glm::dvec3 m_cachedModifiedUp{0.0, 0.0, 0.0};  // In rigid body local coordinates
     std::weak_ptr<RigidBody> m_cachedRigidBody;  // Rigid body the cache is relative to
+
+    // Last valid contact point cache (in surface local coordinates)
+    glm::dvec3 m_lastValidContactPoint{0.0, 0.0, 0.0};
+    std::weak_ptr<RigidBody> m_lastValidContactRigidBody;
 };

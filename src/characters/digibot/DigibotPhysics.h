@@ -37,6 +37,9 @@ public:
     // Walking sensor for ground detection
     std::weak_ptr<Collider> getWalkingSensor() const { return m_walkingSensor; }
     
+    // Get walking sensor radius
+    double getWalkingSensorRadius() const { return m_walkingSensorRadius; }
+
     // Physics update (called each physics step)
     void updatePhysics();
 
@@ -63,4 +66,7 @@ private:
 
     // Walking sensor
     std::weak_ptr<Collider> m_walkingSensor;
+
+    // Walking sensor configuration
+    double m_walkingSensorRadius;
 };

@@ -19,6 +19,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     , m_colliderLocalPosition(-0.5, -0.5, -1.0)
     //, m_centerOfMass(0.0, 0.0, 0.0)
     , m_collisionBoxMeshId(-1)
+    , m_walkingSensorRadius(2.0)
 {
     // 1. Create GridCollider at origin
     m_colliderWeak = m_physics->getCollisionDetector().addGridCollider(
@@ -178,7 +179,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     }
     m_walkingSensor = m_physics->getCollisionDetector().addBallCollider(
         rigidBody->m_position,
-        2.0);  // 2 meter radius
+        m_walkingSensorRadius);
 
     // Attach sensor as a trigger (detects but doesn't respond physically)
     m_physics->attachCollider(

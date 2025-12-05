@@ -35,6 +35,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_groundSelectionBias(2.0)
     , m_maxGroundAngle(glm::radians(90.0))
     , m_maxLockedGroundAngle(glm::radians(45.0))
+    , m_walkingSensorRadius(physics->getWalkingSensorRadius())
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -415,7 +416,9 @@ void DigibotController::handleFlying() {
     m_physicsEngine->applyTorque(rigidBodyWeak, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 }
 
+int test = 0;
 void DigibotController::handleWalking() {
+    test++;
     // DEBUG
     if (DebugGlobals::getDebugRenderer()) {
         DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
@@ -494,7 +497,7 @@ void DigibotController::handleWalking() {
         glm::dvec3 position;
         glm::dvec3 normal;
         double distance;
-        const CollisionData* collision;
+        std::weak_ptr<RigidBody> rigidBody;
     };
     
     std::vector<ContactCandidate> candidates;
@@ -506,11 +509,13 @@ void DigibotController::handleWalking() {
         // Skip collisions with the robot's own body
         ColliderAttachment* otherAttachment = 
             collision.otherCollider->get_pointer<ColliderAttachment>();
+        std::weak_ptr<RigidBody> otherRigidBody;
         if (otherAttachment) {
-            auto otherRigidBody = otherAttachment->rigidBody.lock();
-            if (otherRigidBody && otherRigidBody.get() == rigidBody.get()) {
+            auto otherRigidBodyShared = otherAttachment->rigidBody.lock();
+            if (otherRigidBodyShared && otherRigidBodyShared.get() == rigidBody.get()) {
                 continue;
             }
+            otherRigidBody = otherAttachment->rigidBody;
         }
         for (const auto& contactPoint : collision.contactPoints) {
             // Calculate surface normal (points from surface toward body)
@@ -529,7 +534,7 @@ void DigibotController::handleWalking() {
                 continue; // Surface angle exceeds maximum ground angle
             }
             
-            candidates.push_back({contactPoint, normal, distance, &collision});
+            candidates.push_back({contactPoint, normal, distance, otherRigidBody});
         }
     }
     
@@ -569,11 +574,35 @@ void DigibotController::handleWalking() {
         }
     }
 
+    // ========== Step 2.5: Add Last Valid Contact Point if Available ==========
+    // Added after filtering so cached point is never filtered out
+    if (usingCache && !m_lastValidContactRigidBody.expired()) {
+        auto cachedTargetRigidBody = m_lastValidContactRigidBody.lock();
+        if (cachedTargetRigidBody) {
+            // Transform cached point from surface local to world coordinates
+            glm::dvec3 worldPoint = cachedTargetRigidBody->m_position + 
+                cachedTargetRigidBody->m_orientation * m_lastValidContactPoint;
+            
+            // Calculate distance from rigid body to cached point
+            glm::dvec3 toBody = rigidBody->m_position - worldPoint;
+            double distance = glm::length(toBody);
+            
+            // Only add if within sensor detection range
+            if (distance > 1e-6 && distance <= m_walkingSensorRadius) {
+                glm::dvec3 normal = toBody / distance;
+                
+                // Add cached point as a candidate (won't be filtered)
+                candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
+                filtered.push_back(false);  // Add corresponding filter flag
+            }
+        }
+    }
+
     // ========== Step 3: Find Best Ground Contact Point ==========
     bool foundContact = false;
     glm::dvec3 closestPoint(0.0);
     double bestScore = std::numeric_limits<double>::max();
-    const CollisionData* closestCollision = nullptr;
+    std::weak_ptr<RigidBody> closestRigidBody;
     
     for (size_t i = 0; i < candidates.size(); ++i) {
         if (filtered[i]) continue;
@@ -591,22 +620,17 @@ void DigibotController::handleWalking() {
             bestScore = score;
             closestPoint = contactPoint;
             foundContact = true;
-            closestCollision = candidates[i].collision;
+            closestRigidBody = candidates[i].rigidBody;
         }
     }
     
     if (!foundContact) {
+        m_lastValidContactRigidBody.reset();
         return; // No ground contact
     }
 
-    // ========== Step 4: Get Target Rigid Body ==========
-    if (closestCollision) {
-        ColliderAttachment* closestAttachment = 
-            closestCollision->otherCollider->get_pointer<ColliderAttachment>();
-        if (closestAttachment) {
-            m_walkingTargetRigidBody = closestAttachment->rigidBody;
-        }
-    }
+    // ========== Step 4: Store Target Rigid Body ==========
+    m_walkingTargetRigidBody = closestRigidBody;
 
     // ========== Step 5: Calculate Normal ==========
     glm::dvec3 toBody = rigidBody->m_position - closestPoint;
@@ -636,6 +660,24 @@ void DigibotController::handleWalking() {
         surfaceAlignment = glm::dot(normal, modifiedUp);
         double angleThreshold = glm::cos(m_maxLockedGroundAngle);
         surfaceAlignedEnough = (surfaceAlignment >= angleThreshold);
+        
+        // Update last valid contact point cache
+        if (targetRigidBody) {
+            if (surfaceAlignedEnough) {
+                // Store this contact point in surface local coordinates
+                glm::dvec3 localPoint = glm::conjugate(targetRigidBody->m_orientation) * 
+                    (closestPoint - targetRigidBody->m_position);
+                
+                m_lastValidContactPoint = localPoint;
+                m_lastValidContactRigidBody = targetRigidBody;
+            } else {
+                // No valid contact found - clear the cache
+                m_lastValidContactRigidBody.reset();
+            }
+        }
+    } else {
+        // Not using cache - clear cache
+        m_lastValidContactRigidBody.reset();
     }
 
     // ========== Accumulators for Force/Torque ==========
