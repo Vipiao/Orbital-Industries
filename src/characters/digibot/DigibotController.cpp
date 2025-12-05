@@ -416,9 +416,7 @@ void DigibotController::handleFlying() {
     m_physicsEngine->applyTorque(rigidBodyWeak, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 }
 
-int test = 0;
 void DigibotController::handleWalking() {
-    test++;
     // DEBUG
     if (DebugGlobals::getDebugRenderer()) {
         DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
