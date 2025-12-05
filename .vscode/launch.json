@@ -43,7 +43,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "visualizerFile": "${workspaceFolder}/.vscode/natvis/glm.natvis",
+            //"visualizerFile": "${workspaceFolder}/.vscode/natvis/glm.natvis",
             //"showDisplayString": true,
             "preLaunchTask": "CMake: build",  // This uses CMake extension's task
             "logging": {
