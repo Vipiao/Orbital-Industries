@@ -589,9 +589,16 @@ void DigibotController::handleWalking() {
             if (distance > 1e-6 && distance <= m_walkingSensorRadius) {
                 glm::dvec3 normal = toBody / distance;
                 
-                // Add cached point as a candidate (won't be filtered)
-                candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
-                filtered.push_back(false);  // Add corresponding filter flag
+                // Verify cached point still meets ground angle constraint
+                double alignment = glm::dot(-normal, downDirection);
+                if (alignment >= angleThreshold) {
+                    // Add cached point as a candidate (won't be filtered)
+                    candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
+                    filtered.push_back(false);  // Add corresponding filter flag
+                } else {
+                    // Cached point no longer valid - clear cache
+                    m_lastValidContactRigidBody.reset();
+                }
             }
         }
     }
