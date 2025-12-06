@@ -44,13 +44,14 @@
                 }
             ],
             //"visualizerFile": "${workspaceFolder}/.vscode/natvis/glm.natvis",
+            "visualizerFile": "",
             //"showDisplayString": true,
             "preLaunchTask": "CMake: build",  // This uses CMake extension's task
-            "logging": {
-                "engineLogging": true,
-                "trace": true,
-                "traceResponse": true
-            }
+            //"logging": {
+            //    "engineLogging": true,
+            //    "trace": true,
+            //    "traceResponse": true
+            //}
         }
     ]
 }
