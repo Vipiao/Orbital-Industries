@@ -416,7 +416,9 @@ void DigibotController::handleFlying() {
     m_physicsEngine->applyTorque(rigidBodyWeak, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 }
 
+int test = 0;
 void DigibotController::handleWalking() {
+    test++;
     // DEBUG
     if (DebugGlobals::getDebugRenderer()) {
         DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
@@ -703,102 +705,100 @@ void DigibotController::handleWalking() {
     // so we can proceed with all force/torque calculations
 
     // Project view direction onto tangent plane
-    {
-        glm::dvec3 projectedViewDirection = m_viewDirection - glm::dot(m_viewDirection, targetUpDirection) * targetUpDirection;
-        double projectedViewLengthSq = glm::length2(projectedViewDirection);
-        
-        glm::dvec3 targetForward;
-        if (projectedViewLengthSq < 1e-12) {
-            // View is aligned with normal - keep current forward direction
-            targetForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
-            targetForward = targetForward - glm::dot(targetForward, targetUpDirection) * targetUpDirection;
-            double targetForwardLengthSq = glm::length2(targetForward);
-            if (targetForwardLengthSq < 1e-12) {
-                // Current forward also aligned with normal - pick arbitrary tangent
-                glm::dvec3 arbitrary = glm::dvec3(1.0, 0.0, 0.0);
-                if (glm::abs(glm::dot(targetUpDirection, arbitrary)) > 0.9) {
-                    arbitrary = glm::dvec3(0.0, 1.0, 0.0);
-                }
-                targetForward = arbitrary - glm::dot(arbitrary, targetUpDirection) * targetUpDirection;
-                targetForward = glm::normalize(targetForward);
-            } else {
-                targetForward = targetForward / glm::sqrt(targetForwardLengthSq);
+    glm::dvec3 projectedViewDirection = m_viewDirection - glm::dot(m_viewDirection, targetUpDirection) * targetUpDirection;
+    double projectedViewLengthSq = glm::length2(projectedViewDirection);
+    
+    glm::dvec3 targetForward;
+    if (projectedViewLengthSq < 1e-12) {
+        // View is aligned with normal - keep current forward direction
+        targetForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
+        targetForward = targetForward - glm::dot(targetForward, targetUpDirection) * targetUpDirection;
+        double targetForwardLengthSq = glm::length2(targetForward);
+        if (targetForwardLengthSq < 1e-12) {
+            // Current forward also aligned with normal - pick arbitrary tangent
+            glm::dvec3 arbitrary = glm::dvec3(1.0, 0.0, 0.0);
+            if (glm::abs(glm::dot(targetUpDirection, arbitrary)) > 0.9) {
+                arbitrary = glm::dvec3(0.0, 1.0, 0.0);
             }
+            targetForward = arbitrary - glm::dot(arbitrary, targetUpDirection) * targetUpDirection;
+            targetForward = glm::normalize(targetForward);
         } else {
-            targetForward = projectedViewDirection / glm::sqrt(projectedViewLengthSq);    
+            targetForward = targetForward / glm::sqrt(targetForwardLengthSq);
         }
-
-        // Construct target orientation from orthonormal basis
-        glm::dvec3 targetRight = glm::cross(targetForward, targetUpDirection);
-        glm::dvec3 targetUp = targetUpDirection;
-        
-        // Build rotation matrix and convert to quaternion
-        glm::dmat3 targetRotationMatrix;
-        targetRotationMatrix[0] = targetRight;   // x-axis
-        targetRotationMatrix[1] = targetForward; // y-axis
-        targetRotationMatrix[2] = targetUp;      // z-axis
-        glm::dquat targetOrientation = glm::quat_cast(targetRotationMatrix);
-
-        // Ensure we take the short path: negate target if dot product is negative
-        // (q and -q represent the same rotation, so pick the closer one)
-        if (glm::dot(targetOrientation, rigidBody->m_orientation) < 0.0) {
-            targetOrientation = -targetOrientation;
-        }
-        
-        // Calculate rotation from current to target orientation
-        glm::dquat rotationDelta = targetOrientation * glm::conjugate(rigidBody->m_orientation);
-        //rotationDelta = glm::normalize(rotationDelta);
-        
-        // Extract axis-angle from rotation delta
-        double deltaAngle = 2.0 * std::acos(glm::clamp(rotationDelta.w, -1.0, 1.0));
-        glm::dvec3 rotationAxis(rotationDelta.x, rotationDelta.y, rotationDelta.z);
-        double axisLength = glm::length(rotationAxis);
-        
-        glm::dvec3 targetAngularVelocity(0.0);
-        
-        // Scale acceleration based on remaining angle
-        double effectiveAngAcc = m_angularAccelerationMax;
-        effectiveAngAcc *= glm::min(glm::abs(deltaAngle) / 0.1, 1.0);
-        
-        if (axisLength > 1e-6 && deltaAngle > 1e-6) {
-            rotationAxis = rotationAxis / axisLength;
-            
-            // Calculate target angular speed using sqrt(2ad) with margin
-            double margin = 0.5;
-            double maxAngularSpeed = std::sqrt(2.0 * effectiveAngAcc * (1.0 - margin) * deltaAngle);
-            targetAngularVelocity = rotationAxis * maxAngularSpeed;
-        }
-        
-        // Add grid's angular velocity if walking on moving surface
-        if (targetRigidBody) {
-            targetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
-        }
-        
-        // Calculate needed angular acceleration
-        glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
-        glm::dvec3 angularAcceleration = targetAngularVelocity - currentAngularVelocity;
-        
-        // Limit angular acceleration
-        double angAccMagnitude = glm::length(angularAcceleration);
-        if (angAccMagnitude > effectiveAngAcc) {
-            angularAcceleration = angularAcceleration * (effectiveAngAcc / angAccMagnitude);
-        }
-         
-        // Calculate torque using effective inertia
-        glm::dvec3 orientationTorque;
-        if (targetRigidBody && !targetRigidBody->m_isStatic) {
-            // Calculate effective inertia between Digibot and moving ground
-            glm::dmat3 invInertiaSum = rigidBody->getWorldInvInertiaTensor() + 
-                                        targetRigidBody->getWorldInvInertiaTensor();
-            glm::dmat3 effectiveInertia = glm::inverse(invInertiaSum);
-            orientationTorque = effectiveInertia * angularAcceleration;
-        } else {
-            // Static ground or no ground - use only Digibot's inertia
-            orientationTorque = rigidBody->getWorldInertiaTensor() * angularAcceleration;
-        }
-        
-        netTorqueOnDigibot += orientationTorque;
+    } else {
+        targetForward = projectedViewDirection / glm::sqrt(projectedViewLengthSq);    
     }
+
+    // Construct target orientation from orthonormal basis
+    glm::dvec3 targetRight = glm::cross(targetForward, targetUpDirection);
+    glm::dvec3 targetUp = targetUpDirection;
+    
+    // Build rotation matrix and convert to quaternion
+    glm::dmat3 targetRotationMatrix;
+    targetRotationMatrix[0] = targetRight;   // x-axis
+    targetRotationMatrix[1] = targetForward; // y-axis
+    targetRotationMatrix[2] = targetUp;      // z-axis
+    glm::dquat targetOrientation = glm::quat_cast(targetRotationMatrix);
+
+    // Ensure we take the short path: negate target if dot product is negative
+    // (q and -q represent the same rotation, so pick the closer one)
+    if (glm::dot(targetOrientation, rigidBody->m_orientation) < 0.0) {
+        targetOrientation = -targetOrientation;
+    }
+    
+    // Calculate rotation from current to target orientation
+    glm::dquat rotationDelta = targetOrientation * glm::conjugate(rigidBody->m_orientation);
+    //rotationDelta = glm::normalize(rotationDelta);
+    
+    // Extract axis-angle from rotation delta
+    double deltaAngle = 2.0 * std::acos(glm::clamp(rotationDelta.w, -1.0, 1.0));
+    glm::dvec3 rotationAxis(rotationDelta.x, rotationDelta.y, rotationDelta.z);
+    double axisLength = glm::length(rotationAxis);
+    
+    glm::dvec3 targetAngularVelocity(0.0);
+    
+    // Scale acceleration based on remaining angle
+    double effectiveAngAcc = m_angularAccelerationMax;
+    effectiveAngAcc *= glm::min(glm::abs(deltaAngle) / 0.1, 1.0);
+    
+    if (axisLength > 1e-6 && deltaAngle > 1e-6) {
+        rotationAxis = rotationAxis / axisLength;
+        
+        // Calculate target angular speed using sqrt(2ad) with margin
+        double margin = 0.5;
+        double maxAngularSpeed = std::sqrt(2.0 * effectiveAngAcc * (1.0 - margin) * deltaAngle);
+        targetAngularVelocity = rotationAxis * maxAngularSpeed;
+    }
+    
+    // Add grid's angular velocity if walking on moving surface
+    if (targetRigidBody) {
+        targetAngularVelocity += targetRigidBody->getAngularVelocityWorld();
+    }
+    
+    // Calculate needed angular acceleration
+    glm::dvec3 currentAngularVelocity = rigidBody->getAngularVelocityWorld();
+    glm::dvec3 angularAcceleration = targetAngularVelocity - currentAngularVelocity;
+    
+    // Limit angular acceleration
+    double angAccMagnitude = glm::length(angularAcceleration);
+    if (angAccMagnitude > effectiveAngAcc) {
+        angularAcceleration = angularAcceleration * (effectiveAngAcc / angAccMagnitude);
+    }
+        
+    // Calculate torque using effective inertia
+    glm::dvec3 orientationTorque;
+    if (targetRigidBody && !targetRigidBody->m_isStatic) {
+        // Calculate effective inertia between Digibot and moving ground
+        glm::dmat3 invInertiaSum = rigidBody->getWorldInvInertiaTensor() + 
+                                    targetRigidBody->getWorldInvInertiaTensor();
+        glm::dmat3 effectiveInertia = glm::inverse(invInertiaSum);
+        orientationTorque = effectiveInertia * angularAcceleration;
+    } else {
+        // Static ground or no ground - use only Digibot's inertia
+        orientationTorque = rigidBody->getWorldInertiaTensor() * angularAcceleration;
+    }
+    
+    netTorqueOnDigibot += orientationTorque;
     
     // ========== Step 7: Position Control Along Normal ==========
     // Calculate target position along normal
