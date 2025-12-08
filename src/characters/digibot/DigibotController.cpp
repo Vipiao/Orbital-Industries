@@ -654,41 +654,6 @@ void DigibotController::handleWalking() {
             "closest_contact", closestPoint, 0.1);
     }
 
-    // Local alias for readability
-    auto targetRigidBody = m_walkingTargetRigidBody.lock();
-
-    // Calculate alignment between surface normal and locked up direction
-    // Used for orientation control, hover force, and movement force gating
-    double surfaceAlignment = 1.0; // Default to full alignment when not using cache
-    bool surfaceAlignedEnough = true;
-    if (usingCache) {
-        surfaceAlignment = glm::dot(normal, modifiedUp);
-        double angleThreshold = glm::cos(m_maxLockedGroundAngle);
-        surfaceAlignedEnough = (surfaceAlignment >= angleThreshold);
-        
-        // Update last valid contact point cache
-        if (targetRigidBody) {
-            if (surfaceAlignedEnough) {
-                // Store this contact point in surface local coordinates
-                glm::dvec3 localPoint = glm::conjugate(targetRigidBody->m_orientation) * 
-                    (closestPoint - targetRigidBody->m_position);
-                
-                m_lastValidContactPoint = localPoint;
-                m_lastValidContactRigidBody = targetRigidBody;
-            } else {
-                // No valid contact found - clear the cache
-                m_lastValidContactRigidBody.reset();
-            }
-        }
-    } else {
-        // Not using cache - clear cache
-        m_lastValidContactRigidBody.reset();
-    }
-
-    // ========== Accumulators for Force/Torque ==========
-    glm::dvec3 netForceOnDigibot(0.0);
-    glm::dvec3 netTorqueOnDigibot(0.0);
-
     // ========== Step 6: Unified Orientation Control ==========
     // Calculate target orientation that aligns:
     // - Local z-axis with surface normal (or cached up when using cache)
@@ -697,9 +662,48 @@ void DigibotController::handleWalking() {
     // Determine target up direction based on whether we're using cache
     glm::dvec3 targetUpDirection = usingCache ? modifiedUp : normal;
     
-    // Only apply orientation control if surface is aligned enough with locked up direction
-    if (surfaceAlignedEnough) {
-        // Project view direction onto tangent plane
+    // Set orientation cache when establishing new lock (not using cache yet)
+    auto targetRigidBody = m_walkingTargetRigidBody.lock();
+    if (!usingCache && targetRigidBody) {
+        m_cachedRigidBody = targetRigidBody;
+        m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * normal;
+    }
+
+    // Handle contact cache and early return for misaligned surfaces
+    double surfaceAlignment = 1.0; // Default to full alignment when not using cache
+    if (usingCache) {
+        surfaceAlignment = glm::dot(normal, modifiedUp);
+        double angleThreshold = glm::cos(m_maxLockedGroundAngle);
+        bool surfaceAlignedEnough = (surfaceAlignment >= angleThreshold);
+        
+        if (surfaceAlignedEnough && targetRigidBody) {
+            // Update contact point cache
+            glm::dvec3 localPoint = glm::conjugate(targetRigidBody->m_orientation) * 
+                (closestPoint - targetRigidBody->m_position);
+            m_lastValidContactPoint = localPoint;
+            m_lastValidContactRigidBody = targetRigidBody;
+        } else {
+            // Clear contact cache
+            m_lastValidContactRigidBody.reset();
+            // Early return if surface not aligned with locked direction
+            if (!surfaceAlignedEnough) {
+                return;
+            }
+        }
+    } else {
+        // Not using orientation cache, so contact cache not needed
+        m_lastValidContactRigidBody.reset();
+    }
+
+    // ========== Accumulators for Force/Torque ==========
+    glm::dvec3 netForceOnDigibot(0.0);
+    glm::dvec3 netTorqueOnDigibot(0.0);
+
+    // At this point we know the surface is aligned (or we're not using cache)
+    // so we can proceed with all force/torque calculations
+
+    // Project view direction onto tangent plane
+    {
         glm::dvec3 projectedViewDirection = m_viewDirection - glm::dot(m_viewDirection, targetUpDirection) * targetUpDirection;
         double projectedViewLengthSq = glm::length2(projectedViewDirection);
         
@@ -796,12 +800,6 @@ void DigibotController::handleWalking() {
         netTorqueOnDigibot += orientationTorque;
     }
     
-    // Cache the surface normal when unlocked or first contact while locked
-    if (targetRigidBody && (!m_upDirectionLocked || m_cachedRigidBody.expired())) {
-        m_cachedRigidBody = targetRigidBody;
-        m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * normal;
-    }
-    
     // ========== Step 7: Position Control Along Normal ==========
     // Calculate target position along normal
     glm::dvec3 targetPosition = closestPoint + normal * m_targetHoverHeight;
@@ -847,32 +845,27 @@ void DigibotController::handleWalking() {
      
     glm::dvec3 neededAcceleration = normal * accelerationAlongNormal;
     
-     // Apply force to character
-     // Calculate effective mass for hover control
-     double effectiveMass;
-     if (targetRigidBody) {
-         // Calculate effective mass between Digibot and ground
-         //glm::dvec3 rDigibot = glm::dvec3(0.0); // Force at COM, so r = 0
-         glm::dvec3 rGround = rigidBody->m_position - targetRigidBody->m_position;
-         
-         glm::dvec3 rGround_cross_n = glm::cross(rGround, normal);
-         glm::dvec3 rotContribGround = targetRigidBody->getWorldInvInertiaTensor() * rGround_cross_n;
-         double rotTermGround = glm::dot(rGround_cross_n, rotContribGround);
-         
-         double invEffectiveMass = rigidBody->m_invMass + targetRigidBody->m_invMass + rotTermGround;
-         effectiveMass = 1.0 / invEffectiveMass;
-     } else {
-         effectiveMass = rigidBody->m_mass;
-     }
-     
-     glm::dvec3 hoverForce = neededAcceleration * effectiveMass;
-
-    // Only apply hover force if surface is aligned enough
-    bool applyHoverForce = surfaceAlignedEnough;
-    
-    if (applyHoverForce) {
-        netForceOnDigibot += hoverForce;
+    // Apply force to character
+    // Calculate effective mass for hover control
+    double effectiveMass;
+    if (targetRigidBody) {
+        // Calculate effective mass between Digibot and ground
+        //glm::dvec3 rDigibot = glm::dvec3(0.0); // Force at COM, so r = 0
+        glm::dvec3 rGround = rigidBody->m_position - targetRigidBody->m_position;
+        
+        glm::dvec3 rGround_cross_n = glm::cross(rGround, normal);
+        glm::dvec3 rotContribGround = targetRigidBody->getWorldInvInertiaTensor() * rGround_cross_n;
+        double rotTermGround = glm::dot(rGround_cross_n, rotContribGround);
+        
+        double invEffectiveMass = rigidBody->m_invMass + targetRigidBody->m_invMass + rotTermGround;
+        effectiveMass = 1.0 / invEffectiveMass;
+    } else {
+        effectiveMass = rigidBody->m_mass;
     }
+    
+    glm::dvec3 hoverForce = neededAcceleration * effectiveMass;
+
+    netForceOnDigibot += hoverForce;
 
     // ========== Step 8: Apply Movement Force ==========
     // Create 2D tangent space on the surface using cross products
@@ -952,20 +945,17 @@ void DigibotController::handleWalking() {
         movementForce = movementForce / movementForceLength * forceMagnitude;
     }
     
-    // Apply movement force only if surface is aligned enough, and scale by alignment
-    if (surfaceAlignedEnough) {
-        if (usingCache) {
-            double scaleFactor = glm::max(0.0, surfaceAlignment);
-            movementForce *= scaleFactor;
-        }
-        
-        if (glm::length(movementForce) > 1e-6) {
-            netForceOnDigibot += movementForce;
-        }
+    // Scale movement force by alignment when using cached direction
+    if (usingCache) {
+        double scaleFactor = glm::max(0.0, surfaceAlignment);
+        movementForce *= scaleFactor;
+    }
+    
+    if (glm::length(movementForce) > 1e-6) {
+        netForceOnDigibot += movementForce;
     }
 
     // ========== Apply All Accumulated Forces/Torques ==========
-    // Apply to Digibot at center of mass
     m_physicsEngine->applyForce(rigidBodyWeak, netForceOnDigibot);
     m_physicsEngine->applyTorque(rigidBodyWeak, netTorqueOnDigibot);
 
