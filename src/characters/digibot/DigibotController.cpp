@@ -34,7 +34,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_walkingThrustStrength(0.007)
     , m_groundSelectionBias(2.0)
     , m_maxGroundAngle(glm::radians(90.0))
-    , m_maxLockedGroundAngle(glm::radians(45.0))
+    , m_maxLockedGroundAngle(glm::radians(30.0))
     , m_walkingSensorRadius(physics->getWalkingSensorRadius())
 {
     if (!m_physics) {
@@ -502,9 +502,6 @@ void DigibotController::handleWalking() {
     
     std::vector<ContactCandidate> candidates;
     
-    // Calculate angle threshold for ground surface filtering
-    double angleThreshold = glm::cos(m_maxGroundAngle);
-
     for (const auto& collision : collisions) {
         // Skip collisions with the robot's own body
         ColliderAttachment* otherAttachment = 
@@ -527,12 +524,6 @@ void DigibotController::handleWalking() {
             }
             
             glm::dvec3 normal = toBody / distance;
-            
-            // Filter: only consider surfaces within maxGroundAngle of "below"
-            double alignment = glm::dot(-normal, downDirection);
-            if (alignment < angleThreshold) {
-                continue; // Surface angle exceeds maximum ground angle
-            }
             
             candidates.push_back({contactPoint, normal, distance, otherRigidBody});
         }
@@ -591,14 +582,32 @@ void DigibotController::handleWalking() {
             if (distance > 1e-6 && distance <= m_walkingSensorRadius) {
                 glm::dvec3 normal = toBody / distance;
                 
-                // Verify cached point still meets ground angle constraint
-                double alignment = glm::dot(-normal, downDirection);
-                if (alignment >= angleThreshold) {
-                    // Add cached point as a candidate (won't be filtered)
-                    candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
-                    filtered.push_back(false);  // Add corresponding filter flag
-                } else {
-                    // Cached point no longer valid - clear cache
+                // Add cached point as a candidate (won't be plane-filtered)
+                candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
+                filtered.push_back(false);  // Add corresponding filter flag
+            }
+        }
+    }
+
+    // ========== Step 2.6: Angle-Based Filtering ==========
+    // Filter out surfaces that are too steep to be considered ground
+    double angleThreshold = glm::cos(m_maxGroundAngle);
+    
+    for (size_t i = 0; i < candidates.size(); ++i) {
+        if (filtered[i]) continue;
+        
+        const glm::dvec3& normal = candidates[i].normal;
+        double alignment = glm::dot(-normal, downDirection);
+        
+        if (alignment < angleThreshold) {
+            filtered[i] = true;
+            
+            // If this was the cached contact point, clear the cache
+            if (!m_lastValidContactRigidBody.expired()) {
+                auto cachedRigidBody = m_lastValidContactRigidBody.lock();
+                auto candidateRigidBody = candidates[i].rigidBody.lock();
+                if (cachedRigidBody && candidateRigidBody && 
+                    cachedRigidBody.get() == candidateRigidBody.get()) {
                     m_lastValidContactRigidBody.reset();
                 }
             }
