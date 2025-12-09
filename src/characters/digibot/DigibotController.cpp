@@ -21,8 +21,8 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_movementDirection(0, 0, 0)
     , m_thrustStrength(0.004)  // Default thrust strength
     , m_angularAccelerationMax(0.016)  // Maximum angular acceleration (rad/s²)
-    , m_maxRollRate(0.0)  // Will be set later if needed
-    , m_rollAcceleration(0.01)  // Roll acceleration strength (rad/s^2)
+    , m_maxRollRate(0.04)  // Target roll rate (rad/s)
+    , m_rollAcceleration(0.008)  // Roll acceleration strength (rad/s^2)
     , m_rollInput(0)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
     , m_lockState(LockState::UNLOCKED)
@@ -329,27 +329,6 @@ void DigibotController::handleFlying() {
         m_physicsEngine->applyForce(rigidBodyWeak, totalForce);
     }
 
-    // ========== Handle Roll Input ==========
-    if (m_rollInput != 0) {
-        // Calculate roll torque around view direction
-        glm::dvec3 rollAxis = glm::normalize(m_viewDirection);
-
-        double adjustedRollAcceleration = m_rollAcceleration;
-        if(m_rollInput != 0) {
-            glm::dvec3 currentAngVel = rigidBody->getAngularVelocityWorld();
-            double currentRollRate = glm::dot(currentAngVel, rollAxis);
-            if (glm::abs(currentRollRate) < 0.01)
-            {
-                //adjustedRollAcceleration *= 2.;
-            }
-        }
-        
-        // Scale by roll acceleration, inertia, and input direction
-        double torqueMagnitude = adjustedRollAcceleration * static_cast<double>(m_rollInput);
-        glm::dvec3 rollTorque = rollAxis * torqueMagnitude;
-        m_physicsEngine->applyTorque(rigidBodyWeak, rigidBody->getWorldInertiaTensor() * rollTorque);
-    }
-
     // ========== View Direction Rotation Logic ==========
     // 1. Calculate local forward direction in world space
     glm::dvec3 currentForward = rigidBody->m_orientation * glm::dvec3(0.0, 1.0, 0.0);
@@ -389,6 +368,12 @@ void DigibotController::handleFlying() {
     }
     // else: targetAngularVelocity remains zero - we want to stop any rotation
     
+    // ========== Add Roll Component to Target Angular Velocity ==========
+    // Roll axis is the view direction
+    glm::dvec3 rollAxis = glm::normalize(m_viewDirection);
+    double targetRollVel = static_cast<double>(m_rollInput) * m_maxRollRate;
+    targetAngularVelocity += targetRollVel * rollAxis;
+
     // ========== Add Grid Angular Velocity for Full Lock ==========
     if (m_lockState == LockState::FULL_LOCK && !m_targetGrid.expired()) {
         auto targetGrid = m_targetGrid.lock();
