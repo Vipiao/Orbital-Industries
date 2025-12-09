@@ -795,14 +795,14 @@ void DigibotController::handleWalking() {
     netTorqueOnDigibot += orientationTorque;
     
     // ========== Step 8: Position Control Along Normal ==========
-    // Calculate target position along normal
-    glm::dvec3 targetPosition = closestPoint + normal * m_targetHoverHeight;
+    // Calculate target position along target up direction
+    glm::dvec3 targetPosition = closestPoint + targetUpDirection * m_targetHoverHeight;
     
-    // Calculate position error along normal only
+    // Calculate position error along target up direction only
     glm::dvec3 positionError = targetPosition - rigidBody->m_position;
-    double distanceAlongNormal = glm::dot(positionError, normal);
+    double distanceAlongNormal = glm::dot(positionError, targetUpDirection);
     
-    // Calculate target speed along normal using sqrt(2ad)
+    // Calculate target speed along target up direction using sqrt(2ad)
     double margin = 0.5;
     double effectiveACC = m_maxGroundAcceleration;
     effectiveACC *= glm::min(glm::abs(distanceAlongNormal) / 0.1, 1.);
@@ -822,14 +822,14 @@ void DigibotController::handleWalking() {
         glm::dvec3 velocityFromRotation = glm::cross(targetRigidBody->getAngularVelocityWorld(), radiusVector);
         
         glm::dvec3 surfaceVelocityAtContact = surfaceLinearVelocity + velocityFromRotation;
-        surfaceVelocityAlongNormal = glm::dot(surfaceVelocityAtContact, normal);
+        surfaceVelocityAlongNormal = glm::dot(surfaceVelocityAtContact, targetUpDirection);
     }
     
     // Add surface velocity to target speed
     double targetVelocityAlongNormal = targetSpeedAlongNormal + surfaceVelocityAlongNormal;
     
-    // Calculate needed acceleration along normal
-    double currentVelocityAlongNormal = glm::dot(rigidBody->m_velocity, normal);
+    // Calculate needed acceleration along target up direction
+    double currentVelocityAlongNormal = glm::dot(rigidBody->m_velocity, targetUpDirection);
     double accelerationAlongNormal = targetVelocityAlongNormal - currentVelocityAlongNormal;
     
     // Clamp acceleration
@@ -837,7 +837,7 @@ void DigibotController::handleWalking() {
         accelerationAlongNormal = (accelerationAlongNormal > 0.0 ? 1.0 : -1.0) * effectiveACC;
     }
      
-    glm::dvec3 neededAcceleration = normal * accelerationAlongNormal;
+    glm::dvec3 neededAcceleration = targetUpDirection * accelerationAlongNormal;
     
     // Apply force to character
     // Calculate effective mass for hover control
@@ -847,7 +847,7 @@ void DigibotController::handleWalking() {
         //glm::dvec3 rDigibot = glm::dvec3(0.0); // Force at COM, so r = 0
         glm::dvec3 rGround = rigidBody->m_position - targetRigidBody->m_position;
         
-        glm::dvec3 rGround_cross_n = glm::cross(rGround, normal);
+        glm::dvec3 rGround_cross_n = glm::cross(rGround, targetUpDirection);
         glm::dvec3 rotContribGround = targetRigidBody->getWorldInvInertiaTensor() * rGround_cross_n;
         double rotTermGround = glm::dot(rGround_cross_n, rotContribGround);
         
