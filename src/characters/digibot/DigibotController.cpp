@@ -862,24 +862,24 @@ void DigibotController::handleWalking() {
     netForceOnDigibot += hoverForce;
 
     // ========== Step 9: Apply Movement Force ==========
-    // Create 2D tangent space on the surface using cross products
-    glm::dvec3 tangentX = glm::cross(m_viewDirection, normal);
+    // Create 2D tangent space using targetUpDirection
+    // This uses locked up when cached, or surface normal when unlocked
+    glm::dvec3 tangentX = glm::cross(m_viewDirection, targetUpDirection);
     double tangentXLengthSq = glm::length2(tangentX);
     
-    // If view direction is too aligned with normal, use a fallback
+    // If view direction is too aligned with up direction, use a fallback
     if (tangentXLengthSq < 1e-12) {
-        // View is aligned with normal, pick arbitrary tangent direction
+        // View is aligned with up direction, pick arbitrary tangent direction
         glm::dvec3 arbitrary = glm::dvec3(1.0, 0.0, 0.0);
-        if (glm::abs(glm::dot(normal, arbitrary)) > 0.9) {
+        if (glm::abs(glm::dot(targetUpDirection, arbitrary)) > 0.9) {
             arbitrary = glm::dvec3(0.0, 1.0, 0.0);
         }
-        tangentX = glm::cross(arbitrary, normal);
+        tangentX = glm::cross(arbitrary, targetUpDirection);
         tangentXLengthSq = glm::length2(tangentX);
     }
     
     tangentX = tangentX / glm::sqrt(tangentXLengthSq);
-    // Cross product of two perpendicular unit vectors is already unit length
-    glm::dvec3 tangentY = glm::cross(normal, tangentX);
+    glm::dvec3 tangentY = glm::cross(targetUpDirection, tangentX);
     
     // Calculate surface velocity at body position
     glm::dvec3 surfaceVelocityAtBody(0.0);
@@ -903,6 +903,9 @@ void DigibotController::handleWalking() {
     if (targetVelocityMagnitude > 1e-6) {
         targetVelocityDirection = (targetVelocityDirection / targetVelocityMagnitude) * m_targetWalkSpeed;
     }
+
+    // Project target velocity onto actual surface plane to ensure it's achievable
+    targetVelocityDirection = targetVelocityDirection - glm::dot(targetVelocityDirection, normal) * normal;
     
     glm::dvec3 velocityError = targetVelocityDirection - relativeVelocityTangent;
     // Calculate effective mass for movement control in the direction of velocity error
