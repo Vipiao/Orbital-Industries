@@ -591,13 +591,16 @@ void DigibotController::handleWalking() {
 
     // ========== Step 2.6: Angle-Based Filtering ==========
     // Filter out surfaces that are too steep to be considered ground
-    double angleThreshold = glm::cos(m_maxGroundAngle);
+    // Use stricter angle when orientation is locked
+    glm::dvec3 comparisonDirection = usingCache ? modifiedUp : -downDirection;
+    double maxAngle = usingCache ? m_maxLockedGroundAngle : m_maxGroundAngle;
+    double angleThreshold = glm::cos(maxAngle);
     
     for (size_t i = 0; i < candidates.size(); ++i) {
         if (filtered[i]) continue;
         
         const glm::dvec3& normal = candidates[i].normal;
-        double alignment = glm::dot(-normal, downDirection);
+        double alignment = glm::dot(normal, comparisonDirection);
         
         if (alignment < angleThreshold) {
             filtered[i] = true;
@@ -648,6 +651,19 @@ void DigibotController::handleWalking() {
     // ========== Step 4: Store Target Rigid Body ==========
     m_walkingTargetRigidBody = closestRigidBody;
 
+    // ========== Step 4.5: Update Contact Cache ==========
+    auto targetRigidBody = m_walkingTargetRigidBody.lock();
+    if (usingCache && targetRigidBody) {
+        // Update contact point cache
+        glm::dvec3 localPoint = glm::conjugate(targetRigidBody->m_orientation) * 
+            (closestPoint - targetRigidBody->m_position);
+        m_lastValidContactPoint = localPoint;
+        m_lastValidContactRigidBody = targetRigidBody;
+    } else {
+        // Not using orientation cache, so contact cache not needed
+        m_lastValidContactRigidBody.reset();
+    }
+
     // ========== Step 5: Calculate Normal ==========
     glm::dvec3 toBody = rigidBody->m_position - closestPoint;
     double toBodyLengthSq = glm::length2(toBody);
@@ -665,54 +681,23 @@ void DigibotController::handleWalking() {
             "closest_contact", closestPoint, 0.1);
     }
 
-    // ========== Step 6: Unified Orientation Control ==========
-    // Calculate target orientation that aligns:
-    // - Local z-axis with surface normal (or cached up when using cache)
-    // - Local y-axis with view direction (projected onto tangent plane)
-    
-    // Determine target up direction based on whether we're using cache
+    // ========== Step 6: Calculate Surface Alignment for Force Scaling ==========
+    // Calculate alignment between surface normal and locked up direction (for movement force scaling)
+    double surfaceAlignment = usingCache ? glm::dot(normal, modifiedUp) : 1.0;
+
     glm::dvec3 targetUpDirection = usingCache ? modifiedUp : normal;
     
     // Set orientation cache when establishing new lock (not using cache yet)
-    auto targetRigidBody = m_walkingTargetRigidBody.lock();
     if (!usingCache && targetRigidBody) {
         m_cachedRigidBody = targetRigidBody;
         m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * normal;
-    }
-
-    // Handle contact cache and early return for misaligned surfaces
-    double surfaceAlignment = 1.0; // Default to full alignment when not using cache
-    if (usingCache) {
-        surfaceAlignment = glm::dot(normal, modifiedUp);
-        double angleThreshold = glm::cos(m_maxLockedGroundAngle);
-        bool surfaceAlignedEnough = (surfaceAlignment >= angleThreshold);
-        
-        if (surfaceAlignedEnough && targetRigidBody) {
-            // Update contact point cache
-            glm::dvec3 localPoint = glm::conjugate(targetRigidBody->m_orientation) * 
-                (closestPoint - targetRigidBody->m_position);
-            m_lastValidContactPoint = localPoint;
-            m_lastValidContactRigidBody = targetRigidBody;
-        } else {
-            // Clear contact cache
-            m_lastValidContactRigidBody.reset();
-            // Early return if surface not aligned with locked direction
-            if (!surfaceAlignedEnough) {
-                return;
-            }
-        }
-    } else {
-        // Not using orientation cache, so contact cache not needed
-        m_lastValidContactRigidBody.reset();
     }
 
     // ========== Accumulators for Force/Torque ==========
     glm::dvec3 netForceOnDigibot(0.0);
     glm::dvec3 netTorqueOnDigibot(0.0);
 
-    // At this point we know the surface is aligned (or we're not using cache)
-    // so we can proceed with all force/torque calculations
-
+    // ========== Step 7: Unified Orientation Control ==========
     // Project view direction onto tangent plane
     glm::dvec3 projectedViewDirection = m_viewDirection - glm::dot(m_viewDirection, targetUpDirection) * targetUpDirection;
     double projectedViewLengthSq = glm::length2(projectedViewDirection);
@@ -809,7 +794,7 @@ void DigibotController::handleWalking() {
     
     netTorqueOnDigibot += orientationTorque;
     
-    // ========== Step 7: Position Control Along Normal ==========
+    // ========== Step 8: Position Control Along Normal ==========
     // Calculate target position along normal
     glm::dvec3 targetPosition = closestPoint + normal * m_targetHoverHeight;
     
@@ -876,7 +861,7 @@ void DigibotController::handleWalking() {
 
     netForceOnDigibot += hoverForce;
 
-    // ========== Step 8: Apply Movement Force ==========
+    // ========== Step 9: Apply Movement Force ==========
     // Create 2D tangent space on the surface using cross products
     glm::dvec3 tangentX = glm::cross(m_viewDirection, normal);
     double tangentXLengthSq = glm::length2(tangentX);
