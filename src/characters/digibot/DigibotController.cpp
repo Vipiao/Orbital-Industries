@@ -21,7 +21,7 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_movementDirection(0, 0, 0)
     , m_thrustStrength(0.004)  // Default thrust strength
     , m_angularAccelerationMax(0.016)  // Maximum angular acceleration (rad/s²)
-    , m_maxRollRate(0.04)  // Target roll rate (rad/s)
+    , m_maxRollRate(0.032)  // Target roll rate (rad/s) - reduced by 0.8x
     , m_rollAcceleration(0.008)  // Roll acceleration strength (rad/s^2)
     , m_rollInput(0)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
@@ -513,6 +513,29 @@ void DigibotController::handleWalking() {
             candidates.push_back({contactPoint, normal, distance, otherRigidBody});
         }
     }
+
+    // ========== Step 2.5: Add Last Valid Contact Point if Available ==========
+    // Add cached point BEFORE filtering so it can also be plane-filtered
+    if (usingCache && !m_lastValidContactRigidBody.expired()) {
+        auto cachedTargetRigidBody = m_lastValidContactRigidBody.lock();
+        if (cachedTargetRigidBody) {
+            // Transform cached point from surface local to world coordinates
+            glm::dvec3 worldPoint = cachedTargetRigidBody->m_position + 
+                cachedTargetRigidBody->m_orientation * m_lastValidContactPoint;
+            
+            // Calculate distance from rigid body to cached point
+            glm::dvec3 toBody = rigidBody->m_position - worldPoint;
+            double distance = glm::length(toBody);
+            
+            // Only add if within sensor detection range
+            if (distance > 1e-6 && distance <= m_walkingSensorRadius) {
+                glm::dvec3 normal = toBody / distance;
+                
+                // Add cached point as a candidate (will be plane-filtered)
+                candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
+            }
+        }
+    }
     
     // ========== Step 2: Plane-Based Filtering ==========
     // Filter out points that are recessed relative to other points
@@ -546,30 +569,6 @@ void DigibotController::handleWalking() {
                 filtered[j] = true;
             } else if (jFiltersI) {
                 filtered[i] = true;
-            }
-        }
-    }
-
-    // ========== Step 2.5: Add Last Valid Contact Point if Available ==========
-    // Added after filtering so cached point is never filtered out
-    if (usingCache && !m_lastValidContactRigidBody.expired()) {
-        auto cachedTargetRigidBody = m_lastValidContactRigidBody.lock();
-        if (cachedTargetRigidBody) {
-            // Transform cached point from surface local to world coordinates
-            glm::dvec3 worldPoint = cachedTargetRigidBody->m_position + 
-                cachedTargetRigidBody->m_orientation * m_lastValidContactPoint;
-            
-            // Calculate distance from rigid body to cached point
-            glm::dvec3 toBody = rigidBody->m_position - worldPoint;
-            double distance = glm::length(toBody);
-            
-            // Only add if within sensor detection range
-            if (distance > 1e-6 && distance <= m_walkingSensorRadius) {
-                glm::dvec3 normal = toBody / distance;
-                
-                // Add cached point as a candidate (won't be plane-filtered)
-                candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
-                filtered.push_back(false);  // Add corresponding filter flag
             }
         }
     }
@@ -627,6 +626,33 @@ void DigibotController::handleWalking() {
             closestRigidBody = candidates[i].rigidBody;
         }
     }
+
+    //// ========== DEBUG: GeoGebra Output ==========
+    //std::cout << "// GeoGebra 3D Points for contact candidates:" << std::endl;
+    //for (size_t i = 0; i < candidates.size(); ++i) {
+    //    //if (filtered[i]) continue;
+    //    
+    //    const glm::dvec3& pos = candidates[i].position;
+    //    const glm::dvec3& normal = candidates[i].normal;
+    //    
+    //    std::cout << "P" << i << " = (" 
+    //              << pos.x << ", " 
+    //              << pos.y << ", " 
+    //              << pos.z << ")" << std::endl;
+    //    
+    //    glm::dvec3 normalEnd = pos + normal * 0.3; // Scale normal for visibility
+    //    std::cout << "N" << i << " = Vector(P" << i << ", (" 
+    //              << normalEnd.x << ", " 
+    //              << normalEnd.y << ", " 
+    //              << normalEnd.z << "))" << std::endl;
+    //}
+    //if (foundContact) {
+    //    std::cout << "ClosestPoint = (" 
+    //              << closestPoint.x << ", " 
+    //              << closestPoint.y << ", " 
+    //              << closestPoint.z << ")" << std::endl;
+    //}
+    //std::cout << std::endl;
     
     if (!foundContact) {
         m_lastValidContactRigidBody.reset();
