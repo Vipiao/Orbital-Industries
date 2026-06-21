@@ -55,4 +55,5 @@ private:
 
     // Lock state
     bool m_needsRaycast{false};
+    bool m_needsFullLockRaycast{false};
 };

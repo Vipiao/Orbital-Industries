@@ -96,11 +96,19 @@ void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* control
     
     // Lock to the closest grid if found
     if (gridFound) {
-        controller->setLockState(DigibotController::LockState::TRANSLATION_LOCK);
-        controller->setTargetGrid(closestGrid);
+        if (m_needsFullLockRaycast) {
+            controller->setLockState(DigibotController::LockState::FULL_LOCK);
+            controller->setTargetGrid(closestGrid);
+        } else {
+            controller->setLockState(DigibotController::LockState::TRANSLATION_LOCK);
+            controller->setTargetGrid(closestGrid);
+        }
     } else {
         std::cout << "No grid found to lock to" << std::endl;
     }
+
+    m_needsRaycast = false;
+    m_needsFullLockRaycast = false;
 }
 
 void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& cameraPosition, glm::dquat& cameraOrientation, double timeRemainder) {
@@ -117,23 +125,37 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
             
             // Get current lock state
             DigibotController::LockState lockState = controller->getLockState();
+            bool longPress = keyboard->m_z.isDown() && keyboard->m_z.timeDown() == fullLockThreshold;
+            bool shortRelease = keyboard->m_z.justReleased() && keyboard->m_z.timeDown() < fullLockThreshold;
             
-            // Handle Z button press for lock/unlock
-            if (keyboard->m_z.justPressed()) {
-                if (lockState == DigibotController::LockState::UNLOCKED) {
-                    // Request raycast on next physics update
+            if (lockState == DigibotController::LockState::UNLOCKED) {
+                // Quick press -> translation lock
+                if (shortRelease) {
                     m_needsRaycast = true;
-                } else {
-                    // Already locked - unlock immediately
+                }
+                // Long press -> full lock
+                if (longPress) {
+                    m_needsRaycast = true;
+                    m_needsFullLockRaycast = true;
+                }
+            } else if (lockState == DigibotController::LockState::TRANSLATION_LOCK) {
+                // Quick press -> unlock
+                if (shortRelease) {
                     controller->unlock();
                 }
-            }
-            
-            // Handle transition to FULL_LOCK when holding Z
-            if (keyboard->m_z.isDown() && lockState == DigibotController::LockState::TRANSLATION_LOCK) {
-                if (keyboard->m_z.timeDown() > fullLockThreshold) {
+                // Long press -> full lock (no raycast needed, keep current target)
+                if (longPress) {
                     controller->setLockState(DigibotController::LockState::FULL_LOCK);
-                    std::cout << "Transitioning to FULL_LOCK (not yet implemented)" << std::endl;
+                }
+            } else if (lockState == DigibotController::LockState::FULL_LOCK) {
+                // Quick press -> unlock
+                if (shortRelease) {
+                    controller->unlock();
+                }
+                // Long press -> raycast for new target, keep lock regardless
+                if (longPress) {
+                    m_needsRaycast = true;
+                    m_needsFullLockRaycast = true;
                 }
             }
         }
