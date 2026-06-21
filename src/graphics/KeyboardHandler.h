@@ -7,15 +7,6 @@
 #include <filesystem>
 #include <fstream>
 
-// Platform detection
-#if defined(_WIN32) || defined(_WIN64)
-    #define PLATFORM_WINDOWS
-    #include <windows.h>
-#elif defined(__linux__)
-    #define PLATFORM_LINUX
-    #include <X11/XKBlib.h>
-#endif
-
 class KeyboardHandler {
 public:
    class Button {
@@ -80,10 +71,6 @@ public:
    enum class Mode { NONE, RECORD, PLAY };
    KeyboardHandler(GLFWwindow* window, Mode mode = Mode::NONE, const std::filesystem::path& filepath = "keyboard_data.bin");
    ~KeyboardHandler();
-
-   // Caps Lock state management
-   void setSuppressCapsLock(bool suppress);
-   bool getSuppressCapsLock() const { return m_suppressCapsLock; }
 
    void update();
    template <typename T>
@@ -150,18 +137,5 @@ public:
 protected:
    Mode m_mode{};
    std::fstream m_file{};
-
-   // Caps Lock suppression
-   bool m_suppressCapsLock{ false };
-
-   // Static registry of all handlers
-   static std::vector<KeyboardHandler*> s_allHandlers;
-   static bool s_callbackRegistered;
-
-   // Platform-specific helper
-   static void toggleCapsLock();
-
-   // GLFW callback (must be static)
-   static void capsLockCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 };
 

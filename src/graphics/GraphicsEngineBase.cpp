@@ -89,6 +89,7 @@ GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& f
 
    // Try to bypass compositor on Linux
    //glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+   glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
    //glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 
    // glfw window creation

@@ -46,14 +46,6 @@ public:
     // Shader reloading
     std::pair<bool, std::string> reloadShaders();
 
-    // Caps Lock suppression control
-    void setSuppressCapsLock(bool suppress) {
-        if (m_graphicsEngine) m_graphicsEngine->setSuppressCapsLock(suppress);
-    }
-    bool getSuppressCapsLock() const {
-        return m_graphicsEngine ? m_graphicsEngine->getSuppressCapsLock() : false;
-    }
-
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
     std::unique_ptr<JobManager> m_jobManager;

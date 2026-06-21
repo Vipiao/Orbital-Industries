@@ -59,7 +59,6 @@ GameBase::GameBase(
     
     std::cout << "Display refresh rate: " << refreshRate << " Hz" << std::endl;
     std::cout << "Physics update rate: " << 64 << " Hz" << std::endl;
-    setSuppressCapsLock(true);
 }
 
 GameBase::~GameBase() {

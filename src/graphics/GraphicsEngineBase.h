@@ -38,14 +38,6 @@ public:
    void setTriangleRenderMode(bool useTriangles);
    bool getTriangleRenderMode();
 
-   // Caps Lock suppression control
-   void setSuppressCapsLock(bool suppress) {
-      if (m_keyboardHandler) m_keyboardHandler->setSuppressCapsLock(suppress);
-   }
-   bool getSuppressCapsLock() const {
-      return m_keyboardHandler ? m_keyboardHandler->getSuppressCapsLock() : false;
-   }
-
    GLFWwindow* m_window{ nullptr };
    unsigned int m_screen_width{ 800 };
    unsigned int m_screen_height{ 600 };
