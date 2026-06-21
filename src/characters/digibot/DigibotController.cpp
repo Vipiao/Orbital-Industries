@@ -65,6 +65,12 @@ void DigibotController::setRollInput(int rollInput) {
 
 void DigibotController::setJetpackEnabled(bool enabled) {
     m_jetpackEnabled = enabled;
+    if (enabled) {
+        m_cachedRigidBody.reset();
+        m_cachedModifiedUp = glm::dvec3(0.0, 0.0, 0.0);
+        m_lastValidContactRigidBody.reset();
+        m_framesWithoutContact = 0;
+    }
     std::cout << "Jetpack " << (m_jetpackEnabled ? "ENABLED" : "DISABLED") << std::endl;
 }
 
@@ -656,8 +662,16 @@ void DigibotController::handleWalking() {
     
     if (!foundContact) {
         m_lastValidContactRigidBody.reset();
-        return; // No ground contact
+        m_framesWithoutContact++;
+        if (m_framesWithoutContact >= m_physicsEngine->getPhysicsHz()) { // 1 second
+            m_cachedRigidBody.reset();
+            m_cachedModifiedUp = glm::dvec3(0.0, 0.0, 0.0);
+            m_framesWithoutContact = 0;
+        }
+        return;
     }
+
+    m_framesWithoutContact = 0;
 
     // ========== Step 4: Store Target Rigid Body ==========
     m_walkingTargetRigidBody = closestRigidBody;

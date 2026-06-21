@@ -64,6 +64,9 @@ public:
     std::weak_ptr<Grid> getTargetGrid() const { return m_targetGrid; }
     
 private:
+    // Frames spent without ground contact (physics timestep units)
+    uint64_t m_framesWithoutContact{0};
+    
     // Physics handlers for different movement modes
     void handleFlying();
     void handleWalking();

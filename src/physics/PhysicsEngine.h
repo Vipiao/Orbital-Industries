@@ -56,7 +56,8 @@ public:
     
     //
     uint64_t getCurrentPhysicsTimeStep() const { return m_currentPhysicsTimeStep; }
-    
+    uint64_t getPhysicsHz() const { return m_physicsHz; }
+
     // Remove a rigid body from the simulation
     void removeRigidBody(std::weak_ptr<RigidBody> bodyWeak);
     
@@ -118,6 +119,7 @@ private:
     std::vector<std::shared_ptr<RigidBody>> m_rigidBodies;
     glm::dvec3 m_gravity{0.0, 0.0, 0.0}; // Default zero gravity
     uint64_t m_currentPhysicsTimeStep{0};
+    uint64_t m_physicsHz{64};
 
     CollisionDetector m_collisionDetector;
 

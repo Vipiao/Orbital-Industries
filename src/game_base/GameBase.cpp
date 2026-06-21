@@ -55,10 +55,10 @@ GameBase::GameBase(
     
     int refreshRate = m_graphicsEngine->getFrameRate();
     
-    m_physicsTimeStep = 1.0 / static_cast<double>(64);
-    
+    m_physicsTimeStep = 1.0 / static_cast<double>(m_physicsEngine->getPhysicsHz());
+
     std::cout << "Display refresh rate: " << refreshRate << " Hz" << std::endl;
-    std::cout << "Physics update rate: " << 64 << " Hz" << std::endl;
+    std::cout << "Physics update rate: " << m_physicsEngine->getPhysicsHz() << " Hz" << std::endl;
 }
 
 GameBase::~GameBase() {
