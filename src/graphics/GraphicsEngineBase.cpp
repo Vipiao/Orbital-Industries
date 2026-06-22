@@ -73,6 +73,9 @@ GraphicsEngineBase::GraphicsEngineBase(Mode mode, const std::filesystem::path& f
 
    // glfw: initialize and configure
    // ------------------------------
+   #ifdef __linux__
+      glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+   #endif
    glfwInit();
    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
