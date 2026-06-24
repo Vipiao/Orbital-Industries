@@ -166,7 +166,6 @@ void Creative::physics() {
                         // Get body interpolated transform
                         glm::dvec3 interpolatedPos;
                         glm::dquat interpolatedOri;
-                        //auto targetGrid = targetGridWeak.lock();
                         body->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
 
                         // Convert camera position to body-local space

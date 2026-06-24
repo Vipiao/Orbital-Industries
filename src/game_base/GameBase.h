@@ -87,6 +87,18 @@ private:
     // Flag to track if physics update is in progress
     bool m_physicsUpdateInProgress{false};
 
+    // Resumable state for updatePhysics. Grid splits and physics callbacks can
+    // both destroy grids/colliders, so they must run exactly once per physics
+    // step and only at a clean step boundary -- never re-run when the physics
+    // engine has parked mid-step (which would free a collider still referenced
+    // by this step's collision records).
+    enum class PhysicsUpdateState {
+        SPLITS,     // draining m_gridSubsystem->handlePendingSplits
+        CALLBACKS,  // running onPhysicsUpdateComplete callbacks (once)
+        PHYSICS     // running m_physicsEngine->runUntil
+    };
+    PhysicsUpdateState m_physicsUpdateState{PhysicsUpdateState::SPLITS};
+
     DebugRenderer* m_debugRenderer = nullptr;
 };
 

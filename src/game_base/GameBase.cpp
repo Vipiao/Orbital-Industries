@@ -186,36 +186,41 @@ void GameBase::finalizeFrame() {
 }
 
 bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
-    // Handle any pending grid splits before running physics
-    if (m_gridSubsystem->handlePendingSplits(endTime)) {
-        return true; // Grid splitting needs more time
+    // Resumable state machine
+    switch (m_physicsUpdateState) {
+        case PhysicsUpdateState::SPLITS:
+            // Drain pending grid splits
+            if (m_gridSubsystem->handlePendingSplits(endTime)) {
+                return true; // Grid splitting needs more time -- stay in SPLITS
+            }
+            m_physicsUpdateState = PhysicsUpdateState::CALLBACKS;
+            [[fallthrough]];
+
+        case PhysicsUpdateState::CALLBACKS:
+            // Runs exactly once per physics step
+            for (auto* callback : m_callbacks) {
+                callback->onPhysicsUpdateComplete();
+            }
+
+            m_physicsUpdateState = PhysicsUpdateState::PHYSICS;
+            [[fallthrough]];
+
+        case PhysicsUpdateState::PHYSICS:
+            // Run physics engine
+            if (m_physicsEngine->runUntil(endTime)) {
+                return true; // Physics step needs more time -- stay in PHYSICS
+            }
+
+            m_gridSubsystem->updateAllGraphics(m_graphicsEngine->getCamPos());
+            m_characterSubsystem->updateAllPhysicsComplete();
+
+            // Clear the in-progress flag and reset for the next step.
+            m_physicsUpdateInProgress = false;
+            m_physicsUpdateState = PhysicsUpdateState::SPLITS;
+            return false;
     }
 
-    // Call physics callbacks FIRST (before physics invalidates timeRemainder)
-    for (auto* callback : m_callbacks) {
-        callback->onPhysicsUpdateComplete();
-    }
-
-    // Apply drag to all objects before running physics
-    // (move existing drag code from MyGame here if you want)
-    
-    // Run physics engine
-    bool needsMoreTime = m_physicsEngine->runUntil(endTime);
-    if (needsMoreTime)
-    {
-        return true;
-    }
-    
-    // Update graphics only when physics step is complete
-    m_gridSubsystem->updateAllGraphics(m_graphicsEngine->getCamPos());
-
-    // Update characters after physics
-    m_characterSubsystem->updateAllPhysicsComplete();
-    
-    // Clear the physics update flag
-    m_physicsUpdateInProgress = false;
-
-    return false;
+    return false; // Unreachable; keeps the compiler happy.
 }
 
 void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
