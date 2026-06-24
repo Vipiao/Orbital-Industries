@@ -159,14 +159,14 @@ void PhysicsEngine::removeRigidBody(std::weak_ptr<RigidBody> bodyWeak) {
 
 void PhysicsEngine::applyForce(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force) {
     auto body = bodyWeak.lock();
-    if (body && !body->m_isStatic) {
+    if (!body || body->m_isStatic) return;
         body->m_forces += force;
-    }
 }
 
 void PhysicsEngine::applyForceAtPoint(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force, const glm::dvec3& point) {
     auto body = bodyWeak.lock();
-    if (body && !body->m_isStatic) {
+    if (!body || body->m_isStatic) return;
+
         // Add the force to overall forces
         body->m_forces += force;
         
