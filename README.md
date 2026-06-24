@@ -1,88 +1,39 @@
-# Orbital-Industries# OpenGL and Assimp Setup Guide for Windows with MSYS2
+# OrbitalIndustries
 
-This guide covers the setup process for developing OpenGL applications with Assimp for 3D model loading using MSYS2's UCRT64 environment on Windows.
+A game built on a separate graphics engine repo. The engine lives in its own
+repository and is pulled in at build time via a local path, so you clone both
+and tell this project where the engine is.
 
-## Table of Contents
-
-- [Prerequisites](#prerequisites)
-- [Setting up MSYS2](#setting-up-msys2)
-- [Setting up OpenGL with GLFW and GLAD](#setting-up-opengl-with-glfw-and-glad)
-- [Setting up Assimp](#setting-up-assimp)
 ## Prerequisites
 
-- Windows 10 or 11
-- Administrator access to install software
-- Basic familiarity with command line interfaces
+- CMake 3.16+
+- A C++20 compiler (GCC/Clang on Linux, MSVC or MSYS2/UCRT64 on Windows)
+- Dependencies: assimp, glfw3, OpenGL
+- The graphics engine repo, cloned separately
 
-## Setting up MSYS2
+## Setup
 
-MSYS2 provides a Unix-like development environment for Windows.
+1. Clone this repo and the graphics engine repo.
 
-1. **Download and Install MSYS2**:
-   - Visit [https://www.msys2.org/](https://www.msys2.org/) and download the installer
-   - Run the installer and follow the setup instructions
-   - When installation completes, launch the MSYS2 UCRT64 terminal
+2. Create a `CMakeUserPresets.json` next to this README, pointing `ENGINE_DIR`
+   at your local engine clone. This file is gitignored — it's personal to your
+   machine. Example:
 
-2. **Update the package database and core packages**:
-   ```bash
-   pacman -Syu
-   ```
-   - Close the terminal when prompted, then reopen it and run:
-   ```bash
-   pacman -Su
-   ```
+```json
+   {
+     "version": 3,
+     "configurePresets": [
+       {
+         "name": "dev",
+         "binaryDir": "${sourceDir}/build",
+         "cacheVariables": {
+           "ENGINE_DIR": "/home/markus/repos/02_graphics_engine/graphics_engine"
+         }
+       }
+     ]
+   }
+```
 
-3. **Install development tools**:
-   ```bash
-   pacman -S mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-cmake make
-   ```
+   Set `ENGINE_DIR` to wherever you cloned the engine on your machine.
 
-4. **Add MSYS2 bin directory to your system PATH**:
-   - Navigate to System Properties → Advanced → Environment Variables
-   - Add `C:\msys64\ucrt64\bin` to your PATH variable
-
-## Setting up OpenGL with GLFW and GLAD
-
-### Install GLFW using MSYS2:
-   ```bash
-   pacman -S mingw-w64-ucrt-x86_64-glfw
-   ```
-
-### Setting up GLAD
-
-GLAD is a loader generator for OpenGL that provides the required headers and functions.
-
-1. **Generate GLAD files**:
-   - Visit [https://glad.dav1d.de/](https://glad.dav1d.de/)
-   - Set Language to "C/C++"
-   - Set Specification to "OpenGL"
-   - Set Profile to "Core"
-   - Set API gl to at least "Version 3.3" (or higher if needed)
-   - Check "Generate a loader" option
-   - Click "Generate" and download the ZIP file
-
-2. **Extract GLAD files into your project**:
-   - Create directories in your project: `include/glad`, `include/KHR`, and `src`
-   - Extract `glad.h` to `include/glad/`
-   - Extract `khrplatform.h` to `include/KHR/`
-   - Extract `glad.c` to `src/`
-
-## Setting up Assimp
-
-Assimp (Open Asset Import Library) allows you to import various 3D model formats.
-
-1. **Install Assimp in MSYS2 UCRT64**:
-   ```bash
-   pacman -S mingw-w64-ucrt-x86_64-assimp
-   ```
-
-2. **Copy Required DLLs to your project**:
-   Run this script to copy the DLLs to your bin directory `copy_assimp_dlls.bat`.
-
-## Building and Running Your Project
-
-Use CMake. Easiest way is using vscode cmake extension.
-
-## Resources
-    Check this useful website. But it shows for visual studio not vs code.
-https://learnopengl.com/
+3. Configure and build:

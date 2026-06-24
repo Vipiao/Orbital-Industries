@@ -1,10 +1,10 @@
 // GridGraphics.h
 #pragma once
 
-#include "../graphics/GraphicsEngine.h"
+#include "graphics/GraphicsEngine.h"
 #include "CellType.h"
 #include "../utils/HashFunctions.h"
-#include "../graphics/AssimpLoader.h"
+#include "graphics/AssimpLoader.h"
 #include "StructuralBlock.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>

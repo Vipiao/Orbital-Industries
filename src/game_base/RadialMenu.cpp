@@ -1,8 +1,8 @@
 // RadialMenu.cpp
 #include "RadialMenu.h"
-#include "../graphics/GraphicsEngine.h"
-#include "../graphics/instanceHandler/InstanceHandler.h"
-#include "../graphics/SSBOManager.h"
+#include "graphics/GraphicsEngine.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/SSBOManager.h"
 #include <iostream>
 
 // Static member initialization

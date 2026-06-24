@@ -1,7 +1,7 @@
 // DigibotResources.cpp
 #include "DigibotResources.h"
-#include "../../graphics/GraphicsEngine.h"
-#include "../../graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/GraphicsEngine.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
 #include <iostream>
 
 DigibotResources::DigibotResources(GraphicsEngine* graphics)

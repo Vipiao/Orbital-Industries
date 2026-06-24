@@ -1,8 +1,8 @@
 // DebugVisualization.h
 #pragma once
 
-#include "../graphics/instanceHandler/InstanceHandler.h"
-#include "../graphics/SSBOManager.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/SSBOManager.h"
 #include "../debug/DebugRenderer.h"
 #include <vector>
 #include <memory>

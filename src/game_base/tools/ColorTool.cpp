@@ -6,8 +6,8 @@
 #include "../StructuralBlock.h"
 #include "../../utils/ColorUtils.h"
 #include <iostream>
-#include "../../graphics/MeshManager2D/MeshManager2D.h"
-#include "../../graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/MeshManager2D/MeshManager2D.h"
+#include "graphics/MeshManager2D/GeometryInstance.h"
 #include "../../utils/GridGeometry.h"
 
 ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)

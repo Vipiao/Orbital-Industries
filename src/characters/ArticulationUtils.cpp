@@ -1,6 +1,6 @@
 // src/characters/ArticulationUtils.cpp
 #include "ArticulationUtils.h"
-#include "../graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
 #include <glm/gtx/quaternion.hpp>
 
 glm::dvec3 ArticulationUtils::applyDistanceConstraint(const glm::dvec3& point, const glm::dvec3& anchor, double targetDistance) {

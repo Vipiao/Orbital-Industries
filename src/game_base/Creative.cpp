@@ -1,7 +1,7 @@
 // Creative.cpp
 #include "Creative.h"
 #include "../game_base/GameBase.h"
-#include "../graphics/GraphicsEngine.h"
+#include "graphics/GraphicsEngine.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "../game_base/Grid.h"
@@ -9,10 +9,10 @@
 #include "../utils/PositionSelector.h"
 #include <iostream>
 #include "../utils/ColorUtils.h"
-#include "../graphics/MeshManager2D/MeshManager2D.h"
-#include "../graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/MeshManager2D/MeshManager2D.h"
+#include "graphics/MeshManager2D/GeometryInstance.h"
 #include "StructuralBlock.h"
-#include "../graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
 #include "RadialMenu.h"
 #include "tools/CharacterSelectionTool.h"
 #include "tools/FreeCameraController.h"

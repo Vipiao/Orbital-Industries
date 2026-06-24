@@ -5,10 +5,10 @@
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "../game_base/Grid.h"
-#include "../graphics/GraphicsEngine.h"
+#include "graphics/GraphicsEngine.h"
 #include "../characters/ArticulationUtils.h"
-#include "../graphics/KeyboardHandler.h"
-#include "../graphics/MouseHandler.h"
+#include "graphics/KeyboardHandler.h"
+#include "graphics/MouseHandler.h"
 #include <iostream>
 #include "../utils/GridGeometry.h"
 

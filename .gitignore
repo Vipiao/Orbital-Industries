@@ -46,3 +46,5 @@ target-*
 *.swp
 *.swo
 .vs/
+
+CMakeUserPresets.json

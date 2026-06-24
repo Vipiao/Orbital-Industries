@@ -1,13 +1,13 @@
 // main.cpp
 #include "src/game_base/GameBase.h"
-#include "src/graphics/GraphicsEngineBase.h"
+#include "graphics/GraphicsEngineBase.h"
 #include "src/utils/TimeHandler.h"
 #include "src/debug/DebugVisualization.h"
 #include "src/game_base/Creative.h"
 #include "src/debug/DebugRenderer.h"
 #include "src/debug/DebugGlobals.h"
-#include "src/graphics/MeshManager2D/MeshManager2D.h"
-#include "src/graphics/CallbackManager.h"
+#include "graphics/MeshManager2D/MeshManager2D.h"
+#include "graphics/CallbackManager.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -209,10 +209,10 @@ private:
 int main() {
     try {
         // Create the TimeHandler with appropriate mode
-        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::NONE);
+        TimeHandler* timeHandler = new TimeHandler(TimeHandler::Mode::RECORD);
 
         // Use existing GraphicsEngineBase::Mode for controls
-        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE;
+        GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::RECORD;
 
         Game game(timeHandler, controlMode);
         game.run();

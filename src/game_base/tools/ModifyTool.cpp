@@ -4,9 +4,9 @@
 #include "../RadialMenu.h"
 #include "../Grid.h"
 #include "../StructuralBlock.h"
-#include "../../graphics/MeshManager2D/MeshManager2D.h"
-#include "../../graphics/MeshManager2D/GeometryInstance.h"
-#include "../../graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/MeshManager2D/MeshManager2D.h"
+#include "graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
 #include "../../utils/PositionSelector.h"
 #include <cmath>
 #include <iostream>

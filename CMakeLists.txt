@@ -26,53 +26,29 @@ endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+# Engine location — set in CMakeUserPresets.json (gitignored), Option 3.
+set(ENGINE_DIR "" CACHE PATH "Path to the graphics engine repo")
+add_subdirectory(${ENGINE_DIR} ${CMAKE_BINARY_DIR}/engine-build)
+
 # Specify output directory for the executable
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
-# Common include directories
+# Game's own includes. glad/glm and all libs come from the engine target.
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories("${CMAKE_SOURCE_DIR}/include")
-include_directories("${CMAKE_SOURCE_DIR}/external/glad/include")
-include_directories("${CMAKE_SOURCE_DIR}/external/glm")
-
-# Platform-specific configuration
 if(WIN32)
-    message(STATUS "Configuring for Windows")
     include_directories("C:/msys64/ucrt64/include")
     link_directories("C:/msys64/ucrt64/lib")
-elseif(UNIX)
-    message(STATUS "Configuring for Linux")
-    # Find packages using CMake's package finder
-    find_package(assimp REQUIRED)
-    find_package(glfw3 REQUIRED)
-    find_package(OpenGL REQUIRED)
-    include_directories(${ASSIMP_INCLUDE_DIRS})
 endif()
 
 # Manually list source files
 file(GLOB_RECURSE SRC_FILES
     "${CMAKE_SOURCE_DIR}/main.cpp"
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_SOURCE_DIR}/external/glad/src/glad.c"
 )
 
 # Add the executable
 add_executable(OrbitalIndustries ${SRC_FILES})
 
-# Platform-specific linking
-if(WIN32)
-    target_link_libraries(OrbitalIndustries
-        "${CMAKE_SOURCE_DIR}/lib/libglfw3.a"
-        -lassimp
-        -lopengl32
-        -lgdi32
-        -luser32
-        -lshell32
-    )
-elseif(UNIX)
-    target_link_libraries(OrbitalIndustries
-        glfw
-        ${ASSIMP_LIBRARIES}
-        ${OPENGL_LIBRARIES}
-    )
-endif()
+# Everything comes through the engine target's PUBLIC properties.
+target_link_libraries(OrbitalIndustries PRIVATE GraphicsEngine::graphics)

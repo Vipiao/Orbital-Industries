@@ -5,7 +5,7 @@
 #include <functional>
 #include <glm/glm.hpp>
 #include <vector>
-#include "../../graphics/MeshManager2D/GeometryData.h"
+#include "graphics/MeshManager2D/GeometryData.h"
 
 // Forward declarations
 class GameBase;

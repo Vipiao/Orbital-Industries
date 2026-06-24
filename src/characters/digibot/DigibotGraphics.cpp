@@ -2,9 +2,9 @@
 #include "DigibotGraphics.h"
 #include "DigibotResources.h"
 #include "../ArticulationUtils.h"
-#include "../../graphics/GraphicsEngine.h"
-#include "../../graphics/instanceHandler/InstanceHandler.h"
-#include "../../graphics/SSBOManager.h"
+#include "graphics/GraphicsEngine.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/SSBOManager.h"
 #include <iostream>
 
 // Static skeleton measurements (T-pose natural positions)

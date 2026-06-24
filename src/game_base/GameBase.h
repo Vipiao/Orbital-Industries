@@ -1,8 +1,8 @@
 // GameBase.h
 #pragma once
 
-#include "../graphics/GraphicsEngine.h"
-#include "../graphics/GraphicsEngineBase.h"
+#include "graphics/GraphicsEngine.h"
+#include "graphics/GraphicsEngineBase.h"
 #include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
 #include "../utils/IHashable.h"

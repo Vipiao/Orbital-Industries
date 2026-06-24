@@ -4,11 +4,11 @@
 #include "../../physics/GridCollider.h"
 #include "../../physics/RigidBody.h"
 #include "../../physics/PolyhedronCollider.h"
-#include "../../graphics/GraphicsEngine.h"
+#include "graphics/GraphicsEngine.h"
 #include "../../utils/PolyhedronProcessor.h"
 #include "../../utils/MassInertiaCalculator.h"
 #include "../../utils/GridGeometry.h"
-#include "../../graphics/meshHandler/MeshHandler.h"
+#include "graphics/meshHandler/MeshHandler.h"
 #include "../../physics/SensorCollider.h"
 #include "../../physics/BallCollider.h"
 
