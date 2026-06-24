@@ -67,6 +67,9 @@ public:
     // Apply a force at a specific point (will generate torque)
     void applyForceAtPoint(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force, const glm::dvec3& point);
     
+    // Apply a force at a body-local point with a body-local force vector (will generate torque)
+    void applyLocalForceAtPoint(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& localForce, const glm::dvec3& localPoint);
+
     // Apply a torque directly
     void applyTorque(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& torque);
     
