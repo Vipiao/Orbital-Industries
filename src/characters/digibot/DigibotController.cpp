@@ -68,7 +68,6 @@ void DigibotController::setJetpackEnabled(bool enabled) {
     if (enabled) {
         m_cachedRigidBody.reset();
         m_cachedModifiedUp = glm::dvec3(0.0, 0.0, 0.0);
-        m_lastValidContactRigidBody.reset();
         m_framesWithoutContact = 0;
     }
     std::cout << "Jetpack " << (m_jetpackEnabled ? "ENABLED" : "DISABLED") << std::endl;
@@ -519,29 +518,6 @@ void DigibotController::handleWalking() {
             candidates.push_back({contactPoint, normal, distance, otherRigidBody});
         }
     }
-
-    // ========== Step 2.5: Add Last Valid Contact Point if Available ==========
-    // Add cached point BEFORE filtering so it can also be plane-filtered
-    if (usingCache && !m_lastValidContactRigidBody.expired()) {
-        auto cachedTargetRigidBody = m_lastValidContactRigidBody.lock();
-        if (cachedTargetRigidBody) {
-            // Transform cached point from surface local to world coordinates
-            glm::dvec3 worldPoint = cachedTargetRigidBody->m_position + 
-                cachedTargetRigidBody->m_orientation * m_lastValidContactPoint;
-            
-            // Calculate distance from rigid body to cached point
-            glm::dvec3 toBody = rigidBody->m_position - worldPoint;
-            double distance = glm::length(toBody);
-            
-            // Only add if within sensor detection range
-            if (distance > 1e-6 && distance <= m_walkingSensorRadius) {
-                glm::dvec3 normal = toBody / distance;
-                
-                // Add cached point as a candidate (will be plane-filtered)
-                candidates.push_back({worldPoint, normal, distance, m_lastValidContactRigidBody});
-            }
-        }
-    }
     
     // ========== Step 2: Plane-Based Filtering ==========
     // Filter out points that are recessed relative to other points
@@ -594,16 +570,6 @@ void DigibotController::handleWalking() {
         
         if (alignment < angleThreshold) {
             filtered[i] = true;
-            
-            // If this was the cached contact point, clear the cache
-            if (!m_lastValidContactRigidBody.expired()) {
-                auto cachedRigidBody = m_lastValidContactRigidBody.lock();
-                auto candidateRigidBody = candidates[i].rigidBody.lock();
-                if (cachedRigidBody && candidateRigidBody && 
-                    cachedRigidBody.get() == candidateRigidBody.get()) {
-                    m_lastValidContactRigidBody.reset();
-                }
-            }
         }
     }
 
@@ -661,7 +627,6 @@ void DigibotController::handleWalking() {
     //std::cout << std::endl;
     
     if (!foundContact) {
-        m_lastValidContactRigidBody.reset();
         m_framesWithoutContact++;
         if (m_framesWithoutContact >= m_physicsEngine->getPhysicsHz()) { // 1 second
             m_cachedRigidBody.reset();
@@ -675,19 +640,7 @@ void DigibotController::handleWalking() {
 
     // ========== Step 4: Store Target Rigid Body ==========
     m_walkingTargetRigidBody = closestRigidBody;
-
-    // ========== Step 4.5: Update Contact Cache ==========
     auto targetRigidBody = m_walkingTargetRigidBody.lock();
-    if (usingCache && targetRigidBody) {
-        // Update contact point cache
-        glm::dvec3 localPoint = glm::conjugate(targetRigidBody->m_orientation) * 
-            (closestPoint - targetRigidBody->m_position);
-        m_lastValidContactPoint = localPoint;
-        m_lastValidContactRigidBody = targetRigidBody;
-    } else {
-        // Not using orientation cache, so contact cache not needed
-        m_lastValidContactRigidBody.reset();
-    }
 
     // ========== Step 5: Calculate Normal ==========
     glm::dvec3 toBody = rigidBody->m_position - closestPoint;
