@@ -163,13 +163,21 @@ void Creative::physics() {
                     if (body) {
                         // Apply force in the view direction
                         const double forceStrength = 0.001 * body->m_mass * forceMultiplier;
-                        glm::dvec3 force = forward * forceStrength;
-                        
-                        // Apply the force at the camera position
-                        glm::dvec3 applicationPoint = m_gameBase->m_graphicsEngine->getCamPos();
-                        
-                        // Apply force at the point
-                        m_gameBase->m_physicsEngine->applyForceAtPoint(bodyWeak, force, applicationPoint);
+                        // Get body interpolated transform
+                        glm::dvec3 interpolatedPos;
+                        glm::dquat interpolatedOri;
+                        //auto targetGrid = targetGridWeak.lock();
+                        body->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
+
+                        // Convert camera position to body-local space
+                        glm::dvec3 camPos = m_gameBase->m_graphicsEngine->getCamPos();
+                        glm::dvec3 localApplicationPoint = GridGeometry::worldToGrid(
+                            camPos, interpolatedPos, interpolatedOri, {});
+
+                        // Rotate force vector into body-local space
+                        glm::dvec3 localForce = glm::conjugate(interpolatedOri) * (forward * forceStrength);
+
+                        m_gameBase->m_physicsEngine->applyLocalForceAtPoint(bodyWeak, localForce, localApplicationPoint);
                         
                         //std::cout << "Applied force to grid at t: " << closestT << std::endl;
                     }

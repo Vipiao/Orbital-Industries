@@ -160,22 +160,32 @@ void PhysicsEngine::removeRigidBody(std::weak_ptr<RigidBody> bodyWeak) {
 void PhysicsEngine::applyForce(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force) {
     auto body = bodyWeak.lock();
     if (!body || body->m_isStatic) return;
-        body->m_forces += force;
+    body->m_forces += force;
 }
 
 void PhysicsEngine::applyForceAtPoint(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force, const glm::dvec3& point) {
     auto body = bodyWeak.lock();
     if (!body || body->m_isStatic) return;
 
-        // Add the force to overall forces
-        body->m_forces += force;
-        
-        // Calculate torque: τ = r × F
-        // where r is the vector from center of mass to point of application
-        glm::dvec3 r = point - body->m_position;
-        glm::dvec3 torque = glm::cross(r, force);
-        body->m_torques += torque;
-    }
+    // Add the force to overall forces
+    body->m_forces += force;
+    
+    // Calculate torque: τ = r × F
+    // where r is the vector from center of mass to point of application
+    glm::dvec3 r = point - body->m_position;
+    glm::dvec3 torque = glm::cross(r, force);
+    body->m_torques += torque;
+}
+
+void PhysicsEngine::applyLocalForceAtPoint(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& localForce, const glm::dvec3& localPoint) {
+    auto body = bodyWeak.lock();
+    if (!body || body->m_isStatic) return;
+
+    // Rotate force and point from body-local space to world space
+    glm::dvec3 worldForce = body->m_orientation * localForce;
+    glm::dvec3 worldPoint = body->m_position + body->m_orientation * localPoint;
+
+    applyForceAtPoint(bodyWeak, worldForce, worldPoint);
 }
 
 void PhysicsEngine::applyTorque(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& torque) {
