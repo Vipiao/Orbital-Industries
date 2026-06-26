@@ -70,7 +70,7 @@ DigibotGraphics::DigibotGraphics(GraphicsEngine* graphics, DigibotResources* res
             m_resources->getColorTextureUnit(), // colorTextureUnit
             m_resources->getNormalTextureUnit(),// normalTextureUnit
             -1,                                  // materialTextureUnit - no material
-            glm::dvec4(1.0, 0.0, 0.0, 1.0));    // white color
+            glm::dvec4(1.0, 1.0, 1.0, 1.0));
     }
     
     // Initialize all instance transforms

@@ -25,11 +25,11 @@ struct RadialMenuNode {
     std::function<void()> m_onExitCallback;
     int m_symbolTextureIndex = -1; // Optional symbol texture for this node
     std::weak_ptr<Instance> instance;
-    glm::dvec4 m_selectColor{0.5, 0.5, 1.0, 1.0};
-    glm::dvec4 m_unSelectColor{0.2, 0.1, 0.8, 1.0};
-    
-    RadialMenuNode(int64_t nodeId, const glm::dvec4& selectColor = glm::dvec4(0.5, 0.5, 1.0, 1.0), 
-                   const glm::dvec4& unSelectColor = glm::dvec4(0.2, 0.1, 0.8, 1.0)) 
+    glm::dvec4 m_selectColor;
+    glm::dvec4 m_unSelectColor;
+
+    RadialMenuNode(int64_t nodeId, const glm::dvec4& selectColor = glm::dvec4(0.5, 0.5, 1.0, 0.5),
+                   const glm::dvec4& unSelectColor = glm::dvec4(0.2, 0.1, 0.8, 0.5)) 
         : m_id(nodeId), m_selectColor(selectColor), m_unSelectColor(unSelectColor) {}
 };
 

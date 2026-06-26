@@ -690,7 +690,7 @@ void ModifyTool::updateMarkerPositions() {
             if (i < markerDistances.size()) {
                 alpha = 0.25 + 0.5 * (maxDist - markerDistances[i]) / (maxDist - minDist);
             }
-            inst->setColor(glm::dvec4(1.0, 0.0, 0.0, alpha));
+            inst->setColor(glm::dvec4(1.0, 1.0, 1.0, alpha));
         }
     }
 }

@@ -60,7 +60,7 @@ void BuildTool::activate() {
             glm::vec2 position(static_cast<float>(m_crosshairOffset.x), static_cast<float>(-m_crosshairOffset.y)); // down-right direction
             instance->setPosition(position);
             instance->setScale(glm::vec2(static_cast<float>(m_crosshairScale.x), static_cast<float>(m_crosshairScale.y)));
-            glm::dvec4 color(1.0, 0., 0., m_buildCrosshairTransparency); // Construction orange
+            glm::dvec4 color(1.0, 1.0, 1.0, m_buildCrosshairTransparency);
             instance->setColor(color);
         }
     }

@@ -416,7 +416,7 @@ void RadialMenu::updateRendering() {
                     
                     inst->m_localOrientation = glm::dquat(1.0, 0.0, 0.0, 0.0); // Unit orientation (no rotation)
                     inst->m_localScale = glm::dvec3(0.2);
-                    inst->m_color = glm::dvec4(1.0, 0.0, 0.0, 1.0); // White color for symbol
+                    inst->m_color = glm::dvec4(1.0, 1.0, 1.0, 1.0);
 
                     geometry->updateInstanceInBuffer(inst.get());
                     m_currentInstances.push_back(symbolInstance);
