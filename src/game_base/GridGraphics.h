@@ -6,6 +6,8 @@
 #include "../utils/HashFunctions.h"
 #include "graphics/AssimpLoader.h"
 #include "StructuralBlock.h"
+#include "thruster/ThrusterResources.h"
+#include "thruster/ThrusterGraphics.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -61,9 +63,14 @@ public:
     bool hasGraphicsCell(const glm::ivec3& coord) const;
     GraphicsCell* getGraphicsCell(const glm::ivec3& coord);
 
-    // Access to mesh ID for instance rendering
+    // Access to mesh ID / SSBO index (they are the same slot — addMesh allocates the SSBO index)
     int getMeshId() const { return m_meshId; }
-    
+    int getSSBOIndex() const { return m_meshId; }
+
+    // Thruster instance management
+    void addThrusterInstance(const glm::ivec3& anchorCoord);
+    void removeThrusterInstance(const glm::ivec3& anchorCoord);
+
 private:
     // Graphics cell storage
     std::unordered_map<glm::ivec3, GraphicsCell, Hash::IVec3Hash> m_graphicsCells;
@@ -71,6 +78,10 @@ private:
     // Graphics engine reference
     GraphicsEngine* m_graphics;
     int m_meshId;
+
+    // Thruster instance rendering — declare resources before map so resources outlive instances
+    std::unique_ptr<ThrusterResources> m_thrusterResources;
+    std::unordered_map<glm::ivec3, std::unique_ptr<ThrusterGraphics>, Hash::IVec3Hash> m_thrusterGraphicsMap;
     
     // Texture management
     static int s_colorTextureUnit;

@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include <functional>
 #include <array>
+#include <vector>
 #include "../utils/IHashable.h"
 #include "../utils/StochasticAnalyzer.h"
 #include "CellType.h"
@@ -42,6 +43,12 @@ public:
      * @return Tuple of (mass, local center of mass, local inertia tensor)
      */
     virtual std::tuple<double, glm::dvec3, glm::dmat3> getMassProperties() const = 0;
+
+    /**
+     * @brief Get local vertices of this cell (in [0,1] space relative to cell coord)
+     * Default returns a unit cube. Override for non-cube shapes.
+     */
+    virtual std::vector<glm::dvec3> getLocalVertices() const;
 
     // IHashable interface
     virtual size_t computeHash() const override;

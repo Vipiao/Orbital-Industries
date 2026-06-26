@@ -11,6 +11,8 @@
 #include "../utils/GridGeometry.h"
 #include "CellType.h"
 #include "StructuralBlock.h"
+#include "thruster/ThrusterBlock.h"
+#include "thruster/ThrusterSecondaryCell.h"
 #include "../utils/TimeHandler.h"
 #include <glm/glm.hpp>
 #include "../utils/JobManager.h"
@@ -35,7 +37,11 @@ public:
     
     // Cell management methods
     void addCell(const glm::ivec3& coord);
-    void removeCell(const glm::ivec3& coord);
+    void addThruster(const glm::ivec3& anchorCoord);
+
+    // Returns all coords removed (1 for structural block, 2 for thruster anchor+secondary)
+    std::vector<glm::ivec3> removeCell(const glm::ivec3& coord);
+
     bool hasCell(const glm::ivec3& coord) const;
     bool isEmpty() const;
 
@@ -73,8 +79,9 @@ public:
     // Get collider for subsystem queries
     std::weak_ptr<Collider> getCollider() const { return m_colliderWeak; }
 
-    // Get graphics mesh ID for instance rendering
+    // Get graphics mesh ID / SSBO index (shared between mesh and instance renderers)
     int getGraphicsMeshId() const;
+    int getGridSSBOIndex() const;
 
     // Convert world coordinates to grid-local coordinates
     glm::dvec3 worldToGrid(const glm::dvec3& worldPos) const;
@@ -101,11 +108,13 @@ public:
     // Center of mass in local space. Get m_rigidBody->m_position to get the world center of mass.
     glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
 
-    // Access to cells for partitioning
+    // Structural block access (for StochasticAnalyzer and vertex/color data)
     const std::unordered_map<glm::ivec3, StructuralBlock, Hash::IVec3Hash>& getCells() const { return m_cells; }
-    
-    // Public cell access for vertex data preservation
     StructuralBlock* getCell(const glm::ivec3& coord);
+
+    // Generic registry of all cells (structural blocks + thruster anchor + thruster secondary)
+    const std::unordered_map<glm::ivec3, GridCell*, Hash::IVec3Hash>& getCellRegistry() const { return m_cellRegistry; }
+    GridCell* getCellFromRegistry(const glm::ivec3& coord);
 
     // IHashable interface
     virtual size_t computeHash() const override;
@@ -124,10 +133,17 @@ private:
     // Static counter for unique IDs
     static uint64_t s_nextUniqueId;
 
-    // Core data for block grid
+    // Structural blocks (owning)
     std::unordered_map<glm::ivec3, StructuralBlock, Hash::IVec3Hash> m_cells;
 
-    // Stochastic analysis
+    // Thruster cells (owning)
+    std::unordered_map<glm::ivec3, ThrusterBlock, Hash::IVec3Hash> m_thrusterCells;
+    std::unordered_map<glm::ivec3, ThrusterSecondaryCell, Hash::IVec3Hash> m_thrusterSecondaryCells;
+
+    // Non-owning registry — all cells of any type, updated in sync with the owning maps
+    std::unordered_map<glm::ivec3, GridCell*, Hash::IVec3Hash> m_cellRegistry;
+
+    // Stochastic analysis (structural blocks only)
     std::unique_ptr<StochasticAnalyzer<StructuralBlock>> m_stochasticAnalyzer;
         
     // External system references

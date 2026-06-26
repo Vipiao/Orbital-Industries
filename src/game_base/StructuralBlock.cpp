@@ -55,6 +55,10 @@ PolyhedronProcessor::MeshData StructuralBlock::generateTriangleMeshData() const 
     return PolyhedronProcessor::generateMeshData(triangles);
 }
 
+std::vector<glm::dvec3> StructuralBlock::getLocalVertices() const {
+    return getVertices();
+}
+
 std::tuple<double, glm::dvec3, glm::dmat3> StructuralBlock::getMassProperties() const {
     // Return cached values if still valid
     if (!m_massPropertiesDirty) {

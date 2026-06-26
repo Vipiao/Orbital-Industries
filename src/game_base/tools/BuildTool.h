@@ -16,6 +16,11 @@ class Grid;
 
 class BuildTool {
 public:
+    enum class BlockType {
+        STRUCTURAL_BLOCK,
+        THRUSTER
+    };
+
     BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange);
     ~BuildTool();
     
@@ -37,6 +42,7 @@ private:
     
     // Internal state
     bool m_active{false};
+    BlockType m_selectedBlockType{BlockType::STRUCTURAL_BLOCK};
     
     // Input flags
     bool m_doCreate{false};
@@ -53,12 +59,13 @@ private:
     glm::dvec2 m_crosshairOffset;
     glm::dvec2 m_crosshairScale;
     
-    // Icon texture
+    // Icon textures
     int m_constructionIconTextureIndex{-1};
+    int m_thrusterIconTextureIndex{-1};
     
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);
     void addGridBlock(Grid* grid, int x, int y, int z);
-    void removeGridBlock(Grid* grid, int x, int y, int z);
-    void handleGridSplitting(std::weak_ptr<Grid> targetGrid, const glm::ivec3& removedPos);
+    std::vector<glm::ivec3> removeGridBlock(Grid* grid, int x, int y, int z);
+    void handleGridSplitting(std::weak_ptr<Grid> targetGrid, const std::vector<glm::ivec3>& removedCoords);
 };

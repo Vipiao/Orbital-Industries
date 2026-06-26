@@ -2,6 +2,8 @@
 #include "GridSplitter.h"
 #include "Grid.h"
 #include "StructuralBlock.h"
+#include "GridCell.h"
+#include "CellType.h"
 #include "../utils/PartitionCalculator.h"
 #include "../utils/TimeHandler.h"
 #include "../physics/RigidBody.h"
@@ -107,13 +109,13 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
 
     co_yield true; // Allow time check before expensive operation
     
-    // Step 1: Analyze partitions using PartitionCalculator
-    auto result = PartitionCalculator<StructuralBlock>::analyzePartitions(
-        &sourceGrid->getCells(),
+    // Step 1: Analyze partitions using the full cell registry (structural + thrusters)
+    auto result = PartitionCalculator<GridCell*>::analyzePartitions(
+        &sourceGrid->getCellRegistry(),
         edgeCoords,
-        [](const StructuralBlock& cell) -> std::vector<glm::ivec3> {
+        [](GridCell* const& cell) -> std::vector<glm::ivec3> {
             std::vector<glm::ivec3> neighbors;
-            cell.forEachConnectedNeighbor([&](const glm::ivec3& neighbor) {
+            cell->forEachConnectedNeighbor([&](const glm::ivec3& neighbor) {
                 neighbors.push_back(neighbor);
             });
             return neighbors;
@@ -149,17 +151,19 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
     
     for (size_t i = 0; i < result.partitions.size(); ++i) {
         const std::vector<glm::ivec3>& partition = result.partitions[i];
-        
+
         // Calculate center of mass for this partition
         glm::dvec3 weightedSum(0.0);
         double totalMass = 0.0;
-        
-        for (const glm::ivec3& coord : partition) {
-            // Get actual mass and center of mass from the block's shape
-            const StructuralBlock* block = sourceGrid->getCell(coord);
-            auto [blockMass, localCOM, inertiaTensor] = block->getMassProperties();
 
-            glm::dvec3 blockPosition = sourceGrid->gridToWorld(glm::dvec3(coord) + localCOM); // Actual center of mass in world space
+        for (const glm::ivec3& coord : partition) {
+            const GridCell* cell = sourceGrid->getCellFromRegistry(coord);
+            if (!cell) continue;
+
+            auto [blockMass, localCOM, inertiaTensor] = cell->getMassProperties();
+            if (blockMass <= 0.0) continue; // ThrusterSecondaryCell has zero mass
+
+            glm::dvec3 blockPosition = sourceGrid->gridToWorld(glm::dvec3(coord) + localCOM);
             weightedSum += blockPosition * blockMass;
             totalMass += blockMass;
         }
@@ -214,25 +218,25 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
         // Move cells from source grid to new grid
         size_t cellsProcessed = 0;
         for (const glm::ivec3& cellCoord : partition) {
-            // Save vertex modifications before removing
-            std::array<glm::ivec3, 8> savedVertices;
-            glm::dvec4 savedColor{1.0, 1.0, 1.0, 1.0};
-            const StructuralBlock* existingCell = sourceGrid->getCell(cellCoord);
-            if (existingCell) {
-                savedVertices = existingCell->m_localVertices;
-                savedColor = existingCell->m_color;
-            }
-            
-            // Remove from source grid and add to new grid
-            sourceGrid->removeCell(cellCoord);
-            newGrid->addCell(cellCoord);
+            GridCell* cell = sourceGrid->getCellFromRegistry(cellCoord);
+            if (!cell) continue; // Already removed (e.g. thruster secondary handled via anchor)
 
-            if (existingCell) {
+            if (cell->type == CellType::STRUCTURAL_BLOCK) {
+                const StructuralBlock* block = static_cast<const StructuralBlock*>(cell);
+                std::array<glm::ivec3, 8> savedVertices = block->m_localVertices;
+                glm::dvec4 savedColor = block->m_color;
+
+                sourceGrid->removeCell(cellCoord);
+                newGrid->addCell(cellCoord);
                 newGrid->modifyCell(cellCoord, savedVertices);
                 newGrid->setColor(cellCoord, savedColor);
+            } else if (cell->type == CellType::THRUSTER) {
+                // removeCell handles both anchor and secondary; addThruster re-creates both
+                sourceGrid->removeCell(cellCoord);
+                newGrid->addThruster(cellCoord);
             }
+            // THRUSTER_SECONDARY: skip — handled when anchor is processed above
 
-            // Yield every 5 cells to avoid blocking too long
             if (++cellsProcessed % 5 == 0) {
                 co_yield true;
             }

@@ -62,6 +62,8 @@ public:
      */
     virtual std::tuple<double, glm::dvec3, glm::dmat3> getMassProperties() const override;
 
+    virtual std::vector<glm::dvec3> getLocalVertices() const override;
+
 private:
     // Mass properties caching
     mutable bool m_massPropertiesDirty = true;

@@ -22,12 +22,13 @@ GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager)
         throw std::runtime_error("JobManager pointer cannot be null");
     }
 
-    // Create mesh in graphics engine
+    // Create mesh in graphics engine — addMesh() allocates an SSBO slot and returns it as meshId,
+    // so m_meshId IS the SSBO index shared with instance renderers (e.g. thrusters).
     m_meshId = m_graphics->createMesh();
     if (m_meshId < 0) {
         throw std::runtime_error("Failed to create mesh for GridGraphics");
     }
-    
+
     // Load textures
     loadTextures();
     
@@ -44,7 +45,7 @@ GridGraphics::~GridGraphics() {
         }
     }
 
-    // Clean up mesh
+    // Clean up mesh (removeMesh also releases the SSBO slot)
     if (m_meshId >= 0) {
         m_graphics->removeMesh(m_meshId);
     }
@@ -170,6 +171,18 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
             &transformedMeshData.tangents, &transformedMeshData.uvs, 
             nullptr, &colors);
     }
+}
+
+void GridGraphics::addThrusterInstance(const glm::ivec3& anchorCoord) {
+    if (!m_thrusterResources) {
+        m_thrusterResources = std::make_unique<ThrusterResources>(m_graphics);
+    }
+    m_thrusterGraphicsMap.emplace(anchorCoord,
+        std::make_unique<ThrusterGraphics>(m_thrusterResources.get(), m_meshId, anchorCoord));
+}
+
+void GridGraphics::removeThrusterInstance(const glm::ivec3& anchorCoord) {
+    m_thrusterGraphicsMap.erase(anchorCoord);
 }
 
 void GridGraphics::trackJob(std::weak_ptr<Job> jobHandle) {

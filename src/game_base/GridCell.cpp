@@ -13,6 +13,13 @@ void GridCell::forEachConnectedNeighbor(std::function<void(const glm::ivec3&)> c
     }
 }
 
+std::vector<glm::dvec3> GridCell::getLocalVertices() const {
+    return {
+        {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}, {1.0, 1.0, 0.0},
+        {0.0, 0.0, 1.0}, {1.0, 0.0, 1.0}, {0.0, 1.0, 1.0}, {1.0, 1.0, 1.0}
+    };
+}
+
 size_t GridCell::computeHash() const {
     size_t hash = 0;
     

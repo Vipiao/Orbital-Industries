@@ -20,8 +20,9 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
         throw std::runtime_error("RadialMenu cannot be null");
     }
 
-    // Load construction icon texture
+    // Load icon textures
     m_constructionIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/07_construction_icon.png");
+    m_thrusterIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/09_thruster_icon.png");
 
     // Calculate crosshair offset and scale once in constructor
     m_crosshairScale = glm::dvec2(0.1, 0.1);
@@ -183,12 +184,12 @@ void BuildTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& 
         if (blockFound) {
             auto targetGrid = targetGridWeak.lock();
             if (targetGrid) {
-                // Remove the hit block
-                removeGridBlock(targetGrid.get(), hitPos.x, hitPos.y, hitPos.z);
-                
-                // Handle grid splitting
-                handleGridSplitting(targetGridWeak, hitPos);
-                
+                // Remove the hit block (returns all coords removed — 1 for structural, 2 for thruster)
+                auto removedCoords = removeGridBlock(targetGrid.get(), hitPos.x, hitPos.y, hitPos.z);
+
+                // Handle grid splitting using all removed coords as edge candidates
+                handleGridSplitting(targetGridWeak, removedCoords);
+
                 // Remove empty grids
                 if (targetGrid->isEmpty()) {
                     m_gameBase->removeGrid(targetGridWeak);
@@ -203,43 +204,52 @@ void BuildTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& 
 }
 
 void BuildTool::createMenuStructure(int64_t parentNodeId) {
-    // Simple single node structure like ModifyTool
     auto activateCallback = [this]() { activate(); };
     auto deactivateCallback = [this]() { deactivate(); };
-    
-    // Create build tool parent node
-    //glm::dvec4 selectColor = glm::dvec4(0.8, 0.6, 0.2, 0.5);    // Construction orange
-    //glm::dvec4 unSelectColor = glm::dvec4(0.4, 0.3, 0.1, 0.5);  // Dark orange
-    
+
+    // Top-level build tool node — opens the block-type submenu
     m_buildToolParentId = m_radialMenu->createNode(parentNodeId, m_constructionIconTextureIndex, activateCallback, deactivateCallback);
-    
-    // Add center node so you can navigate into the build tool
-    m_centerNodeId = m_radialMenu->createNode(
-        m_buildToolParentId, -1, activateCallback, deactivateCallback);
-        
-    m_radialMenu->createNode(
-        m_buildToolParentId, m_constructionIconTextureIndex, activateCallback, deactivateCallback);
+
+    // Center node for navigating into the submenu
+    m_centerNodeId = m_radialMenu->createNode(m_buildToolParentId, -1, activateCallback, deactivateCallback);
+
+    // Structural block option (keeps last selected type on re-entry by default)
+    m_radialMenu->createNode(m_buildToolParentId, m_constructionIconTextureIndex,
+        [this]() { m_selectedBlockType = BlockType::STRUCTURAL_BLOCK; activate(); },
+        deactivateCallback);
+
+    // Thruster option
+    m_radialMenu->createNode(m_buildToolParentId, m_thrusterIconTextureIndex,
+        [this]() { m_selectedBlockType = BlockType::THRUSTER; activate(); },
+        deactivateCallback);
 }
 
 void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
-    if (grid) grid->addCell(glm::ivec3(x, y, z));
+    if (!grid) return;
+    if (m_selectedBlockType == BlockType::STRUCTURAL_BLOCK) {
+        grid->addCell(glm::ivec3(x, y, z));
+    } else {
+        grid->addThruster(glm::ivec3(x, y, z));
+    }
 }
 
-void BuildTool::removeGridBlock(Grid* grid, int x, int y, int z) {
-    if (grid) grid->removeCell(glm::ivec3(x, y, z));
+std::vector<glm::ivec3> BuildTool::removeGridBlock(Grid* grid, int x, int y, int z) {
+    if (!grid) return {};
+    return grid->removeCell(glm::ivec3(x, y, z));
 }
 
-void BuildTool::handleGridSplitting(std::weak_ptr<Grid> targetGrid, const glm::ivec3& removedPos) {
-    // Check for grid splits by testing connectivity of neighboring blocks
-    std::vector<glm::ivec3> edgeCoords = {
-        glm::ivec3(removedPos.x + 1, removedPos.y, removedPos.z),  // +X
-        glm::ivec3(removedPos.x - 1, removedPos.y, removedPos.z),  // -X
-        glm::ivec3(removedPos.x, removedPos.y + 1, removedPos.z),  // +Y
-        glm::ivec3(removedPos.x, removedPos.y - 1, removedPos.z),  // -Y
-        glm::ivec3(removedPos.x, removedPos.y, removedPos.z + 1),  // +Z
-        glm::ivec3(removedPos.x, removedPos.y, removedPos.z - 1)   // -Z
+void BuildTool::handleGridSplitting(std::weak_ptr<Grid> targetGrid, const std::vector<glm::ivec3>& removedCoords) {
+    static const glm::ivec3 directions[6] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
-    
-    // Schedule the grid split check for later processing
+
+    std::vector<glm::ivec3> edgeCoords;
+    edgeCoords.reserve(removedCoords.size() * 6);
+    for (const auto& pos : removedCoords) {
+        for (const auto& dir : directions) {
+            edgeCoords.push_back(pos + dir);
+        }
+    }
+
     m_gameBase->scheduleGridSplitCheck(targetGrid, edgeCoords);
 }

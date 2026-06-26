@@ -108,8 +108,9 @@ void Grid::addCell(const glm::ivec3& coord) {
     // Create structural block
     StructuralBlock block(coord);
     
-    // Move block into cells map
-    m_cells.emplace(coord, std::move(block));
+    // Move block into cells map and register in cell registry
+    auto [it, _] = m_cells.emplace(coord, std::move(block));
+    m_cellRegistry[coord] = &it->second;
 
     // Schedule structural analysis
     scheduleStructuralAnalysis();
@@ -134,49 +135,109 @@ void Grid::addCell(const glm::ivec3& coord) {
     scheduleMeshUpdatesForCellAndNeighbors(coord);
 }
 
-// Remove a cell from the grid
-void Grid::removeCell(const glm::ivec3& coord) {
-    // If cell doesn't exist, return
-    if (!hasCell(coord)) return;
+// Remove a cell (structural block or thruster) from the grid.
+// Returns all coordinates that were removed.
+std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
+    auto regIt = m_cellRegistry.find(coord);
+    if (regIt == m_cellRegistry.end()) return {};
 
-    // Cancel existing analysis to prevent accessing deleted cells
+    GridCell* cell = regIt->second;
+
+    if (cell->type == CellType::STRUCTURAL_BLOCK) {
+        cancelStructuralAnalysis();
+
+        // Schedule mesh updates before removing (neighbors still exist)
+        scheduleMeshUpdatesForCellAndNeighbors(coord);
+
+        removeNeighborConnections(coord);
+
+        auto rigidBody = m_rigidBody.lock();
+        if (!rigidBody) throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
+        glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
+        updateCellMassContribution(coord, -1.0);
+        rigidBody->setAngularVelocityBody(angVel);
+
+        if (auto collider = m_colliderWeak.lock()) collider->removeCell(coord);
+        m_gridGraphics->removeCell(coord);
+
+        m_cellRegistry.erase(coord);
+        m_cells.erase(coord);
+
+        scheduleStructuralAnalysis();
+        return {coord};
+    } else {
+        // Thruster — find the anchor coord regardless of whether coord is anchor or secondary
+        glm::ivec3 anchorCoord;
+        if (cell->type == CellType::THRUSTER) {
+            anchorCoord = coord;
+        } else {
+            anchorCoord = static_cast<ThrusterSecondaryCell*>(cell)->m_owner->coordinates;
+        }
+        glm::ivec3 secondCoord = anchorCoord + glm::ivec3{0, 1, 0};
+
+        cancelStructuralAnalysis();
+
+        removeNeighborConnections(anchorCoord);
+        removeNeighborConnections(secondCoord);
+
+        auto rigidBody = m_rigidBody.lock();
+        if (!rigidBody) throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
+        glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
+        updateCellMassContribution(anchorCoord, -1.0);
+        rigidBody->setAngularVelocityBody(angVel);
+
+        if (auto collider = m_colliderWeak.lock()) {
+            collider->removeCell(anchorCoord);
+            collider->removeCell(secondCoord);
+        }
+
+        m_gridGraphics->removeThrusterInstance(anchorCoord);
+
+        m_cellRegistry.erase(anchorCoord);
+        m_cellRegistry.erase(secondCoord);
+        m_thrusterSecondaryCells.erase(secondCoord);
+        m_thrusterCells.erase(anchorCoord);
+
+        scheduleStructuralAnalysis();
+        return {anchorCoord, secondCoord};
+    }
+}
+
+void Grid::addThruster(const glm::ivec3& anchorCoord) {
+    glm::ivec3 secondCoord = anchorCoord + glm::ivec3{0, 1, 0};
+
+    // Both coords must be free
+    if (m_cellRegistry.count(anchorCoord) || m_cellRegistry.count(secondCoord)) return;
+
+    auto collider = m_colliderWeak.lock();
+    if (!collider) throw std::runtime_error("Grid::addThruster: Collider has been destroyed");
+
     cancelStructuralAnalysis();
 
-    // Schedule mesh updates BEFORE removing (while neighbors still exist)
-    scheduleMeshUpdatesForCellAndNeighbors(coord);
+    collider->addCubeCell(anchorCoord, 1.0);
+    collider->addCubeCell(secondCoord, 1.0);
 
-    removeNeighborConnections(coord);
+    // Emplace into owning maps — unordered_map guarantees stable references even after rehash
+    auto [anchorIt, _a] = m_thrusterCells.emplace(anchorCoord, ThrusterBlock{anchorCoord});
+    ThrusterBlock& thrusterBlock = anchorIt->second;
 
-    // Preserve angular velocity across mass change
-    auto rigidBody = m_rigidBody.lock();
-    if (!rigidBody) {
-        throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
-    }
-    
-    glm::dvec3 originalAngularVelocity = rigidBody->getAngularVelocityBody();
-    
-    // Remove mass contribution before removing the cell
-    updateCellMassContribution(coord, -1.0);
-    
-    rigidBody->setAngularVelocityBody(originalAngularVelocity);
-    
-    // Remove from collider
-    auto collider = m_colliderWeak.lock();
-    if (collider) {
-        collider->removeCell(coord);
-    }
-    
-    // Remove from graphics subsystem
-    m_gridGraphics->removeCell(coord);
+    auto [secIt, _s] = m_thrusterSecondaryCells.emplace(secondCoord, ThrusterSecondaryCell{secondCoord, &thrusterBlock});
 
-    // Remove neighbor connections before removing from map
-    removeNeighborConnections(coord);
-    
-    // Remove cell from map
-    m_cells.erase(coord);
+    m_cellRegistry[anchorCoord] = &thrusterBlock;
+    m_cellRegistry[secondCoord] = &secIt->second;
 
-    // Schedule structural analysis
+    m_gridGraphics->addThrusterInstance(anchorCoord);
+
     scheduleStructuralAnalysis();
+
+    updateNeighborConnections(anchorCoord);
+    updateNeighborConnections(secondCoord);
+
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) throw std::runtime_error("Grid::addThruster: RigidBody has been destroyed");
+    glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
+    updateCellMassContribution(anchorCoord, 1.0);
+    rigidBody->setAngularVelocityBody(angVel);
 }
 
 bool Grid::canModifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices) const {
@@ -284,6 +345,15 @@ StructuralBlock* Grid::getCell(const glm::ivec3& coord) {
     return (it != m_cells.end()) ? &it->second : nullptr;
 }
 
+GridCell* Grid::getCellFromRegistry(const glm::ivec3& coord) {
+    auto it = m_cellRegistry.find(coord);
+    return (it != m_cellRegistry.end()) ? it->second : nullptr;
+}
+
+int Grid::getGridSSBOIndex() const {
+    return m_gridGraphics ? m_gridGraphics->getSSBOIndex() : -1;
+}
+
 void Grid::updateNeighborConnections(const glm::ivec3& coord) {
     // Direction mapping: Right, Left, Front, Back, Top, Bottom
     static const glm::ivec3 directions[6] = {
@@ -294,46 +364,41 @@ void Grid::updateNeighborConnections(const glm::ivec3& coord) {
         {0, 0, 1},   // Top    (index 4)
         {0, 0, -1}   // Bottom (index 5)
     };
-    
+
     // Opposite direction mapping
     static const int oppositeDir[6] = {1, 0, 3, 2, 5, 4};
-    
-    StructuralBlock* cell = getCell(coord);
-    if (!cell) return;
+
+    auto cellIt = m_cellRegistry.find(coord);
+    if (cellIt == m_cellRegistry.end()) return;
+    GridCell* cell = cellIt->second;
 
     // Get this cell's vertices in grid space
-    std::vector<glm::dvec3> cellVertices = cell->getVertices();
-    for (auto& vertex : cellVertices) {
-        vertex += glm::dvec3(coord);  // Transform to grid coordinates
-    }
-    
+    std::vector<glm::dvec3> cellVertices = cell->getLocalVertices();
+    for (auto& vertex : cellVertices) vertex += glm::dvec3(coord);
+
     // Update this cell's neighbor pointers and update neighbors to point back
     for (int i = 0; i < 6; ++i) {
         glm::ivec3 neighborCoord = coord + directions[i];
-        StructuralBlock* neighbor = getCell(neighborCoord);
-        
+        auto neighborIt = m_cellRegistry.find(neighborCoord);
+
         bool hasConnection = false;
-        
-        if (neighbor) {
+        GridCell* neighbor = nullptr;
+
+        if (neighborIt != m_cellRegistry.end()) {
+            neighbor = neighborIt->second;
+
             // Get neighbor's vertices in grid space
-            std::vector<glm::dvec3> neighborVertices = neighbor->getVertices();
-            for (auto& vertex : neighborVertices) {
-                vertex += glm::dvec3(neighborCoord);  // Transform to grid coordinates
-            }
-            
+            std::vector<glm::dvec3> neighborVertices = neighbor->getLocalVertices();
+            for (auto& vertex : neighborVertices) vertex += glm::dvec3(neighborCoord);
+
             // Use direction as face normal
-            glm::dvec3 faceNormal = glm::dvec3(directions[i]);
-            
-            // Calculate overlap area
             double overlapArea = GeometryUtils::calculateSurfaceOverlapArea(
-                cellVertices, neighborVertices, faceNormal);
-            
-            // Set connection if area exceeds threshold
+                cellVertices, neighborVertices, glm::dvec3(directions[i]));
             hasConnection = (overlapArea > 0.05);
         }
-        
+
         cell->neighbors[i] = hasConnection ? neighbor : nullptr;
-        
+
         // If neighbor exists, make it point back to this cell
         if (neighbor) {
             neighbor->neighbors[oppositeDir[i]] = hasConnection ? cell : nullptr;
@@ -342,14 +407,14 @@ void Grid::updateNeighborConnections(const glm::ivec3& coord) {
 }
 
 void Grid::removeNeighborConnections(const glm::ivec3& coord) {
-    StructuralBlock* cell = getCell(coord);
-    if (!cell) return;
-    
+    auto cellIt = m_cellRegistry.find(coord);
+    if (cellIt == m_cellRegistry.end()) return;
+    GridCell* cell = cellIt->second;
+
     // Remove this cell from all its neighbors' pointer arrays
     for (int i = 0; i < 6; ++i) {
         GridCell* neighbor = cell->neighbors[i];
         if (neighbor) {
-            // Find this cell in neighbor's array and set to nullptr
             for (int j = 0; j < 6; ++j) {
                 if (neighbor->neighbors[j] == cell) {
                     neighbor->neighbors[j] = nullptr;
@@ -453,14 +518,14 @@ bool Grid::performStructuralAnalysisUntil(std::chrono::time_point<std::chrono::h
     return true; // More work needed (either current iteration or more iterations)
 }
 
-// Check if a cell exists at the given coordinates
+// Check if a cell of any type exists at the given coordinates
 bool Grid::hasCell(const glm::ivec3& coord) const {
-    return m_cells.find(coord) != m_cells.end();
+    return m_cellRegistry.find(coord) != m_cellRegistry.end();
 }
 
-// Check if the grid is empty (has no cells)
+// Check if the grid has no cells of any type
 bool Grid::isEmpty() const {
-    return m_cells.empty();
+    return m_cellRegistry.empty();
 }
 
 void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
@@ -471,14 +536,14 @@ void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
     
     glm::dvec3 oldCM = m_centerOfMass;
     
-    // Lambda to get cell properties with sign applied
+    // Lambda to get cell properties with sign applied (works for all cell types)
     auto getProperties = [this, sign](const glm::ivec3& cellCoord) -> std::tuple<double, glm::dvec3, glm::dmat3> {
-        auto cellIt = m_cells.find(cellCoord);
-        if (cellIt != m_cells.end()) {
-            auto [mass, localCOM, inertia] = cellIt->second.getMassProperties();
-            return std::make_tuple(mass * sign, localCOM, inertia * sign);
+        auto regIt = m_cellRegistry.find(cellCoord);
+        if (regIt != m_cellRegistry.end()) {
+            auto [mass, localCOM, inertia] = regIt->second->getMassProperties();
+            return {mass * sign, localCOM, inertia * sign};
         }
-        return std::make_tuple(0.0, glm::dvec3(0.0), glm::dmat3(0.0));
+        return {0.0, glm::dvec3(0.0), glm::dmat3(0.0)};
     };
     
     // Update mass contribution using coordinate-based calculation
@@ -610,29 +675,21 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
 
 size_t Grid::computeHash() const {
     size_t hash = 0;
-    
+
     // Hash rigid body state (most important)
     auto rigidBody = m_rigidBody.lock();
     if (rigidBody) {
         hash = Hash::combineHashes(hash, rigidBody->computeHash());
     }
-    
+
     // Hash center of mass
     hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_centerOfMass));
-    
-    // Hash all cells in deterministic order
-    std::vector<std::pair<glm::ivec3, const StructuralBlock*>> sortedCells;
-    sortedCells.reserve(m_cells.size());
-    for (const auto& pair : m_cells) {
-        sortedCells.emplace_back(pair.first, &pair.second);
+
+    // Hash all cells via the combined registry (IVec3Hash keys → deterministic iteration order)
+    for (const auto& [coord, cell] : m_cellRegistry) {
+        hash = Hash::combineHashes(hash, cell->computeHash());
     }
-    std::sort(sortedCells.begin(), sortedCells.end(), 
-              [](const auto& a, const auto& b) { return a.second->uniqueId < b.second->uniqueId; });
-    
-    for (const auto& pair : sortedCells) {
-        hash = Hash::combineHashes(hash, pair.second->computeHash());
-    }
-    
+
     return hash;
 }
 
@@ -767,21 +824,21 @@ bool Grid::processPendingMeshUpdates(std::chrono::time_point<std::chrono::high_r
     auto it = m_pendingMeshUpdates.begin();
     while (it != m_pendingMeshUpdates.end() && m_timeHandler->now() < endTime) {
         glm::ivec3 coord = *it;
-        
-        if (hasCell(coord)) {
-            // Generate filtered mesh and update graphics
+
+        // Only structural blocks use the mesh system; thrusters use instance rendering
+        auto cellIt = m_cells.find(coord);
+        if (cellIt != m_cells.end()) {
             auto meshData = generateFilteredMeshData(coord);
-            const auto& cell = m_cells.at(coord);
-            // Check if graphics cell exists - if not, add it; otherwise update it
+            const auto& cell = cellIt->second;
             if (m_gridGraphics->hasGraphicsCell(coord)) {
                 m_gridGraphics->updateCell(coord, meshData, cell.m_color);
             } else {
                 m_gridGraphics->addCell(coord, StructuralBlock::TYPE, meshData, cell.m_color);
             }
         }
-        
+
         it = m_pendingMeshUpdates.erase(it);
     }
-    
+
     return !m_pendingMeshUpdates.empty(); // More work if set not empty
 }
