@@ -60,7 +60,7 @@ Creative::Creative(GameBase* gameBase)
     m_radialMenu->setVisible(false);
 
     // Load crosshair geometry (instance will be managed in processInputLogic)
-    m_crosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/00_crosshair.png", -1, true);
+    m_crosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/00_crosshair.png", -1, true);
 
     // Create interaction sensor for spatial filtering
     glm::dvec3 sensorHalfScale(m_interactionRange / 2.0, m_interactionRange / 2.0, m_interactionRange / 2.0);

@@ -21,7 +21,7 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     }
 
     // Load construction icon texture
-    m_constructionIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/07_construction_icon.png");
+    m_constructionIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/07_construction_icon.png");
 
     // Calculate crosshair offset and scale once in constructor
     m_crosshairScale = glm::dvec2(0.1, 0.1);
@@ -33,7 +33,7 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     createMenuStructure(parentNodeId);
 
     // Create build crosshair using 2D mesh manager
-    m_buildCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/07_construction_icon.png", -1, true);
+    m_buildCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/07_construction_icon.png", -1, true);
     if (auto geometry = m_buildCrosshairGeometry.lock()) {
         // Don't create instance yet - will be created when activated
     }

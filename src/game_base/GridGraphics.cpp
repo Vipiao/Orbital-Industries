@@ -8,6 +8,7 @@
 // Static member initialization
 int GridGraphics::s_colorTextureUnit = -1;
 int GridGraphics::s_normalTextureUnit = -1;
+int GridGraphics::s_maskTextureUnit = -1;
 bool GridGraphics::s_texturesLoaded = false;
 
 GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager) 
@@ -55,10 +56,13 @@ void GridGraphics::loadTextures() {
     try {
         MeshHandler::Texture colorTexture = m_graphics->createTexture("../media/color_512x512_occluded.png");
         s_colorTextureUnit = colorTexture.m_textureUnit;
-        
+
         MeshHandler::Texture normalTexture = m_graphics->createTexture("../media/normal_combined_512x512.png");
         s_normalTextureUnit = normalTexture.m_textureUnit;
-        
+
+        MeshHandler::Texture maskTexture = m_graphics->createTexture("../media/albedo_mask.png");
+        s_maskTextureUnit = maskTexture.m_textureUnit;
+
         s_texturesLoaded = true;
         std::cout << "GridGraphics: Textures loaded successfully" << std::endl;
     } catch (const std::exception& e) {
@@ -281,9 +285,10 @@ void GridGraphics::updateGraphics(
         glm::dvec3(1.0, 1.0, 1.0),      // Default scale
         s_colorTextureUnit,
         s_normalTextureUnit,
-        -1,                             // No material texture for grid graphics
+        -1,
         currentTimeStep,
-        0.0                             // Grid blocks non-emissive by default
+        0.0,                            // Grid blocks non-emissive by default
+        s_maskTextureUnit
     );
 
     // Update tracking variables with current grid state

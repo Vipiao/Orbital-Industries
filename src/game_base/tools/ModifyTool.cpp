@@ -26,7 +26,7 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     }
     
     // Load marker geometry using graphics engine's 2D mesh manager
-    m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/05_marker_v2.png", -1, true);
+    m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/05_marker_v2.png", -1, true);
 
     // Load 3D arrow geometry and texture
     m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
@@ -38,14 +38,14 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     }
 
     // Create modify crosshair using 2D mesh manager
-    m_modifyCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/04_crosshair_wrench.png", -1, true);
+    m_modifyCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/04_crosshair_wrench.png", -1, true);
     
     // Calculate crosshair offset and scale once in constructor
     m_crosshairScale = glm::dvec2(0.05, 0.05);
     // 9x12 pixels of a 64x64 image where the wrench center is located
 
     // Load modify icon texture
-    m_modifyIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/06_modify_icon.png");
+    m_modifyIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/06_modify_icon.png");
     m_crosshairOffset.x = 2.0 * (0.5 - 9.0/64.0) * m_crosshairScale.x;
     m_crosshairOffset.y = 2.0 * (0.5 - 12.0/64.0) * m_crosshairScale.y;
 

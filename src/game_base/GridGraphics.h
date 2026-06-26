@@ -75,6 +75,7 @@ private:
     // Texture management
     static int s_colorTextureUnit;
     static int s_normalTextureUnit;
+    static int s_maskTextureUnit;
     static bool s_texturesLoaded;
 
     // Job system

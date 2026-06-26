@@ -25,14 +25,14 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     m_hueTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_hue_v2.png");
     m_saturationTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_saturation_v2.png");
     m_valueTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/radial_menu_graphics_generator/icon_value_v2.png");
-    m_paintIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/03_crosshair_paint_v4.png");
+    m_paintIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/03_crosshair_paint_v4.png");
 
     // Create menu structure with loaded textures
     
     createMenuStructure(parentNodeId);
 
     // Create paint crosshair using 2D mesh manager
-    m_paintCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/03_crosshair_paint_v3.png", -1, true);
+    m_paintCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/03_crosshair_paint_v3.png", -1, true);
     if (auto geometry = m_paintCrosshairGeometry.lock()) {
         // Don't create instance yet - will be created when activated
     }
