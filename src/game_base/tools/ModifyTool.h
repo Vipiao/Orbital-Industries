@@ -65,7 +65,7 @@ private:
     // 3D arrow markers
     std::weak_ptr<Geometry> m_arrowGeometry;
     std::vector<std::weak_ptr<Instance>> m_arrowInstances;
-    int m_currentSelectedGridMeshId{-1};
+    int m_currentSelectedGridSsboIndex{-1};
     
     // Cell modification data
     std::weak_ptr<Grid> m_modificationGrid;

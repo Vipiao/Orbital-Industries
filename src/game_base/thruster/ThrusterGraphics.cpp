@@ -4,7 +4,10 @@
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include <stdexcept>
 
-ThrusterGraphics::ThrusterGraphics(ThrusterResources* resources, int ssboIndex, const glm::ivec3& anchorCoord)
+ThrusterGraphics::ThrusterGraphics(ThrusterResources* resources,
+                                   int ssboIndex,
+                                   const glm::ivec3& anchorCoord,
+                                   const glm::dquat& orientation)
     : m_resources(resources)
 {
     if (!m_resources) {
@@ -30,9 +33,11 @@ ThrusterGraphics::ThrusterGraphics(ThrusterResources* resources, int ssboIndex, 
         throw std::runtime_error("ThrusterGraphics: failed to create instance");
     }
 
-    // OBJ spans (0,0,0)→(1,2,1) — place origin at anchor coord in grid-local space
-    instance->m_localPosition    = glm::dvec3{anchorCoord};
-    instance->m_localOrientation = glm::dquat{1.0, 0.0, 0.0, 0.0};
+    // Rotate around the anchor cell's centre (0.5,0.5,0.5 in model space) rather
+    // than the model origin, so the mesh stays aligned with the collider cells.
+    static constexpr glm::dvec3 pivot{0.5, 0.5, 0.5};
+    instance->m_localPosition    = glm::dvec3{anchorCoord} + pivot - glm::dvec3{orientation * pivot};
+    instance->m_localOrientation = orientation;
     instance->m_localScale       = glm::dvec3{1.0, 1.0, 1.0};
     geometry->updateInstanceInBuffer(instance.get());
 }

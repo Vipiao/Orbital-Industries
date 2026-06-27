@@ -39,7 +39,8 @@ public:
     
     // Cell management methods
     void addCell(const glm::ivec3& coord);
-    void addThruster(const glm::ivec3& anchorCoord);
+    void addThruster(const glm::ivec3& anchorCoord,
+                     const glm::dquat& orientation = glm::dquat{1.0, 0.0, 0.0, 0.0});
 
     // Returns all coords removed (1 for structural block, 2 for thruster anchor+secondary)
     std::vector<glm::ivec3> removeCell(const glm::ivec3& coord);

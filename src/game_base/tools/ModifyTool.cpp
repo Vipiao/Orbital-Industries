@@ -100,7 +100,7 @@ void ModifyTool::deactivate() {
         }
     }
     m_arrowInstances.clear();
-    m_currentSelectedGridMeshId = -1;
+    m_currentSelectedGridSsboIndex = -1;
 
     // Remove modify crosshair
     if (auto instance = m_modifyCrosshairInstance.lock()) {
@@ -147,7 +147,7 @@ void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
             }
         }
         m_arrowInstances.clear();
-        m_currentSelectedGridMeshId = -1;
+        m_currentSelectedGridSsboIndex = -1;
         return;
     }
     
@@ -428,7 +428,7 @@ void ModifyTool::updateMarkerPositions() {
             }
         }
         m_markerInstances.clear();
-        m_currentSelectedGridMeshId = -1;
+        m_currentSelectedGridSsboIndex = -1;
     };
     
     if (!m_hasSelectedBlock) {
@@ -466,11 +466,10 @@ void ModifyTool::updateMarkerPositions() {
     std::vector<glm::ivec3> directionData;
 
     // Check if grid SSBO index changed and recreate arrow instances if needed
-    int gridMeshId = -1;
-    gridMeshId = selectedGrid->getGridSSBOIndex();
-    
-    if (gridMeshId != m_currentSelectedGridMeshId) {
-        // Clear existing arrow instances since mesh ID changed
+    int ssboIndex = selectedGrid->getGridSSBOIndex();
+
+    if (ssboIndex != m_currentSelectedGridSsboIndex) {
+        // Clear existing arrow instances since SSBO index changed
         if (auto geometry = m_arrowGeometry.lock()) {
             for (auto& instance : m_arrowInstances) {
                 if (auto inst = instance.lock()) {
@@ -479,7 +478,7 @@ void ModifyTool::updateMarkerPositions() {
             }
         }
         m_arrowInstances.clear();
-        m_currentSelectedGridMeshId = gridMeshId;
+        m_currentSelectedGridSsboIndex = ssboIndex;
     }
     
     // Get current vertices from the selected block for bounds checking
@@ -630,7 +629,7 @@ void ModifyTool::updateMarkerPositions() {
     // Add missing arrow instances
     while (m_arrowInstances.size() < neededArrows) {
         if (auto geometry = m_arrowGeometry.lock()) {
-            auto newInstance = geometry->addInstance(gridMeshId, -1, -1);
+            auto newInstance = geometry->addInstance(ssboIndex, -1, -1);
             m_arrowInstances.push_back(newInstance);
         }
     }

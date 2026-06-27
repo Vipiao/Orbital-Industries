@@ -182,7 +182,7 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
         } else {
             anchorCoord = static_cast<ThrusterSecondaryCell*>(cell)->m_owner->coordinates;
         }
-        glm::ivec3 secondCoord = anchorCoord + glm::ivec3{0, 1, 0};
+        glm::ivec3 secondCoord = m_thrusterCells.at(anchorCoord).m_secondCoord;
 
         cancelStructuralAnalysis();
 
@@ -212,8 +212,8 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
     }
 }
 
-void Grid::addThruster(const glm::ivec3& anchorCoord) {
-    glm::ivec3 secondCoord = anchorCoord + glm::ivec3{0, 1, 0};
+void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
+    glm::ivec3 secondCoord = ThrusterBlock::secondCoord(anchorCoord, orientation);
 
     // Both coords must be free
     if (m_cellRegistry.count(anchorCoord) || m_cellRegistry.count(secondCoord)) return;
@@ -227,7 +227,7 @@ void Grid::addThruster(const glm::ivec3& anchorCoord) {
     collider->addCubeCell(secondCoord, 1.0);
 
     // Emplace into owning maps — unordered_map guarantees stable references even after rehash
-    auto [anchorIt, _a] = m_thrusterCells.emplace(anchorCoord, ThrusterBlock{anchorCoord});
+    auto [anchorIt, _a] = m_thrusterCells.emplace(anchorCoord, ThrusterBlock{anchorCoord, orientation});
     ThrusterBlock& thrusterBlock = anchorIt->second;
 
     auto [secIt, _s] = m_thrusterSecondaryCells.emplace(secondCoord, ThrusterSecondaryCell{secondCoord, &thrusterBlock});
@@ -235,7 +235,7 @@ void Grid::addThruster(const glm::ivec3& anchorCoord) {
     m_cellRegistry[anchorCoord] = &thrusterBlock;
     m_cellRegistry[secondCoord] = &secIt->second;
 
-    m_gridGraphics->addThrusterInstance(anchorCoord);
+    m_gridGraphics->addThrusterInstance(anchorCoord, orientation);
 
     scheduleStructuralAnalysis();
 

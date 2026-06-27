@@ -4,73 +4,81 @@
 #include "../RadialMenu.h"
 #include "../Grid.h"
 #include "../StructuralBlock.h"
+#include "../thruster/ThrusterBlock.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
+#include "graphics/KeyboardHandler.h"
 #include <iostream>
 #include "../../utils/GridGeometry.h"
 
+// Exponential decay constant for orientation slerp animation (radians/second feel).
+static constexpr double k_orientationSlerpRate = 20.0;
+
 BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {
-    
+
     if (!m_gameBase) {
         throw std::runtime_error("GameBase cannot be null");
     }
-    
     if (!m_radialMenu) {
         throw std::runtime_error("RadialMenu cannot be null");
     }
 
     // Load icon textures
-    m_constructionIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/07_construction_icon.png");
-    m_thrusterIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/09_thruster_icon.png");
+    auto* ih = m_gameBase->m_graphicsEngine->getInstanceHandler();
+    m_constructionIconTextureIndex = ih->createTexture("../media/2d_graphics/07_construction_icon.png");
+    m_thrusterIconTextureIndex     = ih->createTexture("../media/2d_graphics/09_thruster_icon.png");
 
-    // Calculate crosshair offset and scale once in constructor
+    // Load ghost geometry and texture (transparent preview for thruster placement)
+    m_ghostColorTextureUnit = ih->createTexture("../media/models/thruster/albedo_ghost.png");
+    m_ghostGeometry = ih->createGeometry("../media/models/thruster/thruster_ghost.obj");
+    if (auto geom = m_ghostGeometry.lock()) {
+        geom->setAlphaBlending(true);
+    }
+
+    // Calculate crosshair offset and scale
     m_crosshairScale = glm::dvec2(0.1, 0.1);
     // 16x16 pixels of a 64x64 image where the construction icon center is located
-    m_crosshairOffset.x = 2.0 * (0.5 - 16.0/64.0) * m_crosshairScale.x;
-    m_crosshairOffset.y = 2.0 * (0.5 - 16.0/64.0) * m_crosshairScale.y;
+    m_crosshairOffset.x = 2.0 * (0.5 - 16.0 / 64.0) * m_crosshairScale.x;
+    m_crosshairOffset.y = 2.0 * (0.5 - 16.0 / 64.0) * m_crosshairScale.y;
 
-    // Create menu structure
     createMenuStructure(parentNodeId);
 
-    // Create build crosshair using 2D mesh manager
-    m_buildCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/07_construction_icon.png", -1, true);
-    if (auto geometry = m_buildCrosshairGeometry.lock()) {
-        // Don't create instance yet - will be created when activated
-    }
+    m_buildCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh(
+        "../media/blender/03_face.obj", "../media/2d_graphics/07_construction_icon.png", -1, true);
 }
 
 BuildTool::~BuildTool() {
-    // Remove crosshair instance if it exists
+    hideGhost();
+
     if (auto instance = m_buildCrosshairInstance.lock()) {
         if (auto geometry = m_buildCrosshairGeometry.lock()) {
             geometry->removeInstance(instance.get());
         }
     }
-    
-    // Textures are automatically cleaned up by TextureManagerBase destructor
 }
 
 void BuildTool::activate() {
     m_active = true;
-    
-    // Create and show build crosshair
+
     if (!m_buildCrosshairInstance.lock() && m_buildCrosshairGeometry.lock()) {
         m_buildCrosshairInstance = m_buildCrosshairGeometry.lock()->createInstance();
         if (auto instance = m_buildCrosshairInstance.lock()) {
-            glm::vec2 position(static_cast<float>(m_crosshairOffset.x), static_cast<float>(-m_crosshairOffset.y)); // down-right direction
+            glm::vec2 position(static_cast<float>(m_crosshairOffset.x),
+                               static_cast<float>(-m_crosshairOffset.y));
             instance->setPosition(position);
-            instance->setScale(glm::vec2(static_cast<float>(m_crosshairScale.x), static_cast<float>(m_crosshairScale.y)));
-            glm::dvec4 color(1.0, 1.0, 1.0, m_buildCrosshairTransparency);
-            instance->setColor(color);
+            instance->setScale(glm::vec2(static_cast<float>(m_crosshairScale.x),
+                                         static_cast<float>(m_crosshairScale.y)));
+            instance->setColor(glm::dvec4(1.0, 1.0, 1.0, m_buildCrosshairTransparency));
         }
     }
 }
 
 void BuildTool::deactivate() {
     m_active = false;
+    hideGhost();
 
-    // Remove build crosshair
     if (auto instance = m_buildCrosshairInstance.lock()) {
         if (auto geometry = m_buildCrosshairGeometry.lock()) {
             geometry->removeInstance(instance.get());
@@ -83,142 +91,165 @@ void BuildTool::preRenderCallback(bool doCreate, bool doRemove) {
     if (!m_active) {
         return;
     }
-    
+
     if (doCreate) m_doCreate = true;
     if (doRemove) m_doRemove = true;
+
+    // --- Orientation cycling (only relevant for thruster) ---
+    // Insert/Delete  → ±90° around world Y
+    // Home/End       → ±90° around world Z
+    // PgUp/PgDn      → ±90° around world X
+    KeyboardHandler* kb = m_gameBase->m_graphicsEngine->getKeyboardHandler();
+    const double half = glm::half_pi<double>();
+
+    if (kb->m_insert.justPressed()) {
+        m_targetOrientation = glm::normalize(
+            glm::angleAxis(half, glm::dvec3{0.0, 1.0, 0.0}) * m_targetOrientation);
+    }
+    if (kb->m_delete.justPressed()) {
+        m_targetOrientation = glm::normalize(
+            glm::angleAxis(-half, glm::dvec3{0.0, 1.0, 0.0}) * m_targetOrientation);
+    }
+    if (kb->m_home.justPressed()) {
+        m_targetOrientation = glm::normalize(
+            glm::angleAxis(half, glm::dvec3{0.0, 0.0, 1.0}) * m_targetOrientation);
+    }
+    if (kb->m_end.justPressed()) {
+        m_targetOrientation = glm::normalize(
+            glm::angleAxis(-half, glm::dvec3{0.0, 0.0, 1.0}) * m_targetOrientation);
+    }
+    if (kb->m_pageUp.justPressed()) {
+        m_targetOrientation = glm::normalize(
+            glm::angleAxis(half, glm::dvec3{1.0, 0.0, 0.0}) * m_targetOrientation);
+    }
+    if (kb->m_pageDown.justPressed()) {
+        m_targetOrientation = glm::normalize(
+            glm::angleAxis(-half, glm::dvec3{1.0, 0.0, 0.0}) * m_targetOrientation);
+    }
+
+    // --- Exponential slerp of rendered orientation toward target ---
+    int    frameRate  = m_gameBase->m_graphicsEngine->getFrameRate();
+    double deltaTime  = 1.0 / static_cast<double>(frameRate > 0 ? frameRate : 60);
+    double slerpAlpha = 1.0 - glm::exp(-k_orientationSlerpRate * deltaTime);
+    m_renderedOrientation = glm::normalize(
+        glm::slerp(m_renderedOrientation, m_targetOrientation, slerpAlpha));
+
+    // --- Update ghost preview every render frame ---
+    // Collect available grids for ghost raycasting.
+    // We re-use the same grids the physics callback uses, but gathered here for render-time use.
+    // GameBase exposes grids via the grid subsystem.
+    std::vector<std::weak_ptr<Grid>> gridsForGhost;
+    for (const auto& g : m_gameBase->getGridSubsystem()->getGrids()) {
+        if (g) gridsForGhost.push_back(g);
+    }
+    updateGhost(gridsForGhost);
 }
 
 void BuildTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
     if (!m_active) {
         return;
     }
-    
+
     if (!m_doCreate && !m_doRemove) {
         return;
     }
-    
-    // Perform ray casting against all grids (copied from Creative::physics)
+
+    // Perform ray casting against all grids
     std::weak_ptr<Grid> targetGridWeak;
     glm::ivec3 targetPos;
     glm::ivec3 hitPos;
-    bool blockFound = false;
-    double closestT = -1.0;
-    
-    // Camera position and direction
-    glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
-    glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
-    glm::dvec3 endPos = startPos + forward * m_interactionRange;
+    bool   blockFound = false;
+    double closestT   = -1.0;
 
-    // Get interpolation time for accurate raycasting
+    glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
+    glm::dvec3 forward  = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+    glm::dvec3 endPos   = startPos + forward * m_interactionRange;
+
     auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
-    
-    // Find closest ray intersection across all grids
+
     for (const auto& gridWeak : availableGrids) {
         auto gridShared = gridWeak.lock();
         if (!gridShared) continue;
-        
-        // Get interpolated transform once per grid
+
         glm::dvec3 interpolatedPos;
         glm::dquat interpolatedOri;
         gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
-        
-        // Transform world ray to interpolated grid-local space
-        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
-        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
-        
-        // Perform ray intersection in grid-local space
+
+        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(
+            startPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(
+            endPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+
         RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-        
-        // Check if this is a closer hit than what we have so far
+
         if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
-            closestT = result.t;
+            closestT   = result.t;
             blockFound = true;
             targetGridWeak = gridWeak;
-            
-            // Calculate intersection point with small epsilon to ensure we're inside the hit cell
+
             const double epsilon = 1e-6;
             double adjustedT = result.t + epsilon;
-            glm::dvec3 gridLocalIntersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
-            
-            // Floor to get hit cell (already in grid coordinates)
-            hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
-            
-            // Surface normal is already in grid-local space from the ray intersection
-            glm::dvec3 gridNormal = result.surfaceNormal;
-            
-            // Find dominant axis direction
-            glm::dvec3 absNormal = glm::abs(gridNormal);
-            glm::ivec3 dominantAxis;
-            if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z) {
-                dominantAxis = glm::ivec3(gridNormal.x > 0 ? 1 : -1, 0, 0);
-            } else if (absNormal.y >= absNormal.z) {
-                dominantAxis = glm::ivec3(0, gridNormal.y > 0 ? 1 : -1, 0);
-            } else {
-                dominantAxis = glm::ivec3(0, 0, gridNormal.z > 0 ? 1 : -1);
-            }
+            glm::dvec3 intersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
+            hitPos = glm::ivec3(glm::floor(intersectionPoint));
 
-            // Calculate target position (one cell forward along dominant axis)
+            glm::dvec3 absNormal = glm::abs(result.surfaceNormal);
+            glm::ivec3 dominantAxis;
+            if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z)
+                dominantAxis = {result.surfaceNormal.x > 0 ? 1 : -1, 0, 0};
+            else if (absNormal.y >= absNormal.z)
+                dominantAxis = {0, result.surfaceNormal.y > 0 ? 1 : -1, 0};
+            else
+                dominantAxis = {0, 0, result.surfaceNormal.z > 0 ? 1 : -1};
+
             targetPos = hitPos + dominantAxis;
         }
     }
-    
-    // Handle block creation
+
     if (m_doCreate) {
         if (blockFound) {
             auto targetGrid = targetGridWeak.lock();
             if (targetGrid) {
-                // Place block at the position before the hit
                 addGridBlock(targetGrid.get(), targetPos.x, targetPos.y, targetPos.z);
             }
         } else {
-            // No block found, create a new grid 2 units ahead
             glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
             auto newGridWeak = m_gameBase->createGrid(newGridPos);
             Grid* newGrid = newGridWeak.lock().get();
-            addGridBlock(newGrid, 0, 0, 0);  // Add initial block at grid center
+            addGridBlock(newGrid, 0, 0, 0);
         }
     }
-    
-    // Handle block removal
+
     if (m_doRemove) {
         if (blockFound) {
             auto targetGrid = targetGridWeak.lock();
             if (targetGrid) {
-                // Remove the hit block (returns all coords removed — 1 for structural, 2 for thruster)
                 auto removedCoords = removeGridBlock(targetGrid.get(), hitPos.x, hitPos.y, hitPos.z);
-
-                // Handle grid splitting using all removed coords as edge candidates
                 handleGridSplitting(targetGridWeak, removedCoords);
-
-                // Remove empty grids
                 if (targetGrid->isEmpty()) {
                     m_gameBase->removeGrid(targetGridWeak);
                 }
             }
         }
     }
-    
-    // Reset flags
+
     m_doCreate = false;
     m_doRemove = false;
 }
 
 void BuildTool::createMenuStructure(int64_t parentNodeId) {
-    auto activateCallback = [this]() { activate(); };
+    auto activateCallback   = [this]() { activate(); };
     auto deactivateCallback = [this]() { deactivate(); };
 
-    // Top-level build tool node — opens the block-type submenu
-    m_buildToolParentId = m_radialMenu->createNode(parentNodeId, m_constructionIconTextureIndex, activateCallback, deactivateCallback);
+    m_buildToolParentId = m_radialMenu->createNode(
+        parentNodeId, m_constructionIconTextureIndex, activateCallback, deactivateCallback);
 
-    // Center node for navigating into the submenu
-    m_centerNodeId = m_radialMenu->createNode(m_buildToolParentId, -1, activateCallback, deactivateCallback);
+    m_centerNodeId = m_radialMenu->createNode(
+        m_buildToolParentId, -1, activateCallback, deactivateCallback);
 
-    // Structural block option (keeps last selected type on re-entry by default)
     m_radialMenu->createNode(m_buildToolParentId, m_constructionIconTextureIndex,
         [this]() { m_selectedBlockType = BlockType::STRUCTURAL_BLOCK; activate(); },
         deactivateCallback);
 
-    // Thruster option
     m_radialMenu->createNode(m_buildToolParentId, m_thrusterIconTextureIndex,
         [this]() { m_selectedBlockType = BlockType::THRUSTER; activate(); },
         deactivateCallback);
@@ -229,7 +260,7 @@ void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
     if (m_selectedBlockType == BlockType::STRUCTURAL_BLOCK) {
         grid->addCell(glm::ivec3(x, y, z));
     } else {
-        grid->addThruster(glm::ivec3(x, y, z));
+        grid->addThruster(glm::ivec3(x, y, z), m_targetOrientation);
     }
 }
 
@@ -238,7 +269,8 @@ std::vector<glm::ivec3> BuildTool::removeGridBlock(Grid* grid, int x, int y, int
     return grid->removeCell(glm::ivec3(x, y, z));
 }
 
-void BuildTool::handleGridSplitting(std::weak_ptr<Grid> targetGrid, const std::vector<glm::ivec3>& removedCoords) {
+void BuildTool::handleGridSplitting(std::weak_ptr<Grid> targetGrid,
+                                     const std::vector<glm::ivec3>& removedCoords) {
     static const glm::ivec3 directions[6] = {
         {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
@@ -252,4 +284,121 @@ void BuildTool::handleGridSplitting(std::weak_ptr<Grid> targetGrid, const std::v
     }
 
     m_gameBase->scheduleGridSplitCheck(targetGrid, edgeCoords);
+}
+
+void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
+    // Ghost is only shown for thrusters
+    if (m_selectedBlockType != BlockType::THRUSTER) {
+        hideGhost();
+        return;
+    }
+
+    auto geom = m_ghostGeometry.lock();
+    if (!geom) {
+        return;
+    }
+
+    // Raycast using render-time interpolation so the ghost tracks visually correctly.
+    // Camera position is per-frame; grid transforms are interpolated to the same moment.
+    auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
+
+    glm::dvec3 camPos  = m_gameBase->m_graphicsEngine->getCamPos();
+    glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
+    glm::dvec3 endPos  = camPos + forward * m_interactionRange;
+
+    std::weak_ptr<Grid> bestGridWeak;
+    glm::ivec3 anchorCoord;
+    bool  hitFound = false;
+    double closestT = -1.0;
+
+    for (const auto& gridWeak : availableGrids) {
+        auto grid = gridWeak.lock();
+        if (!grid) continue;
+
+        glm::dvec3 interpolatedPos;
+        glm::dquat interpolatedOri;
+        grid->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
+
+        glm::dvec3 localStart = GridGeometry::worldToGrid(
+            camPos, interpolatedPos, interpolatedOri, grid->m_centerOfMass);
+        glm::dvec3 localEnd = GridGeometry::worldToGrid(
+            endPos, interpolatedPos, interpolatedOri, grid->m_centerOfMass);
+
+        RayIntersectionResult result = grid->intersectRay(localStart, localEnd);
+        if (result.t < 0.0 || (hitFound && result.t >= closestT)) continue;
+
+        closestT = result.t;
+        hitFound = true;
+        bestGridWeak = gridWeak;
+
+        const double epsilon = 1e-6;
+        glm::dvec3 intersection = localStart + (result.t + epsilon) * (localEnd - localStart);
+        glm::ivec3 hitPos = glm::ivec3(glm::floor(intersection));
+
+        glm::dvec3 absNormal = glm::abs(result.surfaceNormal);
+        glm::ivec3 dominantAxis;
+        if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z)
+            dominantAxis = {result.surfaceNormal.x > 0 ? 1 : -1, 0, 0};
+        else if (absNormal.y >= absNormal.z)
+            dominantAxis = {0, result.surfaceNormal.y > 0 ? 1 : -1, 0};
+        else
+            dominantAxis = {0, 0, result.surfaceNormal.z > 0 ? 1 : -1};
+
+        anchorCoord = hitPos + dominantAxis;
+    }
+
+    if (!hitFound) {
+        hideGhost();
+        return;
+    }
+
+    auto bestGrid = bestGridWeak.lock();
+    if (!bestGrid) {
+        hideGhost();
+        return;
+    }
+
+    // Check legality: both cells must be free
+    glm::ivec3 secCoord = ThrusterBlock::secondCoord(anchorCoord, m_renderedOrientation);
+    const auto& registry = bestGrid->getCellRegistry();
+    if (registry.count(anchorCoord) || registry.count(secCoord)) {
+        hideGhost();
+        return;
+    }
+
+    // Ensure ghost instance is attached to the correct grid SSBO
+    int ssboIndex = bestGrid->getGridSSBOIndex();
+    if (ssboIndex != m_currentGhostSsboIndex) {
+        // Detach from old grid
+        if (auto inst = m_ghostInstance.lock()) {
+            geom->removeInstance(inst);
+        }
+        m_ghostInstance.reset();
+        m_currentGhostSsboIndex = -1;
+    }
+
+    if (!m_ghostInstance.lock()) {
+        m_ghostInstance = geom->addInstance(ssboIndex, m_ghostColorTextureUnit, -1, -1,
+                                            glm::dvec4{1.0, 1.0, 1.0, 0.45}, -1);
+        m_currentGhostSsboIndex = ssboIndex;
+    }
+
+    auto inst = m_ghostInstance.lock();
+    if (!inst) return;
+
+    static constexpr glm::dvec3 pivot{0.5, 0.5, 0.5};
+    inst->m_localPosition    = glm::dvec3{anchorCoord} + pivot - glm::dvec3{m_renderedOrientation * pivot};
+    inst->m_localOrientation = m_renderedOrientation;
+    inst->m_localScale       = glm::dvec3{1.0, 1.0, 1.0};
+    geom->updateInstanceInBuffer(inst.get());
+}
+
+void BuildTool::hideGhost() {
+    if (auto inst = m_ghostInstance.lock()) {
+        if (auto geom = m_ghostGeometry.lock()) {
+            geom->removeInstance(inst);
+        }
+    }
+    m_ghostInstance.reset();
+    m_currentGhostSsboIndex = -1;
 }

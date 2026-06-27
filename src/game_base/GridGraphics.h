@@ -66,7 +66,7 @@ public:
     int getSSBOIndex() const { return m_ssboIndex; }
 
     // Thruster instance management
-    void addThrusterInstance(const glm::ivec3& anchorCoord);
+    void addThrusterInstance(const glm::ivec3& anchorCoord, const glm::dquat& orientation);
     void removeThrusterInstance(const glm::ivec3& anchorCoord);
 
 private:

@@ -173,12 +173,12 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
     }
 }
 
-void GridGraphics::addThrusterInstance(const glm::ivec3& anchorCoord) {
+void GridGraphics::addThrusterInstance(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
     if (!m_thrusterResources) {
         m_thrusterResources = std::make_unique<ThrusterResources>(m_graphics);
     }
     m_thrusterGraphicsMap.emplace(anchorCoord,
-        std::make_unique<ThrusterGraphics>(m_thrusterResources.get(), m_ssboIndex, anchorCoord));
+        std::make_unique<ThrusterGraphics>(m_thrusterResources.get(), m_ssboIndex, anchorCoord, orientation));
 }
 
 void GridGraphics::removeThrusterInstance(const glm::ivec3& anchorCoord) {
