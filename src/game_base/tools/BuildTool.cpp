@@ -10,10 +10,31 @@
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "graphics/KeyboardHandler.h"
 #include <iostream>
+#include <optional>
+#include <functional>
 #include "../../utils/GridGeometry.h"
 
 // Exponential decay constant for orientation slerp animation (radians/second feel).
 static constexpr double k_orientationSlerpRate = 20.0;
+
+// Tries to place a multi-cell block whose cells sit at (anchor + offsets[i]).
+// Iterates each offset as the "aimed-at" cell, shifting the anchor accordingly.
+// Returns the anchor that makes all cells land on free positions, or nullopt.
+static std::optional<glm::ivec3> findMultiCellAnchor(
+    const glm::ivec3& targetPos,
+    const std::vector<glm::ivec3>& offsets,
+    const std::function<bool(const glm::ivec3&)>& isOccupied)
+{
+    for (const auto& pivot : offsets) {
+        const glm::ivec3 candidate = targetPos - pivot;
+        bool fits = true;
+        for (const auto& o : offsets) {
+            if (isOccupied(candidate + o)) { fits = false; break; }
+        }
+        if (fits) return candidate;
+    }
+    return std::nullopt;
+}
 
 BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {
@@ -257,10 +278,18 @@ void BuildTool::createMenuStructure(int64_t parentNodeId) {
 
 void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
     if (!grid) return;
+    const glm::ivec3 targetPos{x, y, z};
     if (m_selectedBlockType == BlockType::STRUCTURAL_BLOCK) {
-        grid->addCell(glm::ivec3(x, y, z));
+        grid->addCell(targetPos);
     } else {
-        grid->addThruster(glm::ivec3(x, y, z), m_targetOrientation);
+        const glm::ivec3 dir = ThrusterBlock::dominantAxis(m_targetOrientation);
+        const auto& registry = grid->getCellRegistry();
+        auto anchor = findMultiCellAnchor(
+            targetPos, {{0, 0, 0}, dir},
+            [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
+        if (anchor) {
+            grid->addThruster(*anchor, m_targetOrientation);
+        }
     }
 }
 
@@ -307,8 +336,8 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
     glm::dvec3 endPos  = camPos + forward * m_interactionRange;
 
     std::weak_ptr<Grid> bestGridWeak;
-    glm::ivec3 anchorCoord;
-    bool  hitFound = false;
+    glm::ivec3 targetPos;   // cell adjacent to the hit surface — starting point for placement search
+    bool   hitFound = false;
     double closestT = -1.0;
 
     for (const auto& gridWeak : availableGrids) {
@@ -336,15 +365,15 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
         glm::ivec3 hitPos = glm::ivec3(glm::floor(intersection));
 
         glm::dvec3 absNormal = glm::abs(result.surfaceNormal);
-        glm::ivec3 dominantAxis;
+        glm::ivec3 surfaceAxis;
         if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z)
-            dominantAxis = {result.surfaceNormal.x > 0 ? 1 : -1, 0, 0};
+            surfaceAxis = {result.surfaceNormal.x > 0 ? 1 : -1, 0, 0};
         else if (absNormal.y >= absNormal.z)
-            dominantAxis = {0, result.surfaceNormal.y > 0 ? 1 : -1, 0};
+            surfaceAxis = {0, result.surfaceNormal.y > 0 ? 1 : -1, 0};
         else
-            dominantAxis = {0, 0, result.surfaceNormal.z > 0 ? 1 : -1};
+            surfaceAxis = {0, 0, result.surfaceNormal.z > 0 ? 1 : -1};
 
-        anchorCoord = hitPos + dominantAxis;
+        targetPos = hitPos + surfaceAxis;
     }
 
     if (!hitFound) {
@@ -358,13 +387,19 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
         return;
     }
 
-    // Check legality: both cells must be free
-    glm::ivec3 secCoord = ThrusterBlock::secondCoord(anchorCoord, m_renderedOrientation);
+    // Use m_targetOrientation for the footprint check (what will actually be placed),
+    // but display the mesh with m_renderedOrientation for smooth animation.
+    const glm::ivec3 dir = ThrusterBlock::dominantAxis(m_targetOrientation);
     const auto& registry = bestGrid->getCellRegistry();
-    if (registry.count(anchorCoord) || registry.count(secCoord)) {
+    auto anchorOpt = findMultiCellAnchor(
+        targetPos, {{0, 0, 0}, dir},
+        [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
+
+    if (!anchorOpt) {
         hideGhost();
         return;
     }
+    const glm::ivec3 anchorCoord = *anchorOpt;
 
     // Ensure ghost instance is attached to the correct grid SSBO
     int ssboIndex = bestGrid->getGridSSBOIndex();
