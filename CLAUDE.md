@@ -14,3 +14,5 @@ Non cyclic dependencies (hirearchical or layer based ect)
 Reproducibility
 - Should be deterministic (no raw pointers used for hashing that could influence iteration order)
 Limit the size of a module to below ~1000 lines of code.
+
+Limit line width to 100 columns.
