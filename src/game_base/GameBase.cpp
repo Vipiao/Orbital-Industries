@@ -122,10 +122,8 @@ void GameBase::prepareFrame() {
     m_currentFrameStartTime = m_timeHandler->now();
     m_lastFrameTime = m_currentFrameStartTime;
 
-    // Calculate timing parameters for graphics engine at beginning of frame
-    // Calculate time remainder since last physics update
-    auto currentTime = m_timeHandler->now();
-    auto timeSinceLastPhysics = std::chrono::duration<double>(currentTime - m_physicsEngine->getLastPhysicsStepTime()).count();
+    auto timeSinceLastPhysics = std::chrono::duration<double>(
+        m_currentFrameStartTime - m_physicsEngine->getLastPhysicsStepTime()).count();
     
     // Adjust time remainder based on scheduling error
     double adjustedTimeSincePhysics = timeSinceLastPhysics + m_physicsTimeError;
