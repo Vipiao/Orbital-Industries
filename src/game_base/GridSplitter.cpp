@@ -4,6 +4,7 @@
 #include "StructuralBlock.h"
 #include "GridCell.h"
 #include "CellType.h"
+#include "thruster/ThrusterBlock.h"
 #include "../utils/PartitionCalculator.h"
 #include "../utils/TimeHandler.h"
 #include "../physics/RigidBody.h"
@@ -232,8 +233,9 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
                 newGrid->setColor(cellCoord, savedColor);
             } else if (cell->type == CellType::THRUSTER) {
                 // removeCell handles both anchor and secondary; addThruster re-creates both
+                const glm::dquat thrusterOrientation = static_cast<const ThrusterBlock*>(cell)->m_orientation;
                 sourceGrid->removeCell(cellCoord);
-                newGrid->addThruster(cellCoord);
+                newGrid->addThruster(cellCoord, thrusterOrientation);
             }
             // THRUSTER_SECONDARY: skip — handled when anchor is processed above
 
