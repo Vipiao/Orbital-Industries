@@ -440,8 +440,8 @@ void DigibotController::handleWalking() {
             auto cachedRigidBody = m_cachedRigidBody.lock();
             // Verify cached rigid body still exists
             bool isValid = false;
-            for (const auto& bodyPtr : m_physicsEngine->getRigidBodies()) {
-                if (bodyPtr.get() == cachedRigidBody.get()) {
+            for (const auto& weak : m_physicsEngine->getRigidBodies()) {
+                if (weak.lock().get() == cachedRigidBody.get()) {
                     isValid = true;
                     break;
                 }

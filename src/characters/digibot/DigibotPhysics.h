@@ -51,6 +51,7 @@ private:
 
     // Physics engine reference
     PhysicsEngine* m_physics;
+    GraphicsEngine* m_graphics{nullptr};  // Held only for collision box debug visualization cleanup in destructor
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
 

@@ -1,28 +1,30 @@
 // Grid.h
 #pragma once
 
-#include "../physics/RigidBody.h"
-#include "../physics/GridCollider.h"
-#include "../utils/MassInertiaCalculator.h"
 #include "../utils/IHashable.h"
 #include "../utils/HashFunctions.h"
 #include "../utils/StochasticAnalyzer.h"
-#include "GridGraphics.h"
 #include "../utils/GridGeometry.h"
-#include "CellType.h"
+#include "../utils/GeometryUtils.h"
 #include "StructuralBlock.h"
 #include "thruster/ThrusterBlock.h"
 #include "thruster/ThrusterSecondaryCell.h"
-#include "../utils/TimeHandler.h"
 #include <glm/glm.hpp>
-#include "../utils/JobManager.h"
-#include <memory>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 
 // Forward declarations
 class PhysicsEngine;
+class GraphicsEngine;
+class RigidBody;
+class Collider;
+class GridCollider;
+class GridGraphics;
+class TimeHandler;
+class JobManager;
+class Job;
 
 class Grid : public IHashable {
 public:
@@ -77,10 +79,8 @@ public:
     std::weak_ptr<RigidBody> getRigidBody() const { return m_rigidBody; }
 
     // Get collider for subsystem queries
-    std::weak_ptr<Collider> getCollider() const { return m_colliderWeak; }
+    std::weak_ptr<Collider> getCollider() const;
 
-    // Get graphics mesh ID / SSBO index (shared between mesh and instance renderers)
-    int getGraphicsMeshId() const;
     int getGridSSBOIndex() const;
 
     // Convert world coordinates to grid-local coordinates

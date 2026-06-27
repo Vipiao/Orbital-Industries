@@ -2,9 +2,14 @@
 
 #include <set>
 #include "Grid.h"
+#include "GridGraphics.h"
+#include "CellType.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "../physics/PhysicsEngine.h"
+#include "../physics/GridCollider.h"
 #include "../utils/MassInertiaCalculator.h"
+#include "../utils/TimeHandler.h"
+#include "../utils/JobManager.h"
 #include "../debug/DebugGlobals.h"
 #include "../physics/CubeCollider.h"
 #include <limits>
@@ -88,6 +93,10 @@ Grid::~Grid() {
 
     // Cancel any pending analysis job
     cancelStructuralAnalysis();
+}
+
+std::weak_ptr<Collider> Grid::getCollider() const {
+    return m_colliderWeak;
 }
 
 // Add a cell to the grid
@@ -637,10 +646,6 @@ double Grid::getApproximateRadius() const {
     return 1.0;
 }
 
-int Grid::getGraphicsMeshId() const {
-    // Delegate to graphics subsystem to get mesh ID
-    return m_gridGraphics ? m_gridGraphics->getMeshId() : -1;
-}
 
 // Updated - Update mesh transform based on physics state
 void Grid::updateGraphics(const glm::dvec3& cameraPos) {

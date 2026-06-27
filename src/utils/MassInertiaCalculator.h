@@ -156,25 +156,24 @@ void MassInertiaCalculator::calculateScalarInertia(
         return;
     }
     
-    // Calculate total mass and weighted center of mass
+    std::vector<ObjectData> cachedData;
+    cachedData.reserve(container.size());
     glm::dvec3 weightedSum(0.0);
     double totalMass = 0.0;
-    
+
     for (const auto& item : container) {
         ObjectData data = getData(item);
         totalMass += data.mass;
         weightedSum += data.position * data.mass;
+        cachedData.push_back(std::move(data));
     }
-    
+
     glm::dvec3 centerOfMass = weightedSum / totalMass;
-    
-    // Calculate scalar inertia with proper mass weighting
+
     double scalarInertia = 0.0;
-    for (const auto& item : container) {
-        ObjectData data = getData(item);
+    for (const auto& data : cachedData) {
         glm::dvec3 displacement = data.position - centerOfMass;
         double distanceSquared = glm::dot(displacement, displacement);
-        // Parallel axis theorem for scalar: I_total = I_local + m * d²
         scalarInertia += data.localInertia + data.mass * distanceSquared;
     }
     
@@ -252,26 +251,24 @@ void MassInertiaCalculator::calculateTensorInertia(
         return;
     }
     
-    // First pass: calculate total mass and center of mass
+    std::vector<TensorObjectData> cachedData;
+    cachedData.reserve(container.size());
     glm::dvec3 weightedSum(0.0);
     double totalMass = 0.0;
-    
-    for (const auto& item : container) {
-        TensorObjectData data = getData(item);  // Should return TensorObjectData
-        totalMass += data.mass;
-        weightedSum += data.position * data.mass;
-    }
-    
-    glm::dvec3 centerOfMass = weightedSum / totalMass;
-    
-    // Second pass: calculate inertia tensor with parallel axis theorem
-    glm::dmat3 totalTensor(0.0);
+
     for (const auto& item : container) {
         TensorObjectData data = getData(item);
+        totalMass += data.mass;
+        weightedSum += data.position * data.mass;
+        cachedData.push_back(std::move(data));
+    }
+
+    glm::dvec3 centerOfMass = weightedSum / totalMass;
+
+    glm::dmat3 totalTensor(0.0);
+    for (const auto& data : cachedData) {
         glm::dvec3 displacement = data.position - centerOfMass;
-        glm::dmat3 transformedTensor = applyParallelAxisTheorem(
-            data.localTensor, data.mass, displacement);
-        totalTensor += transformedTensor;
+        totalTensor += applyParallelAxisTheorem(data.localTensor, data.mass, displacement);
     }
     
     // Set outputs

@@ -465,9 +465,9 @@ void ModifyTool::updateMarkerPositions() {
     std::vector<int> cornerIndexData;
     std::vector<glm::ivec3> directionData;
 
-    // Check if grid mesh ID changed and recreate arrow instances if needed
+    // Check if grid SSBO index changed and recreate arrow instances if needed
     int gridMeshId = -1;
-    gridMeshId = selectedGrid->getGraphicsMeshId();
+    gridMeshId = selectedGrid->getGridSSBOIndex();
     
     if (gridMeshId != m_currentSelectedGridMeshId) {
         // Clear existing arrow instances since mesh ID changed

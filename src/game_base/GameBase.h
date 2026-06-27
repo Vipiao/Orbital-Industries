@@ -6,6 +6,7 @@
 #include "../physics/RigidBody.h"
 #include "../physics/PhysicsEngine.h"
 #include "../utils/IHashable.h"
+#include "../utils/JobManager.h"
 #include "GridSubsystem.h"
 #include "../characters/CharacterSubsystem.h"
 #include "../utils/Generator.h"

@@ -1,5 +1,6 @@
 // GridGraphics.cpp
 #include "GridGraphics.h"
+#include "graphics/SSBOManager.h"
 #include <iostream>
 #include <set>
 #include <algorithm>
@@ -11,23 +12,21 @@ int GridGraphics::s_normalTextureUnit = -1;
 int GridGraphics::s_maskTextureUnit = -1;
 bool GridGraphics::s_texturesLoaded = false;
 
-GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager) 
-    : m_graphics(graphics), m_meshId(-1), m_jobManager(jobManager) {
-    
+GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager)
+    : m_graphics(graphics), m_jobManager(jobManager) {
+
     if (!graphics) {
         throw std::runtime_error("GraphicsEngine pointer cannot be null");
     }
-    
+
     if (!jobManager) {
         throw std::runtime_error("JobManager pointer cannot be null");
     }
 
-    // Create mesh in graphics engine — addMesh() allocates an SSBO slot and returns it as meshId,
-    // so m_meshId IS the SSBO index shared with instance renderers (e.g. thrusters).
-    m_meshId = m_graphics->createMesh();
-    if (m_meshId < 0) {
-        throw std::runtime_error("Failed to create mesh for GridGraphics");
-    }
+    // Allocate SSBO index here — GridGraphics owns this slot and shares it with both
+    // the mesh system (for block triangles) and the instance system (for thruster models).
+    m_ssboIndex = m_graphics->m_ssboManager->allocateIndex();
+    m_graphics->createMesh(m_ssboIndex);
 
     // Load textures
     loadTextures();
@@ -45,9 +44,10 @@ GridGraphics::~GridGraphics() {
         }
     }
 
-    // Clean up mesh (removeMesh also releases the SSBO slot)
-    if (m_meshId >= 0) {
-        m_graphics->removeMesh(m_meshId);
+    // Remove mesh triangles, then release the SSBO slot we own
+    if (m_ssboIndex >= 0) {
+        m_graphics->removeMesh(m_ssboIndex);
+        m_graphics->m_ssboManager->deallocateIndex(m_ssboIndex);
     }
 }
 
@@ -129,7 +129,7 @@ GraphicsCell* GridGraphics::getGraphicsCell(const glm::ivec3& coord) {
 void GridGraphics::removeCellGraphics(const std::vector<uint32_t>& triangleIds) {
     // Remove all triangles from the mesh
     if (!triangleIds.empty()) {
-        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_meshId, &triangleIds);
+        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_ssboIndex, &triangleIds);
     }
 }
 
@@ -141,7 +141,7 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
     
     // Remove existing mesh for this cell first
     if (!cell.triangleIds.empty()) {
-        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_meshId, &cell.triangleIds);
+        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_ssboIndex, &cell.triangleIds);
         cell.triangleIds.clear();
     }
 
@@ -167,7 +167,7 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
         std::vector<glm::dvec4> colors(transformedMeshData.positions.size(), color);
 
         cell.triangleIds = m_graphics->m_meshHandler->appendTrianglesToMesh(
-            m_meshId, &transformedMeshData.positions, &transformedMeshData.normals, 
+            m_ssboIndex, &transformedMeshData.positions, &transformedMeshData.normals, 
             &transformedMeshData.tangents, &transformedMeshData.uvs, 
             nullptr, &colors);
     }
@@ -178,7 +178,7 @@ void GridGraphics::addThrusterInstance(const glm::ivec3& anchorCoord) {
         m_thrusterResources = std::make_unique<ThrusterResources>(m_graphics);
     }
     m_thrusterGraphicsMap.emplace(anchorCoord,
-        std::make_unique<ThrusterGraphics>(m_thrusterResources.get(), m_meshId, anchorCoord));
+        std::make_unique<ThrusterGraphics>(m_thrusterResources.get(), m_ssboIndex, anchorCoord));
 }
 
 void GridGraphics::removeThrusterInstance(const glm::ivec3& anchorCoord) {
@@ -266,7 +266,7 @@ void GridGraphics::updateGraphics(
     uint64_t currentTimeStep,
     double approximateRadius) {
     
-    if (m_meshId < 0) {
+    if (m_ssboIndex < 0) {
         return;
     }
 
@@ -288,7 +288,7 @@ void GridGraphics::updateGraphics(
     }
     
     m_graphics->updateMeshTransform(
-        m_meshId,
+        m_ssboIndex,
         gridPosition - gridCenter,
         gridVelocity,
         gridOrientation,

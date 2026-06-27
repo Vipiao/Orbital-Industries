@@ -191,23 +191,28 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
 }
 
 DigibotPhysics::~DigibotPhysics() {
-    // Disconnect and cleanup physics
+    if (m_collisionBoxMeshId != -1 && m_graphics) {
+        m_graphics->removeMesh(m_collisionBoxMeshId);
+        m_graphics->m_ssboManager->deallocateIndex(m_collisionBoxMeshId);
+        m_collisionBoxMeshId = -1;
+    }
+
     if (!m_rigidBody.expired()) {
         m_physics->removeRigidBody(m_rigidBody);
     }
 
-    // Remove collider
     m_physics->getCollisionDetector().removeCollider(m_colliderWeak);
 
-    // Remove walking sensor
     if (!m_walkingSensor.expired()) {
         m_physics->getCollisionDetector().removeCollider(m_walkingSensor);
     }
 }
 
 void DigibotPhysics::showCollisionBox(GraphicsEngine* graphics) {
+    m_graphics = graphics;
     if (m_collisionBoxMeshId == -1) {
-        m_collisionBoxMeshId = graphics->createMesh();
+        m_collisionBoxMeshId = graphics->m_ssboManager->allocateIndex();
+        graphics->createMesh(m_collisionBoxMeshId);
     }
     createCollisionBoxMesh(graphics);
 }
@@ -215,6 +220,7 @@ void DigibotPhysics::showCollisionBox(GraphicsEngine* graphics) {
 void DigibotPhysics::hideCollisionBox(GraphicsEngine* graphics) {
     if (m_collisionBoxMeshId != -1) {
         graphics->removeMesh(m_collisionBoxMeshId);
+        graphics->m_ssboManager->deallocateIndex(m_collisionBoxMeshId);
         m_collisionBoxMeshId = -1;
     }
 }
@@ -227,10 +233,10 @@ void DigibotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
 
     glm::dvec4 collisionColor(0.2, 1.0, 0.2, 0.4);  // Semi-transparent green
     
-    // Remove and recreate mesh
+    // Remove and recreate mesh (reuse same SSBO index — caller owns it)
     if (m_collisionBoxMeshId != -1) {
         graphics->removeMesh(m_collisionBoxMeshId);
-        m_collisionBoxMeshId = graphics->createMesh();
+        graphics->createMesh(m_collisionBoxMeshId);
     }
 
     // Iterate through all cells in the GridCollider

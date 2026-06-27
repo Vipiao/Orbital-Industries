@@ -35,7 +35,7 @@ public:
         ANALYSIS_COMPLETE
     };
 
-    StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& cells);
+    StochasticAnalyzer(std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& cells);
     ~StochasticAnalyzer();
     
     // Perform analysis until endTime, return true if more work needed
@@ -61,7 +61,7 @@ private:
     size_t getRandomIndex(size_t maxValue);
     
 private:
-    const std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& m_cells;
+    std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& m_cells;
 
     // State machine variables
     AnalysisState m_analysisState = AnalysisState::SELECTING_RANDOM_CELLS;
@@ -82,7 +82,7 @@ private:
 
 // Template implementations (must be in header)
 template<typename CellType>
-StochasticAnalyzer<CellType>::StochasticAnalyzer(const std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& cells) 
+StochasticAnalyzer<CellType>::StochasticAnalyzer(std::unordered_map<glm::ivec3, CellType, Hash::IVec3Hash>& cells)
     : m_cells(cells)
 {
     initializeCostsAndCache();
@@ -103,7 +103,7 @@ void StochasticAnalyzer<CellType>::initializeCostsAndCache() {
     m_costOneCellsCache.clear();
     
     for (auto& [pos, cell] : m_cells) {
-        const_cast<CellType&>(cell).setCost(1);
+        cell.setCost(1);
         m_costOneCellsCache.push_back(pos);
     }
 }
@@ -111,7 +111,7 @@ void StochasticAnalyzer<CellType>::initializeCostsAndCache() {
 template<typename CellType>
 CellType* StochasticAnalyzer<CellType>::getCell(const glm::ivec3& pos) const {
     auto it = m_cells.find(pos);
-    return (it != m_cells.end()) ? const_cast<CellType*>(&it->second) : nullptr;
+    return (it != m_cells.end()) ? &it->second : nullptr;
 }
 
 template<typename CellType>

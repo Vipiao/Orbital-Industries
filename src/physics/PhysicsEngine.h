@@ -90,7 +90,7 @@ public:
     std::chrono::time_point<std::chrono::high_resolution_clock> getLastPhysicsStepTime() const { return m_lastPhysicsStepTime; }
     
     // Access to all rigid bodies for external systems
-    const std::vector<std::shared_ptr<RigidBody>>& getRigidBodies() const { return m_rigidBodies; }
+    std::vector<std::weak_ptr<RigidBody>> getRigidBodies() const;
 
 private:
     // Physics simulation steps

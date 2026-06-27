@@ -63,9 +63,7 @@ public:
     bool hasGraphicsCell(const glm::ivec3& coord) const;
     GraphicsCell* getGraphicsCell(const glm::ivec3& coord);
 
-    // Access to mesh ID / SSBO index (they are the same slot — addMesh allocates the SSBO index)
-    int getMeshId() const { return m_meshId; }
-    int getSSBOIndex() const { return m_meshId; }
+    int getSSBOIndex() const { return m_ssboIndex; }
 
     // Thruster instance management
     void addThrusterInstance(const glm::ivec3& anchorCoord);
@@ -77,7 +75,7 @@ private:
     
     // Graphics engine reference
     GraphicsEngine* m_graphics;
-    int m_meshId;
+    int m_ssboIndex{-1};  // Owned by GridGraphics; shared with mesh system and thruster instances
 
     // Thruster instance rendering — declare resources before map so resources outlive instances
     std::unique_ptr<ThrusterResources> m_thrusterResources;

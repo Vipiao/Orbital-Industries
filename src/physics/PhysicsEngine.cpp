@@ -157,6 +157,15 @@ void PhysicsEngine::removeRigidBody(std::weak_ptr<RigidBody> bodyWeak) {
     }
 }
 
+std::vector<std::weak_ptr<RigidBody>> PhysicsEngine::getRigidBodies() const {
+    std::vector<std::weak_ptr<RigidBody>> result;
+    result.reserve(m_rigidBodies.size());
+    for (const auto& body : m_rigidBodies) {
+        result.emplace_back(body);
+    }
+    return result;
+}
+
 void PhysicsEngine::applyForce(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force) {
     auto body = bodyWeak.lock();
     if (!body || body->m_isStatic) return;

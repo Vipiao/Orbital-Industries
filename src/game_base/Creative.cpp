@@ -1,6 +1,7 @@
 // Creative.cpp
 #include "Creative.h"
 #include "../game_base/GameBase.h"
+#include "../physics/GridCollider.h"
 #include "graphics/GraphicsEngine.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
@@ -262,28 +263,23 @@ void Creative::physics() {
 void Creative::applyDragForces() {
     // Apply drag to all objects before running physics
     // Get all rigid bodies from the physics engine
-    const auto& rigidBodies = m_gameBase->m_physicsEngine->getRigidBodies();
-    
-    // Apply drag to each non-static rigid body
-    for (const auto& bodyPtr : rigidBodies) {
-        // Skip null or static bodies, or bodies that already have forces applied
+    for (const auto& weak : m_gameBase->m_physicsEngine->getRigidBodies()) {
+        auto bodyPtr = weak.lock();
         if (!bodyPtr || bodyPtr->m_isStatic) {
             continue;
         }
-        
-        // Simple drag force calculation: -dragCoefficient * velocity
+
         const double dragCoefficient = 0.04 * 0.2*0.;
-        
-        // Apply drag to linear velocity
+
         if (glm::length(bodyPtr->m_velocity) > 0.0) {
             glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->m_mass;
-            m_gameBase->m_physicsEngine->applyForce(bodyPtr, dragForce);
+            m_gameBase->m_physicsEngine->applyForce(weak, dragForce);
         }
-        
-        // Apply drag to angular velocity
+
         if (glm::length(bodyPtr->m_angularMomentumBody) > 0.0) {
-            glm::dvec3 angularDrag = -dragCoefficient * bodyPtr->getWorldInertiaTensor() * bodyPtr->getAngularVelocityWorld();
-            m_gameBase->m_physicsEngine->applyTorque(bodyPtr, angularDrag);
+            glm::dvec3 angularDrag = -dragCoefficient * bodyPtr->getWorldInertiaTensor()
+                                     * bodyPtr->getAngularVelocityWorld();
+            m_gameBase->m_physicsEngine->applyTorque(weak, angularDrag);
         }
     }
 }
