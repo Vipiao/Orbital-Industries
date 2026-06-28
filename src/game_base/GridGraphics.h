@@ -6,8 +6,8 @@
 #include "../utils/HashFunctions.h"
 #include "graphics/AssimpLoader.h"
 #include "StructuralBlock.h"
-#include "thruster/ThrusterResources.h"
-#include "thruster/ThrusterGraphics.h"
+#include "BlockResources.h"
+#include "BlockGraphics.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -65,9 +65,15 @@ public:
 
     int getSSBOIndex() const { return m_ssboIndex; }
 
-    // Thruster instance management
-    void addThrusterInstance(const glm::ivec3& anchorCoord, const glm::dquat& orientation);
-    void removeThrusterInstance(const glm::ivec3& anchorCoord);
+    // Special block instance management (thruster, cockpit, etc.)
+    void addBlockInstance(CellType type,
+                          const glm::ivec3& anchorCoord,
+                          const glm::dquat& orientation,
+                          const glm::dvec3& modelCentre,
+                          const std::string& geometryPath,
+                          const std::string& colorTexPath,
+                          const std::string& normalTexPath);
+    void removeBlockInstance(const glm::ivec3& anchorCoord);
 
 private:
     // Graphics cell storage
@@ -77,9 +83,10 @@ private:
     GraphicsEngine* m_graphics;
     int m_ssboIndex{-1};  // Owned by GridGraphics; shared with mesh system and thruster instances
 
-    // Thruster instance rendering — declare resources before map so resources outlive instances
-    std::unique_ptr<ThrusterResources> m_thrusterResources;
-    std::unordered_map<glm::ivec3, std::unique_ptr<ThrusterGraphics>, Hash::IVec3Hash> m_thrusterGraphicsMap;
+    // Special block rendering — resources per block type, graphics per anchor coord.
+    // Resources must be declared before the graphics map so they outlive the instances.
+    std::unordered_map<CellType, std::unique_ptr<BlockResources>> m_blockResources;
+    std::unordered_map<glm::ivec3, std::unique_ptr<BlockGraphics>, Hash::IVec3Hash> m_blockGraphicsMap;
     
     // Texture management
     static int s_colorTextureUnit;

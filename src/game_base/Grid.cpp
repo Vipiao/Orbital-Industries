@@ -144,7 +144,7 @@ void Grid::addCell(const glm::ivec3& coord) {
     scheduleMeshUpdatesForCellAndNeighbors(coord);
 }
 
-// Remove a cell (structural block or thruster) from the grid.
+// Remove a cell (structural block or special block) from the grid.
 // Returns all coordinates that were removed.
 std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
     auto regIt = m_cellRegistry.find(coord);
@@ -152,64 +152,63 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
 
     GridCell* cell = regIt->second;
 
+    // Secondary cells delegate mass ownership to their anchor; structural blocks and
+    // anchor cells are their own physics representative.
+    const glm::ivec3 anchorCoord = (cell->type == CellType::THRUSTER_SECONDARY)
+        ? static_cast<SecondaryCell*>(cell)->m_anchorCoord
+        : coord;
+
+    cancelStructuralAnalysis();
+
+    // Preserve angular velocity across the mass change — same for all block types.
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
+    const glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
+    updateCellMassContribution(anchorCoord, -1.0);
+    rigidBody->setAngularVelocityBody(angVel);
+
+    std::vector<glm::ivec3> removed;
+
     if (cell->type == CellType::STRUCTURAL_BLOCK) {
-        cancelStructuralAnalysis();
-
-        // Schedule mesh updates before removing (neighbors still exist)
+        // Schedule mesh updates before removing so neighbors still exist
         scheduleMeshUpdatesForCellAndNeighbors(coord);
-
         removeNeighborConnections(coord);
-
-        auto rigidBody = m_rigidBody.lock();
-        if (!rigidBody) throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
-        glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
-        updateCellMassContribution(coord, -1.0);
-        rigidBody->setAngularVelocityBody(angVel);
 
         if (auto collider = m_colliderWeak.lock()) collider->removeCell(coord);
         m_gridGraphics->removeCell(coord);
-
         m_cellRegistry.erase(coord);
         m_cells.erase(coord);
 
-        scheduleStructuralAnalysis();
-        return {coord};
+        removed = {coord};
     } else {
-        // Thruster — find the anchor coord regardless of whether coord is anchor or secondary
-        glm::ivec3 anchorCoord;
-        if (cell->type == CellType::THRUSTER) {
-            anchorCoord = coord;
-        } else {
-            anchorCoord = static_cast<ThrusterSecondaryCell*>(cell)->m_owner->coordinates;
-        }
-        glm::ivec3 secondCoord = m_thrusterCells.at(anchorCoord).m_secondCoord;
-
-        cancelStructuralAnalysis();
+        auto* anchor = static_cast<BlockAnchor*>(m_cellRegistry.at(anchorCoord));
+        const std::vector<glm::ivec3> secondaries = anchor->secondaryCoords();
 
         removeNeighborConnections(anchorCoord);
-        removeNeighborConnections(secondCoord);
-
-        auto rigidBody = m_rigidBody.lock();
-        if (!rigidBody) throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
-        glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
-        updateCellMassContribution(anchorCoord, -1.0);
-        rigidBody->setAngularVelocityBody(angVel);
+        for (const auto& sc : secondaries) removeNeighborConnections(sc);
 
         if (auto collider = m_colliderWeak.lock()) {
             collider->removeCell(anchorCoord);
-            collider->removeCell(secondCoord);
+            for (const auto& sc : secondaries) collider->removeCell(sc);
         }
 
-        m_gridGraphics->removeThrusterInstance(anchorCoord);
+        m_gridGraphics->removeBlockInstance(anchorCoord);
 
         m_cellRegistry.erase(anchorCoord);
-        m_cellRegistry.erase(secondCoord);
-        m_thrusterSecondaryCells.erase(secondCoord);
-        m_thrusterCells.erase(anchorCoord);
+        for (const auto& sc : secondaries) {
+            m_cellRegistry.erase(sc);
+            m_secondaryCells.erase(sc);
+        }
 
-        scheduleStructuralAnalysis();
-        return {anchorCoord, secondCoord};
+        // Type-specific erase from the anchor's owning map
+        if (anchor->type == CellType::THRUSTER) m_thrusterCells.erase(anchorCoord);
+
+        removed = {anchorCoord};
+        removed.insert(removed.end(), secondaries.begin(), secondaries.end());
     }
+
+    scheduleStructuralAnalysis();
+    return removed;
 }
 
 void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
@@ -228,14 +227,18 @@ void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientat
 
     // Emplace into owning maps — unordered_map guarantees stable references even after rehash
     auto [anchorIt, _a] = m_thrusterCells.emplace(anchorCoord, ThrusterBlock{anchorCoord, orientation});
-    ThrusterBlock& thrusterBlock = anchorIt->second;
 
-    auto [secIt, _s] = m_thrusterSecondaryCells.emplace(secondCoord, ThrusterSecondaryCell{secondCoord, &thrusterBlock});
+    auto [secIt, _s] = m_secondaryCells.emplace(
+        secondCoord, SecondaryCell{secondCoord, anchorCoord, CellType::THRUSTER_SECONDARY});
 
-    m_cellRegistry[anchorCoord] = &thrusterBlock;
+    m_cellRegistry[anchorCoord] = &anchorIt->second;
     m_cellRegistry[secondCoord] = &secIt->second;
 
-    m_gridGraphics->addThrusterInstance(anchorCoord, orientation);
+    m_gridGraphics->addBlockInstance(
+        CellType::THRUSTER, anchorCoord, orientation, ThrusterBlock::MODEL_CENTRE,
+        std::string{ThrusterBlock::GEOMETRY_PATH},
+        std::string{ThrusterBlock::COLOR_TEX_PATH},
+        std::string{ThrusterBlock::NORMAL_TEX_PATH});
 
     scheduleStructuralAnalysis();
 

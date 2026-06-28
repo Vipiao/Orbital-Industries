@@ -19,10 +19,12 @@ glm::ivec3 ThrusterBlock::secondCoord(const glm::ivec3& anchorCoord, const glm::
 }
 
 ThrusterBlock::ThrusterBlock(const glm::ivec3& anchorCoord, const glm::dquat& orientation)
-    : GridCell(anchorCoord, TYPE)
-    , m_secondCoord(secondCoord(anchorCoord, orientation))
-    , m_orientation(orientation)
+    : BlockAnchor{anchorCoord, TYPE, orientation}
 {
+}
+
+std::vector<glm::ivec3> ThrusterBlock::secondaryCoords() const {
+    return {secondCoord(coordinates, m_orientation)};
 }
 
 std::tuple<double, glm::dvec3, glm::dmat3> ThrusterBlock::getMassProperties() const {

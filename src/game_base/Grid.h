@@ -7,8 +7,8 @@
 #include "../utils/GridGeometry.h"
 #include "../utils/GeometryUtils.h"
 #include "StructuralBlock.h"
+#include "SecondaryCell.h"
 #include "thruster/ThrusterBlock.h"
-#include "thruster/ThrusterSecondaryCell.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
@@ -137,9 +137,11 @@ private:
     // Structural blocks (owning)
     std::unordered_map<glm::ivec3, StructuralBlock, Hash::IVec3Hash> m_cells;
 
-    // Thruster cells (owning)
+    // Special block anchor cells (owning, one map per concrete type)
     std::unordered_map<glm::ivec3, ThrusterBlock, Hash::IVec3Hash> m_thrusterCells;
-    std::unordered_map<glm::ivec3, ThrusterSecondaryCell, Hash::IVec3Hash> m_thrusterSecondaryCells;
+
+    // All secondary cells across every block type (owning, unified map)
+    std::unordered_map<glm::ivec3, SecondaryCell, Hash::IVec3Hash> m_secondaryCells;
 
     // Non-owning registry — all cells of any type, updated in sync with the owning maps
     std::unordered_map<glm::ivec3, GridCell*, Hash::IVec3Hash> m_cellRegistry;

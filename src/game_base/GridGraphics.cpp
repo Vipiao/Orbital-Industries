@@ -173,16 +173,25 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
     }
 }
 
-void GridGraphics::addThrusterInstance(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
-    if (!m_thrusterResources) {
-        m_thrusterResources = std::make_unique<ThrusterResources>(m_graphics);
+void GridGraphics::addBlockInstance(CellType type,
+                                    const glm::ivec3& anchorCoord,
+                                    const glm::dquat& orientation,
+                                    const glm::dvec3& modelCentre,
+                                    const std::string& geometryPath,
+                                    const std::string& colorTexPath,
+                                    const std::string& normalTexPath)
+{
+    if (m_blockResources.find(type) == m_blockResources.end()) {
+        m_blockResources.emplace(type,
+            std::make_unique<BlockResources>(m_graphics, geometryPath, colorTexPath, normalTexPath));
     }
-    m_thrusterGraphicsMap.emplace(anchorCoord,
-        std::make_unique<ThrusterGraphics>(m_thrusterResources.get(), m_ssboIndex, anchorCoord, orientation));
+    m_blockGraphicsMap.emplace(anchorCoord,
+        std::make_unique<BlockGraphics>(
+            m_blockResources.at(type).get(), m_ssboIndex, anchorCoord, orientation, modelCentre));
 }
 
-void GridGraphics::removeThrusterInstance(const glm::ivec3& anchorCoord) {
-    m_thrusterGraphicsMap.erase(anchorCoord);
+void GridGraphics::removeBlockInstance(const glm::ivec3& anchorCoord) {
+    m_blockGraphicsMap.erase(anchorCoord);
 }
 
 void GridGraphics::trackJob(std::weak_ptr<Job> jobHandle) {

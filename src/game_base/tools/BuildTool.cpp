@@ -421,8 +421,8 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
     auto inst = m_ghostInstance.lock();
     if (!inst) return;
 
-    static constexpr glm::dvec3 pivot{0.5, 0.5, 0.5};
-    inst->m_localPosition    = glm::dvec3{anchorCoord} + pivot - glm::dvec3{m_renderedOrientation * pivot};
+    static constexpr glm::dvec3 modelCentre{0.5, 0.5, 0.5};
+    inst->m_localPosition    = glm::dvec3{anchorCoord} + modelCentre - glm::dvec3{m_renderedOrientation * modelCentre};
     inst->m_localOrientation = m_renderedOrientation;
     inst->m_localScale       = glm::dvec3{1.0, 1.0, 1.0};
     geom->updateInstanceInBuffer(inst.get());
