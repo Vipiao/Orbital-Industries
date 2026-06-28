@@ -223,26 +223,33 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
             GridCell* cell = sourceGrid->getCellFromRegistry(cellCoord);
             if (!cell) continue; // Already removed (e.g. thruster secondary handled via anchor)
 
-            if (cell->type == CellType::STRUCTURAL_BLOCK) {
+            switch (cell->type) {
+            case CellType::STRUCTURAL_BLOCK: {
                 const StructuralBlock* block = static_cast<const StructuralBlock*>(cell);
                 std::array<glm::ivec3, 8> savedVertices = block->m_localVertices;
                 glm::dvec4 savedColor = block->m_color;
-
                 sourceGrid->removeCell(cellCoord);
                 newGrid->addCell(cellCoord);
                 newGrid->modifyCell(cellCoord, savedVertices);
                 newGrid->setColor(cellCoord, savedColor);
-            } else if (cell->type == CellType::THRUSTER) {
-                // removeCell handles both anchor and secondary; addThruster re-creates both
-                const glm::dquat thrusterOrientation = static_cast<const ThrusterBlock*>(cell)->m_orientation;
-                sourceGrid->removeCell(cellCoord);
-                newGrid->addThruster(cellCoord, thrusterOrientation);
-            } else if (cell->type == CellType::COCKPIT) {
-                const glm::dquat cockpitOrientation = static_cast<const CockpitBlock*>(cell)->m_orientation;
-                sourceGrid->removeCell(cellCoord);
-                newGrid->addCockpit(cellCoord, cockpitOrientation);
+                break;
             }
-            // THRUSTER_SECONDARY / COCKPIT_SECONDARY: skip — handled when anchor is processed above
+            case CellType::THRUSTER: {
+                const glm::dquat ori = static_cast<const ThrusterBlock*>(cell)->m_orientation;
+                sourceGrid->removeCell(cellCoord);
+                newGrid->addThruster(cellCoord, ori);
+                break;
+            }
+            case CellType::COCKPIT: {
+                const glm::dquat ori = static_cast<const CockpitBlock*>(cell)->m_orientation;
+                sourceGrid->removeCell(cellCoord);
+                newGrid->addCockpit(cellCoord, ori);
+                break;
+            }
+            case CellType::THRUSTER_SECONDARY:
+            case CellType::COCKPIT_SECONDARY:
+                break; // handled when their anchor cell is processed above
+            }
 
             if (++cellsProcessed % 5 == 0) {
                 co_yield true;
