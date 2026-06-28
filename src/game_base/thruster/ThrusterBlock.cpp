@@ -4,6 +4,10 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+std::vector<glm::ivec3> ThrusterBlock::footprintOffsets(const glm::dquat& orientation) {
+    return {{0, 0, 0}, dominantAxis(orientation)};
+}
+
 glm::ivec3 ThrusterBlock::dominantAxis(const glm::dquat& orientation) {
     glm::dvec3 rotated = orientation * glm::dvec3{0.0, 1.0, 0.0};
     glm::dvec3 abs = glm::abs(rotated);

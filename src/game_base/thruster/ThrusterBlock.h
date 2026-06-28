@@ -23,6 +23,10 @@ public:
     ThrusterBlock(const glm::ivec3& anchorCoord, const glm::dquat& orientation);
     virtual ~ThrusterBlock() = default;
 
+    // All offsets occupied by this block (including {0,0,0} for the anchor).
+    // Orientation-dependent: the secondary cell follows the dominant axis.
+    static std::vector<glm::ivec3> footprintOffsets(const glm::dquat& orientation);
+
     // Returns the grid axis that the model's +Y maps to under the given orientation.
     static glm::ivec3 dominantAxis(const glm::dquat& orientation);
 

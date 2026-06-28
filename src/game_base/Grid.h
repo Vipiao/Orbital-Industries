@@ -9,6 +9,7 @@
 #include "StructuralBlock.h"
 #include "SecondaryCell.h"
 #include "thruster/ThrusterBlock.h"
+#include "cockpit/CockpitBlock.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
@@ -41,6 +42,8 @@ public:
     void addCell(const glm::ivec3& coord);
     void addThruster(const glm::ivec3& anchorCoord,
                      const glm::dquat& orientation = glm::dquat{1.0, 0.0, 0.0, 0.0});
+    void addCockpit(const glm::ivec3& anchorCoord,
+                    const glm::dquat& orientation = glm::dquat{1.0, 0.0, 0.0, 0.0});
 
     // Returns all coords removed (1 for structural block, 2 for thruster anchor+secondary)
     std::vector<glm::ivec3> removeCell(const glm::ivec3& coord);
@@ -139,6 +142,7 @@ private:
 
     // Special block anchor cells (owning, one map per concrete type)
     std::unordered_map<glm::ivec3, ThrusterBlock, Hash::IVec3Hash> m_thrusterCells;
+    std::unordered_map<glm::ivec3, CockpitBlock,  Hash::IVec3Hash> m_cockpitCells;
 
     // All secondary cells across every block type (owning, unified map)
     std::unordered_map<glm::ivec3, SecondaryCell, Hash::IVec3Hash> m_secondaryCells;

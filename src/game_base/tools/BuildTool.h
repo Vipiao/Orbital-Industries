@@ -20,7 +20,8 @@ class BuildTool {
 public:
     enum class BlockType {
         STRUCTURAL_BLOCK,
-        THRUSTER
+        THRUSTER,
+        COCKPIT
     };
 
     BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange);
@@ -54,11 +55,17 @@ private:
     glm::dquat m_targetOrientation{1.0, 0.0, 0.0, 0.0};
     glm::dquat m_renderedOrientation{1.0, 0.0, 0.0, 0.0};
 
-    // --- Ghost preview (thruster only) ---
-    std::weak_ptr<Geometry> m_ghostGeometry;
+    // --- Ghost preview resources (per block type) ---
+    std::weak_ptr<Geometry> m_thrusterGhostGeometry;
+    int m_thrusterGhostColorTextureUnit{-1};
+
+    std::weak_ptr<Geometry> m_cockpitGhostGeometry;
+    int m_cockpitGhostColorTextureUnit{-1};
+
+    // Active ghost instance state (one instance at a time)
+    std::weak_ptr<Geometry> m_activeGhostGeometry;
     std::weak_ptr<Instance> m_ghostInstance;
-    int  m_ghostColorTextureUnit{-1};
-    int  m_currentGhostSsboIndex{-1};
+    int m_currentGhostSsboIndex{-1};
 
     // --- Menu structure ---
     int64_t m_buildToolParentId{-1};
@@ -74,6 +81,7 @@ private:
     // --- Icon textures ---
     int m_constructionIconTextureIndex{-1};
     int m_thrusterIconTextureIndex{-1};
+    int m_cockpitIconTextureIndex{-1};
 
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);

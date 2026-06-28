@@ -5,6 +5,7 @@
 #include "../Grid.h"
 #include "../StructuralBlock.h"
 #include "../thruster/ThrusterBlock.h"
+#include "../cockpit/CockpitBlock.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/MeshManager2D/GeometryInstance.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
@@ -46,17 +47,22 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
         throw std::runtime_error("RadialMenu cannot be null");
     }
 
-    // Load icon textures
     auto* ih = m_gameBase->m_graphicsEngine->getInstanceHandler();
+
+    // Icon textures
     m_constructionIconTextureIndex = ih->createTexture("../media/2d_graphics/07_construction_icon.png");
     m_thrusterIconTextureIndex     = ih->createTexture("../media/2d_graphics/09_thruster_icon.png");
+    m_cockpitIconTextureIndex      = ih->createTexture("../media/2d_graphics/10_cockpit_icon.png");
 
-    // Load ghost geometry and texture (transparent preview for thruster placement)
-    m_ghostColorTextureUnit = ih->createTexture("../media/models/thruster/albedo_ghost.png");
-    m_ghostGeometry = ih->createGeometry("../media/models/thruster/thruster_ghost.obj");
-    if (auto geom = m_ghostGeometry.lock()) {
-        geom->setAlphaBlending(true);
-    }
+    // Thruster ghost
+    m_thrusterGhostColorTextureUnit = ih->createTexture("../media/models/thruster/albedo_ghost.png");
+    m_thrusterGhostGeometry = ih->createGeometry("../media/models/thruster/thruster_ghost.obj");
+    if (auto geom = m_thrusterGhostGeometry.lock()) geom->setAlphaBlending(true);
+
+    // Cockpit ghost
+    m_cockpitGhostColorTextureUnit = ih->createTexture("../media/models/cockpit/albedo_ghost.png");
+    m_cockpitGhostGeometry = ih->createGeometry("../media/models/cockpit/model_ghost.obj");
+    if (auto geom = m_cockpitGhostGeometry.lock()) geom->setAlphaBlending(true);
 
     // Calculate crosshair offset and scale
     m_crosshairScale = glm::dvec2(0.1, 0.1);
@@ -274,22 +280,29 @@ void BuildTool::createMenuStructure(int64_t parentNodeId) {
     m_radialMenu->createNode(m_buildToolParentId, m_thrusterIconTextureIndex,
         [this]() { m_selectedBlockType = BlockType::THRUSTER; activate(); },
         deactivateCallback);
+
+    m_radialMenu->createNode(m_buildToolParentId, m_cockpitIconTextureIndex,
+        [this]() { m_selectedBlockType = BlockType::COCKPIT; activate(); },
+        deactivateCallback);
 }
 
 void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
     if (!grid) return;
     const glm::ivec3 targetPos{x, y, z};
+    const auto& registry = grid->getCellRegistry();
+
     if (m_selectedBlockType == BlockType::STRUCTURAL_BLOCK) {
         grid->addCell(targetPos);
-    } else {
-        const glm::ivec3 dir = ThrusterBlock::dominantAxis(m_targetOrientation);
-        const auto& registry = grid->getCellRegistry();
+    } else if (m_selectedBlockType == BlockType::THRUSTER) {
         auto anchor = findMultiCellAnchor(
-            targetPos, {{0, 0, 0}, dir},
+            targetPos, ThrusterBlock::footprintOffsets(m_targetOrientation),
             [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
-        if (anchor) {
-            grid->addThruster(*anchor, m_targetOrientation);
-        }
+        if (anchor) grid->addThruster(*anchor, m_targetOrientation);
+    } else if (m_selectedBlockType == BlockType::COCKPIT) {
+        auto anchor = findMultiCellAnchor(
+            targetPos, CockpitBlock::footprintOffsets(m_targetOrientation),
+            [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
+        if (anchor) grid->addCockpit(*anchor, m_targetOrientation);
     }
 }
 
@@ -316,27 +329,38 @@ void BuildTool::handleGridSplitting(std::weak_ptr<Grid> targetGrid,
 }
 
 void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
-    // Ghost is only shown for thrusters
-    if (m_selectedBlockType != BlockType::THRUSTER) {
+    if (m_selectedBlockType != BlockType::THRUSTER && m_selectedBlockType != BlockType::COCKPIT) {
         hideGhost();
         return;
     }
 
-    auto geom = m_ghostGeometry.lock();
-    if (!geom) {
-        return;
+    std::weak_ptr<Geometry> desiredGeometry;
+    int colorTexUnit = -1;
+    std::vector<glm::ivec3> footprint;
+    glm::dvec3 modelCentre;
+
+    if (m_selectedBlockType == BlockType::THRUSTER) {
+        desiredGeometry = m_thrusterGhostGeometry;
+        colorTexUnit    = m_thrusterGhostColorTextureUnit;
+        footprint       = ThrusterBlock::footprintOffsets(m_targetOrientation);
+        modelCentre     = ThrusterBlock::MODEL_CENTRE;
+    } else {
+        desiredGeometry = m_cockpitGhostGeometry;
+        colorTexUnit    = m_cockpitGhostColorTextureUnit;
+        footprint       = CockpitBlock::footprintOffsets(m_targetOrientation);
+        modelCentre     = CockpitBlock::MODEL_CENTRE;
     }
 
-    // Raycast using render-time interpolation so the ghost tracks visually correctly.
-    // Camera position is per-frame; grid transforms are interpolated to the same moment.
-    auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
+    auto geom = desiredGeometry.lock();
+    if (!geom) return;
 
+    auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
     glm::dvec3 camPos  = m_gameBase->m_graphicsEngine->getCamPos();
     glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
     glm::dvec3 endPos  = camPos + forward * m_interactionRange;
 
     std::weak_ptr<Grid> bestGridWeak;
-    glm::ivec3 targetPos;   // cell adjacent to the hit surface — starting point for placement search
+    glm::ivec3 targetPos;
     bool   hitFound = false;
     double closestT = -1.0;
 
@@ -376,44 +400,31 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
         targetPos = hitPos + surfaceAxis;
     }
 
-    if (!hitFound) {
-        hideGhost();
-        return;
-    }
+    if (!hitFound) { hideGhost(); return; }
 
     auto bestGrid = bestGridWeak.lock();
-    if (!bestGrid) {
-        hideGhost();
-        return;
-    }
+    if (!bestGrid) { hideGhost(); return; }
 
-    // Use m_targetOrientation for the footprint check (what will actually be placed),
-    // but display the mesh with m_renderedOrientation for smooth animation.
-    const glm::ivec3 dir = ThrusterBlock::dominantAxis(m_targetOrientation);
     const auto& registry = bestGrid->getCellRegistry();
-    auto anchorOpt = findMultiCellAnchor(
-        targetPos, {{0, 0, 0}, dir},
+    auto anchorOpt = findMultiCellAnchor(targetPos, footprint,
         [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
 
-    if (!anchorOpt) {
-        hideGhost();
-        return;
-    }
+    if (!anchorOpt) { hideGhost(); return; }
     const glm::ivec3 anchorCoord = *anchorOpt;
 
-    // Ensure ghost instance is attached to the correct grid SSBO
+    // If block type switched, destroy the old instance before creating a new one
+    if (m_activeGhostGeometry.lock() != geom) hideGhost();
+    m_activeGhostGeometry = desiredGeometry;
+
     int ssboIndex = bestGrid->getGridSSBOIndex();
     if (ssboIndex != m_currentGhostSsboIndex) {
-        // Detach from old grid
-        if (auto inst = m_ghostInstance.lock()) {
-            geom->removeInstance(inst);
-        }
+        if (auto inst = m_ghostInstance.lock()) geom->removeInstance(inst);
         m_ghostInstance.reset();
         m_currentGhostSsboIndex = -1;
     }
 
     if (!m_ghostInstance.lock()) {
-        m_ghostInstance = geom->addInstance(ssboIndex, m_ghostColorTextureUnit, -1, -1,
+        m_ghostInstance = geom->addInstance(ssboIndex, colorTexUnit, -1, -1,
                                             glm::dvec4{1.0, 1.0, 1.0, 0.45}, -1);
         m_currentGhostSsboIndex = ssboIndex;
     }
@@ -421,8 +432,8 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
     auto inst = m_ghostInstance.lock();
     if (!inst) return;
 
-    static constexpr glm::dvec3 modelCentre{0.5, 0.5, 0.5};
-    inst->m_localPosition    = glm::dvec3{anchorCoord} + modelCentre - glm::dvec3{m_renderedOrientation * modelCentre};
+    inst->m_localPosition    = glm::dvec3{anchorCoord} + modelCentre
+                               - glm::dvec3{m_renderedOrientation * modelCentre};
     inst->m_localOrientation = m_renderedOrientation;
     inst->m_localScale       = glm::dvec3{1.0, 1.0, 1.0};
     geom->updateInstanceInBuffer(inst.get());
@@ -430,10 +441,11 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
 
 void BuildTool::hideGhost() {
     if (auto inst = m_ghostInstance.lock()) {
-        if (auto geom = m_ghostGeometry.lock()) {
+        if (auto geom = m_activeGhostGeometry.lock()) {
             geom->removeInstance(inst);
         }
     }
     m_ghostInstance.reset();
+    m_activeGhostGeometry.reset();
     m_currentGhostSsboIndex = -1;
 }

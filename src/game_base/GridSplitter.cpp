@@ -5,6 +5,7 @@
 #include "GridCell.h"
 #include "CellType.h"
 #include "thruster/ThrusterBlock.h"
+#include "cockpit/CockpitBlock.h"
 #include "../utils/PartitionCalculator.h"
 #include "../utils/TimeHandler.h"
 #include "../physics/RigidBody.h"
@@ -236,8 +237,12 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
                 const glm::dquat thrusterOrientation = static_cast<const ThrusterBlock*>(cell)->m_orientation;
                 sourceGrid->removeCell(cellCoord);
                 newGrid->addThruster(cellCoord, thrusterOrientation);
+            } else if (cell->type == CellType::COCKPIT) {
+                const glm::dquat cockpitOrientation = static_cast<const CockpitBlock*>(cell)->m_orientation;
+                sourceGrid->removeCell(cellCoord);
+                newGrid->addCockpit(cellCoord, cockpitOrientation);
             }
-            // THRUSTER_SECONDARY: skip — handled when anchor is processed above
+            // THRUSTER_SECONDARY / COCKPIT_SECONDARY: skip — handled when anchor is processed above
 
             if (++cellsProcessed % 5 == 0) {
                 co_yield true;
