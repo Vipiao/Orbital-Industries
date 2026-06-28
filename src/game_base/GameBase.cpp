@@ -127,7 +127,7 @@ void GameBase::prepareFrame() {
     
     // Adjust time remainder based on scheduling error
     double adjustedTimeSincePhysics = timeSinceLastPhysics + m_physicsTimeError;
-    double timeRemainder = adjustedTimeSincePhysics / m_physicsTimeStep;
+    double timeRemainder = std::clamp(adjustedTimeSincePhysics / m_physicsTimeStep, 0.0, 1.0);
 
     // Set render parameters in graphics engine
     uint64_t currentTimeStep = m_physicsEngine->getCurrentPhysicsTimeStep();
@@ -141,44 +141,50 @@ void GameBase::prepareFrame() {
 }
 
 void GameBase::finalizeFrame() {
-    // Get current time for physics scheduling decision
-    auto currentTime = m_timeHandler->now();
-    
-    // Process background jobs with remaining frame time
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
 
-    // Process jobs with remaining frame time
     double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->getFrameRate());
-    auto targetFrameEnd = m_currentFrameStartTime + 
+    auto targetFrameEnd = m_currentFrameStartTime +
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(targetFrameDuration));
+    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
 
-    // Schedule physics job if needed
-    if (currentTime >= m_nextPhysicsTime && !m_physicsUpdateInProgress) {
-        // Calculate scheduling error (how late we are)
-        m_physicsTimeError = std::chrono::duration<double>(currentTime - m_nextPhysicsTime).count();
-
-        // Set flag indicating physics update is in progress
-        m_physicsUpdateInProgress = true;
-
-        // Schedule physics as a high-priority job
-        auto jobHandle = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
-            return updatePhysics(endTime);
-        }, JobPriorities::PHYSICS_UPDATE);
-        trackJob(jobHandle);
-        
-        m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
-            std::chrono::duration<double>(m_physicsTimeStep));
+    // Discard physics debt beyond maxStepsPerFrame steps to prevent catch-up after lag spikes.
+    constexpr int maxStepsPerFrame = 4;
+    {
+        auto lagCap = std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+            std::chrono::duration<double>(m_physicsTimeStep * maxStepsPerFrame));
+        if (m_timeHandler->now() > m_nextPhysicsTime + lagCap) {
+            m_nextPhysicsTime = m_timeHandler->now() - lagCap;
+        }
     }
 
-    // Calculate end time with 1ms safety margin
-    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
-    m_jobManager->work(jobEndTime);
+    // Schedule and run up to maxStepsPerFrame physics steps per frame.
+    // This keeps simulation speed correct on displays below physicsHz.
+    for (int step = 0; step < maxStepsPerFrame; ++step) {
+        auto currentTime = m_timeHandler->now();
 
-    auto now = m_timeHandler->now();
-    if (now >= targetFrameEnd) {
+        if (currentTime >= m_nextPhysicsTime && !m_physicsUpdateInProgress) {
+            m_physicsTimeError = std::chrono::duration<double>(currentTime - m_nextPhysicsTime).count();
+            m_physicsUpdateInProgress = true;
+            auto jobHandle = m_jobManager->schedule(
+                [this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
+                    return updatePhysics(endTime);
+                }, JobPriorities::PHYSICS_UPDATE);
+            trackJob(jobHandle);
+            m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+                std::chrono::duration<double>(m_physicsTimeStep));
+        }
+
+        m_jobManager->work(jobEndTime);
+
+        if (m_physicsUpdateInProgress) break;  // step didn't finish in time budget
+        if (m_timeHandler->now() < m_nextPhysicsTime) break;  // no more steps due
+    }
+
+    if (m_timeHandler->now() >= targetFrameEnd) {
         std::cout << "Frame drop" << std::endl;
     }
 }
