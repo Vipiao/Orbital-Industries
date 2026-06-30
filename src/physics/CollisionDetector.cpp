@@ -1,5 +1,6 @@
 // CollisionDetector.cpp
 #include "CollisionDetector.h"
+#include <cassert>
 #include "CollisionDetectionUtils.h"
 #include "GridCollider.h"
 #include "PolyhedronCollider.h"
@@ -19,6 +20,7 @@ CollisionDetector::CollisionDetector(TimeHandler* timeHandler)
 }
 
 void CollisionDetector::registerCollider(std::shared_ptr<Collider> collider) {
+    assert(!m_runActive && "Cannot add colliders while collision detection is running");
     if (!collider) return;
     
     // Store ownership
@@ -100,6 +102,7 @@ std::weak_ptr<SensorCollider> CollisionDetector::addSensorCollider(
 }
 
 void CollisionDetector::removeCollider(std::weak_ptr<Collider> colliderWeak) {
+    assert(!m_runActive && "Cannot remove colliders while collision detection is running");
     auto collider = colliderWeak.lock();
     if (!collider) {
         return; // Already destroyed
@@ -166,6 +169,12 @@ const std::vector<CollisionData>& CollisionDetector::getCollisions(const Collide
 }
 
 Generator<bool> CollisionDetector::run() {
+    struct RunGuard {
+        bool& flag;
+        explicit RunGuard(bool& f) : flag(f) { flag = true; }
+        ~RunGuard() { flag = false; }
+    } guard(m_runActive);
+
     m_byCollider.clear();
 
     // Update all collision boxes

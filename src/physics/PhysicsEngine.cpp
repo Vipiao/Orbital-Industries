@@ -1,5 +1,6 @@
 // PhysicsEngine.cpp
 #include "PhysicsEngine.h"
+#include <cassert>
 #include <iostream>
 #include <limits>
 #include <algorithm>
@@ -17,15 +18,17 @@ PhysicsEngine::PhysicsEngine(TimeHandler* timeHandler)
 }
 
 PhysicsEngine::~PhysicsEngine() {
-    // Vector of unique_ptr will handle cleanup automatically
+    // Must be reset before m_collisionDetector is destroyed — the generator's
+    // coroutine frame holds a RunGuard that references m_collisionDetector::m_runActive.
+    m_collisionGenerator.reset();
 }
 
 std::weak_ptr<RigidBody> PhysicsEngine::addRigidBody(const glm::dvec3& position,
                                                       const glm::dquat& orientation,
-                                                      double mass, 
+                                                      double mass,
                                                       const glm::dmat3& inertiaTensor,
                                                       bool isStatic) {
-    
+    assert(!m_stepInProgress && "Cannot add rigid bodies mid-step");
     auto body = std::make_shared<RigidBody>();
     body->m_position = position;
     body->m_velocity = glm::dvec3{0.0, 0.0, 0.0};
@@ -56,6 +59,7 @@ void PhysicsEngine::attachCollider(std::weak_ptr<RigidBody> bodyWeak, std::weak_
                                    const glm::dvec3& localPosition,
                                    const glm::dquat& localOrientation,
                                    bool isTrigger) {
+    assert(!m_stepInProgress && "Cannot attach colliders mid-step");
     auto body = bodyWeak.lock();
     if (!body) return;
     
@@ -90,6 +94,7 @@ void PhysicsEngine::attachCollider(std::weak_ptr<RigidBody> bodyWeak, std::weak_
 }
 
 void PhysicsEngine::detachCollider(std::weak_ptr<RigidBody> bodyWeak, Collider* collider) {
+    assert(!m_stepInProgress && "Cannot detach colliders mid-step");
     auto body = bodyWeak.lock();
     if (!body || !collider) return;
     
@@ -108,6 +113,7 @@ void PhysicsEngine::detachCollider(std::weak_ptr<RigidBody> bodyWeak, Collider* 
 }
 
 void PhysicsEngine::detachAllColliders(std::weak_ptr<RigidBody> bodyWeak) {
+    assert(!m_stepInProgress && "Cannot detach colliders mid-step");
     auto body = bodyWeak.lock();
     if (!body) return;
     
@@ -140,6 +146,7 @@ void PhysicsEngine::updateColliderTransform(std::weak_ptr<RigidBody> bodyWeak) {
 }
 
 void PhysicsEngine::removeRigidBody(std::weak_ptr<RigidBody> bodyWeak) {
+    assert(!m_stepInProgress && "Cannot remove rigid bodies mid-step");
     auto bodyToRemove = bodyWeak.lock();
     if (!bodyToRemove) return;
 
@@ -212,6 +219,7 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
     while (m_timeHandler->now() < endTime) {
         switch (m_runState) {
             case RunState::APPLY_FORCES:
+                m_stepInProgress = true;
                 applyForces();
                 m_runState = RunState::UPDATE_POSITIONS;
                 
@@ -241,11 +249,11 @@ bool PhysicsEngine::runUntil(std::chrono::time_point<std::chrono::high_resolutio
                 break;
                 
             case RunState::DONE:
-                // Physics step complete - reset state and increment counter
+                m_stepInProgress = false;
                 m_runState = RunState::APPLY_FORCES;
                 m_collisionProcessState = CollisionProcessState::DETECT;
                 m_separationIteration = 0;
-                return false; // No more work needed
+                return false;
         }
     }
 
@@ -281,19 +289,13 @@ bool PhysicsEngine::handleCollisionsUntil(std::chrono::time_point<std::chrono::h
             case CollisionProcessState::RESOLVE:
                 // Process rigid bodies in batches
                 {
-                    static size_t currentBodyIndex = 0;
-                    if (currentBodyIndex == 0) {
-                        // Starting resolution phase
-                        currentBodyIndex = 0;
+                    for (size_t i = 0; i < COLLISION_BATCH_SIZE && m_currentBodyIndex < m_rigidBodies.size(); i++) {
+                        resolveCollision(m_rigidBodies[m_currentBodyIndex]);
+                        m_currentBodyIndex++;
                     }
-                    
-                    for (size_t i = 0; i < COLLISION_BATCH_SIZE && currentBodyIndex < m_rigidBodies.size(); i++) {
-                        resolveCollision(m_rigidBodies[currentBodyIndex]);
-                        currentBodyIndex++;
-                    }
-                    
-                    if (currentBodyIndex >= m_rigidBodies.size()) {
-                        currentBodyIndex = 0;
+
+                    if (m_currentBodyIndex >= m_rigidBodies.size()) {
+                        m_currentBodyIndex = 0;
                         m_collisionProcessState = CollisionProcessState::SEPARATE;
                         m_separationIteration = 0;
                     }

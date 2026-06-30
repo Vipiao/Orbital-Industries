@@ -43,8 +43,10 @@ public:
     
     // Dirty flags
     mutable bool m_orientationMatrixDirty = true;
-    mutable bool m_angularVelocityDirty = true;
-    mutable bool m_worldInertiaDirty = true;
+    mutable bool m_angularVelocityBodyDirty = true;
+    mutable bool m_angularVelocityWorldDirty = true;
+    mutable bool m_worldInertiaTensorDirty = true;
+    mutable bool m_worldInvInertiaTensorDirty = true;
     
     double m_mass;                // Mass in kg
     glm::dmat3 m_inertiaTensor;   // Inertia tensor in local space

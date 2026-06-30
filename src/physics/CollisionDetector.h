@@ -94,6 +94,7 @@ private:
 
     TimeHandler* m_timeHandler;
     uint64_t m_currentTimestep = 0;
+    bool m_runActive = false;
     // Until what time  are you allowed to run run(...) generator.
     std::chrono::time_point<std::chrono::high_resolution_clock> m_endTime;
 

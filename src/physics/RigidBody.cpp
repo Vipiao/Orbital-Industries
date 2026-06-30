@@ -14,17 +14,17 @@ const glm::dmat3& RigidBody::getOrientationMatrix() const {
 }
 
 const glm::dvec3& RigidBody::getAngularVelocityBody() const {
-    if (m_angularVelocityDirty) {
+    if (m_angularVelocityBodyDirty) {
         m_cachedAngularVelocityBody = m_invInertiaTensor * m_angularMomentumBody;
-        m_angularVelocityDirty = false;
+        m_angularVelocityBodyDirty = false;
     }
     return m_cachedAngularVelocityBody;
 }
 
 const glm::dvec3& RigidBody::getAngularVelocityWorld() const {
-    if (m_angularVelocityDirty) {
+    if (m_angularVelocityWorldDirty) {
         m_cachedAngularVelocityWorld = getOrientationMatrix() * getAngularVelocityBody();
-        m_angularVelocityDirty = false;
+        m_angularVelocityWorldDirty = false;
     }
     return m_cachedAngularVelocityWorld;
 }
@@ -35,19 +35,19 @@ void RigidBody::setAngularVelocityBody(glm::dvec3 angularVelocity) {
 }
 
 const glm::dmat3& RigidBody::getWorldInertiaTensor() const {
-    if (m_worldInertiaDirty) {
+    if (m_worldInertiaTensorDirty) {
         const glm::dmat3& orientationMatrix = getOrientationMatrix();
         m_cachedWorldInertiaTensor = orientationMatrix * m_inertiaTensor * glm::transpose(orientationMatrix);
-        m_worldInertiaDirty = false;
+        m_worldInertiaTensorDirty = false;
     }
     return m_cachedWorldInertiaTensor;
 }
 
 const glm::dmat3& RigidBody::getWorldInvInertiaTensor() const {
-    if (m_worldInertiaDirty) {
+    if (m_worldInvInertiaTensorDirty) {
         const glm::dmat3& orientationMatrix = getOrientationMatrix();
         m_cachedWorldInvInertiaTensor = orientationMatrix * m_invInertiaTensor * glm::transpose(orientationMatrix);
-        m_worldInertiaDirty = false;
+        m_worldInvInertiaTensorDirty = false;
     }
     return m_cachedWorldInvInertiaTensor;
 }
@@ -85,12 +85,14 @@ void RigidBody::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPo
 // RigidBody invalidation methods
 void RigidBody::invalidateOrientation() {
     m_orientationMatrixDirty = true;
-    m_angularVelocityDirty = true;
-    m_worldInertiaDirty = true;
+    m_angularVelocityWorldDirty = true;  // world = R * body; body unchanged
+    m_worldInertiaTensorDirty = true;
+    m_worldInvInertiaTensorDirty = true;
 }
 
 void RigidBody::invalidateAngularMomentum() {
-    m_angularVelocityDirty = true;
+    m_angularVelocityBodyDirty = true;
+    m_angularVelocityWorldDirty = true;
 }
 
 size_t RigidBody::computeHash() const {
@@ -118,6 +120,8 @@ size_t RigidBody::computeHash() const {
 }
 
 void RigidBody::invalidateInertiaTensor() {
-    m_angularVelocityDirty = true;
-    m_worldInertiaDirty = true;
+    m_angularVelocityBodyDirty = true;
+    m_angularVelocityWorldDirty = true;
+    m_worldInertiaTensorDirty = true;
+    m_worldInvInertiaTensorDirty = true;
 }

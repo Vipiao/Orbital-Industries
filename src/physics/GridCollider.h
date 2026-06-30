@@ -143,6 +143,7 @@ private:
 
     // Map of grid coordinates to cube colliders
     std::unordered_map<glm::ivec3, std::unique_ptr<Collider>, Hash::IVec3Hash> m_cells;
+    std::unordered_map<Collider*, std::unique_ptr<CellMetadata>> m_cellMetadata;
     
     // Shape change tracking for cache invalidation
     uint64_t m_shapeChangeTimestamp = 0;

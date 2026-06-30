@@ -1,5 +1,6 @@
 // CollisionDetectionUtils.cpp
 #include "CollisionDetectionUtils.h"
+#include <cassert>
 #include "BallCollider.h"
 #include "CubeCollider.h"
 #include "GridCollider.h"
@@ -730,6 +731,7 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
             // Quick AABB check first
             if (polyhedron->checkAABBCollision(gridCollider)) {
                 // Perform detailed collision detection
+                assert(gridCollider->getTypeId() == PolyhedronCollider::TYPE_ID && "grid cells must be PolyhedronCollider");
                 CollisionResult result = detectPolyhedronPolyhedron(polyhedron, static_cast<PolyhedronCollider*>(gridCollider), currentTimestep, useSimplifiedContactGeneration);
                 
                 if (result.m_hasCollision) {
@@ -960,7 +962,9 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         sortedItems.reserve(cellMap.size());
         
         for (const auto& [queryCoord, mapValue] : cellMap) {
-            PolyhedronCollider* queryCollider = static_cast<PolyhedronCollider*>(extractCollider(mapValue));
+            Collider* baseCollider = extractCollider(mapValue);
+            assert(baseCollider->getTypeId() == PolyhedronCollider::TYPE_ID && "grid cells must be PolyhedronCollider");
+            PolyhedronCollider* queryCollider = static_cast<PolyhedronCollider*>(baseCollider);
             sortedItems.emplace_back(queryCoord, queryCollider);
         }
         

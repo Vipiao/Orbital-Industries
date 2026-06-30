@@ -1,5 +1,6 @@
 // GridCollider.cpp
 #include "GridCollider.h"
+#include <cassert>
 #include "CubeCollider.h"
 #include "../utils/PolyhedronProcessor.h"
 #include "PolyhedronCollider.h"
@@ -58,18 +59,8 @@ void GridCollider::addPolyhedronCell(const glm::ivec3& coord,
 }
 
 GridCollider::~GridCollider() {
-    // Cancel pending classification job
     if (!m_classificationJob.expired()) {
         m_jobManager->cancel(m_classificationJob);
-    }
-
-    // Clean up metadata for all remaining cells (GridCollider created them, must delete them)
-    for (auto& pair : m_cells) {
-        CellMetadata* metadata = pair.second->get_pointer<CellMetadata>();
-        if (metadata) {
-            delete metadata;
-            pair.second->remove_pointer<CellMetadata>();
-        }
     }
 }
 
@@ -178,21 +169,23 @@ RayIntersectionResult GridCollider::intersectRay(const glm::dvec3& rayStart, con
 }
 
 void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> collider) {
+    assert(!m_cells.count(coord) && "addCell: coordinate already occupied");
     // Position the collider at the grid coordinate
     glm::dvec3 worldPos = gridToWorld(glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5));
     collider->m_position = worldPos;
     collider->m_orientation = m_orientation;
 
     // Create and set metadata on the collider
-    CellMetadata* metadata = new CellMetadata();
-    collider->set_pointer<CellMetadata>(metadata);
+    auto metadata = std::make_unique<CellMetadata>();
+    collider->set_pointer<CellMetadata>(metadata.get());
 
     // Set up dependent positioning
     collider->m_dependentPosition = this;
     collider->m_dependentOffset = glm::dvec3(coord) + glm::dvec3(0.5, 0.5, 0.5);
     
-    // Store pointer before move for classification map
+    // Store pointer before move for classification map and metadata ownership
     Collider* cellPtr = collider.get();
+    m_cellMetadata[cellPtr] = std::move(metadata);
     m_cells[coord] = std::move(collider);
 
     // Add to corner cells map (default classification)
@@ -291,12 +284,6 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
         // Get pointer before erasing for neighborhood updates
         Collider* removedCell = it->second.get();
 
-        // Clean up metadata before removing collider
-        CellMetadata* metadata = removedCell->get_pointer<CellMetadata>();
-        if (metadata) {
-            delete metadata;
-        }
-
         // Check if this cell is on the border before removing
         bool onBorder = (coord.x == m_localAABBMin.x || coord.x == m_localAABBMax.x ||
                         coord.y == m_localAABBMin.y || coord.y == m_localAABBMax.y ||
@@ -326,7 +313,6 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
             m_cornersValidUntilTime = 0; // Invalidate corners
         }
 
-        m_cells.erase(it);
         updateFilterNormalsAfterRemoval(coord);
 
         // Increment shape change timestamp to invalidate collision cache
@@ -343,17 +329,17 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
             { 1, 0, 0}, {-1, 0, 0},   // ±X
             { 0, 1, 0}, { 0,-1, 0},   // ±Y
             { 0, 0, 1}, { 0, 0,-1},   // ±Z
-        
+
             // Edge neighbors (12)
             { 1, 1, 0}, { 1,-1, 0}, {-1, 1, 0}, {-1,-1, 0},   // XY edges
             { 1, 0, 1}, { 1, 0,-1}, {-1, 0, 1}, {-1, 0,-1},   // XZ edges
             { 0, 1, 1}, { 0, 1,-1}, { 0,-1, 1}, { 0,-1,-1},   // YZ edges
-        
+
             // Corner neighbors (8)
             { 1, 1, 1}, { 1, 1,-1}, { 1,-1, 1}, { 1,-1,-1},
             {-1, 1, 1}, {-1, 1,-1}, {-1,-1, 1}, {-1,-1,-1}
         };
-        
+
         for (int i = 0; i < numDirections; ++i) {
             queueCoordinateForClassification(coord + directions[i]);
         }
@@ -363,14 +349,14 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
             for (int dy = -NEIGHBORHOOD_RADIUS; dy <= NEIGHBORHOOD_RADIUS; ++dy) {
                 for (int dz = -NEIGHBORHOOD_RADIUS; dz <= NEIGHBORHOOD_RADIUS; ++dz) {
                     if (dx == 0 && dy == 0 && dz == 0) continue; // Skip center
-                    
+
                     glm::ivec3 neighborCoord = coord + glm::ivec3(dx, dy, dz);
                     auto neighborhoodIt = m_neighborhoods.find(neighborCoord);
                     if (neighborhoodIt != m_neighborhoods.end()) {
                         // Remove this cell from neighbor's list
                         auto& neighbors = neighborhoodIt->second.m_neighbors;
                         neighbors.erase(std::remove(neighbors.begin(), neighbors.end(), removedCell), neighbors.end());
-                        
+
                         // Clean up neighbor if it's now empty (inline cleanup)
                         if (neighborhoodIt->second.m_neighbors.empty()) {
                             m_neighborhoods.erase(neighborhoodIt);
@@ -379,7 +365,7 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
                 }
             }
         }
-        
+
         // Remove this neighborhood
         auto selfNeighborhoodIt = m_neighborhoods.find(coord);
         if (selfNeighborhoodIt != m_neighborhoods.end()) {
@@ -387,7 +373,7 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
             auto& selfNeighbors = selfNeighborhoodIt->second.m_neighbors;
             selfNeighbors.erase(std::remove(selfNeighbors.begin(), selfNeighbors.end(), removedCell), selfNeighbors.end());
             selfNeighborhoodIt->second.m_hasCenter = false;
-            
+
             // Only remove neighborhood if no neighbors left
             if (selfNeighbors.empty()) {
                 m_neighborhoods.erase(selfNeighborhoodIt);
@@ -395,6 +381,10 @@ void GridCollider::removeCell(const glm::ivec3& coord) {
         } else {
             throw std::runtime_error("GridCollider::removeCell: Neighborhood not found for removed cell coordinate");
         }
+
+        // Erase after all uses of removedCell — m_cells.erase destroys the Collider
+        m_cellMetadata.erase(removedCell);
+        m_cells.erase(it);
     }
 }
 
@@ -774,6 +764,7 @@ VisibleTrianglesResult GridCollider::getVisibleTriangles(const glm::ivec3& coord
     
     // Get the polyhedron collider
     Collider* collider = it->second.get();
+    assert(collider->getTypeId() == PolyhedronCollider::TYPE_ID && "getVisibleTriangles requires PolyhedronCollider cells");
     PolyhedronCollider* polyhedron = static_cast<PolyhedronCollider*>(collider);
     
     // Get local vertices and convert to cell coordinate system [0,1]
@@ -803,6 +794,7 @@ VisibleTrianglesResult GridCollider::getVisibleTriangles(const glm::ivec3& coord
             continue; // No neighbor, vertices remain visible
         }
         
+        assert(neighborIt->second->getTypeId() == PolyhedronCollider::TYPE_ID && "getVisibleTriangles requires PolyhedronCollider cells");
         PolyhedronCollider* neighborPolyhedron = static_cast<PolyhedronCollider*>(neighborIt->second.get());
         
         std::vector<glm::dvec3> neighborLocalVertices = neighborPolyhedron->getLocalVertices();

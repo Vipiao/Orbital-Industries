@@ -120,6 +120,8 @@ private:
     CollisionProcessState m_collisionProcessState = CollisionProcessState::DETECT;
     std::unique_ptr<Generator<bool>> m_collisionGenerator;
     int m_separationIteration = 0;
+    size_t m_currentBodyIndex = 0;
+    bool m_stepInProgress = false;
     
     TimeHandler* m_timeHandler;
 
