@@ -6,6 +6,7 @@
 #include "CollisionResult.h"
 #include <vector>
 #include <set>
+#include <unordered_map>
 #include <memory>
 #include <chrono>
 #include "../utils/Generator.h"
@@ -24,10 +25,10 @@ class JobManager;
 // Custom comparator for deterministic collision pair ordering
 struct ColliderPairComparator {
     bool operator()(const std::pair<Collider*, Collider*>& a, const std::pair<Collider*, Collider*>& b) const {
-        if (a.first->m_debugId != b.first->m_debugId) {
-            return a.first->m_debugId < b.first->m_debugId;
+        if (a.first->m_id != b.first->m_id) {
+            return a.first->m_id < b.first->m_id;
         }
-        return a.second->m_debugId < b.second->m_debugId;
+        return a.second->m_id < b.second->m_id;
     }
 };
 
@@ -69,12 +70,15 @@ public:
     
     // Run collision detection
     Generator<bool> run();
-    
+
     // Set the end time for the current collision detection run
     void setEndTime(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 
     // Set the current timestep for AABB validity tracking
     void setTimestep(uint64_t timestep);
+
+    // Query collision results from the last detection pass
+    const std::vector<CollisionData>& getCollisions(const Collider* collider) const;
     
 private:
     // Helper for factory methods
@@ -92,6 +96,8 @@ private:
     uint64_t m_currentTimestep = 0;
     // Until what time  are you allowed to run run(...) generator.
     std::chrono::time_point<std::chrono::high_resolution_clock> m_endTime;
+
+    std::unordered_map<int, std::vector<CollisionData>> m_byCollider; // keyed by Collider::m_id
 
     // Helper functions
     void updateAllCollidersAndAABB();

@@ -86,6 +86,10 @@ public:
     // Access to collision detector for creating colliders
     CollisionDetector& getCollisionDetector() { return m_collisionDetector; }
 
+    const std::vector<CollisionData>& getCollisions(const Collider* collider) const {
+        return m_collisionDetector.getCollisions(collider);
+    }
+
     // Get the timestamp of the last physics step
     std::chrono::time_point<std::chrono::high_resolution_clock> getLastPhysicsStepTime() const { return m_lastPhysicsStepTime; }
     

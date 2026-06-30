@@ -8,7 +8,6 @@
 #include <unordered_set>
 #include "../utils/GeometryUtils.h"
 #include "../utils/PointerStorage.h"
-#include "CollisionResult.h"
 
 class CoordinateSystem {
 public:
@@ -24,20 +23,17 @@ public:
 
 class Collider : public CoordinateSystem, public IPointerStorage {
 public:
-    // Unique ID for debugging
-    const int m_debugId;
+    const int m_id;
 
     Collider(const glm::dvec3& position = glm::dvec3(0.0), 
              const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0))
         : CoordinateSystem(position, orientation)
-        , m_debugId(s_nextId++)
+        , m_id(s_nextId++)
         , m_positionValidUntilTime(0)
         , m_simpleAABBValidUntilTime(0)
         , m_advancedAABBValidUntilTime(0)
         , m_AABBMin(0.0)
         , m_AABBMax(0.0)
-        , m_collisions()
-        , m_collisionsValidTimestamp(0)
     {}
     
     virtual ~Collider() = default;
@@ -88,23 +84,6 @@ public:
 
     std::unordered_set<Collider*> m_overlappingColliders;
 
-    // Collision data storage
-    void addCollision(const CollisionData& data, uint64_t timestamp) {
-        if (m_collisionsValidTimestamp != timestamp) {
-            m_collisions.clear();
-            m_collisionsValidTimestamp = timestamp;
-        }
-        m_collisions.push_back(data);
-    }
-
-    const std::vector<CollisionData>& getCollisions(uint64_t currentTimestamp) const {
-        if (m_collisionsValidTimestamp != currentTimestamp) {
-            static const std::vector<CollisionData> empty;
-            return empty;
-        }
-        return m_collisions;
-    }
-
     // Dependent positioning system
     void updatePosition(uint64_t currentTimestep);
 
@@ -120,10 +99,6 @@ public:
     // AABB data
     glm::dvec3 m_AABBMin;
     glm::dvec3 m_AABBMax;
-
-    // Collision data with timestamp-based validity
-    std::vector<CollisionData> m_collisions;
-    uint64_t m_collisionsValidTimestamp;
 
 private:
     static int s_nextId;

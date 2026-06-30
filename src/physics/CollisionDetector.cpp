@@ -159,7 +159,15 @@ void CollisionDetector::setTimestep(uint64_t timestep) {
     m_currentTimestep = timestep;
 }
 
+const std::vector<CollisionData>& CollisionDetector::getCollisions(const Collider* collider) const {
+    static const std::vector<CollisionData> empty;
+    auto it = m_byCollider.find(collider->m_id);
+    return (it != m_byCollider.end()) ? it->second : empty;
+}
+
 Generator<bool> CollisionDetector::run() {
+    m_byCollider.clear();
+
     // Update all collision boxes
     updateAllCollidersAndAABB();
     if (m_timeHandler->now() >= m_endTime) {
@@ -173,8 +181,8 @@ Generator<bool> CollisionDetector::run() {
     while (it != m_activeAABBS.end()) {
         if (!it->first->checkAABBCollision(it->second)) {
             // Clear cached data for this collider pair since they're no longer colliding
-            PairCache<glm::dvec3>::clearCachedData(it->first->m_debugId, it->second->m_debugId);  // SAT axes
-            PairCache<int>::clearCachedData(it->first->m_debugId, it->second->m_debugId);         // Contact counts
+            PairCache<glm::dvec3>::clearCachedData(it->first->m_id, it->second->m_id);  // SAT axes
+            PairCache<int>::clearCachedData(it->first->m_id, it->second->m_id);         // Contact counts
             
             // Remove from overlap caches
             it->first->m_overlappingColliders.erase(it->second);
@@ -282,7 +290,7 @@ void CollisionDetector::insertionSort(std::vector<std::unique_ptr<Edge>>& edges,
 
 std::pair<Collider*, Collider*> CollisionDetector::makePair(Collider* a, Collider* b) {
     // Ensure consistent ordering to avoid duplicates
-    return (a->m_debugId < b->m_debugId) ? std::make_pair(a, b) : std::make_pair(b, a);
+    return (a->m_id < b->m_id) ? std::make_pair(a, b) : std::make_pair(b, a);
 }
 
 void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2) {
@@ -325,8 +333,7 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2)
         data2.contactPointsLocalA = result.m_contactPointsLocalB;  // Swap
         data2.contactPointsLocalB = result.m_contactPointsLocalA;  // Swap
         
-        // Write to colliders with current timestamp
-        collider1->addCollision(data1, m_currentTimestep);
-        collider2->addCollision(data2, m_currentTimestep);
+        m_byCollider[collider1->m_id].push_back(std::move(data1));
+        m_byCollider[collider2->m_id].push_back(std::move(data2));
     }
 }

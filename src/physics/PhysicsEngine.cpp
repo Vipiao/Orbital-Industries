@@ -432,11 +432,11 @@ void PhysicsEngine::resolveCollision(std::shared_ptr<RigidBody> bodyShared) {
         }
         
         // Get all collisions for this collider
-        const auto& collisions = collider->getCollisions(m_currentPhysicsTimeStep);
+        const auto& collisions = m_collisionDetector.getCollisions(collider.get());
         
         for (const auto& collision : collisions) {
             // Avoid processing same collision twice - only process if our ID is lower
-            if (collider->m_debugId >= collision.otherCollider->m_debugId) {
+            if (collider->m_id >= collision.otherCollider->m_id) {
                 continue;
             }
             
@@ -534,11 +534,11 @@ void PhysicsEngine::separateOverlaps(std::shared_ptr<RigidBody> bodyShared) {
         }
 
          // Get all collisions for this collider
-        const auto& collisions = collider->getCollisions(m_currentPhysicsTimeStep);
+        const auto& collisions = m_collisionDetector.getCollisions(collider.get());
         
         for (const auto& collision : collisions) {
             // Avoid processing same collision twice
-            if (collider->m_debugId >= collision.otherCollider->m_debugId) {
+            if (collider->m_id >= collision.otherCollider->m_id) {
                 continue;
             }
             

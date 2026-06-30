@@ -402,12 +402,12 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
 
     // Try cached axis first
     constexpr uint64_t SEPARATING_AXIS_CACHE_DURATION = 10; // 10 timesteps
-    const glm::dvec3* cachedAxis = PairCache<glm::dvec3>::getCachedData(polyA->m_debugId, polyB->m_debugId, currentTimestep);
+    const glm::dvec3* cachedAxis = PairCache<glm::dvec3>::getCachedData(polyA->m_id, polyB->m_id, currentTimestep);
     if (cachedAxis) {
         GeometryUtils::SeparatingAxisResult result = GeometryUtils::testSeparatingAxis(*cachedAxis, verticesA, verticesB);
         if (result.isSeparating) {
             // Refresh this separating axis cache (it worked!)
-            PairCache<glm::dvec3>::refreshCachedData(polyA->m_debugId, polyB->m_debugId, currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
+            PairCache<glm::dvec3>::refreshCachedData(polyA->m_id, polyB->m_id, currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
             return CollisionResult();
         }
     }
@@ -420,7 +420,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
         GeometryUtils::SeparatingAxisResult result = GeometryUtils::testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, glm::normalize(axis), currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
+            PairCache<glm::dvec3>::setCachedData(polyA->m_id, polyB->m_id, glm::normalize(axis), currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -443,7 +443,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
         GeometryUtils::SeparatingAxisResult result = GeometryUtils::testSeparatingAxis(axis, verticesA, verticesB);
         if (result.isSeparating) {
             // Cache this separating axis
-            PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, glm::normalize(axis), currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
+            PairCache<glm::dvec3>::setCachedData(polyA->m_id, polyB->m_id, glm::normalize(axis), currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
             return CollisionResult();
         }
         if (result.penetration < minPenetration) {
@@ -476,7 +476,7 @@ CollisionResult CollisionDetectionUtils::detectPolyhedronPolyhedron(
             GeometryUtils::SeparatingAxisResult result = GeometryUtils::testSeparatingAxis(crossProduct, verticesA, verticesB);
             if (result.isSeparating) {
                 // Cache this separating axis
-                PairCache<glm::dvec3>::setCachedData(polyA->m_debugId, polyB->m_debugId, crossProduct, currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
+                PairCache<glm::dvec3>::setCachedData(polyA->m_id, polyB->m_id, crossProduct, currentTimestep, SEPARATING_AXIS_CACHE_DURATION);
                 return CollisionResult();
             }
             if (result.penetration < minPenetration) {
@@ -793,7 +793,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
 
     // Check cached collision data from previous iteration
     constexpr uint64_t COLLISION_CACHE_DURATION = 5; // 5 timesteps  
-    const CollisionCacheData* cacheData = PairCache<CollisionCacheData>::getCachedData(gridA->m_debugId, gridB->m_debugId, currentTimestep);
+    const CollisionCacheData* cacheData = PairCache<CollisionCacheData>::getCachedData(gridA->m_id, gridB->m_id, currentTimestep);
     
     // Get AABB centers instead of positions (more representative of actual object centers)
     glm::dvec3 gridBCenterWorld = (gridB->m_AABBMax + gridB->m_AABBMin) * 0.5;
@@ -877,7 +877,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         //std::cout << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
         // Reuse cached collision data
         // Refresh cache expiry since we're successfully using it
-        PairCache<CollisionCacheData>::refreshCachedData(gridA->m_debugId, gridB->m_debugId, currentTimestep, COLLISION_CACHE_DURATION);
+        PairCache<CollisionCacheData>::refreshCachedData(gridA->m_id, gridB->m_id, currentTimestep, COLLISION_CACHE_DURATION);
         if (!cacheData->contactPoints.empty()) {
             // Get cached contact data and rotate both normal and compliant normal
             std::vector<ContactData> cachedContactData = cacheData->contactData;
@@ -1052,7 +1052,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
         newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
         newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
         newCacheData.cacheTimestamp = currentTimestep;
-        PairCache<CollisionCacheData>::setCachedData(gridA->m_debugId, gridB->m_debugId, std::move(newCacheData), currentTimestep, COLLISION_CACHE_DURATION);
+        PairCache<CollisionCacheData>::setCachedData(gridA->m_id, gridB->m_id, std::move(newCacheData), currentTimestep, COLLISION_CACHE_DURATION);
 
         // Debug visualization of contact points
         //if (DebugGlobals::getDebugRenderer()) {
@@ -1078,7 +1078,7 @@ CollisionResult CollisionDetectionUtils::detectGridGrid(
     newCacheData.gridAShapeTimestamp = gridA->getShapeChangeTimestamp();
     newCacheData.gridBShapeTimestamp = gridB->getShapeChangeTimestamp();
     newCacheData.cacheTimestamp = currentTimestep;
-    PairCache<CollisionCacheData>::setCachedData(gridA->m_debugId, gridB->m_debugId, std::move(newCacheData), currentTimestep, COLLISION_CACHE_DURATION);
+    PairCache<CollisionCacheData>::setCachedData(gridA->m_id, gridB->m_id, std::move(newCacheData), currentTimestep, COLLISION_CACHE_DURATION);
 
     return CollisionResult();
 }

@@ -9,7 +9,6 @@
 #include "../ArticulationUtils.h"
 #include "../../game_base/GridSubsystem.h"
 #include "../../physics/SensorCollider.h"
-#include "../../physics/BallCollider.h"
 #include "../../utils/GridGeometry.h"
 #include "../../debug/DebugGlobals.h"
 #include "../../debug/DebugRenderer.h"
@@ -477,10 +476,7 @@ void DigibotController::handleWalking() {
         return;
     }
     
-    // Cast to BallCollider to access collision data
-    BallCollider* ballSensor = static_cast<BallCollider*>(sensor.get());
-    
-    const auto& collisions = ballSensor->getCollisions(m_physicsEngine->getCurrentPhysicsTimeStep());
+    const auto& collisions = m_physicsEngine->getCollisions(sensor.get());
     
     // ========== Step 1: Collect All Contact Candidates ==========
     struct ContactCandidate {
