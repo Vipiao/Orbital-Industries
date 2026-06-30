@@ -196,8 +196,8 @@ std::vector<std::array<int, 3>> PolyhedronCollider::generateTriangleIndices() co
         return triangles; // Need at least 4 vertices for a polyhedron
     }
     
-    const double margin = 1e-6;
-    
+    const double margin = 1e-5;
+
     // For each face axis direction
     for (const auto& axis : m_localFaceAxes) {
         // Project all vertices onto this axis

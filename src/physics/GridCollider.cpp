@@ -652,7 +652,7 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
     };
     
     // 4. Merge local and adjacent foreign triangles using indices
-    const double vertexTolerance = 1e-6;
+    const double vertexTolerance = 1e-5;
     
     // Start with local vertices and triangles
     std::vector<glm::dvec3> mergedVertices = visibleTrianglesResult.vertices;
@@ -691,7 +691,7 @@ CellMetadata::CellClassification GridCollider::classifyCell(const glm::ivec3& co
                 
                 // Check if any vertex of local triangle is close to foreign triangle
                 bool isTouching = false;
-                const double touchingThreshold = 1e-6;
+                const double touchingThreshold = 1e-5;
                 
                 for (int v = 0; v < 3; ++v) {
                     double distance = GeometryUtils::pointToTriangleDistance(

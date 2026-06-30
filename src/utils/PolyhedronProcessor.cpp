@@ -813,7 +813,7 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
         return false;
     }
 
-    const double distanceMargin = 1e-6;
+    const double distanceMargin = 1e-5;
 
     // Pre-calculate all triangle normals once
     std::vector<glm::dvec3> triangleNormals;
@@ -883,7 +883,7 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
         
         for (const glm::dvec3& normal : neighboringNormals) {
             // Project all vertices onto the normal
-            std::vector<std::pair<double, int>> projections; 
+            std::vector<std::pair<double, int>> projections;
             for (int vIdx : verticesToProject) {
                 double projection = glm::dot(vertices[vIdx], normal);
                 projections.push_back({projection, vIdx});
@@ -896,7 +896,7 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
             }
             
             // Collect vertices at positive extreme (within tolerance)
-            const double tolerance = 1e-9;
+            const double tolerance = 1e-5;
             std::vector<int> extremeVertices;
             for (const auto& proj : projections) {
                 if (proj.first >= maxProjection - tolerance) {
@@ -971,7 +971,7 @@ bool PolyhedronProcessor::hasAtLeastOneConvexVertex(
                     double cross = edge.x * toCorner.y - edge.y * toCorner.x;
                     
                     // For counter-clockwise winding, corner is outside if on right side  
-                    static const double fanMargin = 1.e-6;
+                    static const double fanMargin = 1.e-5;
                     if (cross < -fanMargin) {
                         isInsideFan = false;
                         break;
@@ -1103,8 +1103,8 @@ std::vector<bool> PolyhedronProcessor::checkPolyhedronBorderIntersection(
     double borderValue = std::max(diff.x + diff.y + diff.z, 0);
     double borderValueB = 1.0 - borderValue;
     
-    const double tolerance = 1e-6;
-    
+    const double tolerance = 1e-5;
+
     // Arrays for processing both A and B vertices
     const std::vector<glm::dvec3>* vertices[2] = {&verticesA, &verticesB};
     double borderValues[2] = {borderValue, borderValueB};
