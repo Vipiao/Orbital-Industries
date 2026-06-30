@@ -1,4 +1,22 @@
 {
+    "cmake.debugConfig": {
+        "program": "${command:cmake.launchTargetPath}",
+        "cwd": "${workspaceFolder}/bin",
+        "MIMode": "gdb",
+        "miDebuggerPath": "/usr/local/bin/gdb-nowait",
+        "setupCommands": [
+            {
+                "description": "Suppress controlling terminal warning",
+                "text": "set startup-with-shell off",
+                "ignoreFailures": true
+            },
+            {
+                "description": "Enable pretty-printing",
+                "text": "-enable-pretty-printing",
+                "ignoreFailures": true
+            }
+        ]
+    },
     "files.associations": {
         "iostream": "cpp",
         "type_traits": "cpp",
