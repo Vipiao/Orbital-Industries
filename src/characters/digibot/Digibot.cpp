@@ -2,6 +2,8 @@
 #include "Digibot.h"
 #include "DigibotPhysics.h"
 #include "DigibotGraphics.h"
+#include "DigibotAnimation.h"
+#include "DigibotAnimationContext.h"
 #include "DigibotController.h"
 #include "DigibotResources.h"
 #include "../../physics/PhysicsEngine.h"
@@ -28,6 +30,9 @@ Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
     // Create graphics subsystem
     m_digibotGraphics = std::make_unique<DigibotGraphics>(graphics, resources);
 
+    // Create animation subsystem
+    m_digibotAnimation = std::make_unique<DigibotAnimation>();
+
     // Perform initial transform update
     updateVisualTransform();
 }
@@ -42,40 +47,33 @@ void Digibot::preRenderCallback(uint64_t frameNum, double timeRemainder) {
     //    return;
     //}
     
-    // Update body part articulation every frame
-    DigibotTargetPose targetPose;
-    
-    targetPose.rightHand.position = glm::dvec3(0.6, 0.6, 1.4);
-    double time = (double)frameNum * 0.02;
-    double scale = glm::cos(time) * 0.2 + 0.8;
-    targetPose.rightHand.position.x *= scale;
-    targetPose.rightHand.position.y *= scale;
+    // Assemble animation context
+    auto rigidBodyForAnim = m_rigidBody.lock();
+    if (rigidBodyForAnim) {
+        DigibotAnimationContext animCtx;
+        animCtx.m_frameNum                = frameNum;
+        // The mesh is rendered with a center-of-rotation of -m_graphicsPosition, so the
+        // graphics origin ends up at position + orientation * m_graphicsPosition (see
+        // mesh_vertex_shader.vert). The animation's localToWorld/worldToLocal must use the
+        // same rotated offset, otherwise feet computed in world space drift by
+        // (orientation - identity) * m_graphicsPosition as the surface/grid rotates.
+        animCtx.m_digibotWorldPos         = rigidBodyForAnim->m_position
+            + rigidBodyForAnim->m_orientation * m_graphicsPosition;
+        animCtx.m_digibotWorldOrientation = rigidBodyForAnim->m_orientation;
 
-    targetPose.leftHand = targetPose.rightHand;
-    targetPose.leftHand.position.x = -targetPose.leftHand.position.x;
+        if (m_digibotController->isJetpackEnabled()) {
+            animCtx.m_mode = DigibotAnimationContext::MovementMode::Flying;
+        } else {
+            animCtx.m_mode             = DigibotAnimationContext::MovementMode::Walking;
+            animCtx.m_hasGroundContact = m_digibotController->hasGroundContact();
+            animCtx.m_surfacePoint     = m_digibotController->getGroundContactPoint();
+            animCtx.m_surfaceNormal    = m_digibotController->getGroundSurfaceNormal();
+            animCtx.m_surfaceBody      = m_digibotController->getWalkingTargetRigidBody();
+        }
 
-    // Set foot targets (for now, just at natural positions)
-    double offsetY = 0.4 * glm::cos(time);
-    double offsetZ = 0.16 * glm::sin(time);
-    targetPose.rightFoot.position =
-        glm::dvec3(0.179225, 0.051327, 0.059608) +
-        glm::dvec3(0, offsetY, glm::max(0., -offsetZ));
-    targetPose.leftFoot.position =
-        glm::dvec3(-0.179225, 0.051327, 0.059608) +
-        glm::dvec3(0, -offsetY, glm::max(0., offsetZ));
-
-    targetPose.leftFoot.position.x += glm::cos(time / 1.17) * 0.08 - 0.1;
-    targetPose.leftFoot.position.y += glm::cos(time / 1.17) * 0.08;
-
-    targetPose.rightFoot.position.x -= glm::cos(time / 1.17) * 0.08 + 0.1;
-    targetPose.rightFoot.position.y -= glm::cos(time / 1.17) * 0.08;
-
-    targetPose.headOrientation = glm::angleAxis(
-        glm::radians(glm::cos(time/1.53) * 16.),
-        glm::normalize(glm::dvec3{0,1,1})
-    );
-
-    m_digibotGraphics->updateBodyPartPositions(targetPose);
+        DigibotPose pose = m_digibotAnimation->update(animCtx);
+        m_digibotGraphics->updateBodyPartPositions(pose);
+    }
 
     // Calculate delta time remainder and apply surface rotation to view
     double deltaTimeRemainder = timeRemainder - m_lastTimeRemainder;

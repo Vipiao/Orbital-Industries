@@ -623,6 +623,7 @@ void DigibotController::handleWalking() {
     //std::cout << std::endl;
     
     if (!foundContact) {
+        m_hasGroundContact = false;
         m_framesWithoutContact++;
         if (m_framesWithoutContact >= m_physicsEngine->getPhysicsHz()) { // 1 second
             m_cachedRigidBody.reset();
@@ -660,7 +661,14 @@ void DigibotController::handleWalking() {
     double surfaceAlignment = usingCache ? glm::dot(normal, modifiedUp) : 1.0;
 
     glm::dvec3 targetUpDirection = usingCache ? modifiedUp : normal;
-    
+
+    m_hasGroundContact    = true;
+    m_groundContactPoint  = closestPoint;
+    // Surface normal for the animation is always the direction to the body, regardless of
+    // whether the orientation up is locked (targetUpDirection). Otherwise the feet would
+    // follow the frozen orientation up instead of the surface when the grid rotates.
+    m_groundSurfaceNormal = normal;
+
     // Set orientation cache when establishing new lock (not using cache yet)
     if (!usingCache && targetRigidBody) {
         m_cachedRigidBody = targetRigidBody;

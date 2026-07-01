@@ -31,6 +31,12 @@ public:
     // Get the angular velocity of the surface we're on/locked to (per physics timestep)
     glm::dvec3 getSurfaceAngularVelocity() const { return m_surfaceAngularVelocity; }
 
+    // Ground contact info for animation (valid only in walking mode)
+    bool hasGroundContact() const { return m_hasGroundContact; }
+    glm::dvec3 getGroundContactPoint() const { return m_groundContactPoint; }
+    glm::dvec3 getGroundSurfaceNormal() const { return m_groundSurfaceNormal; }
+    std::weak_ptr<RigidBody> getWalkingTargetRigidBody() const { return m_walkingTargetRigidBody; }
+
     // Set the roll input (-1 for left/Q, +1 for right/E, 0 for none)
     void setRollInput(int rollInput);
 
@@ -105,6 +111,13 @@ private:
 
     // Angular velocity of surface we're on/locked to (zero if not on rotating surface)
     glm::dvec3 m_surfaceAngularVelocity{0.0, 0.0, 0.0};
+
+    // Ground contact state (updated each physics step in handleWalking)
+    bool m_hasGroundContact{false};
+    glm::dvec3 m_groundContactPoint{0.0, 0.0, 0.0};
+    // Surface normal for foot placement: normalize(bodyPos - contactPoint). This is the
+    // direction toward the body, independent of the (possibly locked) orientation up.
+    glm::dvec3 m_groundSurfaceNormal{0.0, 0.0, 1.0};
 
     // Up direction lock state
     bool m_upDirectionLocked{false};

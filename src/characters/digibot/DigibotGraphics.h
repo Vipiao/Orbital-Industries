@@ -1,6 +1,7 @@
 // DigibotGraphics.h
 #pragma once
 
+#include "DigibotPose.h"
 #include <memory>
 #include <vector>
 #include <glm/glm.hpp>
@@ -10,44 +11,6 @@ class GraphicsEngine;
 class Geometry;
 class Instance;
 class DigibotResources;
-
-/**
- * @brief Transform for a body part in local space
- */
-struct BodyPartTransform {
-    glm::dvec3 position;
-    glm::dquat orientation;
-    
-    BodyPartTransform()
-        : position(0.0, 0.0, 0.0)
-        , orientation(1.0, 0.0, 0.0, 0.0)
-    {}
-    
-    BodyPartTransform(const glm::dvec3& pos, const glm::dquat& ori)
-        : position(pos)
-        , orientation(ori)
-    {}
-};
-
-/**
- * @brief Target pose for Digibot IK solver
- */
-struct DigibotTargetPose {
-    BodyPartTransform leftHand;
-    BodyPartTransform rightHand;
-    BodyPartTransform leftFoot;
-    BodyPartTransform rightFoot;
-    glm::dquat headOrientation;
-    
-    // TODO: Define default rest pose values
-    DigibotTargetPose()
-        : leftHand()
-        , rightHand()
-        , leftFoot()
-        , rightFoot()
-        , headOrientation(1.0, 0.0, 0.0, 0.0)
-    {}
-};
 
 /**
  * @brief Manages visual rendering for Digibot character
@@ -71,7 +34,7 @@ public:
         uint64_t physicsTimeStep);
 
     // Body part articulation (IK target)
-    void updateBodyPartPositions(const DigibotTargetPose& targetPose);
+    void updateBodyPartPositions(const DigibotPose& pose);
 
     int getSSBOIndex() const { return m_visualMeshSSBOIndex; }
 

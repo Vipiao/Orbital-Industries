@@ -143,7 +143,7 @@ void DigibotGraphics::updateWorldTransform(
     );
 }
 
-void DigibotGraphics::updateBodyPartPositions(const DigibotTargetPose& targetPose) {
+void DigibotGraphics::updateBodyPartPositions(const DigibotPose& targetPose) {
     // ========== SETUP ARRAYS ==========
     glm::dvec3* elbows[2] = {&m_rightElbowPoint, &m_leftElbowPoint};
     glm::dvec3* knees[2] = {&m_rightKneePoint, &m_leftKneePoint};

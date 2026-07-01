@@ -5,6 +5,7 @@ Never use "using".
 Always use double precision. So dvec3 and dquat and double...
 Use uniform initialization.
 Suggest refactors when reasonable before implementing new features.
+Use m_ prefix for member variables and s_ for static.
 
 Follow principles:
 Single responsibility

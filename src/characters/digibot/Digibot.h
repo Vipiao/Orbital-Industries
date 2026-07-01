@@ -9,8 +9,8 @@
 class DigibotPhysics;
 class DigibotGraphics;
 class DigibotController;
+class DigibotAnimation;
 class DigibotResources;
-struct DigibotTargetPose;
 class GridSubsystem;
 
 /**
@@ -56,6 +56,7 @@ private:
     // Subsystems
     std::unique_ptr<DigibotPhysics> m_digibotPhysics;
     std::unique_ptr<DigibotGraphics> m_digibotGraphics;
+    std::unique_ptr<DigibotAnimation> m_digibotAnimation;
 
     // Controller for movement
     std::unique_ptr<DigibotController> m_digibotController;
