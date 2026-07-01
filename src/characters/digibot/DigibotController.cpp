@@ -68,6 +68,8 @@ void DigibotController::setJetpackEnabled(bool enabled) {
         m_cachedRigidBody.reset();
         m_cachedModifiedUp = glm::dvec3(0.0, 0.0, 0.0);
         m_framesWithoutContact = 0;
+        m_hasGroundContact = false;
+        m_walkingTargetRigidBody.reset();
     }
     std::cout << "Jetpack " << (m_jetpackEnabled ? "ENABLED" : "DISABLED") << std::endl;
 }
