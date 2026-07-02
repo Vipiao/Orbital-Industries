@@ -32,7 +32,7 @@ private:
 public:
 
     Game(TimeHandler* timeHandler, 
-         GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::RECORD) {
+         GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) {
         
         // Create the game base instance
         m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
