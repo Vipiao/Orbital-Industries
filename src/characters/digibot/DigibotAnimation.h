@@ -48,7 +48,7 @@ private:
     bool m_initialized{false};
 
     // Times in physics steps, distances in meters
-    static constexpr double s_stepDuration  = 16.0;  // swing time, liftoff -> plant
+    static constexpr double s_stepDuration  = 10.0;  // swing time, liftoff -> plant
     static constexpr double s_stepThreshold = 0.30;  // foot error that triggers a step
     static constexpr double s_liftHeight    = 0.12;  // apex of the swing arc
 
