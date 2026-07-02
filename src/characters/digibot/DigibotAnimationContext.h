@@ -17,6 +17,12 @@ struct DigibotAnimationContext {
     glm::dvec3 m_digibotWorldPos{0.0, 0.0, 0.0};
     glm::dquat m_digibotWorldOrientation{1.0, 0.0, 0.0, 0.0};
 
+    // World velocity, displacement per physics step (like RigidBody::m_velocity)
+    glm::dvec3 m_digibotWorldVelocity{0.0, 0.0, 0.0};
+
+    // Nominal frame duration in physics-step units (physicsHz / frameRate)
+    double m_deltaTime{0.0};
+
     // Ground contact info — valid when m_mode == Walking and m_hasGroundContact == true
     bool m_hasGroundContact{false};
     glm::dvec3 m_surfacePoint{0.0, 0.0, 0.0};

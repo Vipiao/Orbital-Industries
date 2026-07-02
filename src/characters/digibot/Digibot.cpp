@@ -60,6 +60,9 @@ void Digibot::preRenderCallback(uint64_t frameNum, double timeRemainder) {
         animCtx.m_digibotWorldPos         = rigidBodyForAnim->m_position
             + rigidBodyForAnim->m_orientation * m_graphicsPosition;
         animCtx.m_digibotWorldOrientation = rigidBodyForAnim->m_orientation;
+        animCtx.m_digibotWorldVelocity    = rigidBodyForAnim->m_velocity;
+        animCtx.m_deltaTime               = static_cast<double>(m_physics->getPhysicsHz())
+            / static_cast<double>(m_graphicsEngine->getFrameRate());
 
         if (m_digibotController->isJetpackEnabled()) {
             animCtx.m_mode = DigibotAnimationContext::MovementMode::Flying;

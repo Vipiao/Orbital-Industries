@@ -29,13 +29,13 @@ private:
 
     // All foot state lives in surface-body (grid) space — the single source of truth.
     // A planted foot is simply a fixed point there, so it follows the grid for free.
-    // A stepping foot chases its landing spot through an intermediate point:
-    //   intermediate eases toward target, current eases toward intermediate
-    //   (double exponential for a soft step arc).
+    // A stepping foot travels lift -> target in fixed time: smoothstep along the
+    // ground, sine lift arc along the normal, driven by m_phase.
     struct FootState {
         glm::dvec3 m_currentGridPosition{0.0, 0.0, 0.0};
-        glm::dvec3 m_intermediateGridPosition{0.0, 0.0, 0.0};
+        glm::dvec3 m_liftGridPosition{0.0, 0.0, 0.0};
         glm::dvec3 m_targetGridPosition{0.0, 0.0, 0.0};
+        double m_phase{0.0};  // 0 = liftoff, 1 = planted
         bool m_isPlanted{true};
     };
 
@@ -47,9 +47,10 @@ private:
     std::weak_ptr<RigidBody> m_surfaceBody;
     bool m_initialized{false};
 
-    static constexpr double s_stepThreshold = 0.30;
-    static constexpr double s_footAlpha    = 0.20;
-    static constexpr double s_plantMargin  = 0.02;
+    // Times in physics steps, distances in meters
+    static constexpr double s_stepDuration  = 16.0;  // swing time, liftoff -> plant
+    static constexpr double s_stepThreshold = 0.30;  // foot error that triggers a step
+    static constexpr double s_liftHeight    = 0.12;  // apex of the swing arc
 
     // Digibot-local <-> world (uses the context's digibot transform).
     static glm::dvec3 localToWorld(const glm::dvec3& local, const DigibotAnimationContext& ctx);

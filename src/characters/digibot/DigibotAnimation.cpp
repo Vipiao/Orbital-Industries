@@ -1,8 +1,10 @@
 // DigibotAnimation.cpp
 #include "DigibotAnimation.h"
 #include "../../physics/RigidBody.h"
+#include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <numbers>
 
 namespace {
 bool isFinite(const glm::dvec3& v) {
@@ -90,8 +92,9 @@ void DigibotAnimation::initFeet(const DigibotAnimationContext& context) {
         glm::dvec3 gridPosition = projectOntoPlane(
             worldToGrid(localToWorld(hipLocal, context), body),
             surfaceGridPosition, upGridDirection);
-        foot.m_currentGridPosition = foot.m_intermediateGridPosition
+        foot.m_currentGridPosition = foot.m_liftGridPosition
             = foot.m_targetGridPosition = gridPosition;
+        foot.m_phase = 1.0;
         foot.m_isPlanted = true;
     };
     place(m_rightFoot, s_naturalRightHipLocal);
@@ -122,7 +125,6 @@ DigibotPose DigibotAnimation::walkingPose(const DigibotAnimationContext& context
     glm::dvec3 upGridDirection = body
         ? glm::conjugate(body->m_orientation) * context.m_surfaceNormal
         : context.m_surfaceNormal;
-    glm::dvec3 digibotGridPosition = worldToGrid(context.m_digibotWorldPos, body);
 
     glm::dvec3 idealRightGridPosition = projectOntoPlane(
         worldToGrid(localToWorld(s_naturalRightHipLocal, context), body),
@@ -131,51 +133,63 @@ DigibotPose DigibotAnimation::walkingPose(const DigibotAnimationContext& context
         worldToGrid(localToWorld(s_naturalLeftHipLocal, context), body),
         surfaceGridPosition, upGridDirection);
 
-    // --- Trigger a step when both feet are planted and their average drifts off-center ---
+    // --- Velocity relative to the surface, in grid space, tangent to the plane ---
+    glm::dvec3 relativeWorldVelocity = context.m_digibotWorldVelocity;
+    if (body) {
+        relativeWorldVelocity -= body->m_velocity
+            + glm::cross(body->getAngularVelocityWorld(),
+                         context.m_digibotWorldPos - body->m_position);
+    }
+    glm::dvec3 gridVelocity = body
+        ? glm::conjugate(body->m_orientation) * relativeWorldVelocity
+        : relativeWorldVelocity;
+    gridVelocity -= glm::dot(gridVelocity, upGridDirection) * upGridDirection;
+
+    // Lead each foot's ideal by half the stance interval, so a landed foot spends
+    // its planted time centred around the hip instead of trailing it.
+    glm::dvec3 stepLead = gridVelocity * (0.5 * s_stepDuration);
+    glm::dvec3 predictedRightGridPosition = idealRightGridPosition + stepLead;
+    glm::dvec3 predictedLeftGridPosition  = idealLeftGridPosition + stepLead;
+
+    // --- Trigger a step when a planted foot strays too far from its own ideal.
+    // Targets are anchored to the foot's own hip, so feet can't cross.
     if (m_movingFoot == MovingFoot::NONE) {
-        glm::dvec3 underneathGridPosition =
-            projectOntoPlane(digibotGridPosition, surfaceGridPosition, upGridDirection);
-        glm::dvec3 averageFootGridPosition =
-            (m_leftFoot.m_currentGridPosition + m_rightFoot.m_currentGridPosition) * 0.5;
+        double rightError =
+            glm::length(m_rightFoot.m_currentGridPosition - predictedRightGridPosition);
+        double leftError =
+            glm::length(m_leftFoot.m_currentGridPosition - predictedLeftGridPosition);
 
-        if (glm::length(averageFootGridPosition - underneathGridPosition) > s_stepThreshold) {
-            double rightError =
-                glm::length(m_rightFoot.m_currentGridPosition - idealRightGridPosition);
-            double leftError =
-                glm::length(m_leftFoot.m_currentGridPosition - idealLeftGridPosition);
-            MovingFoot mover = (rightError > leftError) ? MovingFoot::RIGHT : MovingFoot::LEFT;
-
-            FootState& moverFoot  = (mover == MovingFoot::RIGHT) ? m_rightFoot : m_leftFoot;
-            FootState& anchorFoot = (mover == MovingFoot::RIGHT) ? m_leftFoot  : m_rightFoot;
-
-            // Mirror the anchor through underneath so the pair re-centres under the body,
-            // then project onto the surface: a point reflection would otherwise flip the
-            // anchor's out-of-plane component and place the target off the surface.
-            moverFoot.m_targetGridPosition = projectOntoPlane(
-                2.0 * underneathGridPosition - anchorFoot.m_currentGridPosition,
-                surfaceGridPosition, upGridDirection);
-            moverFoot.m_isPlanted = false;
-            m_movingFoot = mover;
+        if (std::max(rightError, leftError) > s_stepThreshold) {
+            m_movingFoot = (rightError > leftError) ? MovingFoot::RIGHT : MovingFoot::LEFT;
+            FootState& foot = (m_movingFoot == MovingFoot::RIGHT) ? m_rightFoot : m_leftFoot;
+            foot.m_liftGridPosition = foot.m_currentGridPosition;
+            foot.m_phase = 0.0;
+            foot.m_isPlanted = false;
         }
     }
 
-    // --- Animate the moving foot: intermediate eases toward target, current toward intermediate ---
+    // --- Advance the swing: fixed duration, smoothstep travel, sine lift arc ---
     if (m_movingFoot != MovingFoot::NONE) {
         FootState& foot = (m_movingFoot == MovingFoot::RIGHT) ? m_rightFoot : m_leftFoot;
 
-        // Re-snap the target onto the surface each frame: the normal keeps rotating while
-        // the foot travels, so a target frozen in grid space would drift off the plane.
+        // Refresh the target from this frame's prediction so it tracks velocity
+        // changes, and re-snap both endpoints onto the surface plane: the normal
+        // keeps rotating while the foot travels.
         foot.m_targetGridPosition = projectOntoPlane(
-            foot.m_targetGridPosition, surfaceGridPosition, upGridDirection);
+            (m_movingFoot == MovingFoot::RIGHT)
+                ? predictedRightGridPosition : predictedLeftGridPosition,
+            surfaceGridPosition, upGridDirection);
+        foot.m_liftGridPosition = projectOntoPlane(
+            foot.m_liftGridPosition, surfaceGridPosition, upGridDirection);
 
-        foot.m_intermediateGridPosition +=
-            (foot.m_targetGridPosition - foot.m_intermediateGridPosition) * s_footAlpha;
-        foot.m_currentGridPosition +=
-            (foot.m_intermediateGridPosition - foot.m_currentGridPosition) * s_footAlpha;
+        foot.m_phase = std::min(foot.m_phase + context.m_deltaTime / s_stepDuration, 1.0);
+        foot.m_currentGridPosition = glm::mix(
+                foot.m_liftGridPosition, foot.m_targetGridPosition,
+                glm::smoothstep(0.0, 1.0, foot.m_phase))
+            + upGridDirection * (s_liftHeight * std::sin(std::numbers::pi * foot.m_phase));
 
-        if (glm::length(foot.m_currentGridPosition - foot.m_targetGridPosition) < s_plantMargin) {
-            foot.m_currentGridPosition = foot.m_intermediateGridPosition
-                = foot.m_targetGridPosition;
+        if (foot.m_phase >= 1.0) {
+            foot.m_currentGridPosition = foot.m_targetGridPosition;
             foot.m_isPlanted = true;
             m_movingFoot = MovingFoot::NONE;
         }
