@@ -3,12 +3,12 @@
 
 #include <glm/glm.hpp>
 #include <memory>
-#include <vector>
-#include "../../game_base/Grid.h"
 
 class DigibotPhysics;
 class PhysicsEngine;
 class GridSubsystem;
+class Grid;
+class RigidBody;
 
 class DigibotController {
 public:
@@ -25,7 +25,6 @@ public:
     void setViewDirection(const glm::dvec3& viewDirection);
 
     // Per-frame update for view direction rotation when locked to grid
-    // Returns the rotation quaternion applied this frame (for UI elements)
     void updatePerFrame(double deltaTimeRemainder);
 
     // Get the angular velocity of the surface we're on/locked to (per physics timestep)
@@ -52,9 +51,6 @@ public:
 
     // Get the current view direction
     const glm::dvec3& getViewDirection() const { return m_viewDirection; }
-
-    // Configure roll properties
-    void setRollAcceleration(double acceleration);
 
     // Configure maximum roll rate
     void setMaxRollRate(double maxRate);
@@ -84,7 +80,6 @@ private:
     double m_thrustStrength;
     double m_angularAccelerationMax;  // Maximum angular acceleration (rad/s^2)
     double m_maxRollRate;             // Maximum roll rate (rad/s)
-    double m_rollAcceleration;        // Roll acceleration strength (rad/s^2)
     int m_rollInput;                  // -1 for roll left, +1 for roll right, 0 for none
     glm::dvec3 m_viewDirection;       // Current view direction in world space
 
@@ -104,7 +99,6 @@ private:
     double m_groundSelectionBias;
     double m_maxGroundAngle;
     double m_maxLockedGroundAngle;
-    double m_walkingSensorRadius;
 
     // Target rigid body from walking (set in handleWalking, empty if not walking or no contact)
     std::weak_ptr<RigidBody> m_walkingTargetRigidBody;

@@ -203,7 +203,9 @@ DigibotPhysics::~DigibotPhysics() {
         m_physics->removeRigidBody(m_rigidBody);
     }
 
-    m_physics->getCollisionDetector().removeCollider(m_colliderWeak);
+    if (!m_colliderWeak.expired()) {
+        m_physics->getCollisionDetector().removeCollider(m_colliderWeak);
+    }
 
     if (!m_walkingSensor.expired()) {
         m_physics->getCollisionDetector().removeCollider(m_walkingSensor);

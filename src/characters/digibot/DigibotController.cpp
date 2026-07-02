@@ -21,7 +21,6 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_thrustStrength(0.004)  // Default thrust strength
     , m_angularAccelerationMax(0.016)  // Maximum angular acceleration (rad/s²)
     , m_maxRollRate(0.032)  // Target roll rate (rad/s) - reduced by 0.8x
-    , m_rollAcceleration(0.008)  // Roll acceleration strength (rad/s^2)
     , m_rollInput(0)
     , m_viewDirection(0.0, 1.0, 0.0)  // Default forward
     , m_lockState(LockState::UNLOCKED)
@@ -34,7 +33,6 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     , m_groundSelectionBias(2.0)
     , m_maxGroundAngle(glm::radians(90.0))
     , m_maxLockedGroundAngle(glm::radians(30.0))
-    , m_walkingSensorRadius(physics->getWalkingSensorRadius())
 {
     if (!m_physics) {
         throw std::runtime_error("DigibotController: Physics component cannot be null");
@@ -407,9 +405,7 @@ void DigibotController::handleFlying() {
     m_physicsEngine->applyTorque(rigidBodyWeak, rigidBody->getWorldInertiaTensor() * angularAcceleration);
 }
 
-int test = 0;
 void DigibotController::handleWalking() {
-    test++;
     // DEBUG
     if (DebugGlobals::getDebugRenderer()) {
         DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
@@ -951,6 +947,6 @@ void DigibotController::setThrustStrength(double strength) {
     m_thrustStrength = strength;
 }
 
-void DigibotController::setRollAcceleration(double acceleration) {
-    m_rollAcceleration = acceleration;
+void DigibotController::setMaxRollRate(double maxRate) {
+    m_maxRollRate = maxRate;
 }
