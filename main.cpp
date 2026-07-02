@@ -215,6 +215,10 @@ int main() {
         GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::RECORD;
 
         Game game(timeHandler, controlMode);
+
+        // Testing convenience: park the window at a fixed spot (no-op on Wayland).
+        game.getGameBase()->m_graphicsEngine->setWindowPos(1500, 700);
+
         game.run();
         
         // Clean up TimeHandler
