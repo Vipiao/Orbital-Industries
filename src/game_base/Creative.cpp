@@ -369,6 +369,11 @@ void Creative::processInputLogic() {
         }
     }
  
+    // Toggle fullscreen with F11 key
+    if (keyboard->m_f11.justPressed()) {
+        m_gameBase->m_graphicsEngine->toggleFullscreen();
+    }
+
     // Toggle mouse lock with M key
     if (keyboard->m_m.justPressed()) {
         bool isLocked = mouseHandler->getMouseLock();

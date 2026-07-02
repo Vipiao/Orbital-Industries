@@ -5,6 +5,7 @@
 #include "graphics/MouseHandler.h"
 #include <glm/gtc/quaternion.hpp>
 #include <iostream>
+#include "../InputSettings.h"
 
 FreeCameraController::FreeCameraController(GraphicsEngine* graphics)
     : m_graphics(graphics)
@@ -38,8 +39,7 @@ void FreeCameraController::update(double deltaTime, glm::dvec3& position, glm::d
     
     // Mouse look (camera rotation)
     if (mouseHandler->getMouseLock()) {
-        // Calculate mouse sensitivity based on framerate
-        const double mouseSensitivity = 0.0008;
+        const double mouseSensitivity = InputSettings::MOUSE_SENSITIVITY;
         glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
         
         // Rotate around Z-axis for yaw (left/right)

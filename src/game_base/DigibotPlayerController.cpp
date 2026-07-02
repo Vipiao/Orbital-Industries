@@ -11,6 +11,7 @@
 #include "graphics/MouseHandler.h"
 #include <iostream>
 #include "../utils/GridGeometry.h"
+#include "InputSettings.h"
 
 DigibotPlayerController::DigibotPlayerController(GraphicsEngine* graphics)
     : m_graphics(graphics)
@@ -258,7 +259,7 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         glm::dquat viewQuat = glm::conjugate(ArticulationUtils::quatLookAtYForward(currentViewDir, upVector));
         
         // Step 2: Apply mouse rotations
-        const double mouseSensitivity = 0.0008;
+        const double mouseSensitivity = InputSettings::MOUSE_SENSITIVITY;
         glm::dvec2 mouseMovement = mouseHandler->getMouseMovement();
         
         double pitchAngle = -mouseMovement.y * mouseSensitivity;
