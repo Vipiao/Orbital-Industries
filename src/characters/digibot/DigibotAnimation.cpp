@@ -1,6 +1,17 @@
 // DigibotAnimation.cpp
 #include "DigibotAnimation.h"
 #include "../../physics/RigidBody.h"
+#include <cassert>
+#include <cmath>
+
+namespace {
+bool isFinite(const glm::dvec3& v) {
+    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+}
+bool isUnit(const glm::dvec3& v) {
+    return std::abs(glm::length(v) - 1.0) < 1e-3;
+}
+}  // namespace
 
 // Skeleton constants match DigibotGraphics natural positions exactly
 const glm::dvec3 DigibotAnimation::s_naturalRightHipLocal  = glm::dvec3( 0.177658,  0.061087, 1.02951);
@@ -35,6 +46,8 @@ glm::dvec3 DigibotAnimation::projectOntoPlane(
     const glm::dvec3& planePoint,
     const glm::dvec3& planeNormal)
 {
+    // Projection assumes a unit normal; a non-unit/zero normal silently produces garbage.
+    assert(isUnit(planeNormal) && "projectOntoPlane requires a unit plane normal");
     return point - glm::dot(point - planePoint, planeNormal) * planeNormal;
 }
 
@@ -90,6 +103,12 @@ void DigibotAnimation::initFeet(const DigibotAnimationContext& context) {
 }
 
 DigibotPose DigibotAnimation::walkingPose(const DigibotAnimationContext& context) {
+    // The controller must hand us a valid, unit surface normal and finite contact point;
+    // otherwise the foot-placement projection blows up (see initFeet).
+    assert(isUnit(context.m_surfaceNormal) && "surface normal must be unit length");
+    assert(isFinite(context.m_surfacePoint) && "surface point must be finite");
+    assert(isFinite(context.m_digibotWorldPos) && "digibot world position must be finite");
+
     auto body        = context.m_surfaceBody.lock();
     auto prevSurface = m_surfaceBody.lock();
 
@@ -170,5 +189,9 @@ DigibotPose DigibotAnimation::walkingPose(const DigibotAnimationContext& context
         worldToLocal(gridToWorld(m_leftFoot.m_currentGridPosition, body), context);
     pose.rightHand.position = s_naturalRightHandLocal;
     pose.leftHand.position  = s_naturalLeftHandLocal;
+
+    // Catch any NaN/inf before it reaches the IK and corrupts the shared render slot.
+    assert(isFinite(pose.rightFoot.position) && isFinite(pose.leftFoot.position)
+        && "walking pose produced a non-finite foot position");
     return pose;
 }

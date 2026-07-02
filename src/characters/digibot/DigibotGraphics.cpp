@@ -6,6 +6,8 @@
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "graphics/SSBOManager.h"
 #include <iostream>
+#include <cassert>
+#include <cmath>
 
 // Static skeleton measurements (T-pose natural positions)
 const glm::dvec3 DigibotGraphics::s_naturalRightShoulderPos = glm::dvec3(0.26788, -0.044638, 1.47241);
@@ -39,10 +41,12 @@ DigibotGraphics::DigibotGraphics(GraphicsEngine* graphics, DigibotResources* res
     : m_graphics(graphics)
     , m_resources(resources)
     , m_visualMeshSSBOIndex(-1)
-    , m_rightElbowPoint(0.0, 0.0, 0.0)
-    , m_leftElbowPoint(0.0, 0.0, 0.0)
-    , m_rightKneePoint(0.0, 0.0, 0.0)
-    , m_leftKneePoint(0.0, 0.0, 0.0)
+    // Seed the IK solver at the natural (T-pose) joint positions so the first solved frame
+    // starts from a valid bent-limb configuration instead of collapsing from the origin.
+    , m_rightElbowPoint(s_naturalRightElbowPos)
+    , m_leftElbowPoint(s_naturalLeftElbowPos)
+    , m_rightKneePoint(s_naturalRightKneePos)
+    , m_leftKneePoint(s_naturalLeftKneePos)
 {
     if (!m_resources) {
         throw std::runtime_error("DigibotResources cannot be null");
@@ -53,6 +57,11 @@ DigibotGraphics::DigibotGraphics(GraphicsEngine* graphics, DigibotResources* res
 
     // Copy shared geometries from resources
     m_bodyPartGeometries = m_resources->getBodyPartGeometries();
+
+    // The instance/geometry loops below index by BodyPart up to PART_COUNT; the resource
+    // count is defined independently, so a mismatch would be silent out-of-bounds access.
+    assert(m_bodyPartGeometries.size() == static_cast<size_t>(PART_COUNT)
+        && "resource geometry count must match PART_COUNT");
 
     // Reserve space for instances
     m_bodyPartInstances.resize(PART_COUNT);
@@ -144,6 +153,15 @@ void DigibotGraphics::updateWorldTransform(
 }
 
 void DigibotGraphics::updateBodyPartPositions(const DigibotPose& targetPose) {
+    // Non-finite IK targets would propagate NaN through the shared SSBO slot and corrupt
+    // the whole robot, so reject them at the boundary.
+    auto isFinite = [](const glm::dvec3& v) {
+        return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
+    };
+    assert(isFinite(targetPose.leftFoot.position) && isFinite(targetPose.rightFoot.position)
+        && isFinite(targetPose.leftHand.position) && isFinite(targetPose.rightHand.position)
+        && "updateBodyPartPositions received a non-finite IK target");
+
     // ========== SETUP ARRAYS ==========
     glm::dvec3* elbows[2] = {&m_rightElbowPoint, &m_leftElbowPoint};
     glm::dvec3* knees[2] = {&m_rightKneePoint, &m_leftKneePoint};
@@ -215,10 +233,25 @@ void DigibotGraphics::updateBodyPartPositions(const DigibotPose& targetPose) {
     for (int ii = 0; ii < 2; ++ii) {
         // Calculate up vector for arm orientation (flip sign for left arm due to mirroring)
         double sign = (ii == 0 ? 1.0 : -1.0);
-        glm::dvec3 up = sign * glm::normalize(glm::cross(
+        glm::dvec3 bendNormal = glm::cross(
             handTargets[ii] - *elbows[ii],
             shoulders[ii] - *elbows[ii]
-        ));
+        );
+        double bendNormalLengthSq = glm::length2(bendNormal);
+        glm::dvec3 up;
+        if (bendNormalLengthSq < 1e-12) {
+            // Shoulder, elbow and hand are colinear (fully extended arm): the bend plane is
+            // undefined, so fall back to any axis perpendicular to the arm direction rather
+            // than normalizing a zero vector (which would yield NaN and corrupt the mesh).
+            glm::dvec3 armDirection = handTargets[ii] - shoulders[ii];
+            glm::dvec3 arbitrary = glm::dvec3(0.0, 0.0, 1.0);
+            if (glm::abs(glm::dot(armDirection, arbitrary)) > 0.9 * glm::length(armDirection)) {
+                arbitrary = glm::dvec3(0.0, 1.0, 0.0);
+            }
+            up = sign * glm::normalize(glm::cross(armDirection, arbitrary));
+        } else {
+            up = sign * (bendNormal / glm::sqrt(bendNormalLengthSq));
+        }
         
         // Update upper arm
         ArticulationUtils::updateArticulatedBodyPart(

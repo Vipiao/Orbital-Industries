@@ -11,6 +11,7 @@
 #include "graphics/meshHandler/MeshHandler.h"
 #include "../../physics/SensorCollider.h"
 #include "../../physics/BallCollider.h"
+#include <cassert>
 
 DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler)
     : m_physics(physics)
@@ -146,6 +147,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         coords, getProperties, &totalMass, &centerOfMass, &inertiaTensor);
 
     // Double mass and inertia
+    assert(totalMass > 0.0 && "computed collision-box mass must be positive before scaling");
     double scalingFactor = 80. / totalMass;
     totalMass = 80.;
     inertiaTensor *= scalingFactor;
