@@ -39,9 +39,9 @@ add_subdirectory(${ENGINE_DIR} ${CMAKE_BINARY_DIR}/engine-build)
 # Specify output directory for the executable
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
-# Game's own includes. glad/glm and all libs come from the engine target.
+# Game's own includes. glad/glm/glfw and all libs come from the engine and
+# utils targets.
 include_directories(${CMAKE_SOURCE_DIR})
-include_directories("${CMAKE_SOURCE_DIR}/include")
 if(WIN32)
     include_directories("C:/msys64/ucrt64/include")
     link_directories("C:/msys64/ucrt64/lib")
