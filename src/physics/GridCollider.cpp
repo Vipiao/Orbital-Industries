@@ -2,15 +2,15 @@
 #include "GridCollider.h"
 #include <cassert>
 #include "CubeCollider.h"
-#include "../utils/PolyhedronProcessor.h"
+#include "utils/PolyhedronProcessor.h"
 #include "PolyhedronCollider.h"
-#include "../utils/JobManager.h"
-#include "../utils/TimeHandler.h"
+#include "utils/JobManager.h"
+#include "utils/TimeHandler.h"
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
-#include "../utils/PolyhedronProcessor.h"
-#include "../utils/GeometryUtils.h"
-#include "../utils/GridGeometry.h"
+#include "utils/PolyhedronProcessor.h"
+#include "utils/GeometryUtils.h"
+#include "utils/GridGeometry.h"
 
 GridCollider::GridCollider(const glm::dvec3& position,
                           const glm::dquat& orientation,

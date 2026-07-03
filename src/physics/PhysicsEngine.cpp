@@ -5,8 +5,8 @@
 #include <limits>
 #include <algorithm>
 #include <glm/gtx/quaternion.hpp>
-#include "../debug/DebugRenderer.h"
-#include "../utils/TimeHandler.h"
+#include "debug/DebugRenderer.h"
+#include "utils/TimeHandler.h"
 
 PhysicsEngine::PhysicsEngine(TimeHandler* timeHandler)
     : m_timeHandler(timeHandler), m_collisionDetector(timeHandler),

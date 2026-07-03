@@ -3,7 +3,7 @@
 
 #include "Grid.h"
 #include "GridSplitter.h"
-#include "../utils/IHashable.h"
+#include "utils/IHashable.h"
 #include <memory>
 #include <vector>
 #include <glm/glm.hpp>

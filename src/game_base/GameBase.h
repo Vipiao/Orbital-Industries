@@ -1,20 +1,24 @@
 // GameBase.h
 #pragma once
 
-#include "graphics/GraphicsEngine.h"
+// GraphicsEngineBase.h is needed for the Mode enum in the constructor signature.
 #include "graphics/GraphicsEngineBase.h"
-#include "../physics/RigidBody.h"
-#include "../physics/PhysicsEngine.h"
-#include "../utils/IHashable.h"
-#include "../utils/JobManager.h"
-#include "GridSubsystem.h"
-#include "../characters/CharacterSubsystem.h"
-#include "../utils/Generator.h"
+#include "utils/IHashable.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <string>
 #include <vector>
 #include <memory>
 #include <chrono>
 
-// Forward declaration
+// Subsystems are held by pointer — include their headers where you use them.
+class GraphicsEngine;
+class PhysicsEngine;
+class JobManager;
+class Job;
+class GridSubsystem;
+class CharacterSubsystem;
+class Grid;
 class TimeHandler;
 class DebugRenderer;
 class Digibot;

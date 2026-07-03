@@ -1,6 +1,6 @@
 // SensorCollider.cpp
 #include "SensorCollider.h"
-#include "../utils/GeometryUtils.h"
+#include "utils/GeometryUtils.h"
 #include <glm/gtx/norm.hpp>
 #include <algorithm>
 

@@ -1,15 +1,18 @@
 // Creative.cpp
 #include "Creative.h"
 #include "../game_base/GameBase.h"
+#include "GridSubsystem.h"
+#include "../characters/CharacterSubsystem.h"
+#include "../characters/digibot/Digibot.h"
 #include "../physics/GridCollider.h"
 #include "graphics/GraphicsEngine.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "../game_base/Grid.h"
-#include "../debug/DebugGlobals.h"
-#include "../utils/PositionSelector.h"
+#include "debug/DebugGlobals.h"
+#include "utils/PositionSelector.h"
 #include <iostream>
-#include "../utils/ColorUtils.h"
+#include "utils/ColorUtils.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/MeshManager2D/GeometryInstance.h"
 #include "StructuralBlock.h"
@@ -21,10 +24,10 @@
 #include "tools/ColorTool.h"
 #include "tools/ModifyTool.h"
 #include "tools/BuildTool.h"
-#include "../utils/ColorUtils.h"
+#include "utils/ColorUtils.h"
 #include <float.h>
 #include "../physics/SensorCollider.h"
-#include "../utils/GridGeometry.h"
+#include "utils/GridGeometry.h"
 #include <map>
 
 Creative::Creative(GameBase* gameBase)

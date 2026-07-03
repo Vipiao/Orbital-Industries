@@ -1,6 +1,6 @@
 // GridCell.cpp
 #include "GridCell.h"
-#include "../utils/HashFunctions.h"
+#include "utils/HashFunctions.h"
 
 // Initialize static member
 uint64_t GridCell::nextId = 0;

@@ -3,7 +3,7 @@
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
 #include <stdexcept>
-#include "../utils/GeometryUtils.h"
+#include "utils/GeometryUtils.h"
 
 PolyhedronCollider::PolyhedronCollider(const glm::dvec3& position,
                                        const glm::dquat& orientation,

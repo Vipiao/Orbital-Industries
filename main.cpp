@@ -1,11 +1,14 @@
 // main.cpp
 #include "src/game_base/GameBase.h"
+#include "src/game_base/Grid.h"
+#include "src/physics/RigidBody.h"
+#include "graphics/GraphicsEngine.h"
 #include "graphics/GraphicsEngineBase.h"
-#include "src/utils/TimeHandler.h"
+#include "utils/TimeHandler.h"
 #include "src/debug/DebugVisualization.h"
 #include "src/game_base/Creative.h"
-#include "src/debug/DebugRenderer.h"
-#include "src/debug/DebugGlobals.h"
+#include "debug/DebugRenderer.h"
+#include "debug/DebugGlobals.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/CallbackManager.h"
 #include <iostream>

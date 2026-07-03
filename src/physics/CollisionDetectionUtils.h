@@ -4,7 +4,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
-#include "../utils/GeometryUtils.h"
+#include "utils/GeometryUtils.h"
 #include "CollisionResult.h"
 
 // Collision cache data structure for spatial coherence optimization

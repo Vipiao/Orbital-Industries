@@ -3,7 +3,7 @@
 
 #include "graphics/GraphicsEngine.h"
 #include "CellType.h"
-#include "../utils/HashFunctions.h"
+#include "utils/HashFunctions.h"
 #include "graphics/AssimpLoader.h"
 #include "StructuralBlock.h"
 #include "BlockResources.h"
@@ -14,7 +14,7 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
-#include "../utils/JobManager.h"
+#include "utils/JobManager.h"
 
 /**
  * @brief Graphics data for grid cells (not a base class)

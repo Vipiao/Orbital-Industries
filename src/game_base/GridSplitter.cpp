@@ -6,8 +6,8 @@
 #include "CellType.h"
 #include "thruster/ThrusterBlock.h"
 #include "cockpit/CockpitBlock.h"
-#include "../utils/PartitionCalculator.h"
-#include "../utils/TimeHandler.h"
+#include "utils/PartitionCalculator.h"
+#include "utils/TimeHandler.h"
 #include "../physics/RigidBody.h"
 #include <iostream>
 

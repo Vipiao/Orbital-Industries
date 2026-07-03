@@ -1,6 +1,6 @@
 // RigidBody.cpp
 #include "RigidBody.h"
-#include "../utils/HashFunctions.h"
+#include "utils/HashFunctions.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/norm.hpp>
 

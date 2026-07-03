@@ -7,19 +7,19 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include "../physics/PhysicsEngine.h"
 #include "../physics/GridCollider.h"
-#include "../utils/MassInertiaCalculator.h"
-#include "../utils/TimeHandler.h"
-#include "../utils/JobManager.h"
-#include "../debug/DebugGlobals.h"
+#include "utils/MassInertiaCalculator.h"
+#include "utils/TimeHandler.h"
+#include "utils/JobManager.h"
+#include "debug/DebugGlobals.h"
 #include "../physics/CubeCollider.h"
 #include <limits>
 #include <iostream>
-#include "../debug/DebugRenderer.h"
+#include "debug/DebugRenderer.h"
 #include "../game_base/JobPriorities.h"
 #include "../physics/PolyhedronCollider.h"
-#include "../utils/GridGeometry.h"
-#include "../utils/PolyhedronProcessor.h"
-#include "../utils/GeometryUtils.h"
+#include "utils/GridGeometry.h"
+#include "utils/PolyhedronProcessor.h"
+#include "utils/GeometryUtils.h"
 
 // Initialize static counter
 uint64_t Grid::s_nextUniqueId = 0;

@@ -1,5 +1,7 @@
 // CharacterSubsystem.cpp
 #include "CharacterSubsystem.h"
+#include "Character.h"
+#include "digibot/Digibot.h"
 #include "digibot/DigibotResources.h"
 #include <algorithm>
 

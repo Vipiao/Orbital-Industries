@@ -2,7 +2,7 @@
 #pragma once
 
 #include "PolyhedronCollider.h"
-#include "../utils/HashFunctions.h"
+#include "utils/HashFunctions.h"
 
 class CubeCollider : public PolyhedronCollider {
 public:

@@ -1,11 +1,11 @@
 // Grid.h
 #pragma once
 
-#include "../utils/IHashable.h"
-#include "../utils/HashFunctions.h"
-#include "../utils/StochasticAnalyzer.h"
-#include "../utils/GridGeometry.h"
-#include "../utils/GeometryUtils.h"
+#include "utils/IHashable.h"
+#include "utils/HashFunctions.h"
+#include "utils/StochasticAnalyzer.h"
+#include "utils/GridGeometry.h"
+#include "utils/GeometryUtils.h"
 #include "StructuralBlock.h"
 #include "SecondaryCell.h"
 #include "thruster/ThrusterBlock.h"

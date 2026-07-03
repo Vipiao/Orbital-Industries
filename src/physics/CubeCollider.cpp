@@ -1,6 +1,6 @@
 // CubeCollider.cpp
 #include "CubeCollider.h"
-#include "../utils/PolyhedronProcessor.h"
+#include "utils/PolyhedronProcessor.h"
 
 CubeCollider::CubeCollider(const glm::dvec3& position,
                            const glm::dquat& orientation,

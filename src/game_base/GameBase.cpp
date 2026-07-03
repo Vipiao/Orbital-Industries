@@ -1,8 +1,13 @@
 // GameBase.cpp
 #include "GameBase.h"
+#include "graphics/GraphicsEngine.h"
+#include "../physics/PhysicsEngine.h"
+#include "../characters/CharacterSubsystem.h"
+#include "utils/JobManager.h"
+#include "utils/HashFunctions.h"
 #include "GridSubsystem.h"
-#include "../utils/TimeHandler.h"
-#include "../debug/DebugRenderer.h"
+#include "utils/TimeHandler.h"
+#include "debug/DebugRenderer.h"
 #include <iostream>
 #include <algorithm>
 #include "../game_base/JobPriorities.h"

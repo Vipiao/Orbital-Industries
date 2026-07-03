@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <memory>
 #include <chrono>
-#include "../utils/Generator.h"
+#include "utils/Generator.h"
 
 // Forward declarations for factory methods
 class GridCollider;

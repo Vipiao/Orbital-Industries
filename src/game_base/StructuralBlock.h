@@ -3,7 +3,7 @@
 
 #include "GridCell.h"
 #include <array>
-#include "../utils/PolyhedronProcessor.h"
+#include "utils/PolyhedronProcessor.h"
 
 /**
  * @brief Concrete implementation of GridCell for structural blocks

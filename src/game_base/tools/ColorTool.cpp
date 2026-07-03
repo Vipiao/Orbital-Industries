@@ -1,14 +1,16 @@
 // ColorTool.cpp
 #include "ColorTool.h"
 #include "../GameBase.h"
+#include "graphics/GraphicsEngine.h"
 #include "../RadialMenu.h"
 #include "../Grid.h"
 #include "../StructuralBlock.h"
-#include "../../utils/ColorUtils.h"
+#include "utils/ColorUtils.h"
 #include <iostream>
 #include "graphics/MeshManager2D/MeshManager2D.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
 #include "graphics/MeshManager2D/GeometryInstance.h"
-#include "../../utils/GridGeometry.h"
+#include "utils/GridGeometry.h"
 
 ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {

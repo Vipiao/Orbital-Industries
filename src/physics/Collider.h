@@ -6,8 +6,8 @@
 #include <utility>
 #include <vector>
 #include <unordered_set>
-#include "../utils/GeometryUtils.h"
-#include "../utils/PointerStorage.h"
+#include "utils/GeometryUtils.h"
+#include "utils/PointerStorage.h"
 
 class CoordinateSystem {
 public:

@@ -1,6 +1,6 @@
 // StructuralBlock.cpp
 #include "StructuralBlock.h"
-#include "../utils/MassInertiaCalculator.h"
+#include "utils/MassInertiaCalculator.h"
 
 StructuralBlock::StructuralBlock(const glm::ivec3& coords)
     : GridCell(coords, TYPE) 

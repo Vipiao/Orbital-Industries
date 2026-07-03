@@ -4,9 +4,9 @@
 #include "../physics/SensorCollider.h"
 #include "../physics/GridCollider.h"
 #include "graphics/GraphicsEngine.h"
-#include "../utils/JobManager.h"
-#include "../utils/TimeHandler.h"
-#include "../utils/HashFunctions.h"
+#include "utils/JobManager.h"
+#include "utils/TimeHandler.h"
+#include "utils/HashFunctions.h"
 #include <algorithm>
 #include <iostream>
 

@@ -11,9 +11,9 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include "../debug/DebugGlobals.h"
-#include "../debug/DebugRenderer.h"
-#include "../utils/PairCache.h"
+#include "debug/DebugGlobals.h"
+#include "debug/DebugRenderer.h"
+#include "utils/PairCache.h"
 #include <cmath>
 
 CollisionResult CollisionDetectionUtils::collideWith(Collider* colliderA, Collider* colliderB, uint64_t currentTimestep) {

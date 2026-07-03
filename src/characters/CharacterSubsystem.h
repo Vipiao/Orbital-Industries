@@ -1,12 +1,12 @@
 // CharacterSubsystem.h
 #pragma once
 
-#include "Character.h"
-#include "digibot/Digibot.h"
-#include "digibot/DigibotResources.h"
 #include <memory>
 #include <vector>
 
+class Character;
+class Digibot;
+class DigibotResources;
 class PhysicsEngine;
 class GraphicsEngine;
 class JobManager;

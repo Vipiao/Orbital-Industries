@@ -28,6 +28,12 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # Engine location — set in CMakeUserPresets.json (gitignored), Option 3.
 set(ENGINE_DIR "" CACHE PATH "Path to the graphics engine repo")
+# Shared utils library. If left empty, the engine adds it from its default
+# sibling location; set it here (or in the presets) to control the path.
+set(UTILS_DIR "" CACHE PATH "Path to the shared utils library repo")
+if(UTILS_DIR AND NOT TARGET utils)
+    add_subdirectory(${UTILS_DIR} ${CMAKE_BINARY_DIR}/utils-build)
+endif()
 add_subdirectory(${ENGINE_DIR} ${CMAKE_BINARY_DIR}/engine-build)
 
 # Specify output directory for the executable
@@ -50,5 +56,8 @@ file(GLOB_RECURSE SRC_FILES
 # Add the executable
 add_executable(OrbitalIndustries ${SRC_FILES})
 
-# Everything comes through the engine target's PUBLIC properties.
-target_link_libraries(OrbitalIndustries PRIVATE GraphicsEngine::graphics)
+# The game depends on the engine and directly on the shared utils library.
+target_link_libraries(OrbitalIndustries PRIVATE
+    GraphicsEngine::graphics
+    Utils::utils
+)

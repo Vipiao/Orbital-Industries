@@ -1,6 +1,6 @@
 // BallCollider.cpp
 #include "BallCollider.h"
-#include "../utils/GeometryUtils.h"
+#include "utils/GeometryUtils.h"
 #include <glm/gtx/norm.hpp>
 
 BallCollider::BallCollider(const glm::dvec3& position,

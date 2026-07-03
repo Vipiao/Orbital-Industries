@@ -1,6 +1,8 @@
 // CharacterSelectionTool.cpp
 #include "CharacterSelectionTool.h"
+#include "graphics/instanceHandler/InstanceHandler.h"
 #include "../GameBase.h"
+#include "graphics/GraphicsEngine.h"
 #include "../RadialMenu.h"
 #include <iostream>
 

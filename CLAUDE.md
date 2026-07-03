@@ -17,3 +17,5 @@ Reproducibility
 Limit the size of a module to below ~1000 lines of code.
 
 Limit line width to 100 columns.
+
+Never commit code yourself using git.

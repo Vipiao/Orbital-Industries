@@ -8,8 +8,8 @@
 #include <functional>
 #include <chrono>
 #include <glm/glm.hpp>
-#include "../utils/Generator.h"
-#include "../utils/HashFunctions.h"
+#include "utils/Generator.h"
+#include "utils/HashFunctions.h"
 
 // Forward declarations
 class Grid;

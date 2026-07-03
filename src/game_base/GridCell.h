@@ -5,8 +5,8 @@
 #include <functional>
 #include <array>
 #include <vector>
-#include "../utils/IHashable.h"
-#include "../utils/StochasticAnalyzer.h"
+#include "utils/IHashable.h"
+#include "utils/StochasticAnalyzer.h"
 #include "CellType.h"
 #include <tuple>
 

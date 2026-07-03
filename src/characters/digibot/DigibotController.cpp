@@ -7,8 +7,8 @@
 #include <iostream>
 #include "../ArticulationUtils.h"
 #include "../../physics/SensorCollider.h"
-#include "../../debug/DebugGlobals.h"
-#include "../../debug/DebugRenderer.h"
+#include "debug/DebugGlobals.h"
+#include "debug/DebugRenderer.h"
 
 DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine)
     : m_physics(physics)

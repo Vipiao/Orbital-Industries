@@ -5,7 +5,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
 #include <vector>
-#include "../utils/IHashable.h"
+#include "utils/IHashable.h"
 
 // Forward declarations
 class RigidBody;

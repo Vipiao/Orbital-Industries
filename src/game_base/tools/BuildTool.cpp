@@ -1,6 +1,8 @@
 // BuildTool.cpp
 #include "BuildTool.h"
 #include "../GameBase.h"
+#include "../GridSubsystem.h"
+#include "graphics/GraphicsEngine.h"
 #include "../RadialMenu.h"
 #include "../Grid.h"
 #include "../StructuralBlock.h"
@@ -13,7 +15,7 @@
 #include <iostream>
 #include <optional>
 #include <functional>
-#include "../../utils/GridGeometry.h"
+#include "utils/GridGeometry.h"
 
 // Exponential decay constant for orientation slerp animation (radians/second feel).
 static constexpr double k_orientationSlerpRate = 20.0;

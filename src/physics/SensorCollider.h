@@ -2,7 +2,7 @@
 #pragma once
 
 #include "Collider.h"
-#include "../utils/HashFunctions.h"
+#include "utils/HashFunctions.h"
 #include <glm/glm.hpp>
 #include <vector>
 

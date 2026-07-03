@@ -8,9 +8,9 @@
 #include "CubeCollider.h"
 #include "SensorCollider.h"
 #include <algorithm>
-#include "../utils/PairCache.h"
+#include "utils/PairCache.h"
 #include <iostream>
-#include "../utils/TimeHandler.h"
+#include "utils/TimeHandler.h"
  
 CollisionDetector::CollisionDetector(TimeHandler* timeHandler) 
     : m_timeHandler(timeHandler) {

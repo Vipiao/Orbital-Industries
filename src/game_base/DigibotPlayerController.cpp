@@ -10,7 +10,7 @@
 #include "graphics/KeyboardHandler.h"
 #include "graphics/MouseHandler.h"
 #include <iostream>
-#include "../utils/GridGeometry.h"
+#include "utils/GridGeometry.h"
 #include "InputSettings.h"
 
 DigibotPlayerController::DigibotPlayerController(GraphicsEngine* graphics)

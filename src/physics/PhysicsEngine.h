@@ -7,7 +7,7 @@
 #include "CollisionDetector.h"
 #include "CollisionResult.h"
 #include <chrono>
-#include "../utils/Generator.h"
+#include "utils/Generator.h"
 
 // Forward declaration
 class TimeHandler;

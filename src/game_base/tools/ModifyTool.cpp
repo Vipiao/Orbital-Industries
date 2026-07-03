@@ -1,5 +1,6 @@
 // ModifyTool.cpp
 #include "ModifyTool.h"
+#include "graphics/GraphicsEngine.h"
 #include "../GameBase.h"
 #include "../RadialMenu.h"
 #include "../Grid.h"
@@ -7,12 +8,12 @@
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/MeshManager2D/GeometryInstance.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
-#include "../../utils/PositionSelector.h"
+#include "utils/PositionSelector.h"
 #include <cmath>
 #include <iostream>
-#include "../../utils/PolyhedronProcessor.h"
+#include "utils/PolyhedronProcessor.h"
 #include <algorithm>
-#include "../../utils/GridGeometry.h"
+#include "utils/GridGeometry.h"
 
 ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {

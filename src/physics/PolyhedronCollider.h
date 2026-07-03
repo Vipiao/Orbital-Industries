@@ -2,8 +2,8 @@
 #pragma once
 
 #include "Collider.h"
-#include "../utils/PairCache.h"
-#include "../utils/HashFunctions.h"
+#include "utils/PairCache.h"
+#include "utils/HashFunctions.h"
 
 class PolyhedronCollider : public Collider {
 public:
