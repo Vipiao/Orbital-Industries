@@ -532,3 +532,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# python3 dependency_graph_generator/dependency_analyzer.py --detect-cycles --skip-folders debug --skip-files TimeHandler
+
