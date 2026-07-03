@@ -36,6 +36,14 @@ public:
     // Body part articulation (IK target)
     void updateBodyPartPositions(const DigibotPose& pose);
 
+    // Head visibility (hidden in first-person view, but keeps casting shadows).
+    // The HEAD instance's color alpha is the source of truth: visible == alpha > 0.
+    void setHeadVisible(bool visible);
+    bool isHeadVisible() const;
+
+    // Head center in model space (model origin is at the feet)
+    static glm::dvec3 getNaturalHeadPosition();
+
     int getSSBOIndex() const { return m_visualMeshSSBOIndex; }
 
 private:

@@ -46,6 +46,13 @@ public:
     // Roll input control
     void setRollInput(int rollInput);
 
+    // Head visibility (hidden in first-person view)
+    void setHeadVisible(bool visible);
+    bool isHeadVisible() const;
+
+    // Head center in rigid-body local space (for first-person camera placement)
+    glm::dvec3 getHeadLocalPosition() const;
+
     // Controller access
     DigibotController* getController() { return m_digibotController.get(); }
 

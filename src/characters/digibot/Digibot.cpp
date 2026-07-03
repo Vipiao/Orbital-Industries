@@ -178,3 +178,17 @@ glm::dvec3 Digibot::getViewDirection() const {
 void Digibot::setRollInput(int rollInput) {
     m_digibotController->setRollInput(rollInput);
 }
+
+void Digibot::setHeadVisible(bool visible) {
+    m_digibotGraphics->setHeadVisible(visible);
+}
+
+bool Digibot::isHeadVisible() const {
+    return m_digibotGraphics->isHeadVisible();
+}
+
+glm::dvec3 Digibot::getHeadLocalPosition() const {
+    // The graphics origin sits at rigidBody position + orientation * m_graphicsPosition
+    // (see preRenderCallback), so the head offset combines both.
+    return m_graphicsPosition + DigibotGraphics::getNaturalHeadPosition();
+}

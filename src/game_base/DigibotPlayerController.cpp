@@ -22,7 +22,19 @@ DigibotPlayerController::DigibotPlayerController(GraphicsEngine* graphics)
 }
 
 void DigibotPlayerController::setPilotableCharacter(std::weak_ptr<Digibot> character) {
+    auto previous = m_pilotableCharacter.lock();
+    auto next = character.lock();
+    if (previous == next) {
+        return;
+    }
+
+    // Never leave a character we no longer control headless
+    if (previous) {
+        previous->setHeadVisible(true);
+    }
+
     m_pilotableCharacter = character;
+    applyHeadVisibility();
 }
 
 std::weak_ptr<Digibot> DigibotPlayerController::getPilotableCharacter() const {
@@ -30,11 +42,27 @@ std::weak_ptr<Digibot> DigibotPlayerController::getPilotableCharacter() const {
 }
 
 void DigibotPlayerController::enable() {
+    if (m_enabled) {
+        return;
+    }
     m_enabled = true;
+    applyHeadVisibility();
 }
 
 void DigibotPlayerController::disable() {
+    if (!m_enabled) {
+        return;
+    }
     m_enabled = false;
+    applyHeadVisibility();
+}
+
+void DigibotPlayerController::applyHeadVisibility() {
+    auto character = m_pilotableCharacter.lock();
+    if (character) {
+        // The head is hidden only while we are looking out of it
+        character->setHeadVisible(!(m_enabled && m_firstPerson));
+    }
 }
 
 glm::dvec3 DigibotPlayerController::getSurfaceAngularVelocity() const {
@@ -193,6 +221,12 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     if (keyboard->m_x.justPressed()) {
         controller->setJetpackEnabled(!controller->isJetpackEnabled());
     }
+
+    // Toggle first-person view with T key
+    if (keyboard->m_t.justPressed()) {
+        m_firstPerson = !m_firstPerson;
+        applyHeadVisibility();
+    }
     
     // Process movement input and send to character
     glm::ivec3 moveDirection(0, 0, 0);
@@ -287,10 +321,29 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     
     // Create orientation quaternion from view direction and up vector
     cameraOrientation = glm::conjugate(ArticulationUtils::quatLookAtYForward(viewDir, upVector));
-    
-    // Set camera position - offset behind character in view direction with height
-    cameraPosition = interpolatedPos +
-        m_cameraOffset.x * rightVector +
-        viewDir * m_cameraOffset.y +
-        upVector * m_cameraOffset.z;
+
+    if (m_firstPerson) {
+        // First person: camera sits where the (hidden) head is
+        cameraPosition = interpolatedPos +
+            interpolatedOrientation * character->getHeadLocalPosition();
+
+        // Lean forward as the view pitches down, so we look past the body instead of
+        // into the neck. Lean direction is the horizontal component of the view.
+        double downFactor = glm::max(0.0, -glm::dot(viewDir, upVector));
+        glm::dvec3 leanDir = viewDir - glm::dot(viewDir, upVector) * upVector;
+        double leanDirLength = glm::length(leanDir);
+        if (leanDirLength > 1e-6) {
+            leanDir /= leanDirLength;
+        } else {
+            // Looking straight up/down: horizontal view is undefined, use body forward
+            leanDir = interpolatedOrientation * glm::dvec3{0.0, 1.0, 0.0};
+        }
+        cameraPosition += leanDir * (m_firstPersonLookDownLean * downFactor);
+    } else {
+        // Third person: offset behind character in view direction with height
+        cameraPosition = interpolatedPos +
+            m_cameraOffset.x * rightVector +
+            viewDir * m_cameraOffset.y +
+            upVector * m_cameraOffset.z;
+    }
 }

@@ -36,6 +36,9 @@ public:
     void disable();
     bool isEnabled() const { return m_enabled; }
 
+    // First-person view state (toggled with the T key while enabled)
+    bool isFirstPerson() const { return m_firstPerson; }
+
     // Physics callback for lock raycasting
     void onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange);
 
@@ -47,11 +50,18 @@ private:
     GraphicsEngine* m_graphics;
     std::weak_ptr<Digibot> m_pilotableCharacter;
     
+    // Sync the character's head visibility with the current view state
+    void applyHeadVisibility();
+
     // State
     bool m_enabled{false};
-    
+    bool m_firstPerson{false};
+
     // Third-person camera offset (in local character space)
     glm::dvec3 m_cameraOffset{0., -2.0, 0.8}; // Behind and above character
+
+    // First-person forward lean when looking straight down (avoids staring down the neck)
+    double m_firstPersonLookDownLean{0.2};
 
     // Lock state
     bool m_needsRaycast{false};

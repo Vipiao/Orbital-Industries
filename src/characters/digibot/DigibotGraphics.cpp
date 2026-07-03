@@ -25,7 +25,7 @@ const glm::dvec3 DigibotGraphics::s_naturalRightPistonRodPos = glm::dvec3(0.1808
 const glm::dvec3 DigibotGraphics::s_naturalRightPistonHousingPos = glm::dvec3(0.180853, -0.130187, 0.324156);
 const glm::dvec3 DigibotGraphics::s_naturalLeftPistonRodPos = glm::dvec3(-0.180853, -0.130187, 0.67836);
 const glm::dvec3 DigibotGraphics::s_naturalLeftPistonHousingPos = glm::dvec3(-0.180853, -0.130187, 0.324156);
-const glm::dvec3 DigibotGraphics::s_naturalHeadPos = glm::dvec3(0.0, 0.0, 1.39974);
+const glm::dvec3 DigibotGraphics::s_naturalHeadPos = glm::dvec3(0.0, 0.0, 1.6);
 
 // Static limb lengths
 const double DigibotGraphics::s_upperArmLength = glm::length(
@@ -121,6 +121,32 @@ void DigibotGraphics::initializeInstanceTransforms() {
         
         geometry->updateInstanceInBuffer(instance.get());
     }
+}
+
+glm::dvec3 DigibotGraphics::getNaturalHeadPosition() {
+    return s_naturalHeadPos;
+}
+
+void DigibotGraphics::setHeadVisible(bool visible) {
+    // Alpha 0 hides the instance from the camera but keeps its shadow: the camera-pass
+    // vertex shader culls fully transparent instances, the depth pass ignores color.
+    auto geometry = m_bodyPartGeometries[HEAD].lock();
+    auto instance = m_bodyPartInstances[HEAD].lock();
+    if (!geometry || !instance) {
+        return;
+    }
+
+    double alpha = visible ? 1.0 : 0.0;
+    if (instance->m_color.a == alpha) {
+        return;
+    }
+    instance->m_color.a = alpha;
+    geometry->updateInstanceInBuffer(instance.get());
+}
+
+bool DigibotGraphics::isHeadVisible() const {
+    auto instance = m_bodyPartInstances[HEAD].lock();
+    return instance && instance->m_color.a > 0.0;
 }
 
 void DigibotGraphics::updateWorldTransform(
