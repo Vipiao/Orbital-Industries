@@ -4,13 +4,13 @@
 #include <algorithm>
 
 CharacterSubsystem::CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,
-                                     GridSubsystem* gridSubsystem,
-                                     JobManager* jobManager, TimeHandler* timeHandler)
+                                     JobManager* jobManager, TimeHandler* timeHandler,
+                                     int colliderClassificationJobPriority)
     : m_physics(physics)
     , m_graphics(graphics)
-    , m_gridSubsystem(gridSubsystem)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
+    , m_colliderClassificationJobPriority(colliderClassificationJobPriority)
 {
     // Initialize shared resources for Digibot characters
     m_digibotResources = std::make_unique<DigibotResources>(m_graphics);
@@ -28,7 +28,7 @@ std::weak_ptr<Digibot> CharacterSubsystem::createDigibot() {
         m_jobManager,
         m_timeHandler,
         m_digibotResources.get(),
-        m_gridSubsystem
+        m_colliderClassificationJobPriority
     );
 
     std::weak_ptr<Digibot> digibotWeak = digibot;

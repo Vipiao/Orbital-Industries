@@ -11,7 +11,6 @@ class PhysicsEngine;
 class GraphicsEngine;
 class JobManager;
 class TimeHandler;
-class GridSubsystem;
 
 /**
  * @brief Subsystem managing all character lifecycle and updates
@@ -22,8 +21,8 @@ class GridSubsystem;
 class CharacterSubsystem {
 public:
     CharacterSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics,
-                      GridSubsystem* gridSubsystem,
-                      JobManager* jobManager, TimeHandler* timeHandler);
+                      JobManager* jobManager, TimeHandler* timeHandler,
+                      int colliderClassificationJobPriority);
     ~CharacterSubsystem();
 
     // Character lifecycle
@@ -41,9 +40,11 @@ private:
     // Dependencies
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
-    GridSubsystem* m_gridSubsystem;
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
+
+    // Job priority for character collider cell classification (supplied by the game layer)
+    int m_colliderClassificationJobPriority;
 
     // Shared resources for character types
     std::unique_ptr<DigibotResources> m_digibotResources;

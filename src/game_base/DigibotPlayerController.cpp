@@ -95,14 +95,18 @@ void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* control
         }
     }
     
-    // Lock to the closest grid if found
+    // Lock to the closest grid if found (the controller only needs its rigid body)
     if (gridFound) {
+        std::weak_ptr<RigidBody> targetBody;
+        if (auto lockedGrid = closestGrid.lock()) {
+            targetBody = lockedGrid->getRigidBody();
+        }
         if (m_needsFullLockRaycast) {
             controller->setLockState(DigibotController::LockState::FULL_LOCK);
-            controller->setTargetGrid(closestGrid);
+            controller->setTargetRigidBody(targetBody);
         } else {
             controller->setLockState(DigibotController::LockState::TRANSLATION_LOCK);
-            controller->setTargetGrid(closestGrid);
+            controller->setTargetRigidBody(targetBody);
         }
     } else {
         std::cout << "No grid found to lock to" << std::endl;

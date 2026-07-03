@@ -38,7 +38,8 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
         position,
         orientation,
         jobManager,
-        timeHandler);
+        timeHandler,
+        JobPriorities::GRID_CELL_CLASSIFICATION);
 
     // Store back-reference to Grid in the collider for sensor queries
     if (auto collider = m_colliderWeak.lock()) {

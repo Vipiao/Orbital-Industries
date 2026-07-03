@@ -20,7 +20,8 @@ class Collider;
  */
 class DigibotPhysics {
 public:
-    DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler);
+    DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler,
+                   int colliderClassificationJobPriority);
     ~DigibotPhysics();
 
     // Physics state access

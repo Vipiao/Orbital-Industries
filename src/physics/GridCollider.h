@@ -53,7 +53,8 @@ public:
     GridCollider(const glm::dvec3& position = glm::dvec3(0.0),
                  const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0),
                  JobManager* jobManager = nullptr,
-                 TimeHandler* timeHandler = nullptr);
+                 TimeHandler* timeHandler = nullptr,
+                 int classificationJobPriority = 0);
     
     virtual ~GridCollider();
     
@@ -127,6 +128,8 @@ private:
     std::queue<glm::ivec3> m_classificationQueue;
     std::unordered_set<glm::ivec3, Hash::IVec3Hash> m_queuedCoordinates;
     std::weak_ptr<Job> m_classificationJob;
+    // Priority for classification jobs; policy supplied by the owner at construction
+    int m_classificationJobPriority;
 
     // Axis counts for efficient AABB calculation
     std::unordered_map<int, int> m_xAxisCounts;

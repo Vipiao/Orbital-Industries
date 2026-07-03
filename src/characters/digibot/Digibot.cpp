@@ -12,12 +12,13 @@
 
 Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
                    JobManager* jobManager, TimeHandler* timeHandler,
-                   DigibotResources* resources, GridSubsystem* gridSubsystem)
+                   DigibotResources* resources, int colliderClassificationJobPriority)
     : Character(physics, graphics, jobManager, timeHandler)
     , m_graphicsEngine(graphics)
 {
     // Create physics subsystem
-    m_digibotPhysics = std::make_unique<DigibotPhysics>(physics, jobManager, timeHandler);
+    m_digibotPhysics = std::make_unique<DigibotPhysics>(
+        physics, jobManager, timeHandler, colliderClassificationJobPriority);
 
     // Set Character base class members
     m_rigidBody = m_digibotPhysics->getRigidBody();
@@ -25,7 +26,7 @@ Digibot::Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
 
     // Create controller subsystem
     m_digibotController = std::make_unique<DigibotController>(
-        m_digibotPhysics.get(), physics, gridSubsystem);
+        m_digibotPhysics.get(), physics);
 
     // Create graphics subsystem
     m_digibotGraphics = std::make_unique<DigibotGraphics>(graphics, resources);

@@ -11,7 +11,6 @@ class DigibotGraphics;
 class DigibotController;
 class DigibotAnimation;
 class DigibotResources;
-class GridSubsystem;
 
 /**
  * @brief Bipedal robot character with reverse-articulated legs
@@ -23,7 +22,7 @@ class Digibot : public Character {
 public:
     Digibot(PhysicsEngine* physics, GraphicsEngine* graphics,
              JobManager* jobManager, TimeHandler* timeHandler,
-             DigibotResources* resources, GridSubsystem* gridSubsystem);
+             DigibotResources* resources, int colliderClassificationJobPriority);
     ~Digibot() override;
 
     void preRenderCallback(uint64_t frameNum, double timeRemainder) override;

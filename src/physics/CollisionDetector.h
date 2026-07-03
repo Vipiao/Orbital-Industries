@@ -42,7 +42,8 @@ public:
         const glm::dvec3& position,
         const glm::dquat& orientation,
         JobManager* jobManager,
-        TimeHandler* timeHandler);
+        TimeHandler* timeHandler,
+        int classificationJobPriority);
     
     std::weak_ptr<PolyhedronCollider> addPolyhedronCollider(
         const glm::dvec3& position,

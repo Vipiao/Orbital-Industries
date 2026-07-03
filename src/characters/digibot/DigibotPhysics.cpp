@@ -13,7 +13,8 @@
 #include "../../physics/BallCollider.h"
 #include <cassert>
 
-DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler)
+DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, TimeHandler* timeHandler,
+                               int colliderClassificationJobPriority)
     : m_physics(physics)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
@@ -27,7 +28,8 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         glm::dvec3(0.0, 0.0, 0.0),
         glm::dquat(1.0, 0.0, 0.0, 0.0),
         m_jobManager,
-        m_timeHandler
+        m_timeHandler,
+        colliderClassificationJobPriority
     );
 
     auto collider = m_colliderWeak.lock();

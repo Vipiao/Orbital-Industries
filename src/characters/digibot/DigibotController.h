@@ -6,8 +6,6 @@
 
 class DigibotPhysics;
 class PhysicsEngine;
-class GridSubsystem;
-class Grid;
 class RigidBody;
 
 class DigibotController {
@@ -15,7 +13,7 @@ public:
     enum class LockState { UNLOCKED, TRANSLATION_LOCK, FULL_LOCK };
 
 public:
-    DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem);
+    DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine);
     ~DigibotController() = default;
     
     // Set the desired movement direction
@@ -58,12 +56,11 @@ public:
     // Set up direction lock state (true = locked, false = free to change)
     void setLockUpDirection(bool locked) { m_upDirectionLocked = locked; }
 
-    // Grid locking
-    void setTargetGrid(std::weak_ptr<Grid> grid);
+    // Lock target: the rigid body to match velocity/rotation with (e.g. a grid's body)
+    void setTargetRigidBody(std::weak_ptr<RigidBody> rigidBody);
     void unlock();
     void setLockState(LockState state) { m_lockState = state; }
     LockState getLockState() const { return m_lockState; }
-    std::weak_ptr<Grid> getTargetGrid() const { return m_targetGrid; }
     
 private:
     // Frames spent without ground contact (physics timestep units)
@@ -75,7 +72,6 @@ private:
 
     DigibotPhysics* m_physics;
     PhysicsEngine* m_physicsEngine;
-    GridSubsystem* m_gridSubsystem;
     glm::ivec3 m_movementDirection;
     double m_thrustStrength;
     double m_angularAccelerationMax;  // Maximum angular acceleration (rad/s^2)
@@ -83,9 +79,9 @@ private:
     int m_rollInput;                  // -1 for roll left, +1 for roll right, 0 for none
     glm::dvec3 m_viewDirection;       // Current view direction in world space
 
-    // Grid locking state
+    // Lock state (target body is typically a grid's rigid body, set by the game layer)
     LockState m_lockState;
-    std::weak_ptr<Grid> m_targetGrid;
+    std::weak_ptr<RigidBody> m_targetRigidBody;
     double m_translationLockStrength;
 
     // Jetpack mode

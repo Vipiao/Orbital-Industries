@@ -39,9 +39,9 @@ GameBase::GameBase(
     m_characterSubsystem = std::make_unique<CharacterSubsystem>(
         m_physicsEngine.get(),
         m_graphicsEngine.get(),
-        m_gridSubsystem.get(),
         m_jobManager.get(),
-        m_timeHandler
+        m_timeHandler,
+        JobPriorities::GRID_CELL_CLASSIFICATION
     );
 
     if (!m_timeHandler) {

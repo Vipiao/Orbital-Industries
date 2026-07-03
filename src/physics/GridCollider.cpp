@@ -9,17 +9,18 @@
 #include <glm/gtx/transform.hpp>
 #include <algorithm>
 #include "../utils/PolyhedronProcessor.h"
-#include "../game_base/JobPriorities.h"
 #include "../utils/GeometryUtils.h"
 #include "../utils/GridGeometry.h"
 
 GridCollider::GridCollider(const glm::dvec3& position,
                           const glm::dquat& orientation,
                           JobManager* jobManager,
-                          TimeHandler* timeHandler)
+                          TimeHandler* timeHandler,
+                          int classificationJobPriority)
     : Collider(position, orientation)
     , m_jobManager(jobManager)
     , m_timeHandler(timeHandler)
+    , m_classificationJobPriority(classificationJobPriority)
 {
     if (!m_jobManager || !m_timeHandler) {
         throw std::invalid_argument("GridCollider requires JobManager and TimeHandler");
@@ -569,7 +570,7 @@ void GridCollider::scheduleClassificationJob() {
     
     m_classificationJob = m_jobManager->schedule([this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
         return processClassificationQueue(endTime);
-    }, JobPriorities::GRID_CELL_CLASSIFICATION);
+    }, m_classificationJobPriority);
 }
 
 bool GridCollider::processClassificationQueue(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {

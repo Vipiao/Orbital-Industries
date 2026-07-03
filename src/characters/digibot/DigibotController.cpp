@@ -3,20 +3,16 @@
 #include "DigibotPhysics.h"
 #include "../../physics/RigidBody.h"
 #include "../../physics/PhysicsEngine.h"
-#include "../../game_base/Grid.h"
 #include <glm/gtx/vector_angle.hpp>
 #include <iostream>
 #include "../ArticulationUtils.h"
-#include "../../game_base/GridSubsystem.h"
 #include "../../physics/SensorCollider.h"
-#include "../../utils/GridGeometry.h"
 #include "../../debug/DebugGlobals.h"
 #include "../../debug/DebugRenderer.h"
 
-DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem)
+DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine)
     : m_physics(physics)
     , m_physicsEngine(physicsEngine)
-    , m_gridSubsystem(gridSubsystem)
     , m_movementDirection(0, 0, 0)
     , m_thrustStrength(0.004)  // Default thrust strength
     , m_angularAccelerationMax(0.016)  // Maximum angular acceleration (rad/s²)
@@ -40,10 +36,6 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     
     if (!m_physicsEngine) {
         throw std::runtime_error("DigibotController: Physics engine cannot be null");
-    }
-
-    if (!m_gridSubsystem) {
-        throw std::runtime_error("DigibotController: Grid subsystem cannot be null");
     }
 }
 
@@ -72,15 +64,15 @@ void DigibotController::setJetpackEnabled(bool enabled) {
     std::cout << "Jetpack " << (m_jetpackEnabled ? "ENABLED" : "DISABLED") << std::endl;
 }
 
-void DigibotController::setTargetGrid(std::weak_ptr<Grid> grid) {
-    m_targetGrid = grid;
-    std::cout << "Target grid set" << std::endl;
+void DigibotController::setTargetRigidBody(std::weak_ptr<RigidBody> rigidBody) {
+    m_targetRigidBody = rigidBody;
+    std::cout << "Target rigid body set" << std::endl;
 }
 
 void DigibotController::unlock() {
-    m_targetGrid.reset();
+    m_targetRigidBody.reset();
     m_lockState = LockState::UNLOCKED;
-    std::cout << "Unlocked from grid" << std::endl;
+    std::cout << "Unlocked" << std::endl;
 }
 
 void DigibotController::updatePerFrame(double deltaTimeRemainder) {
@@ -91,12 +83,9 @@ void DigibotController::updatePerFrame(double deltaTimeRemainder) {
     std::shared_ptr<RigidBody> targetRigidBody;
     
     if (m_jetpackEnabled) {
-        // Flying mode: use FULL_LOCK target grid
+        // Flying mode: use FULL_LOCK target body
         if (m_lockState == LockState::FULL_LOCK) {
-            auto targetGrid = m_targetGrid.lock();
-            if (targetGrid) {
-                targetRigidBody = targetGrid->getRigidBody().lock();
-            }
+            targetRigidBody = m_targetRigidBody.lock();
         }
     } else {
         // Walking mode: use the grid we're standing on
@@ -210,18 +199,12 @@ void DigibotController::handleFlying() {
     // ========== Handle Translation Lock ==========
     glm::dvec3 lockForce(0.0, 0.0, 0.0);
     if (m_lockState == LockState::TRANSLATION_LOCK) {
-        // Check if target grid is still valid
-        if (m_targetGrid.expired()) {
-            std::cout << "Target grid destroyed - unlocking" << std::endl;
-            unlock();
-        } else {
-            // Get target grid's rigid body
-            auto targetGrid = m_targetGrid.lock();
-            auto targetGridRigidBodyWeak = targetGrid->getRigidBody();
-            auto targetGridRigidBody = targetGridRigidBodyWeak.lock();
-            
+        // Check if target rigid body is still valid
+        {
+            auto targetGridRigidBody = m_targetRigidBody.lock();
+
             if (!targetGridRigidBody) {
-                std::cout << "Target grid has no rigid body - unlocking" << std::endl;
+                std::cout << "Target rigid body destroyed - unlocking" << std::endl;
                 unlock();
             } else {
                 // Calculate relative velocity
@@ -250,18 +233,12 @@ void DigibotController::handleFlying() {
             }
         }
     } else if (m_lockState == LockState::FULL_LOCK) {
-        // Check if target grid is still valid
-        if (m_targetGrid.expired()) {
-            std::cout << "Target grid destroyed - unlocking" << std::endl;
-            unlock();
-        } else {
-            // Get target grid's rigid body
-            auto targetGrid = m_targetGrid.lock();
-            auto targetGridRigidBodyWeak = targetGrid->getRigidBody();
-            auto targetGridRigidBody = targetGridRigidBodyWeak.lock();
-            
+        // Check if target rigid body is still valid
+        {
+            auto targetGridRigidBody = m_targetRigidBody.lock();
+
             if (!targetGridRigidBody) {
-                std::cout << "Target grid has no rigid body - unlocking" << std::endl;
+                std::cout << "Target rigid body destroyed - unlocking" << std::endl;
                 unlock();
             } else {
                 // ========== Translation Component ==========
@@ -379,11 +356,9 @@ void DigibotController::handleFlying() {
     targetAngularVelocity += targetRollVel * rollAxis;
 
     // ========== Add Grid Angular Velocity for Full Lock ==========
-    if (m_lockState == LockState::FULL_LOCK && !m_targetGrid.expired()) {
-        auto targetGrid = m_targetGrid.lock();
-        if (targetGrid) {
-            auto targetGridRigidBodyWeak = targetGrid->getRigidBody();
-            auto targetGridRigidBody = targetGridRigidBodyWeak.lock();
+    if (m_lockState == LockState::FULL_LOCK) {
+        {
+            auto targetGridRigidBody = m_targetRigidBody.lock();
             if (targetGridRigidBody) {
                 // Add grid's angular velocity to our target
                 targetAngularVelocity += targetGridRigidBody->getAngularVelocityWorld();
