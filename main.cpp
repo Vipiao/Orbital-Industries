@@ -58,7 +58,10 @@ public:
         // Set up initial camera position and orientation
         m_gameBase->m_graphicsEngine->getCamPos() = glm::dvec3(0, 0, 0);
         m_gameBase->m_graphicsEngine->getCamOri() = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
-        m_gameBase->m_graphicsEngine->getFieldOfView() = glm::radians(90.0);
+        m_gameBase->m_graphicsEngine->getFieldOfView() = glm::radians(120.0);
+        // Panini projection: 0 = standard rectilinear (off), 1 = max distortion.
+        m_gameBase->m_graphicsEngine->getPaniniHorizontal() = 0.3;
+        m_gameBase->m_graphicsEngine->getPaniniVertical() = 0.0;
         
         // Enable mouse lock for camera control
         m_gameBase->m_graphicsEngine->getMouseHandler()->setMouseLock(true);

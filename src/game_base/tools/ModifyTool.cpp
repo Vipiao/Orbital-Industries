@@ -544,10 +544,13 @@ void ModifyTool::updateMarkerPositions() {
         m_gameBase->m_graphicsEngine->getCamPos(),
         m_gameBase->m_graphicsEngine->getCamOri(),
         m_gameBase->m_graphicsEngine->getFieldOfView(),
-        static_cast<double>(m_gameBase->m_graphicsEngine->getScreenWidth()) / 
+        static_cast<double>(m_gameBase->m_graphicsEngine->getScreenWidth()) /
         static_cast<double>(m_gameBase->m_graphicsEngine->getScreenHeight()),
         glm::dvec2(0.0, 0.0), // Screen center as cursor position
-        5 // Separation iterations
+        5, // Separation iterations
+        m_gameBase->m_graphicsEngine->getPaniniHorizontal(),
+        m_gameBase->m_graphicsEngine->getPaniniVertical(),
+        m_gameBase->m_graphicsEngine->getPaniniFitScale()
     );
     
     // Calculate distances for dynamic transparency and track min/max
