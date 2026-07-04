@@ -60,8 +60,10 @@ public:
         m_gameBase->m_graphicsEngine->getCamOri() = glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
         m_gameBase->m_graphicsEngine->getFieldOfView() = glm::radians(120.0);
         // Panini projection: 0 = standard rectilinear (off), 1 = max distortion.
-        m_gameBase->m_graphicsEngine->getPaniniHorizontal() = 0.3;
+        m_gameBase->m_graphicsEngine->getPaniniHorizontal() = 0.5;
         m_gameBase->m_graphicsEngine->getPaniniVertical() = 0.0;
+        // Blue-noise dither defaults to one 8-bit quantization step (1/255);
+        // override via getDitherStrength() (0 = off, more = film grain).
         
         // Enable mouse lock for camera control
         m_gameBase->m_graphicsEngine->getMouseHandler()->setMouseLock(true);
