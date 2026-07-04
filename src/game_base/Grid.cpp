@@ -26,7 +26,8 @@ uint64_t Grid::s_nextUniqueId = 0;
 
 // Updated - Constructor now initializes with physics and graphics references
 Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
-           TimeHandler* timeHandler, const glm::dvec3& position, const glm::dquat& orientation) 
+           TimeHandler* timeHandler, BlockResourceCache* blockResources,
+           const glm::dvec3& position, const glm::dquat& orientation)
     : uniqueId(s_nextUniqueId++), m_jobManager(jobManager), m_timeHandler(timeHandler), m_physics(physics)
 {
     if (!m_jobManager || !m_timeHandler) {
@@ -64,7 +65,7 @@ Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobMana
         false);                                      // isTrigger = false
 
     // Create graphics subsystem
-    m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager);
+    m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager, blockResources);
 
     // Initial graphics update
     // Use a default distant camera position for initial update
@@ -238,10 +239,7 @@ void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientat
     m_cellRegistry[secondCoord] = &secIt->second;
 
     m_gridGraphics->addBlockInstance(
-        CellType::THRUSTER, anchorCoord, orientation, ThrusterBlock::MODEL_CENTRE,
-        std::string{ThrusterBlock::GEOMETRY_PATH},
-        std::string{ThrusterBlock::COLOR_TEX_PATH},
-        std::string{ThrusterBlock::NORMAL_TEX_PATH});
+        CellType::THRUSTER, anchorCoord, orientation, ThrusterBlock::MODEL_CENTRE);
 
     scheduleStructuralAnalysis();
 
@@ -283,10 +281,7 @@ void Grid::addCockpit(const glm::ivec3& anchorCoord, const glm::dquat& orientati
     }
 
     m_gridGraphics->addBlockInstance(
-        CellType::COCKPIT, anchorCoord, orientation, CockpitBlock::MODEL_CENTRE,
-        std::string{CockpitBlock::GEOMETRY_PATH},
-        std::string{CockpitBlock::COLOR_TEX_PATH},
-        std::string{CockpitBlock::NORMAL_TEX_PATH});
+        CellType::COCKPIT, anchorCoord, orientation, CockpitBlock::MODEL_CENTRE);
 
     scheduleStructuralAnalysis();
 

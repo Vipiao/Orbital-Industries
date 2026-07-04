@@ -23,6 +23,7 @@ class RigidBody;
 class Collider;
 class GridCollider;
 class GridGraphics;
+class BlockResourceCache;
 class TimeHandler;
 class JobManager;
 class Job;
@@ -34,7 +35,8 @@ public:
 
     // Constructor now takes physics and graphics pointers
     Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
-         TimeHandler* timeHandler, const glm::dvec3& position,
+         TimeHandler* timeHandler, BlockResourceCache* blockResources,
+         const glm::dvec3& position,
          const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     ~Grid();
     

@@ -1,5 +1,6 @@
 // GridSubsystem.cpp
 #include "GridSubsystem.h"
+#include "BlockResourceCache.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/SensorCollider.h"
 #include "../physics/GridCollider.h"
@@ -23,7 +24,11 @@ GridSubsystem::GridSubsystem(
     if (!m_physics || !m_graphics || !m_jobManager || !m_timeHandler) {
         throw std::runtime_error("GridSubsystem: All dependencies must be non-null");
     }
-    
+
+    // Preload shared special-block models once, up front, so placing a block
+    // never triggers a synchronous OBJ/texture load (no frame spike).
+    m_blockResources = std::make_unique<BlockResourceCache>(m_graphics);
+
     // Create GridSplitter with callbacks to this subsystem
     m_gridSplitter = std::make_unique<GridSplitter>(
         // Create grid callback
@@ -56,6 +61,7 @@ std::weak_ptr<Grid> GridSubsystem::createGrid(const glm::dvec3& position, const 
         m_graphics,
         m_jobManager,
         m_timeHandler,
+        m_blockResources.get(),
         position,
         orientation
     );

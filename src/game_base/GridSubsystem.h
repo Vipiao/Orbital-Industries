@@ -18,6 +18,7 @@ class JobManager;
 class TimeHandler;
 class SensorCollider;
 class Collider;
+class BlockResourceCache;
 
 /**
  * @brief Subsystem managing all grid lifecycle, updates, and splitting logic
@@ -77,7 +78,11 @@ private:
     GraphicsEngine* m_graphics;
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
-    
+
+    // Shared, preloaded geometry/textures for special blocks (thruster, cockpit).
+    // Declared before m_grids so it outlives every Grid that references it.
+    std::unique_ptr<BlockResourceCache> m_blockResources;
+
     // Grid ownership
     std::vector<std::shared_ptr<Grid>> m_grids;
 

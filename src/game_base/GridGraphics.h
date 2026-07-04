@@ -6,7 +6,6 @@
 #include "utils/HashFunctions.h"
 #include "graphics/AssimpLoader.h"
 #include "StructuralBlock.h"
-#include "BlockResources.h"
 #include "BlockGraphics.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -15,6 +14,8 @@
 #include <vector>
 #include <memory>
 #include "utils/JobManager.h"
+
+class BlockResourceCache;
 
 /**
  * @brief Graphics data for grid cells (not a base class)
@@ -36,7 +37,8 @@ public:
      * @brief Constructor
      * @param graphics Pointer to the graphics engine
      */
-    explicit GridGraphics(GraphicsEngine* graphics, JobManager* jobManager);
+    GridGraphics(GraphicsEngine* graphics, JobManager* jobManager,
+                 BlockResourceCache* blockResources);
     
     /**
      * @brief Destructor - cleans up mesh and resources
@@ -69,10 +71,7 @@ public:
     void addBlockInstance(CellType type,
                           const glm::ivec3& anchorCoord,
                           const glm::dquat& orientation,
-                          const glm::dvec3& modelCentre,
-                          const std::string& geometryPath,
-                          const std::string& colorTexPath,
-                          const std::string& normalTexPath);
+                          const glm::dvec3& modelCentre);
     void removeBlockInstance(const glm::ivec3& anchorCoord);
 
 private:
@@ -83,9 +82,9 @@ private:
     GraphicsEngine* m_graphics;
     int m_ssboIndex{-1};  // Owned by GridGraphics; shared with mesh system and thruster instances
 
-    // Special block rendering — resources per block type, graphics per anchor coord.
-    // Resources must be declared before the graphics map so they outlive the instances.
-    std::unordered_map<CellType, std::unique_ptr<BlockResources>> m_blockResources;
+    // Special block rendering — shared resources (preloaded, owned by the grid
+    // subsystem) looked up per block type; graphics owned per anchor coord.
+    BlockResourceCache* m_blockResources{nullptr};
     std::unordered_map<glm::ivec3, std::unique_ptr<BlockGraphics>, Hash::IVec3Hash> m_blockGraphicsMap;
     
     // Texture management

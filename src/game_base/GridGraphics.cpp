@@ -1,5 +1,6 @@
 // GridGraphics.cpp
 #include "GridGraphics.h"
+#include "BlockResourceCache.h"
 #include "graphics/SSBOManager.h"
 #include <iostream>
 #include <set>
@@ -12,8 +13,9 @@ int GridGraphics::s_normalTextureUnit = -1;
 int GridGraphics::s_maskTextureUnit = -1;
 bool GridGraphics::s_texturesLoaded = false;
 
-GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager)
-    : m_graphics(graphics), m_jobManager(jobManager) {
+GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager,
+                           BlockResourceCache* blockResources)
+    : m_graphics(graphics), m_blockResources(blockResources), m_jobManager(jobManager) {
 
     if (!graphics) {
         throw std::runtime_error("GraphicsEngine pointer cannot be null");
@@ -21,6 +23,10 @@ GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager)
 
     if (!jobManager) {
         throw std::runtime_error("JobManager pointer cannot be null");
+    }
+
+    if (!blockResources) {
+        throw std::runtime_error("BlockResourceCache pointer cannot be null");
     }
 
     // Allocate SSBO index here — GridGraphics owns this slot and shares it with both
@@ -176,18 +182,17 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
 void GridGraphics::addBlockInstance(CellType type,
                                     const glm::ivec3& anchorCoord,
                                     const glm::dquat& orientation,
-                                    const glm::dvec3& modelCentre,
-                                    const std::string& geometryPath,
-                                    const std::string& colorTexPath,
-                                    const std::string& normalTexPath)
+                                    const glm::dvec3& modelCentre)
 {
-    if (m_blockResources.find(type) == m_blockResources.end()) {
-        m_blockResources.emplace(type,
-            std::make_unique<BlockResources>(m_graphics, geometryPath, colorTexPath, normalTexPath));
+    // Resources are preloaded and shared via the cache — no lazy load here.
+    BlockResources* resources = m_blockResources->get(type);
+    if (!resources) {
+        throw std::runtime_error("GridGraphics::addBlockInstance: no preloaded "
+                                 "resources for block type");
     }
     m_blockGraphicsMap.emplace(anchorCoord,
         std::make_unique<BlockGraphics>(
-            m_blockResources.at(type).get(), m_ssboIndex, anchorCoord, orientation, modelCentre));
+            resources, m_ssboIndex, anchorCoord, orientation, modelCentre));
 }
 
 void GridGraphics::removeBlockInstance(const glm::ivec3& anchorCoord) {
