@@ -214,6 +214,26 @@ DigibotPhysics::~DigibotPhysics() {
     }
 }
 
+void DigibotPhysics::setBodyColliderSolid(bool solid) {
+    if (m_isBodyColliderSolid == solid) {
+        return;
+    }
+    auto collider = m_colliderWeak.lock();
+    if (!collider) {
+        return;
+    }
+    // Re-attach with the trigger flag flipped: triggers are detected but skipped by
+    // collision response, and stay transform-synced with the rigid body.
+    m_physics->detachCollider(m_rigidBody, collider.get());
+    m_physics->attachCollider(
+        m_rigidBody,
+        m_colliderWeak,
+        m_colliderLocalPosition,
+        glm::dquat{1.0, 0.0, 0.0, 0.0},
+        !solid);
+    m_isBodyColliderSolid = solid;
+}
+
 void DigibotPhysics::showCollisionBox(GraphicsEngine* graphics) {
     m_graphics = graphics;
     if (m_collisionBoxMeshId == -1) {

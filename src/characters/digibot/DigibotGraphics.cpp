@@ -222,7 +222,7 @@ void DigibotGraphics::updateBodyPartPositions(const DigibotPose& targetPose) {
     };
     
     // ========== IK CONSTRAINT SOLVING ==========
-    int numIKIterations = 1;
+    int numIKIterations = 4;
     for (int iteration = 0; iteration < numIKIterations; ++iteration) {
         // Arm IK
         for (int ii = 0; ii < 2; ++ii) {

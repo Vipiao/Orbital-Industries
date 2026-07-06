@@ -6,6 +6,7 @@
 #include "utils/JobManager.h"
 #include "utils/HashFunctions.h"
 #include "GridSubsystem.h"
+#include "cockpit/CockpitDockingCoordinator.h"
 #include "utils/TimeHandler.h"
 #include "debug/DebugRenderer.h"
 #include <iostream>
@@ -48,6 +49,9 @@ GameBase::GameBase(
         m_timeHandler,
         JobPriorities::GRID_CELL_CLASSIFICATION
     );
+
+    // Create cockpit docking coordinator (world-level, mode-independent)
+    m_cockpitDockingCoordinator = std::make_unique<CockpitDockingCoordinator>();
 
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
@@ -222,6 +226,13 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
             }
 
             m_gridSubsystem->updateAllGraphics(m_graphicsEngine->getCamPos());
+
+            // Cockpit docking runs on this step's fresh collisions, right before
+            // the character controllers consume their docking targets.
+            m_cockpitDockingCoordinator->onPhysicsStep(
+                m_characterSubsystem.get(), m_physicsEngine.get(),
+                m_gridSubsystem.get());
+
             m_characterSubsystem->updateAllPhysicsComplete();
 
             // Clear the in-progress flag and reset for the next step.

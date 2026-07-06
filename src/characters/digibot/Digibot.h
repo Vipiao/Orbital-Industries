@@ -11,6 +11,7 @@ class DigibotGraphics;
 class DigibotController;
 class DigibotAnimation;
 class DigibotResources;
+class Collider;
 
 /**
  * @brief Bipedal robot character with reverse-articulated legs
@@ -55,6 +56,9 @@ public:
 
     // Controller access
     DigibotController* getController() { return m_digibotController.get(); }
+
+    // Walking sensor (trigger ball around the body) for game-layer proximity queries
+    std::weak_ptr<Collider> getWalkingSensor() const;
 
 private:
     void updateVisualTransform();

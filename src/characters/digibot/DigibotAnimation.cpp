@@ -63,6 +63,9 @@ DigibotPose DigibotAnimation::update(const DigibotAnimationContext& context) {
     }
 
     m_initialized = false;
+    if (context.m_mode == DigibotAnimationContext::MovementMode::Seated) {
+        return seatedPose();
+    }
     return defaultPose();
 }
 
@@ -74,6 +77,19 @@ DigibotPose DigibotAnimation::defaultPose() {
     pose.leftHand.position  = s_naturalLeftHandLocal;
     pose.rightFoot.position = s_naturalRightFootLocal;
     pose.leftFoot.position  = s_naturalLeftFootLocal;
+    return pose;
+}
+
+// ---- Seated pose ----
+
+DigibotPose DigibotAnimation::seatedPose() {
+    DigibotPose pose;
+    // Feet forward and raised (knees bent as if resting on the cockpit floor),
+    // hands forward and lowered onto the controls. All in digibot-local space.
+    pose.rightFoot.position = s_naturalRightFootLocal + glm::dvec3{0.0, 0.45, 0.35};
+    pose.leftFoot.position  = s_naturalLeftFootLocal  + glm::dvec3{0.0, 0.45, 0.35};
+    pose.rightHand.position = s_naturalRightHandLocal + glm::dvec3{-0.15, 0.25, -0.3};
+    pose.leftHand.position  = s_naturalLeftHandLocal  + glm::dvec3{ 0.15, 0.25, -0.3};
     return pose;
 }
 

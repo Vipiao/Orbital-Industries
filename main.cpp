@@ -61,7 +61,7 @@ public:
         m_gameBase->m_graphicsEngine->getFieldOfView() = glm::radians(120.0);
         // Panini projection: 0 = standard rectilinear (off), 1 = max distortion.
         m_gameBase->m_graphicsEngine->getPaniniHorizontal() = 0.5;
-        m_gameBase->m_graphicsEngine->getPaniniVertical() = 0.0;
+        m_gameBase->m_graphicsEngine->getPaniniVertical() = 0.1;
         // Blue-noise dither defaults to one 8-bit quantization step (1/255);
         // override via getDitherStrength() (0 = off, more = film grain).
         

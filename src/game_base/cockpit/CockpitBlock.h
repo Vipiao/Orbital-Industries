@@ -19,6 +19,27 @@ public:
     static constexpr std::string_view NORMAL_TEX_PATH = "../media/models/cockpit/normal.png";
     static constexpr glm::dvec3       MODEL_CENTRE{1.0, 1.0, 1.0};
 
+    // Docking geometry in the cockpit's canonical frame: origin at the block centre
+    // (anchor + MODEL_CENTRE), +y forward, +z up. The pilot enters through the back
+    // face (-y) along the y axis. The docking corridor is the segment entry -> seat.
+    static constexpr glm::dvec3 SEAT_POSITION_CANONICAL{0.0, 0.0, -0.2};   // seat
+    static constexpr glm::dvec3 ENTRY_POINT_CANONICAL{0.0, -1.0, -0.2};    // entry (door)
+
+    // Enter: dock when the body is within this of the entry point and roughly aligned
+    // with the cockpit up (dot of body-up and cockpit-up above the minimum).
+    static constexpr double ENTER_RADIUS{0.7};
+    static constexpr double ENTRY_UP_ALIGNMENT_MIN{0.7}; // ~45 degrees
+
+    // Transitions (projection of the body onto the entry -> seat segment):
+    static constexpr double SEAT_ARRIVE_DISTANCE{0.25};    // proj near seat => seated
+    static constexpr double EXIT_PROJECTION_DISTANCE{0.3}; // proj near entry ...
+    static constexpr double EXIT_BODY_DISTANCE{1.0};       // ...and body far from entry => release
+
+    // On entry the body sits ~ENTER_RADIUS from the entry point. If that already
+    // exceeded EXIT_BODY_DISTANCE the pilot would release the instant it docked.
+    static_assert(ENTER_RADIUS < EXIT_BODY_DISTANCE,
+                  "enter radius must be below exit distance, else docking releases on entry");
+
     CockpitBlock(const glm::ivec3& anchorCoord, const glm::dquat& orientation);
     virtual ~CockpitBlock() = default;
 

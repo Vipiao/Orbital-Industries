@@ -65,7 +65,12 @@ void Digibot::preRenderCallback(uint64_t frameNum, double timeRemainder) {
         animCtx.m_deltaTime               = static_cast<double>(m_physics->getPhysicsHz())
             / static_cast<double>(m_graphicsEngine->getFrameRate());
 
-        if (m_digibotController->isJetpackEnabled()) {
+        DigibotController::DockingState dockingState =
+            m_digibotController->getDockingState();
+        if (dockingState == DigibotController::DockingState::SEATED) {
+            animCtx.m_mode = DigibotAnimationContext::MovementMode::Seated;
+        } else if (m_digibotController->isJetpackEnabled() ||
+                   dockingState == DigibotController::DockingState::DOCKED) {
             animCtx.m_mode = DigibotAnimationContext::MovementMode::Flying;
         } else {
             animCtx.m_mode             = DigibotAnimationContext::MovementMode::Walking;
@@ -153,6 +158,10 @@ void Digibot::updateVisualTransform() {
         -m_graphicsPosition,
         currentPhysicsTimeStep
     );
+}
+
+std::weak_ptr<Collider> Digibot::getWalkingSensor() const {
+    return m_digibotPhysics->getWalkingSensor();
 }
 
 glm::dvec3 Digibot::worldToLocal(const glm::dvec3& worldPos) const {

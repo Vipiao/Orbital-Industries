@@ -9,7 +9,7 @@
 class RigidBody;
 
 struct DigibotAnimationContext {
-    enum class MovementMode { Idle, Walking, Flying };
+    enum class MovementMode { Idle, Walking, Flying, Seated };
 
     MovementMode m_mode{MovementMode::Idle};
 

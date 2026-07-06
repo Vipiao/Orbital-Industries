@@ -130,10 +130,10 @@ void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* control
             targetBody = lockedGrid->getRigidBody();
         }
         if (m_needsFullLockRaycast) {
-            controller->setLockState(DigibotController::LockState::FULL_LOCK);
+            controller->setLockState(DigibotLockState::FULL_LOCK);
             controller->setTargetRigidBody(targetBody);
         } else {
-            controller->setLockState(DigibotController::LockState::TRANSLATION_LOCK);
+            controller->setLockState(DigibotLockState::TRANSLATION_LOCK);
             controller->setTargetRigidBody(targetBody);
         }
     } else {
@@ -149,19 +149,20 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         return;
     }
     
-    // Handle lock input state machine
-    if (controller) {
+    // Handle lock input state machine (ignored while docked/seated so the lock
+    // settings survive the cockpit episode untouched)
+    if (controller && controller->getDockingState() == DigibotController::DockingState::FREE) {
         KeyboardHandler* keyboard = m_graphics->getKeyboardHandler();
         if (keyboard) {
             // Calculate full lock threshold (0.3 seconds worth of frames)
             uint64_t fullLockThreshold = static_cast<uint64_t>(0.3 * static_cast<double>(m_graphics->getFrameRate()));
             
             // Get current lock state
-            DigibotController::LockState lockState = controller->getLockState();
+            DigibotLockState lockState = controller->getLockState();
             bool longPress = keyboard->m_z.isDown() && keyboard->m_z.timeDown() == fullLockThreshold;
             bool shortRelease = keyboard->m_z.justReleased() && keyboard->m_z.timeDown() < fullLockThreshold;
             
-            if (lockState == DigibotController::LockState::UNLOCKED) {
+            if (lockState == DigibotLockState::UNLOCKED) {
                 // Quick press -> translation lock
                 if (shortRelease) {
                     m_needsRaycast = true;
@@ -171,16 +172,16 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
                     m_needsRaycast = true;
                     m_needsFullLockRaycast = true;
                 }
-            } else if (lockState == DigibotController::LockState::TRANSLATION_LOCK) {
+            } else if (lockState == DigibotLockState::TRANSLATION_LOCK) {
                 // Quick press -> unlock
                 if (shortRelease) {
                     controller->unlock();
                 }
                 // Long press -> full lock (no raycast needed, keep current target)
                 if (longPress) {
-                    controller->setLockState(DigibotController::LockState::FULL_LOCK);
+                    controller->setLockState(DigibotLockState::FULL_LOCK);
                 }
-            } else if (lockState == DigibotController::LockState::FULL_LOCK) {
+            } else if (lockState == DigibotLockState::FULL_LOCK) {
                 // Quick press -> unlock
                 if (shortRelease) {
                     controller->unlock();
@@ -217,9 +218,16 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         controller->setLockUpDirection(!keyboard->m_capsLock.isDown());
     }
 
-    // Toggle jetpack with X key
-    if (keyboard->m_x.justPressed()) {
+    // Toggle jetpack with X key (ignored while docked/seated)
+    if (keyboard->m_x.justPressed() &&
+        controller->getDockingState() == DigibotController::DockingState::FREE) {
         controller->setJetpackEnabled(!controller->isJetpackEnabled());
+    }
+
+    // Escape leaves the cockpit seat (back into the docking corridor to climb out)
+    if (keyboard->m_esc.justPressed() &&
+        controller->getDockingState() == DigibotController::DockingState::SEATED) {
+        controller->requestUnseat();
     }
 
     // Toggle first-person view with T key

@@ -144,8 +144,16 @@ std::vector<std::weak_ptr<Grid>> GridSubsystem::getGridsFromOverlaps(const Senso
             grids.push_back(it->second);
         }
     }
-    
+
     return grids;
+}
+
+std::weak_ptr<Grid> GridSubsystem::getGridFromCollider(Collider* collider) const {
+    auto it = m_colliderToGrid.find(collider);
+    if (it == m_colliderToGrid.end()) {
+        return {};
+    }
+    return it->second;
 }
 
 size_t GridSubsystem::computeHash() const {

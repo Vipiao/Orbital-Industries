@@ -17,6 +17,7 @@ public:
 
 private:
     static DigibotPose defaultPose();
+    static DigibotPose seatedPose();
     DigibotPose walkingPose(const DigibotAnimationContext& context);
 
     // Skeleton constants in Digibot-local space (from DigibotGraphics measurements)

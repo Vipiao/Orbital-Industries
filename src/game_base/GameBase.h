@@ -18,6 +18,7 @@ class JobManager;
 class Job;
 class GridSubsystem;
 class CharacterSubsystem;
+class CockpitDockingCoordinator;
 class Grid;
 class TimeHandler;
 class DebugRenderer;
@@ -56,6 +57,8 @@ public:
     std::unique_ptr<JobManager> m_jobManager;
     std::unique_ptr<GridSubsystem> m_gridSubsystem;
     std::unique_ptr<CharacterSubsystem> m_characterSubsystem;
+    // Cockpit docking is world physics: it runs every step regardless of mode
+    std::unique_ptr<CockpitDockingCoordinator> m_cockpitDockingCoordinator;
     TimeHandler* m_timeHandler;
     std::vector<Callback*> m_callbacks;
 

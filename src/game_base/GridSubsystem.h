@@ -69,6 +69,13 @@ public:
      */
     std::vector<std::weak_ptr<Grid>> getGridsFromOverlaps(const SensorCollider* sensor) const;
 
+    /**
+     * @brief Resolve a collider to its owning grid (O(1) hash lookup)
+     * @param collider Collider to resolve
+     * @return The grid the collider belongs to, or empty if it is not a grid collider
+     */
+    std::weak_ptr<Grid> getGridFromCollider(Collider* collider) const;
+
     // IHashable interface
     virtual size_t computeHash() const override;
     

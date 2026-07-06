@@ -41,6 +41,11 @@ public:
     // Get walking sensor radius
     double getWalkingSensorRadius() const { return m_walkingSensorRadius; }
 
+    // Body collider solidity. While docking into a cockpit the body collider is
+    // re-attached as a trigger: still detected (and transform-synced) but without
+    // physical response, so the body can phase through the cockpit's back face.
+    void setBodyColliderSolid(bool solid);
+
     // Physics update (called each physics step)
     void updatePhysics();
 
@@ -71,4 +76,7 @@ private:
 
     // Walking sensor configuration
     double m_walkingSensorRadius;
+
+    // Whether the body collider currently responds physically (see setBodyColliderSolid)
+    bool m_isBodyColliderSolid{true};
 };

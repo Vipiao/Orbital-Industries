@@ -14,4 +14,5 @@ public:
     virtual ~SecondaryCell() = default;
 
     virtual std::tuple<double, glm::dvec3, glm::dmat3> getMassProperties() const override;
+    virtual glm::ivec3 getAnchorCoord() const override { return m_anchorCoord; }
 };

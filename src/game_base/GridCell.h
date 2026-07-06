@@ -50,6 +50,14 @@ public:
      */
     virtual std::vector<glm::dvec3> getLocalVertices() const;
 
+    /**
+     * @brief Coordinate of the anchor cell of the block this cell belongs to.
+     * Anchor (and single-cell) blocks return their own coordinates; secondary cells
+     * return their owning anchor's coordinates. A cell is an anchor exactly when
+     * getAnchorCoord() == coordinates.
+     */
+    virtual glm::ivec3 getAnchorCoord() const { return coordinates; }
+
     // IHashable interface
     virtual size_t computeHash() const override;
 

@@ -1,6 +1,10 @@
 // DigibotController.h
 #pragma once
 
+#include "DigibotModeTypes.h"
+#include "DigibotFlyingMode.h"
+#include "DigibotWalkingMode.h"
+#include "DigibotDockingMode.h"
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -8,14 +12,17 @@ class DigibotPhysics;
 class PhysicsEngine;
 class RigidBody;
 
+// Orchestrates the digibot movement modes (flying, walking, cockpit docking/seated),
+// blends their wrenches by docking authority, applies them and the equal-opposite
+// reactions, and owns the shared input/lock/docking state.
 class DigibotController {
 public:
-    enum class LockState { UNLOCKED, TRANSLATION_LOCK, FULL_LOCK };
+    enum class DockingState { FREE, DOCKED, SEATED };
 
 public:
     DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine);
     ~DigibotController() = default;
-    
+
     // Set the desired movement direction
     void setMovementDirection(const glm::ivec3& direction);
 
@@ -29,21 +36,27 @@ public:
     glm::dvec3 getSurfaceAngularVelocity() const { return m_surfaceAngularVelocity; }
 
     // Ground contact info for animation (valid only in walking mode)
-    bool hasGroundContact() const { return m_hasGroundContact; }
-    glm::dvec3 getGroundContactPoint() const { return m_groundContactPoint; }
-    glm::dvec3 getGroundSurfaceNormal() const { return m_groundSurfaceNormal; }
-    std::weak_ptr<RigidBody> getWalkingTargetRigidBody() const { return m_walkingTargetRigidBody; }
+    bool hasGroundContact() const { return m_walkingMode.hasGroundContact(); }
+    glm::dvec3 getGroundContactPoint() const {
+        return m_walkingMode.getGroundContactPoint();
+    }
+    glm::dvec3 getGroundSurfaceNormal() const {
+        return m_walkingMode.getGroundSurfaceNormal();
+    }
+    std::weak_ptr<RigidBody> getWalkingTargetRigidBody() const {
+        return m_walkingMode.getWalkingTargetRigidBody();
+    }
 
     // Set the roll input (-1 for left/Q, +1 for right/E, 0 for none)
     void setRollInput(int rollInput);
 
     // Jetpack control
-    bool isJetpackEnabled() const { return m_jetpackEnabled; }
+    bool isJetpackEnabled() const { return m_isJetpackEnabled; }
     void setJetpackEnabled(bool enabled);
-    
+
     // Process physics (called during physics update)
     void physics();
-    
+
     // Configure thrust properties
     void setThrustStrength(double strength);
 
@@ -54,63 +67,61 @@ public:
     void setMaxRollRate(double maxRate);
 
     // Set up direction lock state (true = locked, false = free to change)
-    void setLockUpDirection(bool locked) { m_upDirectionLocked = locked; }
+    void setLockUpDirection(bool locked) { m_isUpDirectionLocked = locked; }
 
     // Lock target: the rigid body to match velocity/rotation with (e.g. a grid's body)
     void setTargetRigidBody(std::weak_ptr<RigidBody> rigidBody);
     void unlock();
-    void setLockState(LockState state) { m_lockState = state; }
-    LockState getLockState() const { return m_lockState; }
-    
+    void setLockState(DigibotLockState state) { m_lockState = state; }
+    DigibotLockState getLockState() const { return m_lockState; }
+
+    // ========== Cockpit docking (driven by the game layer) ==========
+    // Engage or refresh the docking target. First call while FREE removes the solid
+    // collider and enters the DOCKED state; subsequent calls refresh the target
+    // (the grid moves, its centre of mass can shift).
+    void setDockingTarget(const DigibotDockingMode::Target& target);
+    // Cockpit destroyed or otherwise invalid: force release back to free movement.
+    void clearDockingTarget();
+    // Escape while seated: back to the docking corridor to climb out.
+    void requestUnseat();
+    DockingState getDockingState() const { return m_dockingState; }
+
 private:
-    // Frames spent without ground contact (physics timestep units)
-    uint64_t m_framesWithoutContact{0};
-    
-    // Physics handlers for different movement modes
-    void handleFlying();
-    void handleWalking();
+    void applyWrench(const std::weak_ptr<RigidBody>& bodyWeak,
+                     const std::shared_ptr<RigidBody>& body,
+                     const DigibotWrench& wrench, double scale);
+    void releaseDocking();
 
     DigibotPhysics* m_physics;
     PhysicsEngine* m_physicsEngine;
-    glm::ivec3 m_movementDirection;
-    double m_thrustStrength;
-    double m_angularAccelerationMax;  // Maximum angular acceleration (rad/s^2)
-    double m_maxRollRate;             // Maximum roll rate (rad/s)
-    int m_rollInput;                  // -1 for roll left, +1 for roll right, 0 for none
-    glm::dvec3 m_viewDirection;       // Current view direction in world space
+
+    // Movement modes
+    DigibotFlyingMode m_flyingMode{};
+    DigibotWalkingMode m_walkingMode;
+    DigibotDockingMode m_dockingMode{};
+
+    // Shared input state
+    glm::ivec3 m_movementDirection{0, 0, 0};
+    int m_rollInput{0};
+    glm::dvec3 m_viewDirection{0.0, 1.0, 0.0};
+    bool m_isUpDirectionLocked{false};
 
     // Lock state (target body is typically a grid's rigid body, set by the game layer)
-    LockState m_lockState;
-    std::weak_ptr<RigidBody> m_targetRigidBody;
-    double m_translationLockStrength;
+    DigibotLockState m_lockState{DigibotLockState::UNLOCKED};
+    std::weak_ptr<RigidBody> m_targetRigidBody{};
 
     // Jetpack mode
-    bool m_jetpackEnabled;
+    bool m_isJetpackEnabled{true};
 
-    // Walking mode parameters
-    double m_targetHoverHeight;
-    double m_maxGroundAcceleration;
-    double m_targetWalkSpeed;
-    double m_walkingThrustStrength;
-    double m_groundSelectionBias;
-    double m_maxGroundAngle;
-    double m_maxLockedGroundAngle;
+    // Docking state
+    DockingState m_dockingState{DockingState::FREE};
+    DigibotDockingMode::Target m_dockingTarget{};
 
-    // Target rigid body from walking (set in handleWalking, empty if not walking or no contact)
-    std::weak_ptr<RigidBody> m_walkingTargetRigidBody;
+    // Free-movement settings snapshotted on FREE -> DOCKED, restored on release.
+    DigibotLockState m_savedLockState{DigibotLockState::UNLOCKED};
+    std::weak_ptr<RigidBody> m_savedTargetRigidBody{};
+    bool m_savedJetpackEnabled{true};
 
     // Angular velocity of surface we're on/locked to (zero if not on rotating surface)
     glm::dvec3 m_surfaceAngularVelocity{0.0, 0.0, 0.0};
-
-    // Ground contact state (updated each physics step in handleWalking)
-    bool m_hasGroundContact{false};
-    glm::dvec3 m_groundContactPoint{0.0, 0.0, 0.0};
-    // Surface normal for foot placement: normalize(bodyPos - contactPoint). This is the
-    // direction toward the body, independent of the (possibly locked) orientation up.
-    glm::dvec3 m_groundSurfaceNormal{0.0, 0.0, 1.0};
-
-    // Up direction lock state
-    bool m_upDirectionLocked{false};
-    glm::dvec3 m_cachedModifiedUp{0.0, 0.0, 0.0};  // In rigid body local coordinates
-    std::weak_ptr<RigidBody> m_cachedRigidBody;  // Rigid body the cache is relative to
 };
