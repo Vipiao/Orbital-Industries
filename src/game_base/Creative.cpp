@@ -165,8 +165,9 @@ void Creative::physics() {
                     auto bodyWeak = targetGrid->getRigidBody();
                     auto body = bodyWeak.lock();
                     if (body) {
-                        // Apply force in the view direction
-                        const double forceStrength = 0.001 * body->m_mass * forceMultiplier;
+                        // Apply force in the view direction (acceleration * mass)
+                        const double forceStrength =
+                            PhysicsUnits::metersPerSecondSquared(4.096) * body->m_mass * forceMultiplier;
                         // Get body interpolated transform
                         glm::dvec3 interpolatedPos;
                         glm::dquat interpolatedOri;
@@ -272,7 +273,9 @@ void Creative::applyDragForces() {
             continue;
         }
 
-        const double dragCoefficient = 0.04 * 0.2*0.;
+        // Velocity/spin damping rate (force = -coeff * velocity * mass), so a 1/time
+        // gain. Currently disabled by the trailing * 0.0.
+        const double dragCoefficient = PhysicsUnits::perSecond(0.512) * 0.0;
 
         if (glm::length(bodyPtr->m_velocity) > 0.0) {
             glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->m_mass;

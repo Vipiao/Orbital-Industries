@@ -3,6 +3,7 @@
 
 #include "DigibotPose.h"
 #include "DigibotAnimationContext.h"
+#include "../../physics/PhysicsUnits.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
@@ -48,8 +49,8 @@ private:
     std::weak_ptr<RigidBody> m_surfaceBody;
     bool m_initialized{false};
 
-    // Times in physics steps, distances in meters
-    static constexpr double s_stepDuration  = 10.0;  // swing time, liftoff -> plant
+    // Times configured in seconds (converted to physics steps), distances in meters
+    static constexpr double s_stepDuration  = PhysicsUnits::seconds(0.15625); // swing time, liftoff -> plant
     static constexpr double s_stepThreshold = 0.30;  // foot error that triggers a step
     static constexpr double s_liftHeight    = 0.12;  // apex of the swing arc
 

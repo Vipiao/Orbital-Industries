@@ -2,6 +2,7 @@
 #pragma once
 
 #include "DigibotModeTypes.h"
+#include "../../physics/PhysicsUnits.h"
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -35,11 +36,11 @@ private:
     PhysicsEngine* m_physicsEngine;
 
     // Movement parameters
-    double m_angularAccelerationMax{0.016};
+    double m_angularAccelerationMax{PhysicsUnits::radiansPerSecondSquared(65.536)};
     double m_targetHoverHeight{1.0};
-    double m_maxGroundAcceleration{0.008};
-    double m_targetWalkSpeed{0.08};
-    double m_walkingThrustStrength{0.007};
+    double m_maxGroundAcceleration{PhysicsUnits::metersPerSecondSquared(32.768)};
+    double m_targetWalkSpeed{PhysicsUnits::metersPerSecond(5.12)};
+    double m_walkingThrustStrength{PhysicsUnits::metersPerSecondSquared(28.672)};
     double m_groundSelectionBias{2.0};
     double m_maxGroundAngle{glm::radians(90.0)};
     double m_maxLockedGroundAngle{glm::radians(30.0)};

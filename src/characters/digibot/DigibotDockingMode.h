@@ -2,6 +2,7 @@
 #pragma once
 
 #include "DigibotModeTypes.h"
+#include "../../physics/PhysicsUnits.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
@@ -62,23 +63,24 @@ private:
     };
     static SeatFrame seatFrameWorld(const RigidBody& gridBody, const Target& target);
 
-    // All rates and accelerations are in per-physics-step units (like RigidBody).
+    // Rates and accelerations are configured in SI units and converted to per-tick
+    // units (PhysicsUnits); distances stay in meters.
     // Corridor movement (docked). Axial: free WASD movement at a low max speed.
     // Tangential: bang-bang hold onto the entry->seat axis.
-    double m_corridorSpeed{0.03};          // Max axial speed (lower than walking)
-    double m_corridorAxialResponse{0.2};   // Axial velocity tracking rate
-    double m_corridorMaxAxialAccel{0.01};  // Axial force cap / mass
-    double m_corridorTangentialAccel{0.02};// Bang-bang tangential accel cap / mass
-    double m_corridorTangentialRamp{0.1};  // Tangential near-axis ramp distance
-    double m_angularAccelerationMax{0.016};// Orientation servo accel cap
+    double m_corridorSpeed{PhysicsUnits::metersPerSecond(1.92)};        // Max axial speed
+    double m_corridorAxialResponse{PhysicsUnits::perSecond(12.8)};      // Axial vel tracking
+    double m_corridorMaxAxialAccel{PhysicsUnits::metersPerSecondSquared(40.96)}; // force cap/mass
+    double m_corridorTangentialAccel{PhysicsUnits::metersPerSecondSquared(81.92)}; // cap/mass
+    double m_corridorTangentialRamp{0.1};  // Tangential near-axis ramp distance (m)
+    double m_angularAccelerationMax{PhysicsUnits::radiansPerSecondSquared(65.536)}; // servo cap
 
     // Seat restraint (seated state): sqrt(2ad) bang-bang controller toward the seat
     // pose (same method as walking's hover control), with hard force/torque limits.
-    double m_seatMaxAcceleration{0.05};  // Max restraint force / mass; exceeded => sway
-    double m_seatRampDistance{0.1};      // Acceleration ramps down inside this range
-    double m_seatAngularAcceleration{0.05}; // Max restraint torque / inertia
-    double m_unseatDistance{0.5};        // Pulled further than this => thrown out
-    double m_seatRearmDistance{0.6};     // proj must leave B by this to re-arm capture
+    double m_seatMaxAcceleration{PhysicsUnits::metersPerSecondSquared(204.8)}; // force/mass; => sway
+    double m_seatRampDistance{0.1};      // Acceleration ramps down inside this range (m)
+    double m_seatAngularAcceleration{PhysicsUnits::radiansPerSecondSquared(204.8)}; // torque/inertia
+    double m_unseatDistance{0.5};        // Pulled further than this => thrown out (m)
+    double m_seatRearmDistance{0.6};     // proj must leave B by this to re-arm capture (m)
 
     bool m_isSeatCaptureArmed{true};
 };

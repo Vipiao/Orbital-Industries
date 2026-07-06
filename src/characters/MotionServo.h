@@ -7,6 +7,11 @@
 // Stateless bang-bang approach control (sqrt(2*a*d) speed profile with clamped
 // acceleration) for both translation and orientation. Pure kinematics in, force/
 // torque demand out - no frame or mass handling. Leaf module.
+//
+// The commanded speed is capped to the remaining distance/angle so a single tick
+// never carries past the target. This keeps the profile stable at coarse tick rates
+// (where the uncapped sqrt term would exceed the remaining error and oscillate); at
+// fine rates the cap is inert.
 namespace MotionServo {
 
 // Target approach velocity toward a point offset by `displacement`: sqrt(2*a*d)

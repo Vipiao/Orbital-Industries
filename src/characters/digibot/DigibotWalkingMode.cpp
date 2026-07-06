@@ -217,7 +217,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     if (!foundContact) {
         m_hasGroundContact = false;
         m_framesWithoutContact++;
-        if (m_framesWithoutContact >= m_physicsEngine->getPhysicsHz()) { // 1 second
+        if (m_framesWithoutContact >= PhysicsUnits::seconds(1.0)) {
             m_cachedRigidBody.reset();
             m_cachedModifiedUp = glm::dvec3{0.0, 0.0, 0.0};
             m_framesWithoutContact = 0;
@@ -427,7 +427,9 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
 
     double forceMagnitude{m_walkingThrustStrength * effectiveMassForMovement};
 
-    double smoothFactor{0.5};
+    // Velocity-tracking gain: multiplies a velocity error to make an acceleration, so
+    // it carries 1/time units and must scale with the tick rate (not a bare factor).
+    double smoothFactor{PhysicsUnits::perSecond(32.0)};
     glm::dvec3 movementForce{velocityError * effectiveMassForMovement * smoothFactor};
     double movementForceLength{glm::length(movementForce)};
     if (movementForceLength > forceMagnitude) {

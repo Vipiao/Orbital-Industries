@@ -8,7 +8,11 @@ glm::dvec3 velocityToward(const glm::dvec3& displacement, double acceleration) {
     if (distance < 1e-9 || acceleration <= 0.0) {
         return glm::dvec3{0.0, 0.0, 0.0};
     }
-    double speed{std::sqrt(2.0 * acceleration * distance)};
+    // Cap the commanded speed to the remaining distance: over one tick the body moves
+    // `speed` (tick units), so speed <= distance stops the sqrt(2ad) profile from
+    // carrying past the target and oscillating at coarse tick rates. At fine rates the
+    // sqrt term is always the smaller one, so the cap is inert.
+    double speed{glm::min(std::sqrt(2.0 * acceleration * distance), distance)};
     return (displacement / distance) * speed;
 }
 
@@ -29,8 +33,9 @@ AngularTarget towardDirection(const glm::dvec3& currentForward,
 
     if (axisLength > 1e-6) {
         rotationAxis = rotationAxis / axisLength;
-        double maxAngularSpeed{
-            std::sqrt(2.0 * adjustedAngVelMax * (1.0 - margin) * deltaAngle)};
+        // Cap to the remaining angle so one tick never rotates past the target.
+        double maxAngularSpeed{glm::min(
+            std::sqrt(2.0 * adjustedAngVelMax * (1.0 - margin) * deltaAngle), deltaAngle)};
         result.m_targetAngularVelocity = rotationAxis * maxAngularSpeed;
     }
     return result;
@@ -59,8 +64,9 @@ AngularTarget towardOrientation(const glm::dquat& current, const glm::dquat& tar
 
     if (axisLength > 1e-6 && deltaAngle > 1e-6) {
         rotationAxis = rotationAxis / axisLength;
-        double maxAngularSpeed{
-            std::sqrt(2.0 * effectiveAcceleration * (1.0 - margin) * deltaAngle)};
+        // Cap to the remaining angle so one tick never rotates past the target.
+        double maxAngularSpeed{glm::min(
+            std::sqrt(2.0 * effectiveAcceleration * (1.0 - margin) * deltaAngle), deltaAngle)};
         result.m_targetAngularVelocity = rotationAxis * maxAngularSpeed;
     }
     return result;

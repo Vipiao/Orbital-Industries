@@ -2,6 +2,7 @@
 #pragma once
 
 #include "DigibotModeTypes.h"
+#include "../../physics/PhysicsUnits.h"
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -23,8 +24,8 @@ public:
     void setMaxRollRate(double maxRate) { m_maxRollRate = maxRate; }
 
 private:
-    double m_thrustStrength{0.004};
-    double m_angularAccelerationMax{0.016};  // Maximum angular acceleration (rad/s^2)
-    double m_maxRollRate{0.032};             // Target roll rate (rad/s)
-    double m_translationLockStrength{1.0};
+    double m_thrustStrength{PhysicsUnits::metersPerSecondSquared(16.384)};
+    double m_angularAccelerationMax{PhysicsUnits::radiansPerSecondSquared(65.536)};
+    double m_maxRollRate{PhysicsUnits::radiansPerSecond(2.048)};
+    double m_translationLockStrength{PhysicsUnits::perSecond(64.0)};
 };

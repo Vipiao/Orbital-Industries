@@ -8,6 +8,7 @@
 #include "CollisionResult.h"
 #include <chrono>
 #include "utils/Generator.h"
+#include "PhysicsUnits.h"
 
 // Forward declaration
 class TimeHandler;
@@ -128,7 +129,7 @@ private:
     std::vector<std::shared_ptr<RigidBody>> m_rigidBodies;
     glm::dvec3 m_gravity{0.0, 0.0, 0.0}; // Default zero gravity
     uint64_t m_currentPhysicsTimeStep{0};
-    uint64_t m_physicsHz{64};
+    uint64_t m_physicsHz{static_cast<uint64_t>(PhysicsUnits::s_tickRateHz)};
 
     CollisionDetector m_collisionDetector;
 
