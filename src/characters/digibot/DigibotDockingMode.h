@@ -25,9 +25,11 @@ public:
         glm::dvec3 m_entryPositionLocal{0.0, 0.0, 0.0};  // entry (door)
         glm::dvec3 m_seatPositionLocal{0.0, 0.0, 0.0};   // seat
         glm::dquat m_seatOrientationLocal{1.0, 0.0, 0.0, 0.0};
-        double m_seatArriveDistance{0.25};    // proj->seat below this: sit down
-        double m_exitProjectionDistance{0.3}; // proj->entry below this ...
-        double m_exitBodyDistance{1.0};       // ...and body far from entry: release
+        // Distances are filled by the producer (makeTarget) each step; -1 marks unset
+        // so a forgotten field trips the asserts in updateDocked/updateSeated instead
+        // of silently disabling the transition.
+        double m_seatArriveDistance{-1.0};  // proj->seat below this: sit down
+        double m_exitBodyDistance{-1.0};    // body far from entry (proj back at door): release
     };
 
     struct Result {

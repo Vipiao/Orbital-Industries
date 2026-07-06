@@ -39,7 +39,6 @@ DigibotDockingMode::Target makeTarget(const Grid& grid, const CockpitBlock& cock
     target.m_seatPositionLocal = seatLocal(grid, cockpit);
     target.m_seatOrientationLocal = cockpit.m_orientation;
     target.m_seatArriveDistance = CockpitBlock::SEAT_ARRIVE_DISTANCE;
-    target.m_exitProjectionDistance = CockpitBlock::EXIT_PROJECTION_DISTANCE;
     target.m_exitBodyDistance = CockpitBlock::EXIT_BODY_DISTANCE;
     return target;
 }

@@ -28,6 +28,10 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
         return result;
     }
 
+    // Producer (makeTarget) must fill every distance; -1 means a field was left unset.
+    assert(target.m_seatArriveDistance > 0.0 && target.m_exitBodyDistance > 0.0 &&
+           "docking target not fully configured");
+
     SeatFrame seat{seatFrameWorld(*gridBody, target)};
 
     // Corridor endpoints in world space: entry (door) -> seat.
@@ -81,7 +85,16 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
             axialInput = glm::dot(inputWorld / inputLength, axis);
         }
     }
+    // One-sided seat wall: throttle the forward target to the sqrt(2ad) speed that
+    // still stops at the seat, and reverse it past the seat. Sharing the free axial
+    // channel's profile and accel clamp keeps the approach continuous across the
+    // seat, so forward input smoothly reaches zero there instead of overshooting and
+    // bouncing. The pilot can only leave through the entry (door), never the front.
     double targetAxialVelocity{axialInput * m_corridorSpeed};
+    double axialToSeat{axisLength - along};  // >0 behind the seat, <0 past it (front)
+    double seatLimitVelocity{MotionServo::velocityToward(
+        glm::dvec3{axialToSeat, 0.0, 0.0}, m_corridorMaxAxialAccel).x};
+    targetAxialVelocity = glm::min(targetAxialVelocity, seatLimitVelocity);
     double axialAcceleration{
         glm::clamp((targetAxialVelocity - axialVelocity) * m_corridorAxialResponse,
                    -m_corridorMaxAxialAccel, m_corridorMaxAxialAccel)};
@@ -120,9 +133,12 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     result.m_wrench.m_reactionBody = target.m_gridBody;
 
     // ========== Transitions (projection onto the entry->seat segment) ==========
+    // projToEntry clamps to 0 at/behind the entry plane, so a hair above 0 means the
+    // projection has backed out to the door - never a mid-corridor or past-seat pose.
+    constexpr double exitProjectionEpsilon{1e-3};
     if (m_isSeatCaptureArmed && projToSeat < target.m_seatArriveDistance) {
         result.m_wantSeat = true;
-    } else if (projToEntry < target.m_exitProjectionDistance &&
+    } else if (projToEntry < exitProjectionEpsilon &&
                bodyFromEntry > target.m_exitBodyDistance) {
         result.m_wantRelease = true;
     }
@@ -140,6 +156,10 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
         return result;
     }
 
+    // Producer (makeTarget) must fill every distance; -1 means a field was left unset.
+    assert(target.m_seatArriveDistance > 0.0 && target.m_exitBodyDistance > 0.0 &&
+           "docking target not fully configured");
+
     SeatFrame seat{seatFrameWorld(*gridBody, target)};
 
     glm::dvec3 toSeat{seat.m_position - rigidBody->m_position};
@@ -153,23 +173,25 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
 
     // ========== Positional restraint: sqrt(2ad) toward the seat ==========
     // Shared bang-bang profile (same as walking's hover control), relative to the
-    // seat point's material velocity. Acceleration ramps down near the seat
-    // (prevents overshoot chatter at rest); margin keeps the profile decelerable.
+    // seat point's material velocity. The near-seat ramp tames the sqrt curve at d=0
+    // to stop rest chatter, so it only shapes the velocity profile - the correction
+    // keeps full braking authority (m_seatMaxAcceleration), otherwise it cannot
+    // arrest residual velocity near the seat and overshoots.
     double margin{0.5};
-    double effectiveAcceleration{m_seatMaxAcceleration *
-                                 glm::min(distance / m_seatRampDistance, 1.0)};
+    double profileAcceleration{m_seatMaxAcceleration *
+                               glm::min(distance / m_seatRampDistance, 1.0)};
     glm::dvec3 seatRelativeVelocity{
         rigidBody->m_velocity -
         RotatingFrameUtils::velocityAtPoint(*gridBody, seat.m_position)};
     glm::dvec3 targetVelocity{MotionServo::velocityToward(
-        toSeat, effectiveAcceleration * (1.0 - margin))};
+        toSeat, profileAcceleration * (1.0 - margin))};
 
     glm::dvec3 restraintAcceleration{targetVelocity - seatRelativeVelocity};
     double restraintMagnitude{glm::length(restraintAcceleration)};
-    if (restraintMagnitude > effectiveAcceleration) {
+    if (restraintMagnitude > m_seatMaxAcceleration) {
         restraintAcceleration =
-            restraintAcceleration * (effectiveAcceleration / restraintMagnitude);
-        restraintMagnitude = effectiveAcceleration;
+            restraintAcceleration * (m_seatMaxAcceleration / restraintMagnitude);
+        restraintMagnitude = m_seatMaxAcceleration;
     }
 
     // Effective mass along the control direction (reaction lands on the grid)
