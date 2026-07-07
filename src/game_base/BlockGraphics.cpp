@@ -26,7 +26,7 @@ BlockGraphics::BlockGraphics(BlockResources* resources,
         m_resources->getColorTextureUnit(),
         m_resources->getNormalTextureUnit(),
         m_resources->getMaskTextureUnit(),
-        glm::dvec4{1.0, 1.0, 1.0, 1.0},
+        glm::dvec4{1.0, 1.0, 1.0, m_resources->getAlpha()},
         -1);
 
     auto instance = m_instance.lock();

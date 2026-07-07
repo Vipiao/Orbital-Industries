@@ -8,8 +8,9 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
                                const std::string& geometryPath,
                                const std::string& colorTexturePath,
                                const std::string& normalTexturePath,
-                               const std::optional<std::string>& maskTexturePath)
-    : m_graphics{graphics}
+                               const std::optional<std::string>& maskTexturePath,
+                               double alpha)
+    : m_graphics{graphics}, m_alpha{alpha}
 {
     if (!m_graphics) {
         throw std::runtime_error{"BlockResources: GraphicsEngine cannot be null"};
@@ -26,7 +27,8 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
         m_maskTextureUnit = m_graphics->getInstanceHandler()->createTexture(*maskTexturePath);
     }
 
-    m_geometry = m_graphics->getInstanceHandler()->createGeometry(geometryPath);
+    m_geometry = m_graphics->getInstanceHandler()->createGeometry(
+        geometryPath, /*transparent=*/m_alpha < 1.0);
     if (m_geometry.expired()) {
         throw std::runtime_error{"BlockResources: failed to load geometry from " + geometryPath};
     }

@@ -13,11 +13,15 @@ class Geometry;
 // maskTexturePath is optional — pass std::nullopt for blocks that don't use a mask.
 class BlockResources {
 public:
+    // alpha < 1.0 marks the geometry transparent (rendered in the OIT pass) and
+    // tints every instance's color alpha, so all blocks of this type are drawn
+    // translucent.
     BlockResources(GraphicsEngine* graphics,
                    const std::string& geometryPath,
                    const std::string& colorTexturePath,
                    const std::string& normalTexturePath,
-                   const std::optional<std::string>& maskTexturePath = std::nullopt);
+                   const std::optional<std::string>& maskTexturePath = std::nullopt,
+                   double alpha = 1.0);
     ~BlockResources();
 
     BlockResources(const BlockResources&) = delete;
@@ -27,6 +31,7 @@ public:
     int getColorTextureUnit()                const { return m_colorTextureUnit; }
     int getNormalTextureUnit()               const { return m_normalTextureUnit; }
     int getMaskTextureUnit()                 const { return m_maskTextureUnit; }  // -1 if unused
+    double getAlpha()                        const { return m_alpha; }
 
 private:
     GraphicsEngine*         m_graphics;
@@ -34,4 +39,5 @@ private:
     int m_colorTextureUnit{-1};
     int m_normalTextureUnit{-1};
     int m_maskTextureUnit{-1};
+    double m_alpha{1.0};
 };
