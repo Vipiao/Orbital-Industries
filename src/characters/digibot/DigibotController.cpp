@@ -74,7 +74,9 @@ void DigibotController::setDockingTarget(const DigibotDockingMode::Target& targe
 
         m_dockingState = DockingState::DOCKED;
         m_dockingMode.armSeatCapture();
-        m_physics->setBodyColliderSolid(false);
+        for (Collider* cell : m_dockingTarget.m_cockpitCells) {
+            m_physics->addBodyCollisionExceptionWith(cell);
+        }
         std::cout << "Docking: entering cockpit corridor" << std::endl;
     }
 }
@@ -94,9 +96,9 @@ void DigibotController::requestUnseat() {
 }
 
 void DigibotController::releaseDocking() {
+    m_physics->clearBodyCollisionExceptions();
     m_dockingState = DockingState::FREE;
     m_dockingTarget = DigibotDockingMode::Target{};
-    m_physics->setBodyColliderSolid(true);
 
     // Restore the free-movement settings captured on entry. Set members directly
     // (not via setJetpackEnabled) so walking's contact cache is not reset.

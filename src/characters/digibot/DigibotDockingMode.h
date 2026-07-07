@@ -6,8 +6,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
+#include <vector>
 
 class RigidBody;
+class Collider;
 
 // Cockpit entry/exit corridor and seat restraint physics. The corridor is the
 // segment entry (door) -> seat. While docked: WASD moves the body freely along the
@@ -23,6 +25,9 @@ public:
     // +y = cockpit forward (entry is along -y), +z = up.
     struct Target {
         std::weak_ptr<RigidBody> m_gridBody{};
+        // Cockpit's physics cells, ignored by the digibot body while docked so it can phase
+        // through the cockpit cube. Raw because grid cells are unique_ptr-owned by the grid.
+        std::vector<Collider*> m_cockpitCells{};
         glm::dvec3 m_entryPositionLocal{0.0, 0.0, 0.0};  // entry (door)
         glm::dvec3 m_seatPositionLocal{0.0, 0.0, 0.0};   // seat
         glm::dquat m_seatOrientationLocal{1.0, 0.0, 0.0, 0.0};

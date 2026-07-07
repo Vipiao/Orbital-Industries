@@ -626,6 +626,11 @@ CollisionResult CollisionDetectionUtils::detectBallGrid(
     
     // Test collision with each found collider
     for (Collider* gridCell : nearbyColliders) {
+        // Skip pairs registered as collision exceptions
+        if (ball->ignores(gridCell)) {
+            continue;
+        }
+
         // Update cell's transform and AABB
         gridCell->updatePosition(currentTimestep);
         gridCell->updateAdvancedAABB(currentTimestep);
@@ -706,6 +711,11 @@ void CollisionDetectionUtils::processPolyhedronGridCollision(
         
         // Process all cells in neighborhood (center cell first, then neighbors)
         for (Collider* gridCollider : neighborhood.m_neighbors) {
+            // Skip cell pairs registered as collision exceptions
+            if (polyhedron->ignores(gridCollider)) {
+                continue;
+            }
+
             // Apply classification-based filtering if polyhedron has classification
             if (hasPolyhedronClass) {
                 CellMetadata* gridMetadata = gridCollider->get_pointer<CellMetadata>();

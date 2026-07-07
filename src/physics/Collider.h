@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
+#include <memory>
 #include "utils/GeometryUtils.h"
 #include "utils/PointerStorage.h"
 
@@ -36,7 +38,7 @@ public:
         , m_AABBMax(0.0)
     {}
     
-    virtual ~Collider() = default;
+    virtual ~Collider();
 
     // Type identification system
     static const int TYPE_ID;
@@ -72,9 +74,21 @@ public:
         (void)normal;
     }
     virtual void clearFilterNormals() {}
-    virtual const std::vector<glm::dvec3>& getFilterNormals() const { 
-        static const std::vector<glm::dvec3> empty; 
-        return empty; 
+    virtual const std::vector<glm::dvec3>& getFilterNormals() const {
+        static const std::vector<glm::dvec3> empty;
+        return empty;
+    }
+
+    // Pairwise collision exceptions: colliders this one never collides with (no detection,
+    // no response). Stored symmetrically on both participants and keyed by the neighbor's
+    // m_id (deterministic lookup); the neighbor pointer is held only to unlink the reverse
+    // edge on destruction. The storage is allocated lazily, so colliders that never take an
+    // exception cost nothing beyond a null pointer.
+    void addException(Collider* other);
+    void removeException(Collider* other);
+    void clearExceptions();
+    bool ignores(const Collider* other) const {
+        return m_exceptions && other && m_exceptions->count(other->m_id) > 0;
     }
 
     // Overlap tracking - maintained by CollisionDetector during sweep-and-prune
@@ -102,4 +116,7 @@ public:
 
 private:
     static int s_nextId;
+
+    // Neighbor m_id -> neighbor pointer. Lazily allocated; null when there are no exceptions.
+    std::unique_ptr<std::unordered_map<int, Collider*>> m_exceptions;
 };

@@ -153,6 +153,9 @@ void CollisionDetector::removeCollider(std::weak_ptr<Collider> colliderWeak) {
             ++it;
         }
     }
+
+    // Exceptions live on the colliders themselves and unlink via the destructor, so there
+    // is nothing to purge here.
 }
 
 void CollisionDetector::setEndTime(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
@@ -307,8 +310,13 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2)
     if (!collider1 || !collider2 || collider1 == collider2) return;
 
     // Skip collision detection if either collider is a sensor
-    if (collider1->getTypeId() == SensorCollider::TYPE_ID || 
+    if (collider1->getTypeId() == SensorCollider::TYPE_ID ||
         collider2->getTypeId() == SensorCollider::TYPE_ID) {
+        return;
+    }
+
+    // Skip pairs registered as collision exceptions
+    if (collider1->ignores(collider2)) {
         return;
     }
 

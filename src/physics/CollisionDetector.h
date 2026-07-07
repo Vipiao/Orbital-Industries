@@ -68,7 +68,7 @@ public:
     
     // Remove a collider from the collision detection system (pass back what factory gave you)
     void removeCollider(std::weak_ptr<Collider> colliderWeak);
-    
+
     // Run collision detection
     Generator<bool> run();
 

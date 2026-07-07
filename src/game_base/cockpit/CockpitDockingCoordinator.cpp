@@ -8,6 +8,7 @@
 #include "../../characters/digibot/DigibotController.h"
 #include "../../physics/PhysicsEngine.h"
 #include "../../physics/RigidBody.h"
+#include "../../physics/GridCollider.h"
 #include <algorithm>
 #include <cassert>
 #include <limits>
@@ -32,6 +33,25 @@ glm::dvec3 seatLocal(const Grid& grid, const CockpitBlock& cockpit) {
 }
 
 // Build the controller-facing docking target from a cockpit block on a grid.
+// The cockpit's physics cells (one per 2x2x2 footprint offset that still exists), used as
+// collision exceptions so the docked digibot can phase through just the cockpit cube. These
+// do not change frame to frame, so they are resolved once at the docking transition rather
+// than on every target refresh.
+std::vector<Collider*> resolveCockpitCells(const Grid& grid, const CockpitBlock& cockpit) {
+    std::vector<Collider*> cells;
+    auto gridCollider = grid.getCollider().lock();
+    if (!gridCollider || gridCollider->getTypeId() != GridCollider::TYPE_ID) {
+        return cells;
+    }
+    GridCollider* gc{static_cast<GridCollider*>(gridCollider.get())};
+    for (const glm::ivec3& offset : CockpitBlock::footprintOffsets(cockpit.m_orientation)) {
+        if (Collider* cell{gc->getCell(cockpit.coordinates + offset)}) {
+            cells.push_back(cell);
+        }
+    }
+    return cells;
+}
+
 DigibotDockingMode::Target makeTarget(const Grid& grid, const CockpitBlock& cockpit) {
     DigibotDockingMode::Target target{};
     target.m_gridBody = grid.getRigidBody();
@@ -114,7 +134,11 @@ void CockpitDockingCoordinator::updateDigibot(const std::shared_ptr<Digibot>& di
             const CockpitBlock* cockpit{findCockpit(*candidate.m_grid,
                                                     candidate.m_anchor)};
             if (cockpit) {
-                controller->setDockingTarget(makeTarget(*candidate.m_grid, *cockpit));
+                DigibotDockingMode::Target target{makeTarget(*candidate.m_grid, *cockpit)};
+                // Resolve the ignored cockpit cells only here, at the docking transition;
+                // the docked refresh below does not need them.
+                target.m_cockpitCells = resolveCockpitCells(*candidate.m_grid, *cockpit);
+                controller->setDockingTarget(target);
                 // setDockingTarget must leave FREE, or the engagement we push now
                 // desyncs from the controller state (record with no docking).
                 assert(controller->getDockingState() !=

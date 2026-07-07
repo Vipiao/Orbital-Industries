@@ -39,7 +39,7 @@ public:
     static constexpr double SEAT_ARRIVE_DISTANCE{0.05}; // proj near seat => seated
     // Release once the projection has backed out to the entry plane and the body is
     // this far from the entry point.
-    static constexpr double EXIT_BODY_DISTANCE{0.6};
+    static constexpr double EXIT_BODY_DISTANCE{0.5};
 
     // On entry the body sits ~ENTER_RADIUS from the entry point. If that already
     // exceeded EXIT_BODY_DISTANCE the pilot would release the instant it docked.
