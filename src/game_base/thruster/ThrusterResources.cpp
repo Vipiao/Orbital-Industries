@@ -16,19 +16,19 @@ ThrusterResources::ThrusterResources(GraphicsEngine* graphics)
 
 ThrusterResources::~ThrusterResources() {
     if (!m_geometry.expired()) {
-        m_graphics->getInstanceHandler()->releaseGeometry(m_geometry);
+        m_graphics->releaseInstanceGeometry(m_geometry);
     }
 }
 
 void ThrusterResources::loadResources() {
-    m_colorTextureUnit  = m_graphics->getInstanceHandler()->createTexture("../media/models/thruster/albedo.png");
-    m_normalTextureUnit = m_graphics->getInstanceHandler()->createTexture("../media/models/thruster/normal.png");
+    m_colorTextureUnit  = m_graphics->createInstanceTexture("../media/models/thruster/albedo.png");
+    m_normalTextureUnit = m_graphics->createInstanceTexture("../media/models/thruster/normal.png");
 
     if (m_colorTextureUnit == -1 || m_normalTextureUnit == -1) {
         throw std::runtime_error("ThrusterResources: failed to load textures");
     }
 
-    m_geometry = m_graphics->getInstanceHandler()->createGeometry("../media/models/thruster/thruster_v2.obj");
+    m_geometry = m_graphics->createInstanceGeometry("../media/models/thruster/thruster_v2.obj");
     if (m_geometry.expired()) {
         throw std::runtime_error("ThrusterResources: failed to load geometry");
     }

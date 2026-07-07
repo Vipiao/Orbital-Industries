@@ -135,7 +135,7 @@ GraphicsCell* GridGraphics::getGraphicsCell(const glm::ivec3& coord) {
 void GridGraphics::removeCellGraphics(const std::vector<uint32_t>& triangleIds) {
     // Remove all triangles from the mesh
     if (!triangleIds.empty()) {
-        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_ssboIndex, &triangleIds);
+        m_graphics->removeTrianglesFromMesh(m_ssboIndex, &triangleIds);
     }
 }
 
@@ -147,7 +147,7 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
     
     // Remove existing mesh for this cell first
     if (!cell.triangleIds.empty()) {
-        m_graphics->m_meshHandler->removeTrianglesFromMesh(m_ssboIndex, &cell.triangleIds);
+        m_graphics->removeTrianglesFromMesh(m_ssboIndex, &cell.triangleIds);
         cell.triangleIds.clear();
     }
 
@@ -172,7 +172,7 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
         // Create color vector with same size as positions
         std::vector<glm::dvec4> colors(transformedMeshData.positions.size(), color);
 
-        cell.triangleIds = m_graphics->m_meshHandler->appendTrianglesToMesh(
+        cell.triangleIds = m_graphics->appendTrianglesToMesh(
             m_ssboIndex, &transformedMeshData.positions, &transformedMeshData.normals, 
             &transformedMeshData.tangents, &transformedMeshData.uvs, 
             nullptr, &colors);

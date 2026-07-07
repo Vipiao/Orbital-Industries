@@ -30,7 +30,7 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/05_marker_v2.png", -1, true);
 
     // Load 3D arrow geometry and texture
-    m_arrowGeometry = m_gameBase->m_graphicsEngine->getInstanceHandler()->createGeometry("../media/blender/04_arrow.obj");
+    m_arrowGeometry = m_gameBase->m_graphicsEngine->createInstanceGeometry("../media/blender/04_arrow.obj");
     
     // Configure arrows for overlay rendering with transparency
     if (auto geometry = m_arrowGeometry.lock()) {
@@ -46,7 +46,7 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     // 9x12 pixels of a 64x64 image where the wrench center is located
 
     // Load modify icon texture
-    m_modifyIconTextureIndex = m_gameBase->m_graphicsEngine->getInstanceHandler()->createTexture("../media/2d_graphics/06_modify_icon.png");
+    m_modifyIconTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture("../media/2d_graphics/06_modify_icon.png");
     m_crosshairOffset.x = 2.0 * (0.5 - 9.0/64.0) * m_crosshairScale.x;
     m_crosshairOffset.y = 2.0 * (0.5 - 12.0/64.0) * m_crosshairScale.y;
 

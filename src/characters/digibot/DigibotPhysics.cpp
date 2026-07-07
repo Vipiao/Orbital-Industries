@@ -292,7 +292,7 @@ void DigibotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
         std::vector<glm::dvec4> colors(meshData.positions.size(), collisionColor);
 
         // Append this cell's mesh
-        graphics->m_meshHandler->appendTrianglesToMesh(
+        graphics->appendTrianglesToMesh(
             m_collisionBoxMeshId, &meshData.positions, &meshData.normals, 
             &meshData.tangents, &meshData.uvs, nullptr, &colors);
     }

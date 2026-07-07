@@ -15,7 +15,7 @@ RadialMenu::RadialMenu(GraphicsEngine* graphics) : m_graphics(graphics) {
     
     // Load geometry using InstanceHandler
     try {
-        m_geometry = m_graphics->getInstanceHandler()->createGeometry("../media/blender/03_face.obj");
+        m_geometry = m_graphics->createInstanceGeometry("../media/blender/03_face.obj");
         if (m_geometry.expired()) {
             throw std::runtime_error("Failed to create geometry from 03_face.obj");
         }
@@ -61,7 +61,7 @@ RadialMenu::~RadialMenu() {
     
     // Release geometry
     if (!m_geometry.expired()) {
-        m_graphics->getInstanceHandler()->releaseGeometry(m_geometry);
+        m_graphics->releaseInstanceGeometry(m_geometry);
     }
 }
 
@@ -75,7 +75,7 @@ void RadialMenu::loadAllTextures() {
     for (int i = 0; i <= 8; ++i) {
         std::string textureName = "u" + std::to_string(i);
         std::string texturePath = "../media/radial_menu_graphics_generator/" + textureName + ".png";
-        m_textures[i] = m_graphics->getInstanceHandler()->createTexture(texturePath);
+        m_textures[i] = m_graphics->createInstanceTexture(texturePath);
     }
 }
 

@@ -9,9 +9,11 @@
 #include <unordered_map>
 #include <string>
 
+class GraphicsEngine;
+
 class DebugVisualization : public DebugRenderer {
 public:
-    DebugVisualization(InstanceHandler* instanceHandler, SSBOManager* ssboManager);
+    DebugVisualization(GraphicsEngine* graphics, SSBOManager* ssboManager);
     ~DebugVisualization();
     
     // Override DebugRenderer interface methods
@@ -46,7 +48,7 @@ public:
     void update();
     
 private:
-    InstanceHandler* m_instanceHandler;
+    GraphicsEngine* m_graphics;
     SSBOManager* m_ssboManager;
 
     // Shared resources

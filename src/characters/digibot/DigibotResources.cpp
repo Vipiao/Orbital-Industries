@@ -20,7 +20,7 @@ DigibotResources::~DigibotResources() {
     // Release all geometries
     for (auto& geometryWeak : m_bodyPartGeometries) {
         if (!geometryWeak.expired()) {
-            m_graphics->getInstanceHandler()->releaseGeometry(geometryWeak);
+            m_graphics->releaseInstanceGeometry(geometryWeak);
         }
     }
     
@@ -29,8 +29,8 @@ DigibotResources::~DigibotResources() {
 
 void DigibotResources::loadResources() {
     // Load shared texture atlas
-    m_colorTextureUnit = m_graphics->getInstanceHandler()->createTexture("../media/textures/robot/atlas.png");
-    m_normalTextureUnit = m_graphics->getInstanceHandler()->createTexture("../media/textures/robot/atlas_normal.png");
+    m_colorTextureUnit = m_graphics->createInstanceTexture("../media/textures/robot/atlas.png");
+    m_normalTextureUnit = m_graphics->createInstanceTexture("../media/textures/robot/atlas_normal.png");
     
     if (m_colorTextureUnit == -1 || m_normalTextureUnit == -1) {
         throw std::runtime_error("Failed to load Digibot textures");
@@ -63,7 +63,7 @@ void DigibotResources::loadResources() {
     m_bodyPartGeometries.reserve(16);
     
     for (int i = 0; i < 16; ++i) {
-        auto geometry = m_graphics->getInstanceHandler()->createGeometry(filePaths[i]);
+        auto geometry = m_graphics->createInstanceGeometry(filePaths[i]);
         if (geometry.expired()) {
             throw std::runtime_error("Failed to load Digibot geometry: " + std::string(filePaths[i]));
         }

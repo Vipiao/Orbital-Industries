@@ -49,21 +49,21 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
         throw std::runtime_error("RadialMenu cannot be null");
     }
 
-    auto* ih = m_gameBase->m_graphicsEngine->getInstanceHandler();
+    auto* ge = m_gameBase->m_graphicsEngine.get();
 
     // Icon textures
-    m_constructionIconTextureIndex = ih->createTexture("../media/2d_graphics/07_construction_icon.png");
-    m_thrusterIconTextureIndex     = ih->createTexture("../media/2d_graphics/09_thruster_icon.png");
-    m_cockpitIconTextureIndex      = ih->createTexture("../media/2d_graphics/10_cockpit_icon.png");
+    m_constructionIconTextureIndex = ge->createInstanceTexture("../media/2d_graphics/07_construction_icon.png");
+    m_thrusterIconTextureIndex     = ge->createInstanceTexture("../media/2d_graphics/09_thruster_icon.png");
+    m_cockpitIconTextureIndex      = ge->createInstanceTexture("../media/2d_graphics/10_cockpit_icon.png");
 
     // Thruster ghost
-    m_thrusterGhostColorTextureUnit = ih->createTexture("../media/models/thruster/albedo_ghost.png");
-    m_thrusterGhostGeometry = ih->createGeometry("../media/models/thruster/thruster_ghost.obj");
+    m_thrusterGhostColorTextureUnit = ge->createInstanceTexture("../media/models/thruster/albedo_ghost.png");
+    m_thrusterGhostGeometry = ge->createInstanceGeometry("../media/models/thruster/thruster_ghost.obj");
     if (auto geom = m_thrusterGhostGeometry.lock()) geom->setAlphaBlending(true);
 
     // Cockpit ghost
-    m_cockpitGhostColorTextureUnit = ih->createTexture("../media/models/cockpit/albedo_ghost.png");
-    m_cockpitGhostGeometry = ih->createGeometry("../media/models/cockpit/model_ghost.obj");
+    m_cockpitGhostColorTextureUnit = ge->createInstanceTexture("../media/models/cockpit/albedo_ghost.png");
+    m_cockpitGhostGeometry = ge->createInstanceGeometry("../media/models/cockpit/model_ghost.obj");
     if (auto geom = m_cockpitGhostGeometry.lock()) geom->setAlphaBlending(true);
 
     // Calculate crosshair offset and scale

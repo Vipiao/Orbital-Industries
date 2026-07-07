@@ -1,5 +1,6 @@
 // DebugVisualization.cpp
 #include "DebugVisualization.h"
+#include "graphics/GraphicsEngine.h"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -8,14 +9,14 @@
 // Static member initialization
 int DebugVisualization::s_nextDebugId = 1;
 
-DebugVisualization::DebugVisualization(InstanceHandler* instanceHandler, SSBOManager* ssboManager) 
-    : m_instanceHandler(instanceHandler)
+DebugVisualization::DebugVisualization(GraphicsEngine* graphics, SSBOManager* ssboManager)
+    : m_graphics(graphics)
     , m_ssboManager(ssboManager)
     , m_textureIndex(-1)
     , m_resourcesLoaded(false)
 {
-    if (!m_instanceHandler) {
-        throw std::runtime_error("InstanceHandler pointer cannot be null");
+    if (!m_graphics) {
+        throw std::runtime_error("GraphicsEngine pointer cannot be null");
     }
 
     if (!m_ssboManager) {
@@ -46,7 +47,7 @@ DebugVisualization::~DebugVisualization() {
     // Textures are automatically cleaned up by TextureManagerBase destructor
     
     if (auto geometry = m_sphereGeometry.lock()) {
-        m_instanceHandler->releaseGeometry(geometry);
+        m_graphics->releaseInstanceGeometry(geometry);
     }
 
     m_nameToId.clear();
@@ -61,10 +62,10 @@ void DebugVisualization::loadSharedResources() {
     
     try {
         // Load shared sphere geometry
-        m_sphereGeometry = m_instanceHandler->createGeometry("../media/blender/02_sphere.obj");
+        m_sphereGeometry = m_graphics->createInstanceGeometry("../media/blender/02_sphere.obj");
         
         // Load shared texture
-        m_textureIndex = m_instanceHandler->createTexture("../media/debug_red_transparent.png");
+        m_textureIndex = m_graphics->createInstanceTexture("../media/debug_red_transparent.png");
         
         // Configure geometry for overlay rendering with transparency
         if (auto geometry = m_sphereGeometry.lock()) {
