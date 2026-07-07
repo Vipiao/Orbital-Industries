@@ -2,6 +2,7 @@
 #include "BlockResources.h"
 #include "graphics/GraphicsEngine.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
+#include <cassert>
 #include <stdexcept>
 
 BlockResources::BlockResources(GraphicsEngine* graphics,
@@ -31,9 +32,13 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
 
     m_parts.reserve(parts.size());
     for (const BlockGeometryPart& part : parts) {
+        assert(part.alpha > 0.0 && part.alpha <= 1.0 &&
+               "block part alpha must be in (0, 1]");
+
         std::weak_ptr<Geometry> geometry = m_graphics->createInstanceGeometry(
             part.geometryPath, /*transparent=*/part.alpha < 1.0);
         if (geometry.expired()) {
+            releaseGeometries(); // unwind the parts already loaded before failing
             throw std::runtime_error{"BlockResources: failed to load geometry from "
                                      + part.geometryPath};
         }
@@ -41,10 +46,15 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
     }
 }
 
-BlockResources::~BlockResources() {
+void BlockResources::releaseGeometries() {
     for (const Part& part : m_parts) {
         if (!part.geometry.expired()) {
             m_graphics->releaseInstanceGeometry(part.geometry);
         }
     }
+    m_parts.clear();
+}
+
+BlockResources::~BlockResources() {
+    releaseGeometries();
 }

@@ -40,6 +40,10 @@ public:
     int getMaskTextureUnit()             const { return m_maskTextureUnit; }  // -1 if unused
 
 private:
+    // Releases every loaded geometry and clears m_parts. Used by the destructor
+    // and to unwind a partially-constructed instance when a load fails.
+    void releaseGeometries();
+
     GraphicsEngine*   m_graphics;
     std::vector<Part> m_parts;
     int m_colorTextureUnit{-1};

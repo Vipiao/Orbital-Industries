@@ -23,6 +23,7 @@ BlockGraphics::BlockGraphics(BlockResources* resources,
     for (const BlockResources::Part& part : m_resources->getParts()) {
         auto geometry = part.geometry.lock();
         if (!geometry) {
+            releaseInstances(); // detach the parts already attached before failing
             throw std::runtime_error{"BlockGraphics: geometry is invalid"};
         }
 
@@ -36,6 +37,7 @@ BlockGraphics::BlockGraphics(BlockResources* resources,
 
         auto instance = instanceHandle.lock();
         if (!instance) {
+            releaseInstances();
             throw std::runtime_error{"BlockGraphics: failed to create instance"};
         }
 
@@ -48,7 +50,7 @@ BlockGraphics::BlockGraphics(BlockResources* resources,
     }
 }
 
-BlockGraphics::~BlockGraphics() {
+void BlockGraphics::releaseInstances() {
     for (const PartInstance& part : m_parts) {
         auto geometry = part.geometry.lock();
         auto instance = part.instance.lock();
@@ -56,4 +58,9 @@ BlockGraphics::~BlockGraphics() {
             geometry->removeInstance(instance);
         }
     }
+    m_parts.clear();
+}
+
+BlockGraphics::~BlockGraphics() {
+    releaseInstances();
 }

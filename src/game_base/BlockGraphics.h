@@ -36,6 +36,10 @@ private:
         std::weak_ptr<Instance> instance;
     };
 
+    // Removes every attached instance and clears m_parts. Used by the destructor
+    // and to unwind a partially-constructed block if a part fails to attach.
+    void releaseInstances();
+
     BlockResources*           m_resources;
     std::vector<PartInstance> m_parts;
 };
