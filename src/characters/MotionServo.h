@@ -22,26 +22,27 @@ namespace MotionServo {
 // mirroring how towardDirection/towardOrientation pair with torque().
 glm::dvec3 velocityToward(const glm::dvec3& displacement, double acceleration);
 
-struct AngularTarget {
-    glm::dvec3 m_targetAngularVelocity{0.0, 0.0, 0.0};
-    double m_accelerationLimit{0.0};
-};
-
 // 2-DOF servo: rotate `currentForward` onto `targetForward` around their common
-// normal. Speed limit scales with the remaining angle (precise near the target).
-AngularTarget towardDirection(const glm::dvec3& currentForward,
-                              const glm::dvec3& targetForward,
-                              double maxAngularAcceleration, double margin);
+// normal. Returns the target angular velocity; its magnitude scales with the
+// remaining angle for precision near the target.
+glm::dvec3 towardDirection(const glm::dvec3& currentForward,
+                           const glm::dvec3& targetForward,
+                           double maxAngularAcceleration, double margin);
 
-// 3-DOF servo: rotate `current` onto `target`. Acceleration ramps down linearly
-// below `rampAngle` radians of remaining rotation.
-AngularTarget towardOrientation(const glm::dquat& current, const glm::dquat& target,
-                                double maxAngularAcceleration, double margin,
-                                double rampAngle);
+// 3-DOF servo: rotate `current` onto `target`. Returns the target angular velocity;
+// its magnitude ramps down linearly below `rampAngle` radians of remaining rotation
+// so the approach settles without chatter.
+glm::dvec3 towardOrientation(const glm::dquat& current, const glm::dquat& target,
+                             double maxAngularAcceleration, double margin,
+                             double rampAngle);
 
-// Torque driving angular velocity toward target.m_targetAngularVelocity +
-// extraAngularVelocity, with the acceleration clamped to target.m_accelerationLimit.
-glm::dvec3 torque(const AngularTarget& target, const glm::dvec3& extraAngularVelocity,
-                  const glm::dvec3& currentAngularVelocity, const glm::dmat3& inertia);
+// Torque driving angular velocity toward targetAngularVelocity + extraAngularVelocity.
+// The change is clamped to maxAngularAcceleration - the full, constant braking
+// authority, kept separate from any near-target ramp on the target speed so residual
+// velocity can still be arrested at the target.
+glm::dvec3 torque(const glm::dvec3& targetAngularVelocity,
+                  const glm::dvec3& extraAngularVelocity,
+                  const glm::dvec3& currentAngularVelocity, double maxAngularAcceleration,
+                  const glm::dmat3& inertia);
 
 }

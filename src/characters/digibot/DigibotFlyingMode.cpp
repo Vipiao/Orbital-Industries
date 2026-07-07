@@ -107,10 +107,8 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
         glm::normalize(rigidBody->m_orientation * glm::dvec3{0.0, 1.0, 0.0})};
     glm::dvec3 targetForward{glm::normalize(inputs.m_viewDirection)};
 
-    MotionServo::AngularTarget angularTarget{MotionServo::towardDirection(
+    glm::dvec3 targetAngularVelocity{MotionServo::towardDirection(
         currentForward, targetForward, m_angularAccelerationMax, 0.2)};
-    // The clamp uses the unscaled maximum (matches original flying behaviour).
-    angularTarget.m_accelerationLimit = m_angularAccelerationMax;
 
     // Roll around the view direction plus co-rotation with a fully locked grid.
     glm::dvec3 extraAngularVelocity{0.0, 0.0, 0.0};
@@ -122,8 +120,8 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
     }
 
     wrench.m_torque = MotionServo::torque(
-        angularTarget, extraAngularVelocity, rigidBody->getAngularVelocityWorld(),
-        rigidBody->getWorldInertiaTensor());
+        targetAngularVelocity, extraAngularVelocity, rigidBody->getAngularVelocityWorld(),
+        m_angularAccelerationMax, rigidBody->getWorldInertiaTensor());
 
     return wrench;
 }

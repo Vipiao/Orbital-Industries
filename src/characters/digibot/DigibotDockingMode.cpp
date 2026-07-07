@@ -101,7 +101,10 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
 
     // ========== Tangential hold: bang-bang back onto the axis ==========
     // Only the tangential (off-axis) direction is force-limited; the axial direction
-    // stays free for movement.
+    // stays free for movement. The near-axis ramp only shapes the profile speed to
+    // stop chatter at d=0 - the correction keeps full braking authority
+    // (m_corridorTangentialAccel), otherwise it cannot arrest residual tangential
+    // velocity on the axis and oscillates.
     double tangentialRampAcc{
         m_corridorTangentialAccel *
         glm::min(glm::length(tangentialOffset) / m_corridorTangentialRamp, 1.0)};
@@ -109,9 +112,9 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
         MotionServo::velocityToward(-tangentialOffset, tangentialRampAcc * 0.5)};
     glm::dvec3 tangentialAcceleration{tangentialTargetVelocity - tangentialVelocity};
     double tangentialMag{glm::length(tangentialAcceleration)};
-    if (tangentialMag > tangentialRampAcc) {
+    if (tangentialMag > m_corridorTangentialAccel) {
         tangentialAcceleration =
-            tangentialAcceleration * (tangentialRampAcc / tangentialMag);
+            tangentialAcceleration * (m_corridorTangentialAccel / tangentialMag);
     }
 
     // ========== Combine, add frame compensation ==========
@@ -122,13 +125,13 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     result.m_wrench.m_force = controlAcceleration * rigidBody->m_mass + compensation;
 
     // ========== Orientation: bang-bang, fully locked to the seat pose ==========
-    MotionServo::AngularTarget angularTarget{MotionServo::towardOrientation(
+    glm::dvec3 targetAngularVelocity{MotionServo::towardOrientation(
         rigidBody->m_orientation, seat.m_orientation, m_angularAccelerationMax, 0.5,
         0.1)};
     glm::dmat3 inertia{RotatingFrameUtils::effectiveInertia(*rigidBody, gridBody.get())};
     result.m_wrench.m_torque = MotionServo::torque(
-        angularTarget, gridBody->getAngularVelocityWorld(),
-        rigidBody->getAngularVelocityWorld(), inertia);
+        targetAngularVelocity, gridBody->getAngularVelocityWorld(),
+        rigidBody->getAngularVelocityWorld(), m_angularAccelerationMax, inertia);
 
     result.m_wrench.m_reactionBody = target.m_gridBody;
 
@@ -225,13 +228,13 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
     // ========== Orientation restraint toward the seat pose ==========
     // Same sqrt(2ad) servo as walking. The angular acceleration limit inside the
     // servo caps the restraint torque at inertia * m_seatAngularAcceleration.
-    MotionServo::AngularTarget angularTarget{MotionServo::towardOrientation(
+    glm::dvec3 targetAngularVelocity{MotionServo::towardOrientation(
         rigidBody->m_orientation, seat.m_orientation, m_seatAngularAcceleration, 0.5,
         0.1)};
     glm::dmat3 inertia{RotatingFrameUtils::effectiveInertia(*rigidBody, gridBody.get())};
     result.m_wrench.m_torque = MotionServo::torque(
-        angularTarget, gridBody->getAngularVelocityWorld(),
-        rigidBody->getAngularVelocityWorld(), inertia);
+        targetAngularVelocity, gridBody->getAngularVelocityWorld(),
+        rigidBody->getAngularVelocityWorld(), m_seatAngularAcceleration, inertia);
 
     result.m_wrench.m_reactionBody = target.m_gridBody;
     return result;

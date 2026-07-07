@@ -310,7 +310,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     targetRotationMatrix[2] = targetUpDirection; // z-axis
     glm::dquat targetOrientation{glm::quat_cast(targetRotationMatrix)};
 
-    MotionServo::AngularTarget angularTarget{MotionServo::towardOrientation(
+    glm::dvec3 targetAngularVelocity{MotionServo::towardOrientation(
         rigidBody->m_orientation, targetOrientation, m_angularAccelerationMax, 0.5,
         0.1)};
 
@@ -323,8 +323,8 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     glm::dmat3 orientationInertia{
         RotatingFrameUtils::effectiveInertia(*rigidBody, targetRigidBody.get())};
     netTorqueOnDigibot += MotionServo::torque(
-        angularTarget, extraAngularVelocity, rigidBody->getAngularVelocityWorld(),
-        orientationInertia);
+        targetAngularVelocity, extraAngularVelocity, rigidBody->getAngularVelocityWorld(),
+        m_angularAccelerationMax, orientationInertia);
 
     // ========== Step 8: Position Control Along Normal ==========
     // Calculate target position along target up direction
@@ -344,19 +344,21 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     double relativeVelocityAlongNormal{
         glm::dot(rigidBody->m_velocity, targetUpDirection) - surfaceVelocityAlongNormal};
 
-    // sqrt(2ad) approach along the up axis. Acceleration ramps down near the target
-    // (prevents overshoot chatter at rest); margin keeps the profile decelerable.
+    // sqrt(2ad) approach along the up axis. The near-target ramp tames the sqrt curve
+    // at d=0 to stop rest chatter, so it only shapes the profile speed - the correction
+    // below keeps full braking authority (m_maxGroundAcceleration), otherwise it cannot
+    // arrest residual velocity near the hover height and oscillates.
     double margin{0.5};
-    double effectiveACC{m_maxGroundAcceleration *
-                        glm::min(glm::abs(distanceAlongNormal) / 0.1, 1.0)};
+    double profileAcceleration{m_maxGroundAcceleration *
+                               glm::min(glm::abs(distanceAlongNormal) / 0.1, 1.0)};
     glm::dvec3 targetVelocityAlongNormal{MotionServo::velocityToward(
-        targetUpDirection * distanceAlongNormal, effectiveACC * (1.0 - margin))};
+        targetUpDirection * distanceAlongNormal, profileAcceleration * (1.0 - margin))};
 
     glm::dvec3 neededAcceleration{
         targetVelocityAlongNormal - targetUpDirection * relativeVelocityAlongNormal};
     double neededMagnitude{glm::length(neededAcceleration)};
-    if (neededMagnitude > effectiveACC) {
-        neededAcceleration = neededAcceleration * (effectiveACC / neededMagnitude);
+    if (neededMagnitude > m_maxGroundAcceleration) {
+        neededAcceleration = neededAcceleration * (m_maxGroundAcceleration / neededMagnitude);
     }
 
     // Effective mass for hover control (force at digibot COM, reaction on ground)
