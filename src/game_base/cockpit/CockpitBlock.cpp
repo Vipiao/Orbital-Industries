@@ -8,6 +8,15 @@ CockpitBlock::CockpitBlock(const glm::ivec3& anchorCoord, const glm::dquat& orie
 {
 }
 
+std::vector<BlockGeometryPart> CockpitBlock::geometryParts() {
+    return {
+        {"../media/models/cockpit/frame.obj",      1.0},
+        {"../media/models/cockpit/door_left.obj",  1.0},
+        {"../media/models/cockpit/door_right.obj", 1.0},
+        {"../media/models/cockpit/glass.obj",      0.3},
+    };
+}
+
 std::vector<glm::ivec3> CockpitBlock::footprintOffsets(const glm::dquat& /*orientation*/) {
     return {
         {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1},

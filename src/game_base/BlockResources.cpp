@@ -5,15 +5,17 @@
 #include <stdexcept>
 
 BlockResources::BlockResources(GraphicsEngine* graphics,
-                               const std::string& geometryPath,
+                               const std::vector<BlockGeometryPart>& parts,
                                const std::string& colorTexturePath,
                                const std::string& normalTexturePath,
-                               const std::optional<std::string>& maskTexturePath,
-                               double alpha)
-    : m_graphics{graphics}, m_alpha{alpha}
+                               const std::optional<std::string>& maskTexturePath)
+    : m_graphics{graphics}
 {
     if (!m_graphics) {
         throw std::runtime_error{"BlockResources: GraphicsEngine cannot be null"};
+    }
+    if (parts.empty()) {
+        throw std::runtime_error{"BlockResources: block must have at least one part"};
     }
 
     m_colorTextureUnit  = m_graphics->createInstanceTexture(colorTexturePath);
@@ -27,15 +29,22 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
         m_maskTextureUnit = m_graphics->createInstanceTexture(*maskTexturePath);
     }
 
-    m_geometry = m_graphics->createInstanceGeometry(
-        geometryPath, /*transparent=*/m_alpha < 1.0);
-    if (m_geometry.expired()) {
-        throw std::runtime_error{"BlockResources: failed to load geometry from " + geometryPath};
+    m_parts.reserve(parts.size());
+    for (const BlockGeometryPart& part : parts) {
+        std::weak_ptr<Geometry> geometry = m_graphics->createInstanceGeometry(
+            part.geometryPath, /*transparent=*/part.alpha < 1.0);
+        if (geometry.expired()) {
+            throw std::runtime_error{"BlockResources: failed to load geometry from "
+                                     + part.geometryPath};
+        }
+        m_parts.push_back(Part{geometry, part.alpha});
     }
 }
 
 BlockResources::~BlockResources() {
-    if (!m_geometry.expired()) {
-        m_graphics->releaseInstanceGeometry(m_geometry);
+    for (const Part& part : m_parts) {
+        if (!part.geometry.expired()) {
+            m_graphics->releaseInstanceGeometry(part.geometry);
+        }
     }
 }

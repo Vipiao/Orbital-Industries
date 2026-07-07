@@ -2,6 +2,7 @@
 #pragma once
 
 #include "../BlockAnchor.h"
+#include "../BlockGeometryPart.h"
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -15,10 +16,12 @@ class ThrusterBlock : public BlockAnchor {
 public:
     static constexpr CellType TYPE = CellType::THRUSTER;
 
-    static constexpr std::string_view GEOMETRY_PATH   = "../media/models/thruster/thruster_v2.obj";
     static constexpr std::string_view COLOR_TEX_PATH  = "../media/models/thruster/albedo.png";
     static constexpr std::string_view NORMAL_TEX_PATH = "../media/models/thruster/normal.png";
     static constexpr glm::dvec3       MODEL_CENTRE{0.5, 0.5, 0.5};
+
+    // The thruster is a single opaque part.
+    static std::vector<BlockGeometryPart> geometryParts();
 
     ThrusterBlock(const glm::ivec3& anchorCoord, const glm::dquat& orientation);
     virtual ~ThrusterBlock() = default;

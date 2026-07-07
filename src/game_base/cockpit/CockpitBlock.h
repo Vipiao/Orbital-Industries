@@ -2,6 +2,7 @@
 #pragma once
 
 #include "../BlockAnchor.h"
+#include "../BlockGeometryPart.h"
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -14,10 +15,14 @@ class CockpitBlock : public BlockAnchor {
 public:
     static constexpr CellType TYPE = CellType::COCKPIT;
 
-    static constexpr std::string_view GEOMETRY_PATH   = "../media/models/cockpit/model.obj";
     static constexpr std::string_view COLOR_TEX_PATH  = "../media/models/cockpit/albedo.png";
     static constexpr std::string_view NORMAL_TEX_PATH = "../media/models/cockpit/normal.png";
     static constexpr glm::dvec3       MODEL_CENTRE{1.0, 1.0, 1.0};
+
+    // The cockpit is built from four parts sharing the albedo/normal textures:
+    // an opaque frame, two opaque doors (independently transformable for future
+    // opening logic), and a translucent glass canopy at 30% opacity.
+    static std::vector<BlockGeometryPart> geometryParts();
 
     // Docking geometry in the cockpit's canonical frame: origin at the block centre
     // (anchor + MODEL_CENTRE), +y forward, +z up. The pilot enters through the back

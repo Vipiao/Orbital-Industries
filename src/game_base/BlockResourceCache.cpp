@@ -13,14 +13,14 @@ BlockResourceCache::BlockResourceCache(GraphicsEngine* graphics) {
     m_resources.emplace(CellType::THRUSTER,
         std::make_unique<BlockResources>(
             graphics,
-            std::string{ThrusterBlock::GEOMETRY_PATH},
+            ThrusterBlock::geometryParts(),
             std::string{ThrusterBlock::COLOR_TEX_PATH},
             std::string{ThrusterBlock::NORMAL_TEX_PATH}));
 
     m_resources.emplace(CellType::COCKPIT,
         std::make_unique<BlockResources>(
             graphics,
-            std::string{CockpitBlock::GEOMETRY_PATH},
+            CockpitBlock::geometryParts(),
             std::string{CockpitBlock::COLOR_TEX_PATH},
             std::string{CockpitBlock::NORMAL_TEX_PATH}));
 }
