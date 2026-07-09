@@ -4,7 +4,6 @@
 #include "src/physics/RigidBody.h"
 #include "graphics/GraphicsEngine.h"
 #include "graphics/GraphicsEngineBase.h"
-#include "graphics/SSBOManager.h"
 #include "utils/TimeHandler.h"
 #include "src/debug/DebugVisualization.h"
 #include "src/game_base/Creative.h"
@@ -165,41 +164,6 @@ public:
         std::cout << "  F: Apply force to grid" << std::endl;
         std::cout << "  R: Configure block (select corners)" << std::endl;
         std::cout << "  Q: Remove block at (1,1,1)" << std::endl;
-
-        // TEMPORARY: ray-volume smoke test (a uniform gas sphere).
-        setupRayVolumeTest();
-    }
-
-    // TEMPORARY: validates the ray-volume pipeline with a single uniform gas
-    // sphere floating in front of the camera. Remove once the real thruster
-    // plume integration lands.
-    void setupRayVolumeTest() {
-        GraphicsEngine* g = m_gameBase->m_graphicsEngine.get();
-
-        size_t material = g->createRayVolumeMaterial();  // built-in gas body
-        auto geometry = g->createRayVolumeGeometry("../media/blender/02_sphere.obj", material);
-
-        int meshIndex = g->m_ssboManager->allocateIndex();
-        g->m_ssboManager->updateMeshTransform(
-            meshIndex,
-            glm::dvec3(0.0, 0.0, -2.0),          // position, straight ahead
-            glm::dvec3(0.0),                     // velocity
-            glm::dquat(1.0, 0.0, 0.0, 0.0),      // orientation
-            glm::dvec3(0.0, 1.0, 0.0),           // angVelAxis
-            0.0,                                  // angVel
-            glm::dvec3(0.0),                     // centerOfRotation
-            glm::dvec3(1.15),                    // proxy mesh scale (bounds the gas)
-            -1, -1, -1,                           // texture units
-            0,                                    // time
-            1.0);                                 // emissiveScalar
-
-        // value.x = density, value.y = gas radius. The proxy mesh (radius ~1.15)
-        // is authored a little larger than the gas radius so its silhouette does
-        // not clip the soft edges.
-        const glm::dvec4 gasColor(0.35, 0.65, 1.0, 1.0);  // cyan tint
-        const glm::dvec4 state(4.0, 1.0, 0.0, 0.0);
-        const glm::dvec4 velocity(0.0);
-        g->addRayVolumeInstance(geometry, meshIndex, gasColor, state, velocity);
     }
 
     // Expose GameBase for Mode access

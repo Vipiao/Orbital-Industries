@@ -16,6 +16,7 @@
 #include "utils/JobManager.h"
 
 class BlockResourceCache;
+class PlumeGraphics;
 
 /**
  * @brief Graphics data for grid cells (not a base class)
@@ -86,6 +87,9 @@ private:
     // subsystem) looked up per block type; graphics owned per anchor coord.
     BlockResourceCache* m_blockResources{nullptr};
     std::unordered_map<glm::ivec3, std::unique_ptr<BlockGraphics>, Hash::IVec3Hash> m_blockGraphicsMap;
+    // Ion-plume ray-volume instances, one per thruster anchor (parallel to the
+    // block instances, sharing the grid's SSBO slot).
+    std::unordered_map<glm::ivec3, std::unique_ptr<PlumeGraphics>, Hash::IVec3Hash> m_plumeGraphicsMap;
     
     // Texture management
     static int s_colorTextureUnit;

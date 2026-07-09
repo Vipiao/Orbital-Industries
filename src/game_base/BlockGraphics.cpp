@@ -1,6 +1,7 @@
 // BlockGraphics.cpp
 #include "BlockGraphics.h"
 #include "BlockResources.h"
+#include "BlockPlacement.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include <stdexcept>
 
@@ -16,8 +17,7 @@ BlockGraphics::BlockGraphics(BlockResources* resources,
     }
 
     // Rotating about modelCentre keeps the block's centre fixed in the cell.
-    const glm::dvec3 localPosition{
-        glm::dvec3{anchorCoord} + modelCentre - glm::dvec3{orientation * modelCentre}};
+    const glm::dvec3 localPosition{blockLocalPosition(anchorCoord, orientation, modelCentre)};
 
     m_parts.reserve(m_resources->getParts().size());
     for (const BlockResources::Part& part : m_resources->getParts()) {

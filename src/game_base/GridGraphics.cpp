@@ -1,6 +1,7 @@
 // GridGraphics.cpp
 #include "GridGraphics.h"
 #include "BlockResourceCache.h"
+#include "thruster/PlumeGraphics.h"
 #include "graphics/SSBOManager.h"
 #include <iostream>
 #include <set>
@@ -193,10 +194,20 @@ void GridGraphics::addBlockInstance(CellType type,
     m_blockGraphicsMap.emplace(anchorCoord,
         std::make_unique<BlockGraphics>(
             resources, m_ssboIndex, anchorCoord, orientation, modelCentre));
+
+    // Thrusters also get an always-on ion-plume ray-volume instance, sharing the
+    // grid's SSBO slot so it follows the ship.
+    if (type == CellType::THRUSTER) {
+        m_plumeGraphicsMap.emplace(anchorCoord,
+            std::make_unique<PlumeGraphics>(
+                m_graphics, m_blockResources->getPlumeGeometry(),
+                m_ssboIndex, anchorCoord, orientation, modelCentre));
+    }
 }
 
 void GridGraphics::removeBlockInstance(const glm::ivec3& anchorCoord) {
     m_blockGraphicsMap.erase(anchorCoord);
+    m_plumeGraphicsMap.erase(anchorCoord);
 }
 
 void GridGraphics::trackJob(std::weak_ptr<Job> jobHandle) {
