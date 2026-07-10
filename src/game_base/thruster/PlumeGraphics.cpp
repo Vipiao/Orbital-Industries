@@ -17,9 +17,9 @@ PlumeGraphics::PlumeGraphics(GraphicsEngine* graphics,
         throw std::runtime_error{"PlumeGraphics: GraphicsEngine cannot be null"};
     }
 
-    // Translucent blue, composited through the ray-volume (OIT) path. The
-    // placeholder body returns this instance colour directly.
-    const glm::dvec4 plumeColor{0.25, 0.55, 1.0, 0.4};
+    // Plume tint (the body drives alpha from the marched density and uses this
+    // colour). Alpha is unused by the body.
+    const glm::dvec4 plumeColor{0.55, 0.30, 0.95, 1.0};
     m_instance = m_graphics->addRayVolumeInstance(m_geometry, ssboIndex, plumeColor);
 
     auto instance = m_instance.lock();
