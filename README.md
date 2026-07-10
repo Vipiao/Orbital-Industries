@@ -4,6 +4,19 @@ A game built on a separate graphics engine repo. The engine lives in its own
 repository and is pulled in at build time via a local path, so you clone both
 and tell this project where the engine is.
 
+## Controls
+
+| Key           | Action                                                     |
+| ------------- | ---------------------------------------------------------- |
+| WASD          | Move camera                                                |
+| Mouse         | Look around                                                |
+| Space / Shift | Move up / down                                             |
+| M             | Toggle mouse lock                                          |
+| F             | Apply force to grid                                        |
+| R             | Configure block (select corners)                          |
+| Q             | Remove block                                               |
+| N             | Reload shaders (hot-reload, includes the ion-plume body)   |
+
 ## Prerequisites
 
 - CMake 3.16+
