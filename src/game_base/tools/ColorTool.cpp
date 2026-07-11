@@ -9,7 +9,7 @@
 #include <iostream>
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
-#include "graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/MeshManager2D/Instance2D.h"
 #include "utils/GridGeometry.h"
 
 ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
@@ -44,7 +44,7 @@ ColorTool::~ColorTool() {
     // Remove crosshair instance if it exists
     if (auto instance = m_paintCrosshairInstance.lock()) {
         if (auto geometry = m_paintCrosshairGeometry.lock()) {
-            geometry->removeInstance(instance.get());
+            geometry->removeInstance(instance);
         }
     }
     
@@ -55,17 +55,18 @@ void ColorTool::activate() {
     m_active = true;
     // Create and show paint crosshair
     if (!m_paintCrosshairInstance.lock() && m_paintCrosshairGeometry.lock()) {
-        m_paintCrosshairInstance = m_paintCrosshairGeometry.lock()->createInstance();
+        auto geometry = m_paintCrosshairGeometry.lock();
+        m_paintCrosshairInstance = geometry->addInstance();
         if (auto instance = m_paintCrosshairInstance.lock()) {
-            glm::vec2 scale(0.05f, 0.05f);
+            glm::dvec2 scale{0.05, 0.05};
             // 11x11 pixels of a 64x64 image top right is the spray centre.
-            double offset = 2.0 * (0.5 - 11.0/64.0) * static_cast<double>(scale.x);
-            glm::vec2 position(static_cast<float>(offset), static_cast<float>(-offset)); // down-right direction
-            instance->setPosition(position);
-            instance->setScale(scale);
+            double offset = 2.0 * (0.5 - 11.0/64.0) * scale.x;
+            instance->m_position = glm::dvec2(offset, -offset); // down-right direction
+            instance->m_scale = scale;
             glm::dvec4 color = getCurrentColorRGBA();
             color.a = m_paintCrosshairTransparency;
-            instance->setColor(color);
+            instance->m_color = color;
+            geometry->updateInstanceInBuffer(instance.get());
         }
     }
 }
@@ -76,7 +77,7 @@ void ColorTool::deactivate() {
     // Remove paint crosshair
     if (auto instance = m_paintCrosshairInstance.lock()) {
         if (auto geometry = m_paintCrosshairGeometry.lock()) {
-            geometry->removeInstance(instance.get());
+            geometry->removeInstance(instance);
             m_paintCrosshairInstance.reset();
         }
     }
@@ -323,7 +324,11 @@ void ColorTool::updateColorPreviews() {
     if (auto instance = m_paintCrosshairInstance.lock()) {
         glm::dvec4 currentColor = getCurrentColorRGBA();
         currentColor.a = m_paintCrosshairTransparency; // Ensure full opacity for crosshair
-        instance->setColor(currentColor);
+        instance->m_color = currentColor;
+
+        if (auto geometry = m_paintCrosshairGeometry.lock()) {
+            geometry->updateInstanceInBuffer(instance.get());
+        }
     }
 }
 

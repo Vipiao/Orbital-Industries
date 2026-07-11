@@ -8,13 +8,13 @@
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
 #include <array>
-#include "graphics/MeshManager2D/GeometryData.h"
+#include "graphics/MeshManager2D/Geometry2D.h"
 
 // Forward declarations
 class GameBase;
 class Grid;
 class RadialMenu;
-class GeometryInstance;
+class Instance2D;
 class Geometry;
 class Instance;
 class Grid;
@@ -55,8 +55,8 @@ private:
     int m_nearestMarkerIndex{-1};
     
     // 2D marker geometry and instances
-    std::weak_ptr<GeometryData> m_marker;
-    std::vector<std::weak_ptr<GeometryInstance>> m_markerInstances;
+    std::weak_ptr<Geometry2D> m_marker;
+    std::vector<std::weak_ptr<Instance2D>> m_markerInstances;
     
     // Selected marker coordinate and direction data
     glm::ivec3 m_selectedMarkerCoordinate;
@@ -77,8 +77,8 @@ private:
     int64_t m_centerNodeId{-1};
 
     // Modify crosshair
-    std::weak_ptr<GeometryData> m_modifyCrosshairGeometry;
-    std::weak_ptr<GeometryInstance> m_modifyCrosshairInstance;
+    std::weak_ptr<Geometry2D> m_modifyCrosshairGeometry;
+    std::weak_ptr<Instance2D> m_modifyCrosshairInstance;
     double m_modifyCrosshairTransparency = 0.75;
     double m_targetAngle = 0.0;
     double m_currentAngle = 0.0;

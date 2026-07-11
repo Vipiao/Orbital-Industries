@@ -14,7 +14,7 @@
 #include <iostream>
 #include "utils/ColorUtils.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
-#include "graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/MeshManager2D/Instance2D.h"
 #include "StructuralBlock.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "RadialMenu.h"
@@ -77,7 +77,7 @@ Creative::~Creative() {
     // Remove crosshair instance if it exists
     if (auto instance = m_crosshairInstance.lock()) {
         if (auto geometry = m_crosshairGeometry.lock()) {
-            geometry->removeInstance(instance.get());
+            geometry->removeInstance(instance);
         }
     }
 
@@ -297,18 +297,20 @@ void Creative::processInputLogic() {
         // Hide regular crosshair when color tool is active
         if (auto instance = m_crosshairInstance.lock()) {
             if (auto geometry = m_crosshairGeometry.lock()) {
-                geometry->removeInstance(instance.get());
+                geometry->removeInstance(instance);
                 m_crosshairInstance.reset();
             }
         }
     } else {
         // Show regular crosshair when color tool is not active
         if (!m_crosshairInstance.lock() && m_crosshairGeometry.lock()) {
-            m_crosshairInstance = m_crosshairGeometry.lock()->createInstance();
+            auto geometry = m_crosshairGeometry.lock();
+            m_crosshairInstance = geometry->addInstance();
             if (auto instance = m_crosshairInstance.lock()) {
-                instance->setPosition(glm::vec2(0.0f, 0.0f));
-                instance->setScale(glm::vec2(0.05f, 0.05f));
-                instance->setColor(glm::dvec4(1.0, 0.0, 0.0, 0.75)); // 50% transparency
+                instance->m_position = glm::dvec2(0.0, 0.0);
+                instance->m_scale = glm::dvec2(0.05, 0.05);
+                instance->m_color = glm::dvec4(1.0, 0.0, 0.0, 0.75); // 50% transparency
+                geometry->updateInstanceInBuffer(instance.get());
             }
         }
     }

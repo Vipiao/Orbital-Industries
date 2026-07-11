@@ -6,13 +6,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <vector>
-#include "graphics/MeshManager2D/GeometryData.h"
+#include "graphics/MeshManager2D/Geometry2D.h"
 
 // Forward declarations
 class GameBase;
 class Grid;
 class RadialMenu;
-class GeometryInstance;
+class Instance2D;
 class Geometry;
 class Instance;
 
@@ -72,8 +72,8 @@ private:
     int64_t m_centerNodeId{-1};
 
     // --- Build crosshair (2D) ---
-    std::weak_ptr<GeometryData>    m_buildCrosshairGeometry;
-    std::weak_ptr<GeometryInstance> m_buildCrosshairInstance;
+    std::weak_ptr<Geometry2D>    m_buildCrosshairGeometry;
+    std::weak_ptr<Instance2D> m_buildCrosshairInstance;
     double     m_buildCrosshairTransparency{0.75};
     glm::dvec2 m_crosshairOffset;
     glm::dvec2 m_crosshairScale;

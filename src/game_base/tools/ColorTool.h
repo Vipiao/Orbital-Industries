@@ -5,13 +5,13 @@
 #include <functional>
 #include <glm/glm.hpp>
 #include <vector>
-#include "graphics/MeshManager2D/GeometryData.h"
+#include "graphics/MeshManager2D/Geometry2D.h"
 
 // Forward declarations
 class GameBase;
 class Grid;
 class RadialMenu;
-class GeometryInstance;
+class Instance2D;
 
 class ColorTool {
 public:
@@ -69,8 +69,8 @@ private:
     void updateColorPreviews();
 
     // Paint crosshair
-    std::weak_ptr<GeometryData> m_paintCrosshairGeometry;
-    std::weak_ptr<GeometryInstance> m_paintCrosshairInstance;
+    std::weak_ptr<Geometry2D> m_paintCrosshairGeometry;
+    std::weak_ptr<Instance2D> m_paintCrosshairInstance;
     double m_paintCrosshairTransparency = 0.75;
     
     // Color modification callbacks

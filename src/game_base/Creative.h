@@ -7,11 +7,11 @@
 #include <memory>
 #include <vector>
 class RadialMenu;
-class GeometryData;
+class Geometry2D;
 class Geometry;
 class Instance;
 class CharacterSelectionTool;
-class GeometryInstance;
+class Instance2D;
 class ColorTool;
 class ModifyTool;
 class BuildTool;
@@ -76,6 +76,6 @@ private:
     std::weak_ptr<Collider> m_interactionSensor;
 
     // Regular crosshair
-    std::weak_ptr<GeometryData> m_crosshairGeometry;
-    std::weak_ptr<GeometryInstance> m_crosshairInstance;
+    std::weak_ptr<Geometry2D> m_crosshairGeometry;
+    std::weak_ptr<Instance2D> m_crosshairInstance;
 };

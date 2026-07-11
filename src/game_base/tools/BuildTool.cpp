@@ -9,7 +9,7 @@
 #include "../thruster/ThrusterBlock.h"
 #include "../cockpit/CockpitBlock.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
-#include "graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/MeshManager2D/Instance2D.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "graphics/KeyboardHandler.h"
 #include <iostream>
@@ -83,7 +83,7 @@ BuildTool::~BuildTool() {
 
     if (auto instance = m_buildCrosshairInstance.lock()) {
         if (auto geometry = m_buildCrosshairGeometry.lock()) {
-            geometry->removeInstance(instance.get());
+            geometry->removeInstance(instance);
         }
     }
 }
@@ -92,14 +92,13 @@ void BuildTool::activate() {
     m_active = true;
 
     if (!m_buildCrosshairInstance.lock() && m_buildCrosshairGeometry.lock()) {
-        m_buildCrosshairInstance = m_buildCrosshairGeometry.lock()->createInstance();
+        auto geometry = m_buildCrosshairGeometry.lock();
+        m_buildCrosshairInstance = geometry->addInstance();
         if (auto instance = m_buildCrosshairInstance.lock()) {
-            glm::vec2 position(static_cast<float>(m_crosshairOffset.x),
-                               static_cast<float>(-m_crosshairOffset.y));
-            instance->setPosition(position);
-            instance->setScale(glm::vec2(static_cast<float>(m_crosshairScale.x),
-                                         static_cast<float>(m_crosshairScale.y)));
-            instance->setColor(glm::dvec4(1.0, 1.0, 1.0, m_buildCrosshairTransparency));
+            instance->m_position = glm::dvec2(m_crosshairOffset.x, -m_crosshairOffset.y);
+            instance->m_scale = m_crosshairScale;
+            instance->m_color = glm::dvec4(1.0, 1.0, 1.0, m_buildCrosshairTransparency);
+            geometry->updateInstanceInBuffer(instance.get());
         }
     }
 }
@@ -110,7 +109,7 @@ void BuildTool::deactivate() {
 
     if (auto instance = m_buildCrosshairInstance.lock()) {
         if (auto geometry = m_buildCrosshairGeometry.lock()) {
-            geometry->removeInstance(instance.get());
+            geometry->removeInstance(instance);
             m_buildCrosshairInstance.reset();
         }
     }

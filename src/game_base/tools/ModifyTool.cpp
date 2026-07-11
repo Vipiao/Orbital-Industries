@@ -6,7 +6,7 @@
 #include "../Grid.h"
 #include "../StructuralBlock.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
-#include "graphics/MeshManager2D/GeometryInstance.h"
+#include "graphics/MeshManager2D/Instance2D.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "utils/PositionSelector.h"
 #include <cmath>
@@ -64,11 +64,13 @@ void ModifyTool::activate() {
 
     // Create and show modify crosshair
     if (!m_modifyCrosshairInstance.lock() && m_modifyCrosshairGeometry.lock()) {
-        m_modifyCrosshairInstance = m_modifyCrosshairGeometry.lock()->createInstance();
+        auto geometry = m_modifyCrosshairGeometry.lock();
+        m_modifyCrosshairInstance = geometry->addInstance();
         if (auto instance = m_modifyCrosshairInstance.lock()) {
-            instance->setPosition(glm::vec2(static_cast<float>(m_crosshairOffset.x), static_cast<float>(-m_crosshairOffset.y))); // down-right direction
-            instance->setScale(glm::vec2(static_cast<float>(m_crosshairScale.x), static_cast<float>(m_crosshairScale.y)));
-            instance->setColor(glm::dvec4(1.0, 0.8, 0.2, m_modifyCrosshairTransparency)); // Orange color for modify tool
+            instance->m_position = glm::dvec2(m_crosshairOffset.x, -m_crosshairOffset.y); // down-right direction
+            instance->m_scale = m_crosshairScale;
+            instance->m_color = glm::dvec4(1.0, 0.8, 0.2, m_modifyCrosshairTransparency); // Orange color for modify tool
+            geometry->updateInstanceInBuffer(instance.get());
         }
     }
 }
@@ -86,7 +88,7 @@ void ModifyTool::deactivate() {
     if (auto geometry = m_marker.lock()) {
         for (auto& instance : m_markerInstances) {
             if (auto inst = instance.lock()) {
-                geometry->removeInstance(inst.get());
+                geometry->removeInstance(inst);
             }
         }
     }
@@ -106,7 +108,7 @@ void ModifyTool::deactivate() {
     // Remove modify crosshair
     if (auto instance = m_modifyCrosshairInstance.lock()) {
         if (auto geometry = m_modifyCrosshairGeometry.lock()) {
-            geometry->removeInstance(instance.get());
+            geometry->removeInstance(instance);
             m_modifyCrosshairInstance.reset();
         }
     }
@@ -133,7 +135,7 @@ void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
         if (auto geometry = m_marker.lock()) {
             for (auto& instance : m_markerInstances) {
                 if (auto inst = instance.lock()) {
-                    geometry->removeInstance(inst.get());
+                    geometry->removeInstance(inst);
                 }
             }
         }
@@ -169,17 +171,19 @@ void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
     
     // Update wrench crosshair rotation if active
     if (auto instance = m_modifyCrosshairInstance.lock()) {
-        // Rotate towards current angle
-        instance->setOrientation(static_cast<float>(m_currentAngle));
-        
+        instance->m_orientation = m_currentAngle;
+
         // Rotate offset vector around tip point
         double cosAngle = glm::cos(m_currentAngle);
         double sinAngle = glm::sin(m_currentAngle);
         double rotatedOffsetX = m_crosshairOffset.x * cosAngle - (-m_crosshairOffset.y) * sinAngle;
         double rotatedOffsetY = m_crosshairOffset.x * sinAngle + (-m_crosshairOffset.y) * cosAngle;
-        
-        // Apply offset (final position)
-        instance->setPosition(glm::vec2(static_cast<float>(rotatedOffsetX), static_cast<float>(rotatedOffsetY)));
+
+        instance->m_position = glm::dvec2(rotatedOffsetX, rotatedOffsetY);
+
+        if (auto geometry = m_modifyCrosshairGeometry.lock()) {
+            geometry->updateInstanceInBuffer(instance.get());
+        }
     }
 }
 
@@ -424,7 +428,7 @@ void ModifyTool::updateMarkerPositions() {
         if (auto geometry = m_marker.lock()) {
             for (auto& instance : m_markerInstances) {
                 if (auto inst = instance.lock()) {
-                    geometry->removeInstance(inst.get());
+                    geometry->removeInstance(inst);
                 }
             }
         }
@@ -584,8 +588,8 @@ void ModifyTool::updateMarkerPositions() {
     if (maxDist - minDist < 1e-6) { minDist = maxDist - 1e-6; }
 
     struct MarkerData {
-        glm::vec2 position;
-        glm::vec2 scale;
+        glm::dvec2 position;
+        glm::dvec2 scale;
     };
     std::vector<MarkerData> markerData;
     
@@ -605,12 +609,12 @@ void ModifyTool::updateMarkerPositions() {
         // Only add markers that are not behind camera
         if (screenPos.x > -1.9 && screenPos.y > -1.9) {
             MarkerData data;
-            data.position = glm::vec2(screenPos.x, screenPos.y);
-            
+            data.position = screenPos;
+
             // Scale up if this is the nearest marker to cursor
             bool isNearestMarker = m_cursorNearMarker && static_cast<int>(i) == m_nearestMarkerIndex;
             double scale = isNearestMarker ? 0.024 : 0.016;
-            data.scale = glm::vec2(scale, scale);
+            data.scale = glm::dvec2(scale, scale);
             
             markerData.push_back(data);
         }
@@ -667,7 +671,7 @@ void ModifyTool::updateMarkerPositions() {
         auto instance = m_markerInstances.back();
         if (auto inst = instance.lock()) {
             if (auto geometry = m_marker.lock()) {
-                geometry->removeInstance(inst.get());
+                geometry->removeInstance(inst);
             }
         }
         m_markerInstances.pop_back();
@@ -676,7 +680,7 @@ void ModifyTool::updateMarkerPositions() {
     // Add missing instances
     while (m_markerInstances.size() < needed) {
         if (auto geometry = m_marker.lock()) {
-            auto newInstance = geometry->createInstance();
+            auto newInstance = geometry->addInstance();
             m_markerInstances.push_back(newInstance);
         }
     }
@@ -685,15 +689,20 @@ void ModifyTool::updateMarkerPositions() {
     for (size_t i = 0; i < m_markerInstances.size() && i < markerData.size(); ++i) {
         if (auto inst = m_markerInstances[i].lock()) {
             const MarkerData& data = markerData[i];
-            inst->setPosition(data.position);
-            inst->setScale(data.scale);
+            inst->m_position = data.position;
+            inst->m_scale = data.scale;
 
             // Calculate dynamic alpha for 2D markers
             double alpha = 0.5; // default
             if (i < markerDistances.size()) {
                 alpha = 0.25 + 0.5 * (maxDist - markerDistances[i]) / (maxDist - minDist);
             }
-            inst->setColor(glm::dvec4(1.0, 1.0, 1.0, alpha));
+            inst->m_color = glm::dvec4(1.0, 1.0, 1.0, alpha);
+
+            // Update the instance buffer
+            if (auto geometry = m_marker.lock()) {
+                geometry->updateInstanceInBuffer(inst.get());
+            }
         }
     }
 }
