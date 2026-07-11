@@ -5,8 +5,12 @@
 #include "../characters/CharacterSubsystem.h"
 #include "utils/JobManager.h"
 #include "utils/HashFunctions.h"
+#include "Grid.h"
 #include "GridSubsystem.h"
 #include "cockpit/CockpitDockingCoordinator.h"
+#include "thruster/ThrusterControl.h"
+#include "../characters/digibot/Digibot.h"
+#include "../characters/digibot/DigibotController.h"
 #include "utils/TimeHandler.h"
 #include "debug/DebugRenderer.h"
 #include <iostream>
@@ -232,6 +236,21 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
             m_cockpitDockingCoordinator->onPhysicsStep(
                 m_characterSubsystem.get(), m_physicsEngine.get(),
                 m_gridSubsystem.get());
+
+            // Seated pilots command their grid's thrusters, then the stored
+            // throttles burn on every grid -- a burn persists with no one in
+            // the seat until the next command overwrites it.
+            m_cockpitDockingCoordinator->forEachSeatedPilot(
+                [](Digibot& digibot, Grid& grid, const CockpitBlock& cockpit) {
+                    DigibotController* controller{digibot.getController()};
+                    if (controller) {
+                        ThrusterControl::setPilotCommand(
+                            grid, cockpit, controller->getMovementDirection());
+                    }
+                });
+            for (const std::shared_ptr<Grid>& grid : m_gridSubsystem->getGrids()) {
+                ThrusterControl::applyThrustForces(m_physicsEngine.get(), *grid);
+            }
 
             m_characterSubsystem->updateAllPhysicsComplete();
 

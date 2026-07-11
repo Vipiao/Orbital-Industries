@@ -26,6 +26,10 @@ public:
     // Set the desired movement direction
     void setMovementDirection(const glm::ivec3& direction);
 
+    // Current movement input (x right, y forward, z up). The game layer reads it
+    // to drive ship thrusters while this digibot is seated in a cockpit.
+    const glm::ivec3& getMovementDirection() const { return m_movementDirection; }
+
     // Set the view direction (world space)
     void setViewDirection(const glm::dvec3& viewDirection);
 

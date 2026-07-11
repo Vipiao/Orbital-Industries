@@ -75,6 +75,10 @@ public:
                           const glm::dvec3& modelCentre);
     void removeBlockInstance(const glm::ivec3& anchorCoord);
 
+    // Drive the plume appearance of the thruster anchored at the coord from its
+    // throttle in [0, 1] (no-op if there is no plume there).
+    void setPlumeThrust(const glm::ivec3& anchorCoord, double level);
+
 private:
     // Graphics cell storage
     std::unordered_map<glm::ivec3, GraphicsCell, Hash::IVec3Hash> m_graphicsCells;

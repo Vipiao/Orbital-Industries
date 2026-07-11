@@ -235,9 +235,14 @@ Generator<bool> GridSplitter::performGridSplitAsync(Grid* sourceGrid, const std:
                 break;
             }
             case CellType::THRUSTER: {
-                const glm::dquat ori = static_cast<const ThrusterBlock*>(cell)->m_orientation;
+                const ThrusterBlock* thruster = static_cast<const ThrusterBlock*>(cell);
+                const glm::dquat ori = thruster->m_orientation;
+                const double thrustLevel = thruster->m_thrustLevel;
                 sourceGrid->removeCell(cellCoord);
                 newGrid->addThruster(cellCoord, ori);
+                // The throttle is simulation state: a burning engine that breaks
+                // off keeps burning.
+                newGrid->setThrusterLevel(cellCoord, thrustLevel);
                 break;
             }
             case CellType::COCKPIT: {

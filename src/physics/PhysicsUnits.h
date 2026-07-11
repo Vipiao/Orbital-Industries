@@ -47,4 +47,9 @@ inline constexpr double perSecond(double rate) {
     return rate / s_tickRateHz;
 }
 
+// N (kg*m/s^2) -> kg*m/tick^2. A force accumulated into RigidBody::m_forces.
+inline constexpr double newtons(double force) {
+    return force / (s_tickRateHz * s_tickRateHz);
+}
+
 }

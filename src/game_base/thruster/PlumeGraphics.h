@@ -11,8 +11,9 @@ class Instance;
 
 // Per-thruster ion-plume rendering. Attaches one ray-volume instance on the
 // shared plume proxy to the grid's SSBO slot, so the plume moves with the ship.
-// Placement mirrors BlockGraphics (rotation about the model centre). Always
-// present for now; thrust-driven appearance will later ride the value channel.
+// Placement mirrors BlockGraphics (rotation about the model centre). The thrust
+// level rides the instance value channel (state.x) and drives the plume density
+// in the shader; a plume starts invisible until a thrust level is set.
 class PlumeGraphics {
 public:
     PlumeGraphics(GraphicsEngine* graphics,
@@ -25,6 +26,9 @@ public:
 
     PlumeGraphics(const PlumeGraphics&) = delete;
     PlumeGraphics& operator=(const PlumeGraphics&) = delete;
+
+    // Throttle in [0, 1], passed to the shader as the instance value state.x.
+    void setThrustLevel(double level);
 
 private:
     GraphicsEngine*         m_graphics;

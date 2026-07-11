@@ -210,6 +210,13 @@ void GridGraphics::removeBlockInstance(const glm::ivec3& anchorCoord) {
     m_plumeGraphicsMap.erase(anchorCoord);
 }
 
+void GridGraphics::setPlumeThrust(const glm::ivec3& anchorCoord, double level) {
+    auto it = m_plumeGraphicsMap.find(anchorCoord);
+    if (it != m_plumeGraphicsMap.end()) {
+        it->second->setThrustLevel(level);
+    }
+}
+
 void GridGraphics::trackJob(std::weak_ptr<Job> jobHandle) {
     // Clean up expired handles periodically to prevent unbounded growth
     if (m_pendingJobs.size() % 50 == 0) {

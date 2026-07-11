@@ -1,6 +1,7 @@
 // CockpitDockingCoordinator.h
 #pragma once
 
+#include <functional>
 #include <glm/glm.hpp>
 #include <memory>
 #include <vector>
@@ -26,6 +27,12 @@ public:
     // controllers consume their docking targets.
     void onPhysicsStep(CharacterSubsystem* characterSubsystem,
                        PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem);
+
+    // Invoke the callback for every digibot currently SEATED in a cockpit, in
+    // engagement order (deterministic). Grid and cockpit are re-validated at call
+    // time; the cockpit reference is owned by the grid.
+    void forEachSeatedPilot(
+        const std::function<void(Digibot&, Grid&, const CockpitBlock&)>& callback) const;
 
 private:
     // Cockpit a digibot is currently engaged with (DOCKED or SEATED)

@@ -123,6 +123,11 @@ RayVolumeResult rayVolumeShade(
    res.alpha = 0.0;
    res.weightDepth = -centerViewPos.z;
 
+   // value.x is the thruster throttle in [0, 1]; a cold thruster has no plume
+   // and skips the march entirely.
+   float thrust = value.x;
+   if (thrust < 1.0 / 255.0) return res;
+
    // Cylinder inscribed in the 1x2x1 proxy, brought into view space. The camera
    // sits at the view-space origin and rayDir is already the unit view ray.
    const vec3  axisBaseLocal = vec3(0.5, 0.0, 0.5);
@@ -146,6 +151,10 @@ RayVolumeResult rayVolumeShade(
    if (tExit <= tEnter) return res;
 
    float depth = opticalDepth(rayOrigin, rayDir, axisBase, axisDir, tEnter, tExit);
+
+   // Throttle scales the optical depth (a thinner plume rather than a uniform
+   // transparency fade): the dense core fades last, the fringes first.
+   depth *= thrust;
 
    res.color       = color.rgb + opaqueColor;
    res.alpha       = 1.0 - exp(-depth);

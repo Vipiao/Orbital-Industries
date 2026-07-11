@@ -253,6 +253,17 @@ void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientat
     rigidBody->setAngularVelocityBody(angVel);
 }
 
+void Grid::setThrusterLevel(const glm::ivec3& anchorCoord, double level) {
+    auto it = m_thrusterCells.find(anchorCoord);
+    if (it == m_thrusterCells.end() || it->second.m_thrustLevel == level) {
+        return;
+    }
+    it->second.m_thrustLevel = level;
+    // Write-through to the plume: pilot commands rewrite every thruster each
+    // step, so the change gate above keeps GPU uploads to actual transitions.
+    m_gridGraphics->setPlumeThrust(anchorCoord, level);
+}
+
 void Grid::addCockpit(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
     const std::vector<glm::ivec3> offsets = CockpitBlock::footprintOffsets(orientation);
 

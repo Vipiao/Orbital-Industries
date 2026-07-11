@@ -1,5 +1,6 @@
 // ThrusterBlock.cpp
 #include "ThrusterBlock.h"
+#include "utils/HashFunctions.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -24,6 +25,10 @@ glm::ivec3 ThrusterBlock::dominantAxis(const glm::dquat& orientation) {
 
 glm::ivec3 ThrusterBlock::secondCoord(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
     return anchorCoord + dominantAxis(orientation);
+}
+
+glm::ivec3 ThrusterBlock::thrustForceDirection(const glm::dquat& orientation) {
+    return -dominantAxis(orientation);
 }
 
 ThrusterBlock::ThrusterBlock(const glm::ivec3& anchorCoord, const glm::dquat& orientation)
@@ -61,4 +66,10 @@ std::tuple<double, glm::dvec3, glm::dmat3> ThrusterBlock::getMassProperties() co
     glm::dmat3 inertia{R * canonical * glm::transpose(R)};
 
     return {mass, com, inertia};
+}
+
+size_t ThrusterBlock::computeHash() const {
+    // The throttle drives forces, so it is simulation state and must feed the hash.
+    return Hash::combineHashes(GridCell::computeHash(),
+                               std::hash<double>{}(m_thrustLevel));
 }

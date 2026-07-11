@@ -275,7 +275,7 @@ void Creative::applyDragForces() {
 
         // Velocity/spin damping rate (force = -coeff * velocity * mass), so a 1/time
         // gain. Currently disabled by the trailing * 0.0.
-        const double dragCoefficient = PhysicsUnits::perSecond(0.512) * 0.0;
+        const double dragCoefficient = PhysicsUnits::perSecond(0.512) * 0.11;
 
         if (glm::length(bodyPtr->m_velocity) > 0.0) {
             glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->m_mass;

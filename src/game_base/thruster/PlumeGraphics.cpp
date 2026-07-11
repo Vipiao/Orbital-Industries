@@ -43,6 +43,12 @@ PlumeGraphics::PlumeGraphics(GraphicsEngine* graphics,
     geo->updateInstanceInBuffer(instance.get());
 }
 
+void PlumeGraphics::setThrustLevel(double level) {
+    m_graphics->setRayVolumeInstanceValues(m_geometry, m_instance,
+                                           glm::dvec4{level, 0.0, 0.0, 0.0},
+                                           glm::dvec4{0.0});
+}
+
 PlumeGraphics::~PlumeGraphics() {
     if (m_graphics) {
         m_graphics->removeRayVolumeInstance(m_geometry, m_instance);

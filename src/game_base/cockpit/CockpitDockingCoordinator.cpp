@@ -99,6 +99,27 @@ void CockpitDockingCoordinator::onPhysicsStep(CharacterSubsystem* characterSubsy
     }
 }
 
+void CockpitDockingCoordinator::forEachSeatedPilot(
+    const std::function<void(Digibot&, Grid&, const CockpitBlock&)>& callback) const {
+    for (const Engagement& engagement : m_engagements) {
+        std::shared_ptr<Digibot> digibot{engagement.m_digibot.lock()};
+        std::shared_ptr<Grid> grid{engagement.m_grid.lock()};
+        if (!digibot || !grid) {
+            continue;
+        }
+        DigibotController* controller{digibot->getController()};
+        if (!controller || controller->getDockingState() !=
+                               DigibotController::DockingState::SEATED) {
+            continue;
+        }
+        const CockpitBlock* cockpit{findCockpit(*grid, engagement.m_anchor)};
+        if (!cockpit) {
+            continue;
+        }
+        callback(*digibot, *grid, *cockpit);
+    }
+}
+
 CockpitDockingCoordinator::Engagement* CockpitDockingCoordinator::findEngagement(
     const Digibot* digibot) {
     for (Engagement& engagement : m_engagements) {

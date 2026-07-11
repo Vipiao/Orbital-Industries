@@ -122,6 +122,15 @@ public:
     const std::unordered_map<glm::ivec3, GridCell*, Hash::IVec3Hash>& getCellRegistry() const { return m_cellRegistry; }
     GridCell* getCellFromRegistry(const glm::ivec3& coord);
 
+    // Thruster anchors (owning map); levels are driven via setThrusterLevel.
+    const std::unordered_map<glm::ivec3, ThrusterBlock, Hash::IVec3Hash>& getThrusterCells() const {
+        return m_thrusterCells;
+    }
+
+    // Set the stored throttle [0, 1] of the thruster anchored at the coord
+    // (no-op if there is no thruster there).
+    void setThrusterLevel(const glm::ivec3& anchorCoord, double level);
+
     // IHashable interface
     virtual size_t computeHash() const override;
 
