@@ -95,7 +95,7 @@ float density(vec3 point, vec3 axisBase, vec3 axisDir)
     //Soften.
     //density *= max(density, 0.);
 
-    return max(density, 0.0) * 4.0;// clamp, scale to taste.
+    return max(density, 0.0) * 8.0;// clamp, scale to taste.
 }
 
 // Fixed-step march between the two hit t-values, accumulating optical depth.
