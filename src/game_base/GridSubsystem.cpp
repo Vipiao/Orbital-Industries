@@ -102,7 +102,7 @@ void GridSubsystem::removeGrid(std::weak_ptr<Grid> gridWeak) {
     }
 }
 
-void GridSubsystem::updateAllGraphics(const glm::dvec3& cameraPos) {
+void GridSubsystem::stepUpdateGraphicsAll(const glm::dvec3& cameraPos) {
     for (auto& grid : m_grids) {
         grid->updateGraphics(cameraPos);
     }

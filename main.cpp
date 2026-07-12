@@ -22,38 +22,33 @@ int debug2 = 0;
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 IHashable* DebugGlobals::g_gameBase = nullptr;
 
-class Game : public GameBase::Callback {
+class Game {
 private:
     std::unique_ptr<GameBase> m_gameBase;
     std::unique_ptr<DebugVisualization> m_debugViz;
     std::unique_ptr<Mode> m_mode;
     DebugRendererGuard m_debugGuard;
 
-    // Shader reload management
-    bool m_shaderReloadRequested = false;
-
 public:
 
-    Game(TimeHandler* timeHandler, 
+    Game(TimeHandler* timeHandler,
          GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE) {
-        
+
         // Create the game base instance
         m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler, controlMode);
 
-        // Register physics callback
-        m_gameBase->addPhysicsCallback(this);  // Physics callback registration
-        
         // Setup debug visualization
         setupDebugVisualization();
 
-        // Set global debug renderer with RAII guard  
+        // Set global debug renderer with RAII guard
         m_debugGuard = DebugGlobals::setDebugRenderer(m_debugViz.get());
 
         // Set global GameBase for debugging
         DebugGlobals::g_gameBase = m_gameBase.get();
- 
-        // Create creative mode
+
+        // Create creative mode; GameBase drives its stepControl each physics step
         m_mode = std::make_unique<Creative>(m_gameBase.get());
+        m_gameBase->setMode(m_mode.get());
 
         // Set up initial camera position and orientation
         m_gameBase->m_graphicsEngine->getCamPos() = glm::dvec3(0, 0, 0);
@@ -172,16 +167,17 @@ public:
     void onFrame() {
         // Begin frame
         m_gameBase->beginFrame();
-        
+
         // Process game-specific input
         if (m_gameBase->m_graphicsEngine->getKeyboardHandler()->m_n.justPressed()) {
-            m_shaderReloadRequested = true;
+            auto [success, message] = m_gameBase->reloadShaders();
+            std::cout << "Shader Reload " << (success ? "SUCCESS" : "FAILED") << ": " << message << std::endl;
         }
-        m_mode->processInputs();
-        
+        m_mode->frameProcessInputs();
+
         // Render
         m_gameBase->render();
-        
+
         // End frame
         m_gameBase->endFrame();
     }
@@ -189,18 +185,6 @@ public:
     void run() {
         while (!m_gameBase->m_graphicsEngine->getGraphicsEngineBase()->shouldClose()) {
             onFrame();
-        }
-    }
-
-    // GameBase::Callback implementation
-    virtual void onPhysicsUpdateComplete() override {
-        m_mode->physics();
-
-        // Handle shader reload request if pending
-        if (m_shaderReloadRequested) {
-            m_shaderReloadRequested = false;
-            auto [success, message] = m_gameBase->reloadShaders();
-            std::cout << "Shader Reload " << (success ? "SUCCESS" : "FAILED") << ": " << message << std::endl;
         }
     }
 

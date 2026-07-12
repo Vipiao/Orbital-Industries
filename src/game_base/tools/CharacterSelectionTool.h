@@ -18,9 +18,9 @@ public:
     bool isActive() const { return m_active; }
     void toggle(); // Toggle active state
 
-    // Callback hooks - will be used for character control later
-    void preRenderCallback(bool doToggle);
-    void onPhysicsUpdateComplete();
+    // Frame/step hooks - will be used for character control later
+    void framePreRender(bool doToggle);
+    void stepControl();
     
 private:
     GameBase* m_gameBase;

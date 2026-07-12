@@ -26,8 +26,9 @@ public:
              DigibotResources* resources, int colliderClassificationJobPriority);
     ~Digibot() override;
 
-    void preRenderCallback(uint64_t frameNum, double timeRemainder) override;
-    void onPhysicsUpdateComplete() override;
+    void framePreRender(uint64_t frameNum, double timeRemainder) override;
+    void stepControl() override;
+    void stepUpdateGraphics() override;
 
     void showCollisionBox() override;
     void hideCollisionBox() override;

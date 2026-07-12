@@ -23,10 +23,11 @@ class CockpitDockingCoordinator {
 public:
     CockpitDockingCoordinator() = default;
 
-    // Called once per physics step, after collision detection, before the character
-    // controllers consume their docking targets.
-    void onPhysicsStep(CharacterSubsystem* characterSubsystem,
-                       PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem);
+    // Called once per physics step, before integration, using the last completed
+    // step's collisions; runs before the character controllers consume their
+    // docking targets.
+    void stepControl(CharacterSubsystem* characterSubsystem,
+                     PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem);
 
     // Invoke the callback for every digibot currently SEATED in a cockpit, in
     // engagement order (deterministic). Grid and cockpit are re-validated at call

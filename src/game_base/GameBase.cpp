@@ -16,6 +16,7 @@
 #include <iostream>
 #include <algorithm>
 #include "../game_base/JobPriorities.h"
+#include "Mode.h"
 
 GameBase::GameBase(
     int screenWidth, int screenHeight, const std::string& windowTitle,
@@ -108,10 +109,6 @@ void GameBase::scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGridWeak, const 
     m_gridSubsystem->scheduleGridSplitCheck(sourceGridWeak, edgeCoords);
 }
 
-void GameBase::addPhysicsCallback(Callback* callback) {
-    m_callbacks.push_back(callback);
-}
-
 int hit_count = 0;
 
 void GameBase::beginFrame() {
@@ -151,7 +148,7 @@ void GameBase::prepareFrame() {
     );
 
     // Update characters pre-render
-    m_characterSubsystem->updateAllPreRender(m_graphicsEngine->getFrameNum(), timeRemainder);
+    m_characterSubsystem->framePreRenderAll(m_graphicsEngine->getFrameNum(), timeRemainder);
 }
 
 void GameBase::finalizeFrame() {
@@ -211,29 +208,21 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
             if (m_gridSubsystem->handlePendingSplits(endTime)) {
                 return true; // Grid splitting needs more time -- stay in SPLITS
             }
-            m_physicsUpdateState = PhysicsUpdateState::CALLBACKS;
+            m_physicsUpdateState = PhysicsUpdateState::CONTROL;
             [[fallthrough]];
 
-        case PhysicsUpdateState::CALLBACKS:
-            // Runs exactly once per physics step
-            for (auto* callback : m_callbacks) {
-                callback->onPhysicsUpdateComplete();
+        case PhysicsUpdateState::CONTROL:
+            // Runs exactly once per physics step. All input -> force/command
+            // decisions happen here so the runUntil below integrates them,
+            // minimizing input latency.
+            if (m_mode) {
+                m_mode->stepControl();
             }
 
-            m_physicsUpdateState = PhysicsUpdateState::PHYSICS;
-            [[fallthrough]];
-
-        case PhysicsUpdateState::PHYSICS:
-            // Run physics engine
-            if (m_physicsEngine->runUntil(endTime)) {
-                return true; // Physics step needs more time -- stay in PHYSICS
-            }
-
-            m_gridSubsystem->updateAllGraphics(m_graphicsEngine->getCamPos());
-
-            // Cockpit docking runs on this step's fresh collisions, right before
-            // the character controllers consume their docking targets.
-            m_cockpitDockingCoordinator->onPhysicsStep(
+            // Cockpit docking runs on the last completed step's collisions,
+            // right before the character controllers consume their docking
+            // targets.
+            m_cockpitDockingCoordinator->stepControl(
                 m_characterSubsystem.get(), m_physicsEngine.get(),
                 m_gridSubsystem.get());
 
@@ -252,7 +241,21 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
                 ThrusterControl::applyThrustForces(m_physicsEngine.get(), *grid);
             }
 
-            m_characterSubsystem->updateAllPhysicsComplete();
+            m_characterSubsystem->stepControlAll();
+
+            m_physicsUpdateState = PhysicsUpdateState::PHYSICS;
+            [[fallthrough]];
+
+        case PhysicsUpdateState::PHYSICS:
+            // Run physics engine
+            if (m_physicsEngine->runUntil(endTime)) {
+                return true; // Physics step needs more time -- stay in PHYSICS
+            }
+
+            // Publish the new step's state to graphics so rendering
+            // interpolates toward it.
+            m_gridSubsystem->stepUpdateGraphicsAll(m_graphicsEngine->getCamPos());
+            m_characterSubsystem->stepUpdateGraphicsAll();
 
             // Clear the in-progress flag and reset for the next step.
             m_physicsUpdateInProgress = false;

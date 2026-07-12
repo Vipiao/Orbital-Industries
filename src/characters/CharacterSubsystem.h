@@ -29,9 +29,12 @@ public:
     std::weak_ptr<Digibot> createDigibot();
     void removeCharacter(std::weak_ptr<Character> characterWeak);
 
-    // Updates (called by GameBase each frame)
-    void updateAllPreRender(uint64_t frameNum, double timeRemainder);
-    void updateAllPhysicsComplete();
+    // Updates (called by GameBase)
+    void framePreRenderAll(uint64_t frameNum, double timeRemainder);
+    // Once per physics step, before integration
+    void stepControlAll();
+    // Once per physics step, after integration; publishes state to graphics
+    void stepUpdateGraphicsAll();
 
     // Access
     const std::vector<std::shared_ptr<Character>>& getCharacters() const { return m_characters; }

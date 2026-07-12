@@ -29,9 +29,9 @@ public:
     void deactivate();
     bool isActive() const { return m_active; }
     
-    // Callback hooks
-    void preRenderCallback(bool doModify, bool doCancel);
-    void onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids);
+    // Frame/step hooks
+    void framePreRender(bool doModify, bool doCancel);
+    void stepControl(const std::vector<std::weak_ptr<Grid>>& availableGrids);
     
 private:
     // Interaction range

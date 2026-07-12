@@ -85,10 +85,10 @@ void CharacterSelectionTool::toggle() {
     }
 }
 
-void CharacterSelectionTool::preRenderCallback(bool doToggle) {
+void CharacterSelectionTool::framePreRender(bool doToggle) {
     // Will be used for handling control input in the future
 }
 
-void CharacterSelectionTool::onPhysicsUpdateComplete() {
+void CharacterSelectionTool::stepControl() {
     // Will be used for character control logic in the future
 }

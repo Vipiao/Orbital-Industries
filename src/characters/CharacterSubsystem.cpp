@@ -55,14 +55,20 @@ void CharacterSubsystem::removeCharacter(std::weak_ptr<Character> characterWeak)
     }
 }
 
-void CharacterSubsystem::updateAllPreRender(uint64_t frameNum, double timeRemainder) {
+void CharacterSubsystem::framePreRenderAll(uint64_t frameNum, double timeRemainder) {
     for (auto& character : m_characters) {
-        character->preRenderCallback(frameNum, timeRemainder);
+        character->framePreRender(frameNum, timeRemainder);
     }
 }
 
-void CharacterSubsystem::updateAllPhysicsComplete() {
+void CharacterSubsystem::stepControlAll() {
     for (auto& character : m_characters) {
-        character->onPhysicsUpdateComplete();
+        character->stepControl();
+    }
+}
+
+void CharacterSubsystem::stepUpdateGraphicsAll() {
+    for (auto& character : m_characters) {
+        character->stepUpdateGraphics();
     }
 }

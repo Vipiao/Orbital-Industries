@@ -42,7 +42,7 @@ Digibot::~Digibot() {
     // Subsystems clean up automatically via unique_ptr
 }
 
-void Digibot::preRenderCallback(uint64_t frameNum, double timeRemainder) {
+void Digibot::framePreRender(uint64_t frameNum, double timeRemainder) {
     //if (frameNum % 16 != 0)
     //{
     //    return;
@@ -89,17 +89,21 @@ void Digibot::preRenderCallback(uint64_t frameNum, double timeRemainder) {
     if (deltaTimeRemainder < 0.0) deltaTimeRemainder += 1.0; // Handle wraparound
     m_lastTimeRemainder = timeRemainder;
 
-    m_digibotController->updatePerFrame(deltaTimeRemainder);
+    m_digibotController->frameUpdate(deltaTimeRemainder);
 }
 
-void Digibot::onPhysicsUpdateComplete() {
-    auto rigidBody = m_rigidBody.lock();
-    if (!rigidBody) {
+void Digibot::stepControl() {
+    if (m_rigidBody.expired()) {
         return;
     }
 
-    // Update physics subsystem
-    m_digibotPhysics->updatePhysics();
+    m_digibotController->stepControl();
+}
+
+void Digibot::stepUpdateGraphics() {
+    if (m_rigidBody.expired()) {
+        return;
+    }
 
     // Update visual model transform
     updateVisualTransform();
@@ -109,9 +113,6 @@ void Digibot::onPhysicsUpdateComplete() {
         uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
         m_digibotPhysics->updateCollisionBoxTransform(m_graphicsEngine, currentPhysicsTimeStep);
     }
-
-    // Run controller physics
-    m_digibotController->physics();
 }
 
 void Digibot::showCollisionBox() {
@@ -198,6 +199,6 @@ bool Digibot::isHeadVisible() const {
 
 glm::dvec3 Digibot::getHeadLocalPosition() const {
     // The graphics origin sits at rigidBody position + orientation * m_graphicsPosition
-    // (see preRenderCallback), so the head offset combines both.
+    // (see framePreRender), so the head offset combines both.
     return m_graphicsPosition + DigibotGraphics::getNaturalHeadPosition();
 }

@@ -76,9 +76,9 @@ const CockpitBlock* findCockpit(Grid& grid, const glm::ivec3& anchor) {
 
 }
 
-void CockpitDockingCoordinator::onPhysicsStep(CharacterSubsystem* characterSubsystem,
-                                              PhysicsEngine* physicsEngine,
-                                              GridSubsystem* gridSubsystem) {
+void CockpitDockingCoordinator::stepControl(CharacterSubsystem* characterSubsystem,
+                                            PhysicsEngine* physicsEngine,
+                                            GridSubsystem* gridSubsystem) {
     if (!characterSubsystem || !physicsEngine || !gridSubsystem) {
         return;
     }

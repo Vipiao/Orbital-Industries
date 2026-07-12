@@ -39,8 +39,8 @@ public:
     // First-person view state (toggled with the T key while enabled)
     bool isFirstPerson() const { return m_firstPerson; }
 
-    // Physics callback for lock raycasting
-    void onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange);
+    // Once per physics step: lock raycasting and movement input mapping
+    void stepControl(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange);
 
     // Get the angular velocity of the surface we're on/locked to (per physics timestep)
     glm::dvec3 getSurfaceAngularVelocity() const;

@@ -108,7 +108,7 @@ void DigibotController::releaseDocking() {
     std::cout << "Docking released: free movement" << std::endl;
 }
 
-void DigibotController::updatePerFrame(double deltaTimeRemainder) {
+void DigibotController::frameUpdate(double deltaTimeRemainder) {
     // Reset to zero at start of frame
     m_surfaceAngularVelocity = glm::dvec3{0.0, 0.0, 0.0};
 
@@ -209,7 +209,7 @@ void DigibotController::applyWrench(const std::weak_ptr<RigidBody>& bodyWeak,
     }
 }
 
-void DigibotController::physics() {
+void DigibotController::stepControl() {
     auto rigidBodyWeak = m_physics->getRigidBody();
     auto rigidBody = rigidBodyWeak.lock();
     if (!rigidBody) {

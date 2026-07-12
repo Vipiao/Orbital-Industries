@@ -23,10 +23,13 @@ public:
     // Clear transient contact state (used when leaving walking or entering docking).
     void resetContactState();
 
-    // Ground contact info for animation (valid only while walking)
+    // Ground contact info for animation (valid only while walking). The contact
+    // is cached in the ground body's local frame, so these return world-space
+    // values at the body's transform as of the call -- readers after physics
+    // integration see the contact where the moving ground actually is.
     bool hasGroundContact() const { return m_hasGroundContact; }
-    glm::dvec3 getGroundContactPoint() const { return m_groundContactPoint; }
-    glm::dvec3 getGroundSurfaceNormal() const { return m_groundSurfaceNormal; }
+    glm::dvec3 getGroundContactPoint() const;
+    glm::dvec3 getGroundSurfaceNormal() const;
     std::weak_ptr<RigidBody> getWalkingTargetRigidBody() const {
         return m_walkingTargetRigidBody;
     }
@@ -51,11 +54,12 @@ private:
     // Target rigid body from walking (empty if no contact)
     std::weak_ptr<RigidBody> m_walkingTargetRigidBody{};
 
-    // Ground contact state (updated each physics step)
+    // Ground contact state (updated each stepControl). In the target body's
+    // local frame when there is a target body, world frame for static ground.
     bool m_hasGroundContact{false};
-    glm::dvec3 m_groundContactPoint{0.0, 0.0, 0.0};
+    glm::dvec3 m_groundContactPointLocal{0.0, 0.0, 0.0};
     // Direction toward the body from the contact, independent of any locked up.
-    glm::dvec3 m_groundSurfaceNormal{0.0, 0.0, 1.0};
+    glm::dvec3 m_groundSurfaceNormalLocal{0.0, 0.0, 1.0};
 
     // Up direction lock cache (in rigid body local coordinates of the cached body)
     glm::dvec3 m_cachedModifiedUp{0.0, 0.0, 0.0};

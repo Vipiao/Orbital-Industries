@@ -27,9 +27,9 @@ public:
     glm::dvec4 getCurrentColorRGBA() const;
     glm::dvec4 getCurrentColorHSVA() const;
     
-    // Callback hooks
-    void preRenderCallback(bool doTryCopy, bool doTryPaste);
-    void onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids);
+    // Frame/step hooks
+    void framePreRender(bool doTryCopy, bool doTryPaste);
+    void stepControl(const std::vector<std::weak_ptr<Grid>>& availableGrids);
     
 private:
     // Interaction range

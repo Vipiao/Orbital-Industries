@@ -93,7 +93,7 @@ glm::dvec4 ColorTool::getCurrentColorHSVA() const {
     return m_currentColor;
 }
 
-void ColorTool::preRenderCallback(bool doTryCopy, bool doTryPaste) {
+void ColorTool::framePreRender(bool doTryCopy, bool doTryPaste) {
     if (!m_active) {
         return;
     }
@@ -106,7 +106,7 @@ void ColorTool::preRenderCallback(bool doTryCopy, bool doTryPaste) {
     if (doTryPaste) m_doPaste = doTryPaste;
 }
 
-void ColorTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
+void ColorTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
     if (!m_active) {
         return;
     }

@@ -358,9 +358,3 @@ glm::dvec3 DigibotPhysics::localToWorld(const glm::dvec3& localPos) const {
         -m_colliderLocalPosition
     );
 }
-
-void DigibotPhysics::updatePhysics() {
-    if (m_rigidBody.expired()) {
-        return;
-    }
-}

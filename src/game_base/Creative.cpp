@@ -88,11 +88,11 @@ Creative::~Creative() {
     // Destructor defined here where RadialMenu is complete type
 }
 
-void Creative::processInputs() {
+void Creative::frameProcessInputs() {
     processInputLogic();
 }
 
-void Creative::physics() {
+void Creative::stepControl() {
     if (doForce || doTrackSpeed) {
         // Perform ray casting for force and speed tracking only
         std::weak_ptr<Grid> targetGridWeak;
@@ -196,10 +196,7 @@ void Creative::physics() {
     doForce = false;
     doTrackSpeed = false;
 
-    // Apply drag forces to all grids before physics update
-    applyDragForces();
-
-    // Update interaction sensor position (after physics completes)
+    // Update interaction sensor position for the coming step
     if (auto sensor = m_interactionSensor.lock()) {
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 sensorPosition = m_gameBase->m_graphicsEngine->getCamPos() + forward * (m_interactionRange / 2.0);
@@ -236,31 +233,27 @@ void Creative::physics() {
     //    }
     //}
 
-    // Call color tool physics callback
-    m_colorTool->onPhysicsUpdateComplete(interactionGrids);
+    m_colorTool->stepControl(interactionGrids);
 
-    // Call character selection tool physics callback
-    m_characterSelectionTool->onPhysicsUpdateComplete();
+    m_characterSelectionTool->stepControl();
 
-    // Call modify tool physics callback
-    m_modifyTool->onPhysicsUpdateComplete(interactionGrids);
+    m_modifyTool->stepControl(interactionGrids);
 
-    // Call build tool physics callback
-    m_buildTool->onPhysicsUpdateComplete(interactionGrids);
+    m_buildTool->stepControl(interactionGrids);
 
-    // Call player controller physics callback if character control is active
+    // Run player controller if character control is active
     if (m_characterSelectionTool->isActive()) {
         const auto& characters = m_gameBase->m_characterSubsystem->getCharacters();
         for (const auto& character : characters) {
             std::shared_ptr<Digibot> digibot = std::dynamic_pointer_cast<Digibot>(character);
             if (digibot) {
-                m_digibotPlayerController->onPhysicsUpdateComplete(digibot->getController(), interactionGrids, m_interactionRange);
+                m_digibotPlayerController->stepControl(digibot->getController(), interactionGrids, m_interactionRange);
                 break; // Only process first character for now
             }
         }
     }
-    
-    // Apply drag forces to all grids before physics update
+
+    // Apply drag forces to all grids before the coming physics step
     applyDragForces();
 }
 
@@ -275,7 +268,7 @@ void Creative::applyDragForces() {
 
         // Velocity/spin damping rate (force = -coeff * velocity * mass), so a 1/time
         // gain. Currently disabled by the trailing * 0.0.
-        const double dragCoefficient = PhysicsUnits::perSecond(0.512) * 0.11;
+        const double dragCoefficient = PhysicsUnits::perSecond(0.128) * 0.;
 
         if (glm::length(bodyPtr->m_velocity) > 0.0) {
             glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->m_mass;
@@ -511,25 +504,25 @@ void Creative::processInputLogic() {
         // Color tool uses right click for copy, left click for paste
         bool doTryCopy = mouseHandler->rightClick();
         bool doTryPaste = mouseHandler->getLeftDown();
-        m_colorTool->preRenderCallback(doTryCopy, doTryPaste);
+        m_colorTool->framePreRender(doTryCopy, doTryPaste);
 
         // ModifyTool uses left click for modify, right click for cancel
         bool doModify = mouseHandler->leftClick();
         bool doCancel = mouseHandler->rightClick();
-        m_modifyTool->preRenderCallback(doModify, doCancel);
+        m_modifyTool->framePreRender(doModify, doCancel);
 
 
         // BuildTool uses the classic right click to create, left click to remove
         bool doCreate = mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32);
         bool doRemove = mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
-        m_buildTool->preRenderCallback(doCreate, doRemove);
+        m_buildTool->framePreRender(doCreate, doRemove);
 
         // Character selection tool doesn't need input for now (toggle handled by radial menu)
-        m_characterSelectionTool->preRenderCallback(false);
+        m_characterSelectionTool->framePreRender(false);
     } else{
-        m_colorTool->preRenderCallback(false, false);
-        m_modifyTool->preRenderCallback(false, false);
-        m_buildTool->preRenderCallback(false, false);
-        m_characterSelectionTool->preRenderCallback(false);
+        m_colorTool->framePreRender(false, false);
+        m_modifyTool->framePreRender(false, false);
+        m_buildTool->framePreRender(false, false);
+        m_characterSelectionTool->framePreRender(false);
     }
 }

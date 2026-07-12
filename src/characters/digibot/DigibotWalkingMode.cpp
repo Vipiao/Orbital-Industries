@@ -34,6 +34,22 @@ void DigibotWalkingMode::resetContactState() {
     m_walkingTargetRigidBody.reset();
 }
 
+glm::dvec3 DigibotWalkingMode::getGroundContactPoint() const {
+    std::shared_ptr<RigidBody> body{m_walkingTargetRigidBody.lock()};
+    if (!body) {
+        return m_groundContactPointLocal;
+    }
+    return body->m_position + body->m_orientation * m_groundContactPointLocal;
+}
+
+glm::dvec3 DigibotWalkingMode::getGroundSurfaceNormal() const {
+    std::shared_ptr<RigidBody> body{m_walkingTargetRigidBody.lock()};
+    if (!body) {
+        return m_groundSurfaceNormalLocal;
+    }
+    return body->m_orientation * m_groundSurfaceNormalLocal;
+}
+
 DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigidBody,
                                          const DigibotModeInputs& inputs) {
     DigibotWrench wrench{};
@@ -254,12 +270,18 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     glm::dvec3 targetUpDirection{usingCache ? modifiedUp : normal};
 
     m_hasGroundContact = true;
-    m_groundContactPoint = closestPoint;
     // Surface normal for the animation is always the direction to the body, regardless
     // of whether the orientation up is locked (targetUpDirection). Otherwise the feet
     // would follow the frozen orientation up instead of the surface when the grid
     // rotates.
-    m_groundSurfaceNormal = normal;
+    if (targetRigidBody) {
+        glm::dquat toLocal{glm::conjugate(targetRigidBody->m_orientation)};
+        m_groundContactPointLocal = toLocal * (closestPoint - targetRigidBody->m_position);
+        m_groundSurfaceNormalLocal = toLocal * normal;
+    } else {
+        m_groundContactPointLocal = closestPoint;
+        m_groundSurfaceNormalLocal = normal;
+    }
 
     // Set orientation cache when establishing new lock (not using cache yet)
     if (!usingCache && targetRigidBody) {

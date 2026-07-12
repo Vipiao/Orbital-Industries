@@ -34,7 +34,7 @@ public:
     void setViewDirection(const glm::dvec3& viewDirection);
 
     // Per-frame update for view direction rotation when locked to grid
-    void updatePerFrame(double deltaTimeRemainder);
+    void frameUpdate(double deltaTimeRemainder);
 
     // Get the angular velocity of the surface we're on/locked to (per physics timestep)
     glm::dvec3 getSurfaceAngularVelocity() const { return m_surfaceAngularVelocity; }
@@ -58,8 +58,9 @@ public:
     bool isJetpackEnabled() const { return m_isJetpackEnabled; }
     void setJetpackEnabled(bool enabled);
 
-    // Process physics (called during physics update)
-    void physics();
+    // Turn current inputs into forces on the body; runs once per physics
+    // step, before integration
+    void stepControl();
 
     // Configure thrust properties
     void setThrustStrength(double strength);

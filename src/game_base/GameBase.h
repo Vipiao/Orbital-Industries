@@ -23,15 +23,11 @@ class Grid;
 class TimeHandler;
 class DebugRenderer;
 class Digibot;
+class Mode;
 
 class GameBase : public IHashable {
 public:
-    class Callback {
-    public:
-        virtual ~Callback() = default;
-        virtual void onPhysicsUpdateComplete() = 0;
-    };
-    GameBase(int screenWidth = 800, int screenHeight = 600, 
+    GameBase(int screenWidth = 800, int screenHeight = 600,
              const std::string& windowTitle = "Game", 
              TimeHandler* timeHandler = nullptr,
              GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE);
@@ -45,7 +41,8 @@ public:
     void render();
     void endFrame();
 
-    void addPhysicsCallback(Callback* callback);
+    // The mode's stepControl() runs once per physics step, before integration.
+    void setMode(Mode* mode) { m_mode = mode; }
 
     void scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
@@ -60,7 +57,6 @@ public:
     // Cockpit docking is world physics: it runs every step regardless of mode
     std::unique_ptr<CockpitDockingCoordinator> m_cockpitDockingCoordinator;
     TimeHandler* m_timeHandler;
-    std::vector<Callback*> m_callbacks;
 
     // Track pending jobs for cleanup
     std::vector<std::weak_ptr<Job>> m_pendingJobs;
@@ -95,17 +91,21 @@ private:
     // Flag to track if physics update is in progress
     bool m_physicsUpdateInProgress{false};
 
-    // Resumable state for updatePhysics. Grid splits and physics callbacks can
-    // both destroy grids/colliders, so they must run exactly once per physics
-    // step and only at a clean step boundary -- never re-run when the physics
-    // engine has parked mid-step (which would free a collider still referenced
-    // by this step's collision records).
+    // Resumable state for updatePhysics. Grid splits and control code can both
+    // destroy grids/colliders and apply forces, so they must run exactly once
+    // per physics step and only at a clean step boundary -- never re-run when
+    // the physics engine has parked mid-step (which would free a collider
+    // still referenced by this step's collision records, or double-apply
+    // forces depending on frame budget).
     enum class PhysicsUpdateState {
-        SPLITS,     // draining m_gridSubsystem->handlePendingSplits
-        CALLBACKS,  // running onPhysicsUpdateComplete callbacks (once)
-        PHYSICS     // running m_physicsEngine->runUntil
+        SPLITS,   // draining m_gridSubsystem->handlePendingSplits
+        CONTROL,  // input -> forces/commands, consumed by this step (once)
+        PHYSICS   // running m_physicsEngine->runUntil, then graphics publish
     };
     PhysicsUpdateState m_physicsUpdateState{PhysicsUpdateState::SPLITS};
+
+    // Non-owning; drives mode control from the physics step (top down)
+    Mode* m_mode{nullptr};
 
     DebugRenderer* m_debugRenderer = nullptr;
 };

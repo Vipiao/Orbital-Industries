@@ -53,7 +53,7 @@ public:
     void removeGrid(std::weak_ptr<Grid> grid);
     
     // Grid updates (called by GameBase each frame)
-    void updateAllGraphics(const glm::dvec3& cameraPos);
+    void stepUpdateGraphicsAll(const glm::dvec3& cameraPos);
     bool handlePendingSplits(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
     
     // Grid operations (used by tools)

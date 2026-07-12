@@ -77,7 +77,7 @@ glm::dvec3 DigibotPlayerController::getSurfaceAngularVelocity() const {
     return controller->getSurfaceAngularVelocity();
 }
 
-void DigibotPlayerController::onPhysicsUpdateComplete(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange) {
+void DigibotPlayerController::stepControl(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange) {
     if (!m_needsRaycast || !controller || !m_graphics) {
         return;
     }
@@ -296,7 +296,7 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     glm::dvec3 upVector = interpolatedOrientation * glm::dvec3(0.0, 0.0, 1.0);
     glm::dvec3 rightVector = interpolatedOrientation * glm::dvec3(1.0, 0.0, 0.0);
     
-    // Get current view direction (already includes surface rotation from preRenderCallback)
+    // Get current view direction (already includes surface rotation from framePreRender)
     glm::dvec3 currentViewDir = controller->getViewDirection();
 
     // Apply mouse input to view direction

@@ -154,6 +154,19 @@ void CollisionDetector::removeCollider(std::weak_ptr<Collider> colliderWeak) {
         }
     }
 
+    // Collision records persist until the next run(), so purge every record
+    // involving this collider: getCollisions must never return a dangling
+    // otherCollider.
+    m_byCollider.erase(rawPtr->m_id);
+    for (auto& [id, records] : m_byCollider) {
+        records.erase(
+            std::remove_if(records.begin(), records.end(),
+                           [rawPtr](const CollisionData& record) {
+                               return record.otherCollider == rawPtr;
+                           }),
+            records.end());
+    }
+
     // Exceptions live on the colliders themselves and unlink via the destructor, so there
     // is nothing to purge here.
 }

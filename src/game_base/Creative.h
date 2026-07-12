@@ -27,8 +27,8 @@ public:
     Creative(GameBase* gameBase);
     virtual ~Creative();
     
-    virtual void processInputs() override;
-    virtual void physics() override;
+    virtual void frameProcessInputs() override;
+    virtual void stepControl() override;
     
 private:
     // Interaction range for tools and sensors

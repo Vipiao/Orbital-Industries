@@ -116,7 +116,7 @@ void ModifyTool::deactivate() {
     std::cout << "ModifyTool deactivate" << std::endl;
 }
 
-void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
+void ModifyTool::framePreRender(bool doModify, bool doCancel) {
     if (!m_active) {
         return;
     }
@@ -187,7 +187,7 @@ void ModifyTool::preRenderCallback(bool doModify, bool doCancel) {
     }
 }
 
-void ModifyTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
+void ModifyTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
     if (!m_active || !m_doModify) {
         m_doModify = false;
         m_doCancel = false;

@@ -37,12 +37,19 @@ public:
      * @param frameNum Current frame number
      * @param timeRemainder Interpolation parameter [0-1] since last physics step
      */
-    virtual void preRenderCallback(uint64_t frameNum, double timeRemainder) = 0;
+    virtual void framePreRender(uint64_t frameNum, double timeRemainder) = 0;
     
     /**
-     * @brief Called after physics update completes
+     * @brief Called once per physics step, before integration. Turns input and
+     * the last completed step's contacts into forces the coming step consumes.
      */
-    virtual void onPhysicsUpdateComplete() = 0;
+    virtual void stepControl() = 0;
+
+    /**
+     * @brief Called after a physics step completes; publishes the new state to
+     * graphics.
+     */
+    virtual void stepUpdateGraphics() = 0;
 
     // Collision box visualization
     virtual void showCollisionBox() = 0;

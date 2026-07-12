@@ -48,9 +48,6 @@ public:
     void addBodyCollisionExceptionWith(Collider* other);
     void clearBodyCollisionExceptions();
 
-    // Physics update (called each physics step)
-    void updatePhysics();
-
     glm::dvec3 worldToLocal(const glm::dvec3& worldPos) const;
     glm::dvec3 localToWorld(const glm::dvec3& localPos) const;
 

@@ -52,9 +52,9 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     auto* ge = m_gameBase->m_graphicsEngine.get();
 
     // Icon textures
-    m_constructionIconTextureIndex = ge->createInstanceTexture("../media/2d_graphics/07_construction_icon.png");
-    m_thrusterIconTextureIndex     = ge->createInstanceTexture("../media/2d_graphics/09_thruster_icon.png");
-    m_cockpitIconTextureIndex      = ge->createInstanceTexture("../media/2d_graphics/10_cockpit_icon.png");
+    m_blockIconTextureIndex    = ge->createInstanceTexture("../media/2d_graphics/07_block_icon.png");
+    m_thrusterIconTextureIndex = ge->createInstanceTexture("../media/2d_graphics/09_thruster_icon.png");
+    m_cockpitIconTextureIndex  = ge->createInstanceTexture("../media/2d_graphics/10_cockpit_icon.png");
 
     // Thruster ghost
     m_thrusterGhostColorTextureUnit = ge->createInstanceTexture("../media/models/thruster/albedo_ghost.png");
@@ -68,54 +68,40 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
 
     // Calculate crosshair offset and scale
     m_crosshairScale = glm::dvec2(0.1, 0.1);
-    // 16x16 pixels of a 64x64 image where the construction icon center is located
+    // 16x16 pixels of a 64x64 image where the aiming marks of every build icon are located
     m_crosshairOffset.x = 2.0 * (0.5 - 16.0 / 64.0) * m_crosshairScale.x;
     m_crosshairOffset.y = 2.0 * (0.5 - 16.0 / 64.0) * m_crosshairScale.y;
 
     createMenuStructure(parentNodeId);
 
-    m_buildCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh(
-        "../media/blender/03_face.obj", "../media/2d_graphics/07_construction_icon.png", -1, true);
+    // The texture is baked into a Geometry2D, so each block type gets its own crosshair mesh
+    // and the instance moves between them when the selection changes.
+    MeshManager2D* meshManager2D = m_gameBase->m_graphicsEngine->getMeshManager2D();
+    m_blockCrosshairGeometry = meshManager2D->loadMesh(
+        "../media/blender/03_face.obj", "../media/2d_graphics/07_block_icon.png", -1, true);
+    m_thrusterCrosshairGeometry = meshManager2D->loadMesh(
+        "../media/blender/03_face.obj", "../media/2d_graphics/09_thruster_icon.png", -1, true);
+    m_cockpitCrosshairGeometry = meshManager2D->loadMesh(
+        "../media/blender/03_face.obj", "../media/2d_graphics/10_cockpit_icon.png", -1, true);
 }
 
 BuildTool::~BuildTool() {
     hideGhost();
-
-    if (auto instance = m_buildCrosshairInstance.lock()) {
-        if (auto geometry = m_buildCrosshairGeometry.lock()) {
-            geometry->removeInstance(instance);
-        }
-    }
+    hideCrosshair();
 }
 
 void BuildTool::activate() {
     m_active = true;
-
-    if (!m_buildCrosshairInstance.lock() && m_buildCrosshairGeometry.lock()) {
-        auto geometry = m_buildCrosshairGeometry.lock();
-        m_buildCrosshairInstance = geometry->addInstance();
-        if (auto instance = m_buildCrosshairInstance.lock()) {
-            instance->m_position = glm::dvec2(m_crosshairOffset.x, -m_crosshairOffset.y);
-            instance->m_scale = m_crosshairScale;
-            instance->m_color = glm::dvec4(1.0, 1.0, 1.0, m_buildCrosshairTransparency);
-            geometry->updateInstanceInBuffer(instance.get());
-        }
-    }
+    showCrosshair();
 }
 
 void BuildTool::deactivate() {
     m_active = false;
     hideGhost();
-
-    if (auto instance = m_buildCrosshairInstance.lock()) {
-        if (auto geometry = m_buildCrosshairGeometry.lock()) {
-            geometry->removeInstance(instance);
-            m_buildCrosshairInstance.reset();
-        }
-    }
+    hideCrosshair();
 }
 
-void BuildTool::preRenderCallback(bool doCreate, bool doRemove) {
+void BuildTool::framePreRender(bool doCreate, bool doRemove) {
     if (!m_active) {
         return;
     }
@@ -164,7 +150,7 @@ void BuildTool::preRenderCallback(bool doCreate, bool doRemove) {
 
     // --- Update ghost preview every render frame ---
     // Collect available grids for ghost raycasting.
-    // We re-use the same grids the physics callback uses, but gathered here for render-time use.
+    // We re-use the same grids stepControl uses, but gathered here for render-time use.
     // GameBase exposes grids via the grid subsystem.
     std::vector<std::weak_ptr<Grid>> gridsForGhost;
     for (const auto& g : m_gameBase->getGridSubsystem()->getGrids()) {
@@ -173,7 +159,7 @@ void BuildTool::preRenderCallback(bool doCreate, bool doRemove) {
     updateGhost(gridsForGhost);
 }
 
-void BuildTool::onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
+void BuildTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
     if (!m_active) {
         return;
     }
@@ -269,12 +255,12 @@ void BuildTool::createMenuStructure(int64_t parentNodeId) {
     auto deactivateCallback = [this]() { deactivate(); };
 
     m_buildToolParentId = m_radialMenu->createNode(
-        parentNodeId, m_constructionIconTextureIndex, activateCallback, deactivateCallback);
+        parentNodeId, m_blockIconTextureIndex, activateCallback, deactivateCallback);
 
     m_centerNodeId = m_radialMenu->createNode(
         m_buildToolParentId, -1, activateCallback, deactivateCallback);
 
-    m_radialMenu->createNode(m_buildToolParentId, m_constructionIconTextureIndex,
+    m_radialMenu->createNode(m_buildToolParentId, m_blockIconTextureIndex,
         [this]() { m_selectedBlockType = BlockType::STRUCTURAL_BLOCK; activate(); },
         deactivateCallback);
 
@@ -285,6 +271,43 @@ void BuildTool::createMenuStructure(int64_t parentNodeId) {
     m_radialMenu->createNode(m_buildToolParentId, m_cockpitIconTextureIndex,
         [this]() { m_selectedBlockType = BlockType::COCKPIT; activate(); },
         deactivateCallback);
+}
+
+std::weak_ptr<Geometry2D> BuildTool::crosshairGeometryFor(BlockType blockType) const {
+    switch (blockType) {
+        case BlockType::THRUSTER: return m_thrusterCrosshairGeometry;
+        case BlockType::COCKPIT:  return m_cockpitCrosshairGeometry;
+        default:                  return m_blockCrosshairGeometry;
+    }
+}
+
+void BuildTool::showCrosshair() {
+    auto geometry = crosshairGeometryFor(m_selectedBlockType).lock();
+    if (!geometry) return;
+
+    // A crosshair of the wrong block type is discarded before the new one is created
+    if (m_activeCrosshairGeometry.lock() != geometry) hideCrosshair();
+    if (m_buildCrosshairInstance.lock()) return;
+
+    m_buildCrosshairInstance = geometry->addInstance();
+    m_activeCrosshairGeometry = geometry;
+
+    if (auto instance = m_buildCrosshairInstance.lock()) {
+        instance->m_position = glm::dvec2{m_crosshairOffset.x, -m_crosshairOffset.y};
+        instance->m_scale    = m_crosshairScale;
+        instance->m_color    = glm::dvec4{1.0, 1.0, 1.0, m_buildCrosshairTransparency};
+        geometry->updateInstanceInBuffer(instance.get());
+    }
+}
+
+void BuildTool::hideCrosshair() {
+    if (auto instance = m_buildCrosshairInstance.lock()) {
+        if (auto geometry = m_activeCrosshairGeometry.lock()) {
+            geometry->removeInstance(instance);
+        }
+    }
+    m_buildCrosshairInstance.reset();
+    m_activeCrosshairGeometry.reset();
 }
 
 void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {

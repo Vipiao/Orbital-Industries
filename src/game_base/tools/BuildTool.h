@@ -32,9 +32,9 @@ public:
     void deactivate();
     bool isActive() const { return m_active; }
 
-    // Callback hooks
-    void preRenderCallback(bool doCreate, bool doRemove);
-    void onPhysicsUpdateComplete(const std::vector<std::weak_ptr<Grid>>& availableGrids);
+    // Frame/step hooks
+    void framePreRender(bool doCreate, bool doRemove);
+    void stepControl(const std::vector<std::weak_ptr<Grid>>& availableGrids);
 
 private:
     GameBase*    m_gameBase;
@@ -45,7 +45,7 @@ private:
     bool      m_active{false};
     BlockType m_selectedBlockType{BlockType::STRUCTURAL_BLOCK};
 
-    // Input flags (set in preRenderCallback, consumed in onPhysicsUpdateComplete)
+    // Input flags (set in framePreRender, consumed in stepControl)
     bool m_doCreate{false};
     bool m_doRemove{false};
 
@@ -72,14 +72,20 @@ private:
     int64_t m_centerNodeId{-1};
 
     // --- Build crosshair (2D) ---
-    std::weak_ptr<Geometry2D>    m_buildCrosshairGeometry;
+    // One geometry per block type; the crosshair instance lives in the one that matches
+    // the current selection.
+    std::weak_ptr<Geometry2D> m_blockCrosshairGeometry;
+    std::weak_ptr<Geometry2D> m_thrusterCrosshairGeometry;
+    std::weak_ptr<Geometry2D> m_cockpitCrosshairGeometry;
+
+    std::weak_ptr<Geometry2D> m_activeCrosshairGeometry;
     std::weak_ptr<Instance2D> m_buildCrosshairInstance;
     double     m_buildCrosshairTransparency{0.75};
     glm::dvec2 m_crosshairOffset;
     glm::dvec2 m_crosshairScale;
 
     // --- Icon textures ---
-    int m_constructionIconTextureIndex{-1};
+    int m_blockIconTextureIndex{-1};
     int m_thrusterIconTextureIndex{-1};
     int m_cockpitIconTextureIndex{-1};
 
@@ -92,4 +98,9 @@ private:
     // Ghost management
     void updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGrids);
     void hideGhost();
+
+    // Crosshair management
+    std::weak_ptr<Geometry2D> crosshairGeometryFor(BlockType blockType) const;
+    void showCrosshair();
+    void hideCrosshair();
 };

@@ -12,8 +12,10 @@ public:
     Mode(GameBase* gameBase) : m_gameBase(gameBase) {}
     virtual ~Mode() = default;
     
-    virtual void processInputs() = 0;
-    virtual void physics() = 0;
+    virtual void frameProcessInputs() = 0;
+    // Runs once per physics step, before integration: turns the latest input
+    // into forces/commands the coming step consumes.
+    virtual void stepControl() = 0;
     
 protected:
     GameBase* m_gameBase;
