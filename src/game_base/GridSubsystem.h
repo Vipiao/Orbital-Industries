@@ -98,7 +98,4 @@ private:
     
     // Grid splitting logic
     std::unique_ptr<GridSplitter> m_gridSplitter;
-    
-    // Helper for GridSplitter callback
-    Grid* findGridById(uint64_t gridId);
 };

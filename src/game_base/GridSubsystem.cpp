@@ -39,10 +39,6 @@ GridSubsystem::GridSubsystem(
         [this](std::weak_ptr<Grid> grid) {
             removeGrid(grid);
         },
-        // Find grid by ID callback
-        [this](uint64_t gridId) {
-            return findGridById(gridId);
-        },
         m_timeHandler
     );
 }
@@ -118,15 +114,6 @@ bool GridSubsystem::handlePendingSplits(std::chrono::time_point<std::chrono::hig
 
 void GridSubsystem::scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
     m_gridSplitter->scheduleGridSplitCheck(sourceGrid, edgeCoords);
-}
-
-Grid* GridSubsystem::findGridById(uint64_t gridId) {
-    for (const auto& grid : m_grids) {
-        if (grid->uniqueId == gridId) {
-            return grid.get();
-        }
-    }
-    return nullptr;
 }
  
 std::vector<std::weak_ptr<Grid>> GridSubsystem::getGridsFromOverlaps(const SensorCollider* sensor) const {
