@@ -13,9 +13,13 @@ RadialMenu::RadialMenu(GraphicsEngine* graphics) : m_graphics(graphics) {
         throw std::runtime_error("GraphicsEngine cannot be null");
     }
     
-    // Load geometry using InstanceHandler
+    // Load geometry using InstanceHandler. Overlay layer: the menu is in-world
+    // UI, alpha blended over the finished scene and never occluded or tinted
+    // by scene geometry. Instances are added plates-first, symbols-last, which
+    // is the overlay pass's back-to-front draw order.
     try {
-        m_geometry = m_graphics->createInstanceGeometry("../media/blender/03_face.obj");
+        m_geometry = m_graphics->createInstanceGeometry("../media/blender/03_face.obj",
+                                                        RenderLayer::Overlay);
         if (m_geometry.expired()) {
             throw std::runtime_error("Failed to create geometry from 03_face.obj");
         }
@@ -23,12 +27,6 @@ RadialMenu::RadialMenu(GraphicsEngine* graphics) : m_graphics(graphics) {
     } catch (const std::exception& e) {
         std::cerr << "RadialMenu: Failed to load geometry: " << e.what() << std::endl;
         throw;
-    }
-
-    // Configure geometry for alpha blending
-    if (auto geometry = m_geometry.lock()) {
-        geometry->setAlphaBlending(true);
-        std::cout << "RadialMenu: Enabled alpha blending for geometry" << std::endl;
     }
 
     // Allocate SSBO index for mesh transform data

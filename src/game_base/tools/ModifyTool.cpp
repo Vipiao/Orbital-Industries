@@ -29,14 +29,9 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     // Load marker geometry using graphics engine's 2D mesh manager
     m_marker = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/05_marker_v2.png", -1, true);
 
-    // Load 3D arrow geometry and texture
-    m_arrowGeometry = m_gameBase->m_graphicsEngine->createInstanceGeometry("../media/blender/04_arrow.obj");
-    
-    // Configure arrows for overlay rendering with transparency
-    if (auto geometry = m_arrowGeometry.lock()) {
-        geometry->setDepthCompression(0.1);  // Compress depth range to render in front
-        geometry->setAlphaBlending(true);     // Enable transparency
-    }
+    // Load 3D arrow geometry; overlay so the markers draw on top of the scene
+    m_arrowGeometry = m_gameBase->m_graphicsEngine->createInstanceGeometry(
+        "../media/blender/04_arrow.obj", RenderLayer::Overlay);
 
     // Create modify crosshair using 2D mesh manager
     m_modifyCrosshairGeometry = m_gameBase->m_graphicsEngine->getMeshManager2D()->loadMesh("../media/blender/03_face.obj", "../media/2d_graphics/04_crosshair_wrench.png", -1, true);

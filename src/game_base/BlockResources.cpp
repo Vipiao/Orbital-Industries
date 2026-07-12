@@ -36,7 +36,8 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
                "block part alpha must be in (0, 1]");
 
         std::weak_ptr<Geometry> geometry = m_graphics->createInstanceGeometry(
-            part.geometryPath, /*transparent=*/part.alpha < 1.0);
+            part.geometryPath,
+            part.alpha < 1.0 ? RenderLayer::Transparent : RenderLayer::Opaque);
         if (geometry.expired()) {
             releaseGeometries(); // unwind the parts already loaded before failing
             throw std::runtime_error{"BlockResources: failed to load geometry from "

@@ -58,13 +58,13 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
 
     // Thruster ghost
     m_thrusterGhostColorTextureUnit = ge->createInstanceTexture("../media/models/thruster/albedo_ghost.png");
-    m_thrusterGhostGeometry = ge->createInstanceGeometry("../media/models/thruster/thruster_ghost.obj");
-    if (auto geom = m_thrusterGhostGeometry.lock()) geom->setAlphaBlending(true);
+    m_thrusterGhostGeometry = ge->createInstanceGeometry(
+        "../media/models/thruster/thruster_ghost.obj", RenderLayer::Transparent);
 
     // Cockpit ghost
     m_cockpitGhostColorTextureUnit = ge->createInstanceTexture("../media/models/cockpit/albedo_ghost.png");
-    m_cockpitGhostGeometry = ge->createInstanceGeometry("../media/models/cockpit/model_ghost.obj");
-    if (auto geom = m_cockpitGhostGeometry.lock()) geom->setAlphaBlending(true);
+    m_cockpitGhostGeometry = ge->createInstanceGeometry(
+        "../media/models/cockpit/model_ghost.obj", RenderLayer::Transparent);
 
     // Calculate crosshair offset and scale
     m_crosshairScale = glm::dvec2(0.1, 0.1);

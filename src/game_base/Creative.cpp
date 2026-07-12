@@ -35,8 +35,7 @@ Creative::Creative(GameBase* gameBase)
     
     // Create radial menu
     m_radialMenu = std::make_unique<RadialMenu>(m_gameBase->m_graphicsEngine.get());
-    m_radialMenu->getGeometry().lock()->setDepthCompression(0.01);
-    
+
     // Create root node for radial menu
     int64_t rootId = m_radialMenu->createNode(); // parentId defaults to -1 (root)
 
