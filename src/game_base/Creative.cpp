@@ -470,15 +470,24 @@ void Creative::processInputLogic() {
         glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
         m_radialMenu->setPosition(cameraPos + m_radialMenuRelativePosition);
 
-        // Make menu use camera orientation with 90 degree offset around X axis
-        glm::dquat xOffset = glm::angleAxis(glm::radians(90.0), glm::dvec3(1.0, 0.0, 0.0));
-        glm::dquat menuOrientation = m_gameBase->m_graphicsEngine->getCamOri() * xOffset;
-        m_radialMenu->setOrientation(menuOrientation);
+        // Billboard the menu: local +Z (its plane normal) points from the menu back at the camera,
+        // and local +Y follows the camera up axis so the menu stays upright on screen.
+        glm::dvec3 normal{glm::normalize(-m_radialMenuRelativePosition)};
+        glm::dvec3 cameraUp{m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3{0.0, 0.0, 1.0}};
 
-        // Generate camera ray
+        // Fall back to the camera forward axis when the up axis is near parallel to the normal
+        if (glm::abs(glm::dot(cameraUp, normal)) > 0.999) {
+            cameraUp = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3{0.0, 1.0, 0.0};
+        }
+
+        glm::dvec3 right{glm::normalize(glm::cross(cameraUp, normal))};
+        glm::dvec3 up{glm::cross(normal, right)};
+        m_radialMenu->setOrientation(glm::quat_cast(glm::dmat3{right, up, normal}));
+
+        // Generate camera ray, long enough to reach the menu plane at any viewing angle
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
         glm::dvec3 rayStart = cameraPos;
-        glm::dvec3 rayEnd = cameraPos + forward * 5.0;
+        glm::dvec3 rayEnd = cameraPos + forward * m_radialMenuDistance * 4.0;
         
         // Convert to local space
         glm::dvec3 localRayStart = m_radialMenu->worldToLocal(rayStart);
