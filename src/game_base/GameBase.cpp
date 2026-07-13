@@ -13,10 +13,10 @@
 #include "../characters/digibot/DigibotController.h"
 #include "utils/TimeHandler.h"
 #include "debug/DebugRenderer.h"
-#include <iostream>
 #include <algorithm>
+#include <cassert>
+#include <iostream>
 #include "../game_base/JobPriorities.h"
-#include "Mode.h"
 
 GameBase::GameBase(
     int screenWidth, int screenHeight, const std::string& windowTitle,
@@ -75,14 +75,7 @@ GameBase::GameBase(
     std::cout << "Physics update rate: " << m_physicsEngine->getPhysicsHz() << " Hz" << std::endl;
 }
 
-GameBase::~GameBase() {
-    // Cancel all pending jobs
-    for (auto& jobHandle : m_pendingJobs) {
-        if (!jobHandle.expired()) {
-            m_jobManager->cancel(jobHandle);
-        }
-    }
-}
+GameBase::~GameBase() = default;
 
 void GameBase::setDebugRenderer(DebugRenderer* debugRenderer) {
     m_debugRenderer = debugRenderer;
@@ -91,6 +84,10 @@ void GameBase::setDebugRenderer(DebugRenderer* debugRenderer) {
     if (m_physicsEngine) {
         m_physicsEngine->setDebugRenderer(debugRenderer);
     }
+}
+
+uint64_t GameBase::getPhysicsTick() const {
+    return m_physicsEngine->getCurrentPhysicsTimeStep();
 }
 
 std::weak_ptr<Grid> GameBase::createGrid(const glm::dvec3& position, const glm::dquat& orientation) {
@@ -109,7 +106,37 @@ void GameBase::scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGridWeak, const 
     m_gridSubsystem->scheduleGridSplitCheck(sourceGridWeak, edgeCoords);
 }
 
-int hit_count = 0;
+GameBase::FrameStatus GameBase::advanceFrame() {
+    switch (m_framePhase) {
+    case FramePhase::FRAME_BEGIN:
+        beginFrame();
+        m_framePhase = FramePhase::FRAME_CONTROL;
+        return FrameStatus::AwaitingFrameControl;
+
+    case FramePhase::FRAME_CONTROL:
+        render();
+        beginPhysicsWindow();
+        m_framePhase = FramePhase::PHYSICS;
+        [[fallthrough]];
+
+    case FramePhase::PHYSICS:
+        if (advancePhysicsWindow() == PhysicsWindowResult::YIELDED_FOR_CONTROL) {
+            return FrameStatus::AwaitingStepControl;
+        }
+
+        // Background jobs get whatever frame budget remains.
+        m_jobManager->work(m_workEndTime);
+
+        if (m_timeHandler->now() >= m_targetFrameEnd) {
+            std::cout << "Frame drop" << std::endl;
+        }
+        m_graphicsEngine->endFrame();
+        m_framePhase = FramePhase::FRAME_BEGIN;
+        return FrameStatus::FrameDone;
+    }
+
+    return FrameStatus::FrameDone; // Unreachable; keeps the compiler happy.
+}
 
 void GameBase::beginFrame() {
     m_graphicsEngine->beginFrame();
@@ -118,11 +145,6 @@ void GameBase::beginFrame() {
 
 void GameBase::render() {
     m_graphicsEngine->render();
-}
-
-void GameBase::endFrame() {
-    finalizeFrame();
-    m_graphicsEngine->endFrame();
 }
 
 void GameBase::prepareFrame() {
@@ -151,73 +173,83 @@ void GameBase::prepareFrame() {
     m_characterSubsystem->framePreRenderAll(m_graphicsEngine->getFrameNum(), timeRemainder);
 }
 
-void GameBase::finalizeFrame() {
+void GameBase::beginPhysicsWindow() {
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
 
     double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->getFrameRate());
-    auto targetFrameEnd = m_currentFrameStartTime +
+    m_targetFrameEnd = m_currentFrameStartTime +
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(targetFrameDuration));
-    auto jobEndTime = targetFrameEnd - std::chrono::milliseconds(2);
+    m_workEndTime = m_targetFrameEnd - std::chrono::milliseconds(2);
+    m_stepsThisFrame = 0;
 
-    // Discard physics debt beyond maxStepsPerFrame steps to prevent catch-up after lag spikes.
-    constexpr int maxStepsPerFrame = 4;
-    {
-        auto lagCap = std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
-            std::chrono::duration<double>(m_physicsTimeStep * maxStepsPerFrame));
-        if (m_timeHandler->now() > m_nextPhysicsTime + lagCap) {
-            m_nextPhysicsTime = m_timeHandler->now() - lagCap;
-        }
+    // Discard physics debt beyond s_maxStepsPerFrame steps to prevent catch-up
+    // after lag spikes.
+    auto lagCap = std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
+        std::chrono::duration<double>(m_physicsTimeStep * s_maxStepsPerFrame));
+    if (m_timeHandler->now() > m_nextPhysicsTime + lagCap) {
+        m_nextPhysicsTime = m_timeHandler->now() - lagCap;
     }
+}
 
-    // Schedule and run up to maxStepsPerFrame physics steps per frame.
-    // This keeps simulation speed correct on displays below physicsHz.
-    for (int step = 0; step < maxStepsPerFrame; ++step) {
+GameBase::PhysicsWindowResult GameBase::advancePhysicsWindow() {
+    // Runs up to s_maxStepsPerFrame physics steps per frame as direct,
+    // budgeted, resumable calls; a step that exhausts the budget parks and
+    // resumes next frame. This keeps simulation speed correct on displays
+    // below physicsHz.
+    while (m_stepsThisFrame < s_maxStepsPerFrame) {
         auto currentTime = m_timeHandler->now();
 
         if (currentTime >= m_nextPhysicsTime && !m_physicsUpdateInProgress) {
             m_physicsTimeError = std::chrono::duration<double>(currentTime - m_nextPhysicsTime).count();
             m_physicsUpdateInProgress = true;
-            auto jobHandle = m_jobManager->schedule(
-                [this](std::chrono::time_point<std::chrono::high_resolution_clock> endTime) -> bool {
-                    return updatePhysics(endTime);
-                }, JobPriorities::PHYSICS_UPDATE);
-            trackJob(jobHandle);
             m_nextPhysicsTime += std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
                 std::chrono::duration<double>(m_physicsTimeStep));
         }
+        if (!m_physicsUpdateInProgress) {
+            return PhysicsWindowResult::WINDOW_DONE;  // no step due
+        }
 
-        m_jobManager->work(jobEndTime);
+        while (m_physicsUpdateInProgress && m_timeHandler->now() < m_workEndTime) {
+            if (updatePhysics(m_workEndTime) == StepResult::AWAITING_CONTROL) {
+                return PhysicsWindowResult::YIELDED_FOR_CONTROL;
+            }
+        }
 
-        if (m_physicsUpdateInProgress) break;  // step didn't finish in time budget
-        if (m_timeHandler->now() < m_nextPhysicsTime) break;  // no more steps due
+        if (m_physicsUpdateInProgress) {
+            // Step didn't finish in the budget; parked until next frame.
+            return PhysicsWindowResult::WINDOW_DONE;
+        }
+        m_stepsThisFrame++;
+        if (m_timeHandler->now() < m_nextPhysicsTime) {
+            return PhysicsWindowResult::WINDOW_DONE;  // no more steps due
+        }
     }
-
-    if (m_timeHandler->now() >= targetFrameEnd) {
-        std::cout << "Frame drop" << std::endl;
-    }
+    return PhysicsWindowResult::WINDOW_DONE;  // step cap reached
 }
 
-bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
+GameBase::StepResult GameBase::updatePhysics(
+    std::chrono::time_point<std::chrono::high_resolution_clock> endTime) {
     // Resumable state machine
     switch (m_physicsUpdateState) {
         case PhysicsUpdateState::SPLITS:
             // Drain pending grid splits
             if (m_gridSubsystem->handlePendingSplits(endTime)) {
-                return true; // Grid splitting needs more time -- stay in SPLITS
+                return StepResult::OUT_OF_TIME; // Splitting needs more time
             }
-            m_physicsUpdateState = PhysicsUpdateState::CONTROL;
-            [[fallthrough]];
+            // Yield exactly once per step: the caller injects its control
+            // (mode, network) here, at a clean boundary -- splits done,
+            // integration not started.
+            m_physicsUpdateState = PhysicsUpdateState::STEP_CONTROL;
+            return StepResult::AWAITING_CONTROL;
 
-        case PhysicsUpdateState::CONTROL:
-            // Runs exactly once per physics step. All input -> force/command
-            // decisions happen here so the runUntil below integrates them,
-            // minimizing input latency.
-            if (m_mode) {
-                m_mode->stepControl();
-            }
+        case PhysicsUpdateState::STEP_CONTROL:
+            // The caller's control ran; world control follows, exactly once
+            // per step, so the runUntil below integrates it with minimal
+            // input latency.
+            assert(m_physicsUpdateInProgress);
 
             // Cockpit docking runs on the last completed step's collisions,
             // right before the character controllers consume their docking
@@ -249,7 +281,7 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
         case PhysicsUpdateState::PHYSICS:
             // Run physics engine
             if (m_physicsEngine->runUntil(endTime)) {
-                return true; // Physics step needs more time -- stay in PHYSICS
+                return StepResult::OUT_OF_TIME; // Step needs more time
             }
 
             // Publish the new step's state to graphics so rendering
@@ -260,35 +292,10 @@ bool GameBase::updatePhysics(std::chrono::time_point<std::chrono::high_resolutio
             // Clear the in-progress flag and reset for the next step.
             m_physicsUpdateInProgress = false;
             m_physicsUpdateState = PhysicsUpdateState::SPLITS;
-            return false;
+            return StepResult::DONE;
     }
 
-    return false; // Unreachable; keeps the compiler happy.
-}
-
-void GameBase::trackJob(std::weak_ptr<Job> jobHandle) {
-    bool didPrint = false;
-    for (size_t ii = 0; ii < m_pendingJobs.size(); ii++)
-    {
-        if (!m_pendingJobs[ii].expired())
-        {
-            if (!didPrint) {
-                didPrint = true;
-                std::cout << "Physics frame drop" << std::endl;
-            }
-            //extern int hit_count;
-            //std::cout << "hit_count" << hit_count << std::endl;
-        }
-        
-    }
-    
-    // Clean up expired handles periodically to prevent unbounded growth
-    if (m_pendingJobs.size() % 20 == 0) {
-        m_pendingJobs.erase(std::remove_if(m_pendingJobs.begin(), m_pendingJobs.end(),
-            [](const std::weak_ptr<Job>& handle) { return handle.expired(); }), m_pendingJobs.end());
-    }
-    
-    m_pendingJobs.push_back(jobHandle);
+    return StepResult::DONE; // Unreachable; keeps the compiler happy.
 }
 
 size_t GameBase::computeHash() const {

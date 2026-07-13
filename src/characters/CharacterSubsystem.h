@@ -2,6 +2,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 class Character;
@@ -39,6 +40,12 @@ public:
     // Access
     const std::vector<std::shared_ptr<Character>>& getCharacters() const { return m_characters; }
 
+    /**
+     * @brief Resolve a character by its unique id (O(1) hash lookup)
+     * @return The character, or empty if no character has that id
+     */
+    std::weak_ptr<Character> getCharacterById(int id) const;
+
 private:
     // Dependencies
     PhysicsEngine* m_physics;
@@ -54,4 +61,7 @@ private:
 
     // Character ownership
     std::vector<std::shared_ptr<Character>> m_characters;
+
+    // Fast lookup: unique id -> Character, maintained by create/removeCharacter
+    std::unordered_map<int, std::weak_ptr<Character>> m_idToCharacter;
 };

@@ -23,7 +23,6 @@ class Grid;
 class TimeHandler;
 class DebugRenderer;
 class Digibot;
-class Mode;
 
 class GameBase : public IHashable {
 public:
@@ -37,17 +36,36 @@ public:
     void removeGrid(std::weak_ptr<Grid> grid);
     std::weak_ptr<Digibot> createDigibot();
 
-    void beginFrame();
-    void render();
-    void endFrame();
-
-    // The mode's stepControl() runs once per physics step, before integration.
-    void setMode(Mode* mode) { m_mode = mode; }
+    // Resumable frame advance. Call in a loop until FrameDone; the other
+    // statuses yield to the caller at a control point, exactly once each per
+    // frame/step. Run the control, then call again. While yielded the world is
+    // at a clean boundary and may be mutated.
+    enum class FrameStatus {
+        AwaitingFrameControl,  // input is polled; run per-frame control
+        AwaitingStepControl,   // a physics step is at its control point,
+                               // before integration; run per-step control
+        FrameDone,
+    };
+    FrameStatus advanceFrame();
 
     void scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords);
     
     // Shader reloading
     std::pair<bool, std::string> reloadShaders();
+
+    // Count of completed physics ticks; increments only at clean step
+    // boundaries. Frame-level consumers (network sync) compare it across
+    // frames to detect completed ticks.
+    uint64_t getPhysicsTick() const;
+    // True while a physics step is parked mid-step across frames. World state
+    // must not be mutated externally while this holds.
+    bool isPhysicsStepInProgress() const { return m_physicsUpdateInProgress; }
+    // True while advanceFrame is yielded at AwaitingStepControl. Per-step
+    // world mutation (mode control, network state apply) is legal only then.
+    bool isAtStepControlPoint() const {
+        return m_physicsUpdateInProgress &&
+               m_physicsUpdateState == PhysicsUpdateState::STEP_CONTROL;
+    }
 
     std::unique_ptr<GraphicsEngine> m_graphicsEngine;
     std::unique_ptr<PhysicsEngine> m_physicsEngine;
@@ -57,9 +75,6 @@ public:
     // Cockpit docking is world physics: it runs every step regardless of mode
     std::unique_ptr<CockpitDockingCoordinator> m_cockpitDockingCoordinator;
     TimeHandler* m_timeHandler;
-
-    // Track pending jobs for cleanup
-    std::vector<std::weak_ptr<Job>> m_pendingJobs;
 
     // Debug support
     void setDebugRenderer(DebugRenderer* debugRenderer);
@@ -72,21 +87,49 @@ public:
     virtual size_t computeHash() const override;
     
 protected:
+    void beginFrame();
+    void render();
     void prepareFrame();
-    void finalizeFrame();
 
-    virtual bool updatePhysics(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
-
-    // Helper to track job handles
-    void trackJob(std::weak_ptr<Job> jobHandle);
+    enum class StepResult {
+        OUT_OF_TIME,        // frame budget exhausted; call again to continue
+        AWAITING_CONTROL,   // at the step's control point; issued once per step
+        DONE,               // step completed at a clean boundary
+    };
+    virtual StepResult updatePhysics(
+        std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 
 private:
-    
+    // Sets up the frame's physics budget (lag discard, step counter).
+    void beginPhysicsWindow();
+
+    // Runs due physics steps within the frame budget.
+    enum class PhysicsWindowResult {
+        YIELDED_FOR_CONTROL,  // a step is at its control point; the caller
+                              // must surface AwaitingStepControl and re-enter
+        WINDOW_DONE,          // no more physics this frame: all due steps ran,
+                              // none were due, or a step parked on the budget
+    };
+    PhysicsWindowResult advancePhysicsWindow();
+
+    static constexpr int s_maxStepsPerFrame{4};
+
     std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_currentFrameStartTime;
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_targetFrameEnd;
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_workEndTime;
     double m_physicsTimeError{0.0}; // Track scheduling error for interpolation
     double m_physicsTimeStep{}; // Is set in constructor.
+    int m_stepsThisFrame{0};
+
+    // Resumable state for advanceFrame across calls within one frame.
+    enum class FramePhase {
+        FRAME_BEGIN,    // next call polls input and yields for frame control
+        FRAME_CONTROL,  // frame control ran; next call renders and runs physics
+        PHYSICS         // physics catch-up in progress (may span yields)
+    };
+    FramePhase m_framePhase{FramePhase::FRAME_BEGIN};
 
     // Flag to track if physics update is in progress
     bool m_physicsUpdateInProgress{false};
@@ -98,14 +141,11 @@ private:
     // still referenced by this step's collision records, or double-apply
     // forces depending on frame budget).
     enum class PhysicsUpdateState {
-        SPLITS,   // draining m_gridSubsystem->handlePendingSplits
-        CONTROL,  // input -> forces/commands, consumed by this step (once)
-        PHYSICS   // running m_physicsEngine->runUntil, then graphics publish
+        SPLITS,        // draining m_gridSubsystem->handlePendingSplits
+        STEP_CONTROL,  // yielded to the caller's control; world control next
+        PHYSICS        // running m_physicsEngine->runUntil, then graphics publish
     };
     PhysicsUpdateState m_physicsUpdateState{PhysicsUpdateState::SPLITS};
-
-    // Non-owning; drives mode control from the physics step (top down)
-    Mode* m_mode{nullptr};
 
     DebugRenderer* m_debugRenderer = nullptr;
 };

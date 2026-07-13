@@ -51,3 +51,7 @@ CMakeUserPresets.json
 # Local Claude config (kept out of git)
 CLAUDE.md
 .claude/
+
+# Generated artifacts (kept local)
+dependency_graph_generator/cpp_dependencies.graphml
+recording_time/

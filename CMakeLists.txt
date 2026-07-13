@@ -17,7 +17,6 @@ if(MSVC)
     set(CMAKE_CXX_FLAGS_RELEASE "/O2 /MD /DNDEBUG")
 else()
     # GCC/Clang flags
-    add_compile_options(-Wall -Wextra)
     add_compile_options(-Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas)
     set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native")
@@ -35,6 +34,33 @@ if(UTILS_DIR AND NOT TARGET utils)
     add_subdirectory(${UTILS_DIR} ${CMAKE_BINARY_DIR}/utils-build)
 endif()
 add_subdirectory(${ENGINE_DIR} ${CMAKE_BINARY_DIR}/engine-build)
+
+# --- GameNetworkingSockets (BSD-3) ------------------------------------------
+# Built from source via FetchContent; needs system protobuf + OpenSSL:
+#   apt install libprotobuf-dev protobuf-compiler libssl-dev
+if(NOT TARGET GameNetworkingSockets::static)
+    include(FetchContent)
+    set(GAMENETWORKINGSOCKETS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(GAMENETWORKINGSOCKETS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(BUILD_STATIC_LIB ON CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(GameNetworkingSockets
+        GIT_REPOSITORY https://github.com/ValveSoftware/GameNetworkingSockets.git
+        GIT_TAG        v1.4.1
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(GameNetworkingSockets)
+
+    # Third-party code builds silently: the warning flags above are
+    # directory-scoped and would otherwise apply to Valve's sources too.
+    if(TARGET GameNetworkingSockets_s)
+        if(MSVC)
+            target_compile_options(GameNetworkingSockets_s PRIVATE /w)
+        else()
+            target_compile_options(GameNetworkingSockets_s PRIVATE -w)
+        endif()
+    endif()
+endif()
 
 # Specify output directory for the executable
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
@@ -60,4 +86,5 @@ add_executable(OrbitalIndustries ${SRC_FILES})
 target_link_libraries(OrbitalIndustries PRIVATE
     GraphicsEngine::graphics
     Utils::utils
+    GameNetworkingSockets::static
 )

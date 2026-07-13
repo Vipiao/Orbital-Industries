@@ -9,6 +9,7 @@
 #include "utils/TimeHandler.h"
 #include "utils/HashFunctions.h"
 #include <algorithm>
+#include <cassert>
 #include <iostream>
 
 GridSubsystem::GridSubsystem(
@@ -44,8 +45,9 @@ GridSubsystem::GridSubsystem(
 }
 
 GridSubsystem::~GridSubsystem() {
-    // Clear collider mapping before destroying grids to avoid dangling keys
+    // Clear mappings before destroying grids to avoid dangling keys
     m_colliderToGrid.clear();
+    m_idToGrid.clear();
 
     // Clear all grids (will trigger Grid destructors)
     m_grids.clear();
@@ -73,8 +75,9 @@ std::weak_ptr<Grid> GridSubsystem::createGrid(const glm::dvec3& position, const 
             // Should never happen - Grid just created should have valid collider
             throw std::runtime_error("GridSubsystem::createGrid: Grid has no collider");
         }
+        m_idToGrid[gridLocked->uniqueId] = gridPtr;
     }
-    
+
     return gridPtr;
 }
 
@@ -91,15 +94,24 @@ void GridSubsystem::removeGrid(std::weak_ptr<Grid> gridWeak) {
         // but we can continue safely since the map entry is already gone or irrelevant
     }
     
+    // Every grid enters through createGrid, so its id must be mapped.
+    [[maybe_unused]] size_t erasedIds = m_idToGrid.erase(grid->uniqueId);
+    assert(erasedIds == 1);
+
     // Now safe to remove grid (and destroy its collider)
     auto it = std::find_if(m_grids.begin(), m_grids.end(),
         [grid](const std::shared_ptr<Grid>& item) {
             return item.get() == grid.get();
         });
-    
+
     if (it != m_grids.end()) {
         m_grids.erase(it);
     }
+}
+
+std::weak_ptr<Grid> GridSubsystem::getGridById(uint64_t id) const {
+    auto it = m_idToGrid.find(id);
+    return it != m_idToGrid.end() ? it->second : std::weak_ptr<Grid>{};
 }
 
 void GridSubsystem::stepUpdateGraphicsAll(const glm::dvec3& cameraPos) {

@@ -61,6 +61,12 @@ public:
     
     // Access
     const std::vector<std::shared_ptr<Grid>>& getGrids() const { return m_grids; }
+
+    /**
+     * @brief Resolve a grid by its uniqueId (O(1) hash lookup)
+     * @return The grid, or empty if no grid has that id
+     */
+    std::weak_ptr<Grid> getGridById(uint64_t id) const;
     
     /**
      * @brief Convert sensor collider overlaps to Grid pointers
@@ -95,6 +101,9 @@ private:
 
     // Fast lookup: Collider -> Grid mapping for sensor queries
     std::unordered_map<Collider*, std::weak_ptr<Grid>> m_colliderToGrid;
+
+    // Fast lookup: uniqueId -> Grid, maintained by createGrid/removeGrid
+    std::unordered_map<uint64_t, std::weak_ptr<Grid>> m_idToGrid;
     
     // Grid splitting logic
     std::unique_ptr<GridSplitter> m_gridSplitter;
