@@ -118,6 +118,7 @@ void Game::onFrame() {
                   << message << std::endl;
     }
 
+    // Sends a snapshot once per completed physics tick, not per frame.
     m_gameNetwork->frameSend();
 }
 
