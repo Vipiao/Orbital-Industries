@@ -10,15 +10,18 @@
 #include "utils/TimeHandler.h"
 #include "../physics/RigidBody.h"
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <iostream>
+#include <utility>
 
 GridSplitter::GridSplitter(
-    std::function<std::weak_ptr<Grid>(const glm::dvec3&, const glm::dquat&)> createGridCallback,
-    std::function<void(std::weak_ptr<Grid>)> removeGridCallback,
+    std::function<uint64_t()> allocateGridIdCallback,
+    std::function<std::weak_ptr<Grid>(uint64_t, const glm::dvec3&, const glm::dquat&)>
+        createGridCallback,
     TimeHandler* timeHandler)
-    : m_createGridCallback(createGridCallback)
-    , m_removeGridCallback(removeGridCallback)
+    : m_allocateGridIdCallback(allocateGridIdCallback)
+    , m_createGridCallback(createGridCallback)
     , m_timeHandler(timeHandler)
 {
     if (!m_timeHandler) {
@@ -97,12 +100,6 @@ bool GridSplitter::handlePendingSplits(
 
 Generator<bool> GridSplitter::performGridSplitAsync(std::weak_ptr<Grid> sourceGridWeak,
                                                     std::vector<glm::ivec3> edgeCoords) {
-    struct PartitionPhysics {
-        glm::dvec3 centerOfMass;
-        glm::dvec3 velocity;
-        double mass;
-    };
-
     std::shared_ptr<Grid> sourceGrid = sourceGridWeak.lock();
     if (!sourceGrid || edgeCoords.empty()) {
         co_return;
@@ -146,63 +143,9 @@ Generator<bool> GridSplitter::performGridSplitAsync(std::weak_ptr<Grid> sourceGr
     std::cout << "Grid split detected! " << result.partitions.size()
               << " partitions found." << std::endl;
 
-    // Step 3: Pre-calculate physics properties for each partition
-    auto sourceBodyWeak = sourceGrid->getRigidBody();
-    auto sourceBody = sourceBodyWeak.lock();
-    if (!sourceBody) {
-        std::cout << "Source grid has no rigid body - cannot split" << std::endl;
-        co_return;
-    }
-    glm::dvec3 originalCenterOfMass = sourceBody->m_position;
-    glm::dvec3 originalVelocity = sourceBody->m_velocity;
-
-    // Calculate angular velocity from angular momentum
-    glm::dvec3 originalAngularVelocity = sourceBody->getAngularVelocityWorld();
-    glm::dquat originalOrientation = sourceBody->m_orientation;
-
-    std::vector<PartitionPhysics> partitionPhysics(result.partitions.size());
-
-    for (size_t i = 0; i < result.partitions.size(); ++i) {
-        const std::vector<glm::ivec3>& partition = result.partitions[i];
-
-        // Calculate center of mass for this partition
-        glm::dvec3 weightedSum(0.0);
-        double totalMass = 0.0;
-
-        for (const glm::ivec3& coord : partition) {
-            const GridCell* cell = sourceGrid->getCellFromRegistry(coord);
-            if (!cell) continue;
-
-            auto [blockMass, localCOM, inertiaTensor] = cell->getMassProperties();
-            if (blockMass <= 0.0) continue; // ThrusterSecondaryCell has zero mass
-
-            glm::dvec3 blockPosition = sourceGrid->gridToWorld(glm::dvec3(coord) + localCOM);
-            weightedSum += blockPosition * blockMass;
-            totalMass += blockMass;
-        }
-
-        // A partition of only massless cells would poison the rigid body with NaNs
-        assert(totalMass > 0.0);
-        glm::dvec3 partitionCenterOfMass = weightedSum / totalMass;
-
-        // Calculate velocity using rigid body kinematics: v_p = v_t + ω × (cm_p - cm_t)
-        glm::dvec3 relativePosition = partitionCenterOfMass - originalCenterOfMass;
-        glm::dvec3 partitionVelocity =
-            originalVelocity + glm::cross(originalAngularVelocity, relativePosition);
-
-        partitionPhysics[i] = {partitionCenterOfMass, partitionVelocity, totalMass};
-
-        std::cout << "Partition " << i << ": " << partition.size() << " cells, mass=" << totalMass
-                  << ", CM=(" << partitionCenterOfMass.x << "," << partitionCenterOfMass.y << ","
-                  << partitionCenterOfMass.z << ")"
-                  << ", vel=(" << partitionVelocity.x << "," << partitionVelocity.y << ","
-                  << partitionVelocity.z << ")" << std::endl;
-    }
-
-    // Step 4: Find the largest partition (this stays with the original grid)
+    // The largest partition stays with the source grid; the rest become pieces.
     size_t largestPartitionIndex = 0;
     size_t largestSize = result.partitions[0].size();
-
     for (size_t i = 1; i < result.partitions.size(); ++i) {
         if (result.partitions[i].size() > largestSize) {
             largestSize = result.partitions[i].size();
@@ -210,12 +153,8 @@ Generator<bool> GridSplitter::performGridSplitAsync(std::weak_ptr<Grid> sourceGr
         }
     }
 
-    std::cout << "Largest partition (index " << largestPartitionIndex << ") has "
-              << largestSize << " cells" << std::endl;
-
-    // Last chance to abort: from here on the split mutates grids, so the strong
-    // reference is held across suspensions and the operation always completes,
-    // even if the source grid is removed externally mid-split.
+    // Last chance to abort: applySplit mutates grids, so from here the strong
+    // reference is held across suspensions and the operation always completes.
     if (m_timeHandler->now() >= m_endTime) {
         sourceGrid.reset();
         co_yield true;
@@ -223,93 +162,116 @@ Generator<bool> GridSplitter::performGridSplitAsync(std::weak_ptr<Grid> sourceGr
         if (!sourceGrid) co_return;
     }
 
-    // Step 5: Create new grids for all partitions except the largest
-    std::vector<Grid*> newGrids;
-
+    // Assign each non-largest partition a fresh id; the shared applySplit realises them.
+    std::vector<GridSplitPiece> pieces;
+    pieces.reserve(result.partitions.size() - 1);
     for (size_t i = 0; i < result.partitions.size(); ++i) {
         if (i == largestPartitionIndex) {
-            continue; // Skip largest partition - it stays with original grid
+            continue;
         }
+        pieces.push_back({m_allocateGridIdCallback(), result.partitions[i]});
+    }
 
-        const std::vector<glm::ivec3>& partition = result.partitions[i];
+    applySplit(sourceGrid, pieces);
+    m_completedSplits.push_back({sourceGrid->uniqueId, std::move(pieces)});
+    std::cout << "Created split with new pieces" << std::endl;
+}
 
-        // Create new grid using callback - position will be set after adding cells
-        auto newGridWeak = m_createGridCallback(glm::dvec3(0.0), originalOrientation);
-        auto newGrid = newGridWeak.lock();
-        // The callback must return a live grid; everything below dereferences it
+void GridSplitter::applySplit(const std::shared_ptr<Grid>& sourceGrid,
+                              const std::vector<GridSplitPiece>& pieces) {
+    if (!sourceGrid || pieces.empty()) {
+        return;
+    }
+    std::shared_ptr<RigidBody> sourceBody{sourceGrid->getRigidBody().lock()};
+    if (!sourceBody) {
+        return;
+    }
+
+    // Captured once from the un-mutated source: every piece inherits this motion, and
+    // world centres of mass must be read before any cells move (removals shift the
+    // source's centre of mass).
+    glm::dvec3 originalVelocity{sourceBody->m_velocity};
+    glm::dvec3 originalAngularVelocity{sourceBody->getAngularVelocityWorld()};
+    glm::dquat originalOrientation{sourceBody->m_orientation};
+    glm::dvec3 originalCenterOfMass{sourceBody->m_position};
+
+    std::vector<glm::dvec3> pieceCenterOfMass(pieces.size());
+    for (size_t ii = 0; ii < pieces.size(); ii++) {
+        glm::dvec3 weightedSum{0.0};
+        double totalMass{0.0};
+        for (const glm::ivec3& coord : pieces[ii].m_coords) {
+            const GridCell* cell{sourceGrid->getCellFromRegistry(coord)};
+            if (!cell) {
+                continue;
+            }
+            auto [blockMass, localCenterOfMass, inertiaTensor] = cell->getMassProperties();
+            if (blockMass <= 0.0) {
+                continue;  // massless secondary cells
+            }
+            weightedSum += sourceGrid->gridToWorld(glm::dvec3(coord) + localCenterOfMass) * blockMass;
+            totalMass += blockMass;
+        }
+        assert(totalMass > 0.0);
+        pieceCenterOfMass[ii] = weightedSum / totalMass;
+    }
+
+    for (size_t ii = 0; ii < pieces.size(); ii++) {
+        std::shared_ptr<Grid> newGrid{
+            m_createGridCallback(pieces[ii].m_newGridId, glm::dvec3{0.0}, originalOrientation).lock()};
         assert(newGrid);
 
-        std::cout << "Moving " << partition.size() << " cells to new grid" << std::endl;
-
-        // Move cells from source grid to new grid
-        size_t cellsProcessed = 0;
-        for (const glm::ivec3& cellCoord : partition) {
-            if (++cellsProcessed % 5 == 0 && m_timeHandler->now() >= m_endTime) {
-                co_yield true;
+        for (const glm::ivec3& coord : pieces[ii].m_coords) {
+            GridCell* cell{sourceGrid->getCellFromRegistry(coord)};
+            if (!cell) {
+                continue;
             }
-
-            GridCell* cell = sourceGrid->getCellFromRegistry(cellCoord);
-            if (!cell) continue; // Already removed (e.g. thruster secondary handled via anchor)
-
             switch (cell->type) {
             case CellType::STRUCTURAL_BLOCK: {
-                const StructuralBlock* block = static_cast<const StructuralBlock*>(cell);
-                std::array<glm::ivec3, 8> savedVertices = block->m_localVertices;
-                glm::dvec4 savedColor = block->m_color;
-                sourceGrid->removeCell(cellCoord);
-                newGrid->addCell(cellCoord);
-                newGrid->modifyCell(cellCoord, savedVertices);
-                newGrid->setColor(cellCoord, savedColor);
+                const StructuralBlock* block{static_cast<const StructuralBlock*>(cell)};
+                std::array<glm::ivec3, 8> savedVertices{block->m_localVertices};
+                glm::dvec4 savedColor{block->m_color};
+                sourceGrid->removeCell(coord);
+                newGrid->addCell(coord);
+                newGrid->modifyCell(coord, savedVertices);
+                newGrid->setColor(coord, savedColor);
                 break;
             }
             case CellType::THRUSTER: {
-                const ThrusterBlock* thruster = static_cast<const ThrusterBlock*>(cell);
-                const glm::dquat ori = thruster->m_orientation;
-                const double thrustLevel = thruster->m_thrustLevel;
-                sourceGrid->removeCell(cellCoord);
-                newGrid->addThruster(cellCoord, ori);
-                // The throttle is simulation state: a burning engine that breaks
-                // off keeps burning.
-                newGrid->setThrusterLevel(cellCoord, thrustLevel);
+                const ThrusterBlock* thruster{static_cast<const ThrusterBlock*>(cell)};
+                glm::dquat orientation{thruster->m_orientation};
+                double thrustLevel{thruster->m_thrustLevel};
+                sourceGrid->removeCell(coord);
+                newGrid->addThruster(coord, orientation);
+                // A burning engine that breaks off keeps burning.
+                newGrid->setThrusterLevel(coord, thrustLevel);
                 break;
             }
             case CellType::COCKPIT: {
-                const glm::dquat ori = static_cast<const CockpitBlock*>(cell)->m_orientation;
-                sourceGrid->removeCell(cellCoord);
-                newGrid->addCockpit(cellCoord, ori);
+                glm::dquat orientation{static_cast<const CockpitBlock*>(cell)->m_orientation};
+                sourceGrid->removeCell(coord);
+                newGrid->addCockpit(coord, orientation);
                 break;
             }
             case CellType::THRUSTER_SECONDARY:
             case CellType::COCKPIT_SECONDARY:
-                break; // handled when their anchor cell is processed above
+                break;  // moved with their anchor cell
             }
         }
 
-        // Set physics properties using pre-calculated values
-        auto newBodyWeak = newGrid->getRigidBody();
-        auto newBody = newBodyWeak.lock();
-        // Without a body the new grid would be left at the origin with no velocity
+        std::shared_ptr<RigidBody> newBody{newGrid->getRigidBody().lock()};
         assert(newBody);
-        if (newBody) {
-            // Transform center of mass to world space and set position
-            glm::dvec3 worldCenterOfMass = partitionPhysics[i].centerOfMass;
-            newBody->m_position = worldCenterOfMass;
-            newBody->m_velocity = partitionPhysics[i].velocity;
-
-            // Set angular momentum instead of angular velocity
-            glm::dvec3 angularVelocityBody =
-                glm::conjugate(sourceBody->m_orientation) * originalAngularVelocity;
-            newBody->setAngularVelocityBody(angularVelocityBody);
-            newBody->m_orientation = originalOrientation;
-        }
-
-        newGrids.push_back(newGrid.get()); // Keep raw pointer for local processing
+        newBody->m_position = pieceCenterOfMass[ii];
+        newBody->m_velocity = originalVelocity +
+            glm::cross(originalAngularVelocity, pieceCenterOfMass[ii] - originalCenterOfMass);
+        newBody->setAngularVelocityBody(glm::conjugate(originalOrientation) * originalAngularVelocity);
+        newBody->m_orientation = originalOrientation;
     }
 
-    // Recalculate original partition local angular momentum as its mass has now changed.
-    glm::dvec3 angularVelocityBody =
-        glm::conjugate(sourceBody->m_orientation) * originalAngularVelocity;
-    sourceBody->setAngularVelocityBody(angularVelocityBody);
+    // The source lost mass; refresh its angular momentum from the preserved velocity.
+    sourceBody->setAngularVelocityBody(glm::conjugate(sourceBody->m_orientation) *
+                                       originalAngularVelocity);
+}
 
-    std::cout << "Created " << newGrids.size() << " new grids from split" << std::endl;
+std::vector<GridSplitResult> GridSplitter::drainCompletedSplits() {
+    return std::exchange(m_completedSplits, {});
 }

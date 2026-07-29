@@ -346,24 +346,31 @@ void CollisionDetector::checkCollision(Collider* collider1, Collider* collider2)
     CollisionResult result = CollisionDetectionUtils::collideWith(collider1, collider2, m_currentTimestep);
     
     if (result.m_hasCollision) {
-        // Store collision data on BOTH colliders
-        
-        // Data for collider1 (from collider1's perspective)
+        // Store collision data on BOTH colliders. The dispatch may evaluate the
+        // pair in reverse argument order (e.g. grid-ball runs as ball-grid), so
+        // map the local-point arrays by collider identity, not argument position.
+        const bool firstIsA{result.m_colliderA == collider1};
+        const std::vector<glm::dvec3>& local1{
+            firstIsA ? result.m_contactPointsLocalA : result.m_contactPointsLocalB};
+        const std::vector<glm::dvec3>& local2{
+            firstIsA ? result.m_contactPointsLocalB : result.m_contactPointsLocalA};
+
+        // Data for collider1 (from collider1's perspective: A = self, B = other)
         CollisionData data1;
         data1.otherCollider = collider2;
         data1.contactData = result.m_contactData;
         data1.contactPoints = result.m_contactPoints;
-        data1.contactPointsLocalA = result.m_contactPointsLocalA;
-        data1.contactPointsLocalB = result.m_contactPointsLocalB;
-        
+        data1.contactPointsLocalA = local1;
+        data1.contactPointsLocalB = local2;
+
         // Data for collider2 (from collider2's perspective - swap A/B)
         CollisionData data2;
         data2.otherCollider = collider1;
         data2.contactData = result.m_contactData;
-        data2.contactPoints = result.m_contactPoints;
-        data2.contactPointsLocalA = result.m_contactPointsLocalB;  // Swap
-        data2.contactPointsLocalB = result.m_contactPointsLocalA;  // Swap
-        
+        data2.contactPointsLocalA = local2;
+        data2.contactPointsLocalB = local1;
+        data2.contactPoints = std::move(result.m_contactPoints);
+
         m_byCollider[collider1->m_id].push_back(std::move(data1));
         m_byCollider[collider2->m_id].push_back(std::move(data2));
     }

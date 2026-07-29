@@ -22,13 +22,10 @@
 #include "utils/GeometryUtils.h"
 
 // Initialize static counter
-uint64_t Grid::s_nextUniqueId = 0;
-
-// Updated - Constructor now initializes with physics and graphics references
-Grid::Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
-           TimeHandler* timeHandler, BlockResourceCache* blockResources,
+Grid::Grid(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
+           JobManager* jobManager, TimeHandler* timeHandler, BlockResourceCache* blockResources,
            const glm::dvec3& position, const glm::dquat& orientation)
-    : uniqueId(s_nextUniqueId++), m_jobManager(jobManager), m_timeHandler(timeHandler), m_physics(physics)
+    : uniqueId(uniqueId), m_jobManager(jobManager), m_timeHandler(timeHandler), m_physics(physics)
 {
     if (!m_jobManager || !m_timeHandler) {
         throw std::invalid_argument("JobManager and TimeHandler cannot be null");
@@ -144,6 +141,7 @@ void Grid::addCell(const glm::ivec3& coord) {
 
     // Schedule mesh updates for this cell and neighbors
     scheduleMeshUpdatesForCellAndNeighbors(coord);
+    m_structureVersion++;
 }
 
 // Remove a cell (structural block or special block) from the grid.
@@ -212,6 +210,7 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
     }
 
     scheduleStructuralAnalysis();
+    m_structureVersion++;
     return removed;
 }
 
@@ -251,6 +250,7 @@ void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientat
     glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
     updateCellMassContribution(anchorCoord, 1.0);
     rigidBody->setAngularVelocityBody(angVel);
+    m_structureVersion++;
 }
 
 void Grid::setThrusterLevel(const glm::ivec3& anchorCoord, double level) {
@@ -305,6 +305,25 @@ void Grid::addCockpit(const glm::ivec3& anchorCoord, const glm::dquat& orientati
     glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
     updateCellMassContribution(anchorCoord, 1.0);
     rigidBody->setAngularVelocityBody(angVel);
+    m_structureVersion++;
+}
+
+bool Grid::nudgeCellVertex(const glm::ivec3& coord, int cornerIndex,
+                           const glm::ivec3& direction) {
+    if (cornerIndex < 0 || cornerIndex >= 8) {
+        return false;  // index arrives over the wire; guard the array access
+    }
+    auto it = m_cells.find(coord);
+    if (it == m_cells.end()) {
+        return false;
+    }
+    // Nudge from the current vertices, so repeated nudges compose on this state.
+    std::array<glm::ivec3, 8> newVertices = it->second.m_localVertices;
+    newVertices[cornerIndex] += direction;
+    if (!canModifyCell(coord, newVertices)) {
+        return false;  // rejects out-of-bounds or otherwise invalid shapes
+    }
+    return modifyCell(coord, newVertices);
 }
 
 bool Grid::canModifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices) const {
@@ -375,7 +394,8 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     
     // Schedule structural analysis
     scheduleStructuralAnalysis();
-    
+
+    m_structureVersion++;
     return true;
 }
 
@@ -393,8 +413,9 @@ void Grid::setColor(const glm::ivec3& coord, const glm::dvec4& newColor) {
     
     // Schedule mesh update for color change
     scheduleMeshUpdateForCell(coord);
-    
+
     // No need to update physics/mass since only color changed
+    m_structureVersion++;
 }
 
 void Grid::trackJob(std::weak_ptr<Job> jobHandle) {
@@ -618,10 +639,11 @@ void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
         {coord}, getProperties,
         &rigidBody->m_mass, &m_centerOfMass, &rigidBody->m_inertiaTensor);
     
-    // Update physics body with momentum conservation
-    glm::dvec3 cmShift = m_centerOfMass - oldCM;
-    rigidBody->m_position += rigidBody->m_orientation * cmShift;
-    rigidBody->m_velocity += glm::cross(rigidBody->getAngularVelocityWorld(), rigidBody->m_orientation * cmShift);
+    // Update physics body with momentum conservation: the stored linear velocity
+    // tracks the center of mass, so as it shifts it takes on that new point's velocity.
+    glm::dvec3 worldShift = rigidBody->m_orientation * (m_centerOfMass - oldCM);
+    rigidBody->m_velocity = rigidBody->velocityAtPoint(rigidBody->m_position + worldShift);
+    rigidBody->m_position += worldShift;
     
     updateRigidBodyInverses();
 

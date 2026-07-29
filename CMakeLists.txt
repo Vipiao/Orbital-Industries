@@ -23,6 +23,16 @@ else()
     set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O2 -DNDEBUG")
 endif()
 
+# Keep assert() active in optimized builds during development; set OFF for a
+# production build (restores the standard NDEBUG semantics).
+option(ASSERTS_IN_RELEASE "Keep assert() active in Release builds" ON)
+if(ASSERTS_IN_RELEASE)
+    foreach(flags_var CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+        string(REPLACE "/DNDEBUG" "" ${flags_var} "${${flags_var}}")
+        string(REPLACE "-DNDEBUG" "" ${flags_var} "${${flags_var}}")
+    endforeach()
+endif()
+
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # Engine location — set in CMakeUserPresets.json (gitignored), Option 3.
@@ -73,11 +83,13 @@ if(WIN32)
     link_directories("C:/msys64/ucrt64/lib")
 endif()
 
-# Manually list source files
+# Game sources. The recursive glob is scoped to src/ so stray copies of the
+# tree (e.g. git worktrees under .claude/) never leak into the build;
+# GLOB_RECURSE on a root-level file pattern would match it in every subtree.
 file(GLOB_RECURSE SRC_FILES
-    "${CMAKE_SOURCE_DIR}/main.cpp"
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
 )
+list(APPEND SRC_FILES "${CMAKE_SOURCE_DIR}/main.cpp")
 
 # Add the executable
 add_executable(OrbitalIndustries ${SRC_FILES})

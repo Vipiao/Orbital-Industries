@@ -1,6 +1,10 @@
 // CockpitDockingCoordinator.h
 #pragma once
 
+#include "../../characters/digibot/DigibotController.h"
+#include "../../serialization/ByteStream.h"
+
+#include <cstdint>
 #include <functional>
 #include <glm/glm.hpp>
 #include <memory>
@@ -21,6 +25,34 @@ class CockpitBlock;
 // never see Grid; they only get world/body-frame data via DigibotDockingMode::Target.
 class CockpitDockingCoordinator {
 public:
+    // A digibot's docking situation as a value: its state and, when engaged, the
+    // cockpit (grid + anchor cell) it is engaged with. Capturable and forcible, so
+    // one simulation's situation can be reproduced in another.
+    struct DockingStatus {
+        DigibotController::DockingState m_state{DigibotController::DockingState::FREE};
+        std::uint64_t m_gridId{0};        // meaningful only when not FREE
+        glm::ivec3 m_anchor{0, 0, 0};     // meaningful only when not FREE
+
+        void serialize(ByteWriter& writer) const {
+            writer.write(m_state);
+            writer.write(m_gridId);
+            writer.write(m_anchor.x);
+            writer.write(m_anchor.y);
+            writer.write(m_anchor.z);
+        }
+        bool deserialize(ByteReader& reader) {
+            return reader.read(m_state) && reader.read(m_gridId) &&
+                   reader.read(m_anchor.x) && reader.read(m_anchor.y) &&
+                   reader.read(m_anchor.z);
+        }
+        // Deserialized status is untrusted; a raw out-of-range state byte must be
+        // dropped at the door, not applied.
+        bool isValid() const {
+            return m_state >= DigibotController::DockingState::FREE &&
+                   m_state <= DigibotController::DockingState::SEATED;
+        }
+    };
+
     CockpitDockingCoordinator() = default;
 
     // Called once per physics step, before integration, using the last completed
@@ -29,11 +61,26 @@ public:
     void stepControl(CharacterSubsystem* characterSubsystem,
                      PhysicsEngine* physicsEngine, GridSubsystem* gridSubsystem);
 
+    // Called once per physics step, after the character controllers ran: applies
+    // the docking transitions their physics asked for (seat capture, thrown out,
+    // climbed out). The coordinator owns the docking state machine; the
+    // controllers only report desires.
+    void applyDesiredTransitions();
+
     // Invoke the callback for every digibot currently SEATED in a cockpit, in
     // engagement order (deterministic). Grid and cockpit are re-validated at call
     // time; the cockpit reference is owned by the grid.
     void forEachSeatedPilot(
         const std::function<void(Digibot&, Grid&, const CockpitBlock&)>& callback) const;
+
+    // This digibot's current docking situation as a value.
+    DockingStatus captureDockingStatus(const Digibot* digibot) const;
+
+    // Reconcile the digibot toward the given situation: no-op when it already
+    // matches, otherwise release/engage/seat/unseat as needed. A status referring
+    // to a grid or cockpit this simulation does not (yet) have is ignored.
+    void forceDockingStatus(const std::shared_ptr<Digibot>& digibot,
+                            const DockingStatus& status, GridSubsystem* gridSubsystem);
 
 private:
     // Cockpit a digibot is currently engaged with (DOCKED or SEATED)

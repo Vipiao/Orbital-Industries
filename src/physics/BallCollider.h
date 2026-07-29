@@ -23,5 +23,5 @@ public:
     double m_radius;
 
     // Type identification
-    static constexpr int TYPE_ID = Hash::hashColliderName("BallCollider");
+    static constexpr int TYPE_ID = Hash::hashName("BallCollider");
 };

@@ -5,6 +5,7 @@
 #include "DigibotFlyingMode.h"
 #include "DigibotWalkingMode.h"
 #include "DigibotDockingMode.h"
+#include "DigibotInput.h"
 #include <glm/glm.hpp>
 #include <memory>
 
@@ -19,9 +20,28 @@ class DigibotController {
 public:
     enum class DockingState { FREE, DOCKED, SEATED };
 
+    // Docking transition this step's physics asked for. The controller never
+    // applies these itself; the owner of the docking state machine (the game
+    // layer's coordinator) reads and applies them after control.
+    enum class DockingTransition {
+        NONE,
+        SEAT,     // docked and reached the seat: capture
+        UNSEAT,   // seated and restraint overwhelmed: thrown into the corridor
+        RELEASE,  // docked and climbed out: back to free movement
+    };
+
 public:
     DigibotController(DigibotPhysics* physics, PhysicsEngine* physicsEngine);
     ~DigibotController() = default;
+
+    // Drive every input from a single value. The lock target is passed already
+    // resolved (empty when unlocked); the id it came from is the caller's concern.
+    // Side-effecting setters fire only on a change, so this is safe every tick.
+    void applyInput(const DigibotInput& input, const std::weak_ptr<RigidBody>& lockTargetBody);
+
+    // Snapshot the current control intent. The lock target is left as id 0 for the
+    // caller to fill, since the controller holds the target as a body, not an id.
+    DigibotInput captureInput() const;
 
     // Set the desired movement direction
     void setMovementDirection(const glm::ivec3& direction);
@@ -76,6 +96,7 @@ public:
 
     // Lock target: the rigid body to match velocity/rotation with (e.g. a grid's body)
     void setTargetRigidBody(std::weak_ptr<RigidBody> rigidBody);
+    std::weak_ptr<RigidBody> getTargetRigidBody() const { return m_targetRigidBody; }
     void unlock();
     void setLockState(DigibotLockState state) { m_lockState = state; }
     DigibotLockState getLockState() const { return m_lockState; }
@@ -89,7 +110,12 @@ public:
     void clearDockingTarget();
     // Escape while seated: back to the docking corridor to climb out.
     void requestUnseat();
+    // Seat without the proximity capture, for docking transitions decided elsewhere;
+    // the seat restraint pulls the body in from wherever it is in the corridor.
+    void forceSeat();
     DockingState getDockingState() const { return m_dockingState; }
+    // Valid after stepControl, until the next stepControl overwrites it.
+    DockingTransition getDesiredDockingTransition() const { return m_desiredTransition; }
 
 private:
     void applyWrench(const std::weak_ptr<RigidBody>& bodyWeak,
@@ -121,6 +147,7 @@ private:
     // Docking state
     DockingState m_dockingState{DockingState::FREE};
     DigibotDockingMode::Target m_dockingTarget{};
+    DockingTransition m_desiredTransition{DockingTransition::NONE};
 
     // Free-movement settings snapshotted on FREE -> DOCKED, restored on release.
     DigibotLockState m_savedLockState{DigibotLockState::UNLOCKED};

@@ -1,6 +1,8 @@
 #include "Game.h"
 
-#include "GameNetwork.h"
+#include "GameNetworkBase.h"
+#include "GameNetworkClient.h"
+#include "GameNetworkServer.h"
 #include "../debug/DebugVisualization.h"
 #include "../game_base/Creative.h"
 #include "../game_base/GameBase.h"
@@ -22,7 +24,11 @@ Game::Game(TimeHandler* timeHandler, GraphicsEngineBase::Mode controlMode,
 
     m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler,
                                             controlMode);
-    m_gameNetwork = std::make_unique<GameNetwork>(m_transport.get(), m_gameBase.get());
+    if (m_transport->isServer()) {
+        m_gameNetwork = std::make_unique<GameNetworkServer>(m_transport.get(), m_gameBase.get());
+    } else {
+        m_gameNetwork = std::make_unique<GameNetworkClient>(m_transport.get(), m_gameBase.get());
+    }
 
     setupDebugVisualization();
 
@@ -49,8 +55,6 @@ Game::Game(TimeHandler* timeHandler, GraphicsEngineBase::Mode controlMode,
     // Enable mouse lock for camera control
     m_gameBase->m_graphicsEngine->getMouseHandler()->setMouseLock(true);
 
-    setupWorld();
-
     // Print instructions
     std::cout << "3D Grid Block Demo" << std::endl;
     std::cout << "Controls:" << std::endl;
@@ -68,31 +72,14 @@ Game::~Game() {
     DebugGlobals::g_gameBase = nullptr;
 }
 
-void Game::setupWorld() {
-    // Create a center grid that will be our player object
-    auto initialGridWeak = m_gameBase->createGrid(glm::dvec3(0, 0, 0));
-    auto initialGrid = initialGridWeak.lock();
-    auto rigidBodyWeak = initialGrid->getRigidBody();
-    auto bb = rigidBodyWeak.lock();
-    if (bb) {
-        bb->m_position = {0, 0, 0};
-    }
-
-    // Create a Digibot character at origin
-    m_gameBase->createDigibot();
-
-    // Ground.
-    int size{10};
-    for (int ii = -size; ii < size; ii++) {
-        for (int jj = -size; jj < size; jj++) {
-            for (int kk = -3; kk < -2; kk++) {
-                initialGrid->addCell(glm::ivec3(ii, jj, kk));
-            }
-        }
-    }
-}
-
 void Game::onFrame() {
+    // Character control flows desire -> grant -> bind -> local-input-authority,
+    // entirely owned by the network layer: it reads the mode's desire, decides
+    // how that turns into a grant (host: direct; client: round-tripped, with
+    // retries), binds or unbinds the mode to whatever character that resolves
+    // to, and tells itself whether this peer now supplies that character's input.
+    m_gameNetwork->updateCharacterControl(*m_mode);
+
     // Poll the network first, apply its state at tick boundaries, send after:
     // the frame is a receive -> simulate -> send pipeline.
     m_gameNetwork->framePoll();

@@ -4,6 +4,7 @@
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "graphics/SSBOManager.h"
 #include "debug/DebugRenderer.h"
+#include <cstdint>
 #include <vector>
 #include <memory>
 #include <unordered_map>
@@ -26,6 +27,8 @@ public:
     virtual void setPosition(const std::string& name, const glm::dvec3& position) override;
     virtual void setOrientation(const std::string& name, const glm::dquat& orientation) override;
     virtual void setScale(const std::string& name, const glm::dvec3& scale) override;
+    virtual void setVelocity(const std::string& name, const glm::dvec3& velocity,
+                             std::uint64_t timeStep) override;
     
     // Property setters by ID
     virtual void setPosition(int id, const glm::dvec3& position) override;
@@ -65,6 +68,10 @@ private:
         glm::dvec3 position{0.0};
         glm::dquat orientation{1.0, 0.0, 0.0, 0.0};
         glm::dvec3 scale{1.0};
+        // Per-frame extrapolation on the GPU: position is valid at timeStep and
+        // advances by velocity (units per step) after it.
+        glm::dvec3 velocity{0.0};
+        std::uint64_t timeStep{0};
     };
     std::unordered_map<int, MeshProperties> m_meshProperties;
 

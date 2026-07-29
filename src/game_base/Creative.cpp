@@ -53,6 +53,9 @@ Creative::Creative(GameBase* gameBase)
 
     // Create character control tool
     m_characterSelectionTool = std::make_unique<CharacterSelectionTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
+    // Test fixture: start in character control so both peers grab a character
+    // immediately without touching the radial menu.
+    m_characterSelectionTool->activate();
 
     // Create modify tool
     m_modifyTool = std::make_unique<ModifyTool>(m_gameBase, m_radialMenu.get(), rootId, m_interactionRange);
@@ -89,6 +92,40 @@ Creative::~Creative() {
 
 void Creative::frameProcessInputs() {
     processInputLogic();
+}
+
+bool Creative::isControllingCharacter() const {
+    // Controlling requires both the intent (selection tool engaged) and a granted
+    // character; between the two the player waits in free camera.
+    return m_characterSelectionTool->isActive() && !m_boundCharacter.expired();
+}
+
+bool Creative::wantsCharacterControl() const {
+    return m_characterSelectionTool->isActive();
+}
+
+std::weak_ptr<Digibot> Creative::desiredCharacter() const {
+    // The character the player means is the one nearest the camera.
+    glm::dvec3 cameraPos{m_gameBase->m_graphicsEngine->getCamPos()};
+    std::shared_ptr<Digibot> nearest{};
+    double nearestDistance{0.0};
+    for (const auto& character : m_gameBase->m_characterSubsystem->getCharacters()) {
+        std::shared_ptr<Digibot> digibot{std::dynamic_pointer_cast<Digibot>(character)};
+        std::shared_ptr<RigidBody> body{digibot ? digibot->getRigidBody().lock() : nullptr};
+        if (!body) {
+            continue;
+        }
+        double distance{glm::length(body->m_position - cameraPos)};
+        if (!nearest || distance < nearestDistance) {
+            nearest = digibot;
+            nearestDistance = distance;
+        }
+    }
+    return nearest;
+}
+
+bool Creative::hasBoundCharacter() const {
+    return !m_boundCharacter.expired();
 }
 
 void Creative::stepControl() {
@@ -195,12 +232,24 @@ void Creative::stepControl() {
     doForce = false;
     doTrackSpeed = false;
 
-    // Update interaction sensor position for the coming step
+    // Update interaction sensor position for the coming step. The sensor is an
+    // input to that step's overlap test, so it is anchored in physics state:
+    // the controlled body's position advanced one tick along its velocity is
+    // where the body sits when the test runs, keeping the sensor co-moving
+    // with the grids it filters at any world speed. The camera position is
+    // render-space (timeRemainder-extrapolated) and anchors the sensor only
+    // when no character is bound.
     if (auto sensor = m_interactionSensor.lock()) {
-        glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
-        glm::dvec3 sensorPosition = m_gameBase->m_graphicsEngine->getCamPos() + forward * (m_interactionRange / 2.0);
-        
-        sensor->m_position = sensorPosition;
+        glm::dvec3 forward{m_gameBase->m_graphicsEngine->getCamOri() *
+                           glm::dvec3{0.0, 1.0, 0.0}};
+        glm::dvec3 anchor{m_gameBase->m_graphicsEngine->getCamPos()};
+        std::shared_ptr<Digibot> boundDigibot{m_boundCharacter.lock()};
+        std::shared_ptr<RigidBody> body{
+            boundDigibot ? boundDigibot->getRigidBody().lock() : nullptr};
+        if (body) {
+            anchor = body->m_position + body->m_velocity;
+        }
+        sensor->m_position = anchor + forward * (m_interactionRange / 2.0);
         sensor->m_orientation = m_gameBase->m_graphicsEngine->getCamOri();
     }
 
@@ -210,6 +259,7 @@ void Creative::stepControl() {
         SensorCollider* sensorPtr = static_cast<SensorCollider*>(sensorShared.get());
         interactionGrids = m_gameBase->getGridSubsystem()->getGridsFromOverlaps(sensorPtr);
     }
+
 
     //// TEST: Press J to randomly color grids in sensor range
     //KeyboardHandler* keyboard = m_gameBase->m_graphicsEngine->getKeyboardHandler();
@@ -241,14 +291,11 @@ void Creative::stepControl() {
     m_buildTool->stepControl(interactionGrids);
 
     // Run player controller if character control is active
-    if (m_characterSelectionTool->isActive()) {
-        const auto& characters = m_gameBase->m_characterSubsystem->getCharacters();
-        for (const auto& character : characters) {
-            std::shared_ptr<Digibot> digibot = std::dynamic_pointer_cast<Digibot>(character);
-            if (digibot) {
-                m_digibotPlayerController->stepControl(digibot->getController(), interactionGrids, m_interactionRange);
-                break; // Only process first character for now
-            }
+    if (isControllingCharacter()) {
+        std::shared_ptr<Digibot> digibot{m_boundCharacter.lock()};
+        if (digibot) {
+            m_digibotPlayerController->stepControl(digibot->getController(),
+                                                   interactionGrids, m_interactionRange);
         }
     }
 
@@ -388,32 +435,16 @@ void Creative::processInputLogic() {
     // Speed tracking with Z key  
     doTrackSpeed = keyboard->m_z.justPressed();
 
-    // Determine which camera controller to use based on character selection
-    if (m_characterSelectionTool->isActive()) {
+    // Character control drives the player controller only once a character is
+    // bound; an engaged tool with no grant yet stays in free camera.
+    if (isControllingCharacter()) {
         // Get render parameters for interpolation
         auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
 
-        // Character control mode - use player controller
-        // Get first available character
-        std::weak_ptr<Digibot> pilotableCharacter;
-        const auto& characters = m_gameBase->m_characterSubsystem->getCharacters();
-        for (const auto& character : characters) {
-            // Try to cast to Digibot
-            std::shared_ptr<Digibot> digibot = std::dynamic_pointer_cast<Digibot>(character);
-            if (digibot) {
-                pilotableCharacter = digibot;
-                break;
-            }
-        }
+        std::shared_ptr<Digibot> digibot{m_boundCharacter.lock()};
+        DigibotController* controller{digibot ? digibot->getController() : nullptr};
 
-        // Get controller for update
-        DigibotController* controller = nullptr;
-        auto digibot = pilotableCharacter.lock();
-        if (digibot) {
-            controller = digibot->getController();
-        }
-
-        m_digibotPlayerController->setPilotableCharacter(pilotableCharacter);
+        m_digibotPlayerController->setPilotableCharacter(m_boundCharacter);
         m_digibotPlayerController->enable();
         m_digibotPlayerController->update(
             controller,

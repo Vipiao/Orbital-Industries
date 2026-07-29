@@ -5,6 +5,7 @@
 #include "../RadialMenu.h"
 #include "../Grid.h"
 #include "../StructuralBlock.h"
+#include "../StructuralCommand.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/MeshManager2D/Instance2D.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
@@ -316,37 +317,16 @@ void ModifyTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGr
                 if (m_nearestMarkerIndex >= 0 && m_nearestMarkerIndex < static_cast<int>(cornerIndexData.size())) {
                     int cornerIndex = cornerIndexData[m_nearestMarkerIndex];
                     glm::ivec3 direction = directionData[m_nearestMarkerIndex];
-                    
+
+                    // Local validity check drives the wrench animation; the request
+                    // carries the nudge as an action so the server composes repeated
+                    // clicks onto its own current shape (each still re-validated there).
                     std::array<glm::ivec3, 8> newVertices = currentVertices;
                     newVertices[cornerIndex] += direction;
-                    
-                    // Store modification data for execution
-                    m_modificationGrid = selectedGrid;
-                    m_modificationCoord = m_selectedBlockCoord;
-                    m_modificationVertices = newVertices;
-                    
-                    // Execute modification
-                    if (selectedGrid->canModifyCell(m_modificationCoord, m_modificationVertices)) {
+                    if (selectedGrid->canModifyCell(m_selectedBlockCoord, newVertices)) {
                         m_targetAngle = glm::radians(90.);
-                        if (selectedGrid->modifyCell(m_modificationCoord, m_modificationVertices)) {
-                            // Schedule grid split check
-                            std::vector<glm::ivec3> edgeCoords = {
-                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z),
-                                glm::ivec3(m_modificationCoord.x + 1, m_modificationCoord.y, m_modificationCoord.z),
-                                glm::ivec3(m_modificationCoord.x - 1, m_modificationCoord.y, m_modificationCoord.z),
-                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y + 1, m_modificationCoord.z),
-                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y - 1, m_modificationCoord.z),
-                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z + 1),
-                                glm::ivec3(m_modificationCoord.x, m_modificationCoord.y, m_modificationCoord.z - 1)
-                            };
-                            
-                            m_gameBase->scheduleGridSplitCheck(selectedGrid, edgeCoords);
-                            
-                            std::cout << "Successfully modified cell at (" << m_modificationCoord.x 
-                                      << ", " << m_modificationCoord.y << ", " << m_modificationCoord.z << ")" << std::endl;
-                        } else {
-                            std::cout << "Failed to modify cell" << std::endl;
-                        }
+                        m_gameBase->requestStructuralEdit(StructuralCommand::modifyCell(
+                            selectedGrid->uniqueId, m_selectedBlockCoord, cornerIndex, direction));
                     }
                 }
             }

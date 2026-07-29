@@ -6,8 +6,7 @@
 #include "../../physics/RigidBody.h"
 #include "../../physics/RotatingFrameUtils.h"
 #include "../../physics/SensorCollider.h"
-#include "debug/DebugGlobals.h"
-#include "debug/DebugRenderer.h"
+#include <cassert>
 #include <glm/gtx/norm.hpp>
 #include <limits>
 #include <stdexcept>
@@ -53,11 +52,6 @@ glm::dvec3 DigibotWalkingMode::getGroundSurfaceNormal() const {
 DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigidBody,
                                          const DigibotModeInputs& inputs) {
     DigibotWrench wrench{};
-
-    // DEBUG
-    if (DebugGlobals::getDebugRenderer()) {
-        DebugGlobals::getDebugRenderer()->removeMeshesByPrefix("closest_contact");
-    }
 
     // Clear walking target at start (will be set if we find ground contact)
     m_walkingTargetRigidBody.reset();
@@ -141,18 +135,32 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
             if (otherRigidBodyShared && otherRigidBodyShared.get() == rigidBody.get()) {
                 continue;
             }
+            // Trigger volumes (e.g. another character's walking sensor) are not
+            // walkable ground.
+            if (otherAttachment->isTrigger) {
+                continue;
+            }
             otherRigidBody = otherAttachment->rigidBody;
         }
-        for (const auto& contactPoint : collision.contactPoints) {
-            // Calculate surface normal (points from surface toward body)
-            glm::dvec3 toBody{rigidBody->m_position - contactPoint};
-            double distance{glm::length(toBody)};
+        assert(collision.contactPoints.size() == collision.contactData.size());
+        for (size_t k = 0; k < collision.contactPoints.size(); ++k) {
+            // The cached world-space contact is one step stale; rebuilding it at the
+            // other collider's current pose keeps it valid across position rewrites
+            // (e.g. a network state apply).
+            glm::dvec3 contactPoint{
+                collision.otherCollider->localToWorld(collision.contactPointsLocalB[k])};
+            double distance{glm::length(rigidBody->m_position - contactPoint)};
 
             if (distance < 1e-6) {
                 continue; // Skip degenerate case
             }
 
-            glm::dvec3 normal{toBody / distance};
+            // Geometric surface normal from the collision pass, oriented toward the
+            // body. A property of the surface, not of the body's live position.
+            glm::dvec3 normal{collision.contactData[k].normal};
+            if (glm::dot(normal, rigidBody->m_position - contactPoint) < 0.0) {
+                normal = -normal;
+            }
             candidates.push_back({contactPoint, normal, distance, otherRigidBody});
         }
     }
@@ -212,6 +220,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     // ========== Step 3: Find Best Ground Contact Point ==========
     bool foundContact{false};
     glm::dvec3 closestPoint{0.0};
+    glm::dvec3 closestNormal{0.0};
     double bestScore{std::numeric_limits<double>::max()};
     std::weak_ptr<RigidBody> closestRigidBody{};
 
@@ -225,6 +234,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
         if (score < bestScore) {
             bestScore = score;
             closestPoint = candidates[i].position;
+            closestNormal = candidates[i].normal;
             foundContact = true;
             closestRigidBody = candidates[i].rigidBody;
         }
@@ -247,22 +257,8 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     m_walkingTargetRigidBody = closestRigidBody;
     auto targetRigidBody = m_walkingTargetRigidBody.lock();
 
-    // ========== Step 5: Calculate Normal ==========
-    glm::dvec3 toBody{rigidBody->m_position - closestPoint};
-    double toBodyLengthSq{glm::length2(toBody)};
-    glm::dvec3 normal{};
-    if (toBodyLengthSq < 1e-12) {
-        // Degenerate case - pick arbitrary up direction
-        normal = rigidBody->m_orientation * glm::dvec3{0.0, 0.0, 1.0};
-    } else {
-        normal = toBody / glm::sqrt(toBodyLengthSq);
-    }
-
-    // Debug visualization of closest contact point
-    if (DebugGlobals::getDebugRenderer()) {
-        DebugGlobals::getDebugRenderer()->createSphere(
-            "closest_contact", closestPoint, 0.1);
-    }
+    // ========== Step 5: Surface Normal ==========
+    glm::dvec3 normal{closestNormal};
 
     // ========== Step 6: Calculate Surface Alignment for Force Scaling ==========
     double surfaceAlignment{usingCache ? glm::dot(normal, modifiedUp) : 1.0};

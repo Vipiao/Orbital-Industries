@@ -99,6 +99,100 @@ void CockpitDockingCoordinator::stepControl(CharacterSubsystem* characterSubsyst
     }
 }
 
+void CockpitDockingCoordinator::applyDesiredTransitions() {
+    std::vector<const Digibot*> released{};
+    for (const Engagement& engagement : m_engagements) {
+        std::shared_ptr<Digibot> digibot{engagement.m_digibot.lock()};
+        DigibotController* controller{digibot ? digibot->getController() : nullptr};
+        if (!controller) {
+            continue;
+        }
+        switch (controller->getDesiredDockingTransition()) {
+            case DigibotController::DockingTransition::SEAT:
+                controller->forceSeat();
+                break;
+            case DigibotController::DockingTransition::UNSEAT:
+                controller->requestUnseat();
+                break;
+            case DigibotController::DockingTransition::RELEASE:
+                controller->clearDockingTarget();
+                released.push_back(digibot.get());
+                break;
+            case DigibotController::DockingTransition::NONE:
+                break;
+        }
+    }
+    for (const Digibot* digibot : released) {
+        removeEngagement(digibot);
+    }
+}
+
+CockpitDockingCoordinator::DockingStatus CockpitDockingCoordinator::captureDockingStatus(
+    const Digibot* digibot) const {
+    DockingStatus status{};
+    for (const Engagement& engagement : m_engagements) {
+        if (engagement.m_digibot.lock().get() != digibot) {
+            continue;
+        }
+        std::shared_ptr<Grid> grid{engagement.m_grid.lock()};
+        const DigibotController* controller{digibot->getController()};
+        if (grid && controller &&
+            controller->getDockingState() != DigibotController::DockingState::FREE) {
+            status.m_state = controller->getDockingState();
+            status.m_gridId = grid->uniqueId;
+            status.m_anchor = engagement.m_anchor;
+        }
+        break;
+    }
+    return status;
+}
+
+void CockpitDockingCoordinator::forceDockingStatus(const std::shared_ptr<Digibot>& digibot,
+                                                   const DockingStatus& status,
+                                                   GridSubsystem* gridSubsystem) {
+    DigibotController* controller{digibot ? digibot->getController() : nullptr};
+    if (!controller || !gridSubsystem) {
+        return;
+    }
+
+    if (status.m_state == DigibotController::DockingState::FREE) {
+        if (controller->getDockingState() != DigibotController::DockingState::FREE) {
+            controller->clearDockingTarget();
+            removeEngagement(digibot.get());
+        }
+        return;
+    }
+
+    std::shared_ptr<Grid> grid{gridSubsystem->getGridById(status.m_gridId).lock()};
+    const CockpitBlock* cockpit{grid ? findCockpit(*grid, status.m_anchor) : nullptr};
+    if (!cockpit) {
+        return;  // this simulation does not (yet) have the cockpit; try again later
+    }
+
+    // Engaged elsewhere: release first, then engage the right cockpit below.
+    Engagement* engagement{findEngagement(digibot.get())};
+    bool sameCockpit{engagement && engagement->m_grid.lock() == grid &&
+                     engagement->m_anchor == status.m_anchor};
+    if (controller->getDockingState() != DigibotController::DockingState::FREE &&
+        !sameCockpit) {
+        controller->clearDockingTarget();
+        removeEngagement(digibot.get());
+    }
+
+    if (controller->getDockingState() == DigibotController::DockingState::FREE) {
+        DigibotDockingMode::Target target{makeTarget(*grid, *cockpit)};
+        target.m_cockpitCells = resolveCockpitCells(*grid, *cockpit);
+        controller->setDockingTarget(target);
+        m_engagements.push_back({digibot, grid, status.m_anchor});
+    }
+
+    if (status.m_state == DigibotController::DockingState::SEATED) {
+        controller->forceSeat();
+    } else {
+        controller->requestUnseat();  // no-op unless seated
+    }
+}
+
 void CockpitDockingCoordinator::forEachSeatedPilot(
     const std::function<void(Digibot&, Grid&, const CockpitBlock&)>& callback) const {
     for (const Engagement& engagement : m_engagements) {

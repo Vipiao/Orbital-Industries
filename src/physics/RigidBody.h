@@ -65,11 +65,27 @@ public:
     const glm::dvec3& getAngularVelocityBody() const;
     const glm::dvec3& getAngularVelocityWorld() const;
     void setAngularVelocityBody(glm::dvec3 angularVelocity);
+
+    // World-space velocity of the material point at worldPoint on this body.
+    glm::dvec3 velocityAtPoint(const glm::dvec3& worldPoint) const {
+        return m_velocity + glm::cross(getAngularVelocityWorld(), worldPoint - m_position);
+    }
     const glm::dmat3& getWorldInertiaTensor() const;
     const glm::dmat3& getWorldInvInertiaTensor() const;
 
+    // The body's primary collider: its first non-trigger attachment, or empty if it
+    // has none. A trigger (e.g. a sensor) detects contacts but doesn't represent the
+    // body itself, so it is skipped.
+    std::weak_ptr<Collider> getPrimaryCollider() const;
+
+    // The orientation advanced dtTicks under a constant world-space angular
+    // velocity (radians per tick). dtTicks may be negative or fractional.
+    static glm::dquat integrateOrientation(const glm::dquat& orientation,
+                                           const glm::dvec3& angularVelocityWorld,
+                                           double dtTicks);
+
     // Interpolation for smooth rendering
-    void getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, 
+    void getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition,
                                  glm::dquat& outOrientation) const;
     
     // Invalidation methods

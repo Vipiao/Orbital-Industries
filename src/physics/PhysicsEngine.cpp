@@ -391,16 +391,8 @@ void PhysicsEngine::updatePositions() {
         //              << ") |L| = " << globalMagnitude << std::endl;
         //}
         
-        // Update orientation: q = q + (q * ω) * 0.5
-        double angle{ glm::length(angularVelocity) };
-        glm::dquat angularVelocityQuat{};
-        if (angle > 0.) {
-            angularVelocityQuat = glm::angleAxis(angle, angularVelocity / angle);
-        } else {
-            angularVelocityQuat = glm::dquat{1, 0, 0, 0};
-        }
-        body->m_orientation = (angularVelocityQuat * body->m_orientation);
-        body->m_orientation = glm::normalize(body->m_orientation); // Renormalize to prevent drift
+        body->m_orientation =
+            RigidBody::integrateOrientation(body->m_orientation, angularVelocity, 1.0);
 
         // Invalidate cached values after updating orientation and angular momentum
         body->invalidateOrientation();
@@ -469,8 +461,8 @@ void PhysicsEngine::resolveCollision(std::shared_ptr<RigidBody> bodyShared) {
                 glm::dvec3 rB = contactPoint - otherBody->m_position;
                 
                 // Calculate relative velocity at contact point
-                glm::dvec3 velA = body->m_velocity + glm::cross(body->getAngularVelocityWorld(), rA);
-                glm::dvec3 velB = otherBody->m_velocity + glm::cross(otherBody->getAngularVelocityWorld(), rB);
+                glm::dvec3 velA = body->velocityAtPoint(contactPoint);
+                glm::dvec3 velB = otherBody->velocityAtPoint(contactPoint);
                 glm::dvec3 relativeVel = velA - velB;
                 
                 // Project relative velocity onto collision normal
@@ -689,10 +681,8 @@ bool PhysicsEngine::shouldUseCompliantHandling(RigidBody* bodyA, RigidBody* body
         relativeVelCompliant = glm::dot(*relativeVel, compliantNormal);
     } else {
         // Calculate relative velocity at contact point
-        glm::dvec3 rA = contactPoint - bodyA->m_position;
-        glm::dvec3 rB = contactPoint - bodyB->m_position;
-        glm::dvec3 velA = bodyA->m_velocity + glm::cross(bodyA->getAngularVelocityWorld(), rA);
-        glm::dvec3 velB = bodyB->m_velocity + glm::cross(bodyB->getAngularVelocityWorld(), rB);
+        glm::dvec3 velA = bodyA->velocityAtPoint(contactPoint);
+        glm::dvec3 velB = bodyB->velocityAtPoint(contactPoint);
         glm::dvec3 computedRelativeVel = velA - velB;
         relativeVelNormal = glm::dot(computedRelativeVel, normal);
         relativeVelCompliant = glm::dot(computedRelativeVel, compliantNormal);

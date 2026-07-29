@@ -6,6 +6,7 @@
 #include "../RadialMenu.h"
 #include "../Grid.h"
 #include "../StructuralBlock.h"
+#include "../StructuralCommand.h"
 #include "../thruster/ThrusterBlock.h"
 #include "../cockpit/CockpitBlock.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
@@ -37,6 +38,14 @@ static std::optional<glm::ivec3> findMultiCellAnchor(
         if (fits) return candidate;
     }
     return std::nullopt;
+}
+
+static CellType toCellType(BuildTool::BlockType blockType) {
+    switch (blockType) {
+        case BuildTool::BlockType::THRUSTER: return CellType::THRUSTER;
+        case BuildTool::BlockType::COCKPIT:  return CellType::COCKPIT;
+        default:                             return CellType::STRUCTURAL_BLOCK;
+    }
 }
 
 BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
@@ -227,9 +236,8 @@ void BuildTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
             }
         } else {
             glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
-            auto newGridWeak = m_gameBase->createGrid(newGridPos);
-            Grid* newGrid = newGridWeak.lock().get();
-            addGridBlock(newGrid, 0, 0, 0);
+            m_gameBase->requestStructuralEdit(StructuralCommand::spawnGrid(
+                newGridPos, toCellType(m_selectedBlockType), m_targetOrientation));
         }
     }
 
@@ -237,11 +245,8 @@ void BuildTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
         if (blockFound) {
             auto targetGrid = targetGridWeak.lock();
             if (targetGrid) {
-                auto removedCoords = removeGridBlock(targetGrid.get(), hitPos.x, hitPos.y, hitPos.z);
-                handleGridSplitting(targetGridWeak, removedCoords);
-                if (targetGrid->isEmpty()) {
-                    m_gameBase->removeGrid(targetGridWeak);
-                }
+                m_gameBase->requestStructuralEdit(
+                    StructuralCommand::removeCell(targetGrid->uniqueId, hitPos));
             }
         }
     }
@@ -316,40 +321,25 @@ void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
     const auto& registry = grid->getCellRegistry();
 
     if (m_selectedBlockType == BlockType::STRUCTURAL_BLOCK) {
-        grid->addCell(targetPos);
+        m_gameBase->requestStructuralEdit(
+            StructuralCommand::addCell(grid->uniqueId, targetPos));
     } else if (m_selectedBlockType == BlockType::THRUSTER) {
         auto anchor = findMultiCellAnchor(
             targetPos, ThrusterBlock::footprintOffsets(m_targetOrientation),
             [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
-        if (anchor) grid->addThruster(*anchor, m_targetOrientation);
+        if (anchor) {
+            m_gameBase->requestStructuralEdit(StructuralCommand::addThruster(
+                grid->uniqueId, *anchor, m_targetOrientation));
+        }
     } else if (m_selectedBlockType == BlockType::COCKPIT) {
         auto anchor = findMultiCellAnchor(
             targetPos, CockpitBlock::footprintOffsets(m_targetOrientation),
             [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
-        if (anchor) grid->addCockpit(*anchor, m_targetOrientation);
-    }
-}
-
-std::vector<glm::ivec3> BuildTool::removeGridBlock(Grid* grid, int x, int y, int z) {
-    if (!grid) return {};
-    return grid->removeCell(glm::ivec3(x, y, z));
-}
-
-void BuildTool::handleGridSplitting(std::weak_ptr<Grid> targetGrid,
-                                     const std::vector<glm::ivec3>& removedCoords) {
-    static const glm::ivec3 directions[6] = {
-        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
-    };
-
-    std::vector<glm::ivec3> edgeCoords;
-    edgeCoords.reserve(removedCoords.size() * 6);
-    for (const auto& pos : removedCoords) {
-        for (const auto& dir : directions) {
-            edgeCoords.push_back(pos + dir);
+        if (anchor) {
+            m_gameBase->requestStructuralEdit(StructuralCommand::addCockpit(
+                grid->uniqueId, *anchor, m_targetOrientation));
         }
     }
-
-    m_gameBase->scheduleGridSplitCheck(targetGrid, edgeCoords);
 }
 
 void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGrids) {

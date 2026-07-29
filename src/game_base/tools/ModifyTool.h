@@ -66,12 +66,7 @@ private:
     std::weak_ptr<Geometry> m_arrowGeometry;
     std::vector<std::weak_ptr<Instance>> m_arrowInstances;
     int m_currentSelectedGridSsboIndex{-1};
-    
-    // Cell modification data
-    std::weak_ptr<Grid> m_modificationGrid;
-    glm::ivec3 m_modificationCoord;
-    std::array<glm::ivec3, 8> m_modificationVertices;
-    
+
     // Menu structure
     int64_t m_modifyToolParentId{-1};
     int64_t m_centerNodeId{-1};

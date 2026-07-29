@@ -26,6 +26,9 @@ public:
     struct Message {
         ConnectionId m_connection{0};
         std::vector<std::byte> m_data{};
+        // Which channel delivered it: reliable messages arrived in send order
+        // relative to each other, unreliable ones carry no ordering guarantee.
+        bool m_reliable{false};
     };
 
     virtual ~INetworkTransport() = default;

@@ -29,8 +29,18 @@ public:
     
     virtual void frameProcessInputs() override;
     virtual void stepControl() override;
-    
+    virtual bool isControllingCharacter() const override;
+    virtual bool wantsCharacterControl() const override;
+    virtual std::weak_ptr<Digibot> desiredCharacter() const override;
+    virtual void bindCharacter(const std::weak_ptr<Digibot>& character) override {
+        m_boundCharacter = character;
+    }
+    virtual bool hasBoundCharacter() const override;
+
 private:
+    // Character granted to this peer, driven while the selection tool is engaged.
+    // Bound by the layer above; until then the tool waits in free camera.
+    std::weak_ptr<Digibot> m_boundCharacter{};
     // Interaction range for tools and sensors
     double m_interactionRange = 20.0;
 

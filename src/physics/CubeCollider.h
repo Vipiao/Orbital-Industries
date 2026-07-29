@@ -16,7 +16,7 @@ public:
     virtual int getTypeId() const override { return TYPE_ID; }
     
     // Type identification
-    static constexpr int TYPE_ID = Hash::hashColliderName("CubeCollider");
+    static constexpr int TYPE_ID = Hash::hashName("CubeCollider");
 
 private:
 

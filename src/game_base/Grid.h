@@ -33,9 +33,9 @@ public:
     // Unique identifier for deterministic sorting
     const uint64_t uniqueId;
 
-    // Constructor now takes physics and graphics pointers
-    Grid(PhysicsEngine* physics, GraphicsEngine* graphics, JobManager* jobManager,
-         TimeHandler* timeHandler, BlockResourceCache* blockResources,
+    // Id supplied by the caller (GridSubsystem owns allocation) rather than auto-generated.
+    Grid(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
+         JobManager* jobManager, TimeHandler* timeHandler, BlockResourceCache* blockResources,
          const glm::dvec3& position,
          const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
     ~Grid();
@@ -70,11 +70,27 @@ public:
     bool modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& newVertices);
 
     /**
+     * @brief Nudge one corner of a cell by a direction, validating the result.
+     *
+     * Applies the nudge to the cell's current vertices, so repeated nudges compose,
+     * and only commits if the resulting shape is valid. cornerIndex must be in [0, 8).
+     * @return true if the modification was applied, false otherwise
+     */
+    bool nudgeCellVertex(const glm::ivec3& coord, int cornerIndex, const glm::ivec3& direction);
+
+    /**
      * @brief Set color of an existing cell and update graphics
      * @param coord Grid coordinate of the cell
      * @param newColor New color to apply
      */
     void setColor(const glm::ivec3& coord, const glm::dvec4& newColor);
+
+    // Bumped by every call that changes cells, thruster/cockpit anchors or a
+    // cell's color — never by pose, motion or throttle. A cheap way for a
+    // consumer to tell whether anything it cares about has changed since it
+    // last looked, without knowing what that consumer is (e.g. a cached
+    // fingerprint of the structure, see GridSerializer::structureHash).
+    uint64_t getStructureVersion() const { return m_structureVersion; }
 
     // Structural analysis visualization (analysis runs automatically as background job)
     void visualizeStructuralIntegrity();
@@ -83,6 +99,10 @@ public:
     void updateGraphics(const glm::dvec3& cameraPos);
     
     std::weak_ptr<RigidBody> getRigidBody() const { return m_rigidBody; }
+
+    // Radius of a sphere that encloses the grid's cells, about its origin. A coarse
+    // extent for culling, priority and other whole-grid size estimates.
+    double getApproximateRadius() const;
 
     // Get collider for subsystem queries
     std::weak_ptr<Collider> getCollider() const;
@@ -127,6 +147,11 @@ public:
         return m_thrusterCells;
     }
 
+    // Cockpit anchors (owning map).
+    const std::unordered_map<glm::ivec3, CockpitBlock, Hash::IVec3Hash>& getCockpitCells() const {
+        return m_cockpitCells;
+    }
+
     // Set the stored throttle [0, 1] of the thruster anchored at the coord
     // (no-op if there is no thruster there).
     void setThrusterLevel(const glm::ivec3& anchorCoord, double level);
@@ -135,6 +160,8 @@ public:
     virtual size_t computeHash() const override;
 
 private:
+    uint64_t m_structureVersion{0};
+
     // Job management
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
@@ -145,9 +172,6 @@ private:
     static constexpr int MAX_ANALYSIS_ITERATIONS = 8;
     static constexpr double WEAKNESS_BLEND_FACTOR = 0.2; // New result weight in running average
     
-    // Static counter for unique IDs
-    static uint64_t s_nextUniqueId;
-
     // Structural blocks (owning)
     std::unordered_map<glm::ivec3, StructuralBlock, Hash::IVec3Hash> m_cells;
 
@@ -191,7 +215,6 @@ private:
     // Face visibility and mesh management methods
     void updateCellMassContribution(const glm::ivec3& coord, double sign);
     void updateRigidBodyInverses();
-    double getApproximateRadius() const;
 
     // Mesh generation and filtering
     PolyhedronProcessor::MeshData generateFilteredMeshData(const glm::ivec3& coord);

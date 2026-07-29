@@ -92,8 +92,6 @@ private:
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);
     void addGridBlock(Grid* grid, int x, int y, int z);
-    std::vector<glm::ivec3> removeGridBlock(Grid* grid, int x, int y, int z);
-    void handleGridSplitting(std::weak_ptr<Grid> targetGrid, const std::vector<glm::ivec3>& removedCoords);
 
     // Ghost management
     void updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGrids);

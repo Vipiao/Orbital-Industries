@@ -52,34 +52,32 @@ const glm::dmat3& RigidBody::getWorldInvInertiaTensor() const {
     return m_cachedWorldInvInertiaTensor;
 }
 
-void RigidBody::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, 
-                                        glm::dquat& outOrientation) const {
-    // Forward interpolation based on current velocity and angular velocity
-    // timeRemainder represents the fractional time since the last physics update [0-1]
-    
-    // Linear position interpolation: p' = p + v * t
-    outPosition = m_position + m_velocity * timeRemainder;
-    
-    // Angular position interpolation using angular velocity
-    // We need to construct a quaternion that represents a partial rotation
-    const glm::dvec3& angVel = getAngularVelocityWorld();
-    double angVelMagnitudeSqr = glm::length2(angVel);
-    
-    if (angVelMagnitudeSqr > 1e-10) {
-        // Create rotation quaternion based on angular velocity
-        double angVelMagnitude{ glm::sqrt(angVelMagnitudeSqr) };
-        glm::dvec3 axis = angVel / angVelMagnitude;
-        double angle = angVelMagnitude * timeRemainder;
-        
-        // Create rotation quaternion for the partial time step
-        glm::dquat partialRotation = glm::angleAxis(angle, axis);
-        
-        // Apply the partial rotation to the current orientation
-        outOrientation = partialRotation * m_orientation;
-    } else {
-        // No significant rotation, just use the current orientation
-        outOrientation = m_orientation;
+std::weak_ptr<Collider> RigidBody::getPrimaryCollider() const {
+    for (const std::unique_ptr<ColliderAttachment>& attachment : m_attachments) {
+        if (!attachment->isTrigger) {
+            return attachment->collider;
+        }
     }
+    return {};
+}
+
+glm::dquat RigidBody::integrateOrientation(const glm::dquat& orientation,
+                                           const glm::dvec3& angularVelocityWorld,
+                                           double dtTicks) {
+    double speed{glm::length(angularVelocityWorld)};
+    if (speed <= 0.0) {
+        return orientation;
+    }
+    return glm::normalize(
+        glm::angleAxis(speed * dtTicks, angularVelocityWorld / speed) * orientation);
+}
+
+void RigidBody::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition,
+                                        glm::dquat& outOrientation) const {
+    // timeRemainder: fraction of a tick since the last physics update.
+    outPosition = m_position + m_velocity * timeRemainder;
+    outOrientation = integrateOrientation(m_orientation, getAngularVelocityWorld(),
+                                          timeRemainder);
 }
 
 // RigidBody invalidation methods

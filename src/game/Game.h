@@ -12,7 +12,7 @@ class GameBase;
 class DebugVisualization;
 class Mode;
 class INetworkTransport;
-class GameNetwork;
+class GameNetworkBase;
 class TimeHandler;
 
 class Game {
@@ -28,15 +28,12 @@ public:
     void run();
 
 private:
-    // Server and client build the identical world so object ids line up;
-    // network sync then matches state by id with no create/destroy replication.
-    void setupWorld();
     void setupDebugVisualization();
 
     std::unique_ptr<GameBase> m_gameBase;
     std::unique_ptr<DebugVisualization> m_debugViz;
     std::unique_ptr<Mode> m_mode;
     std::unique_ptr<INetworkTransport> m_transport;
-    std::unique_ptr<GameNetwork> m_gameNetwork;
+    std::unique_ptr<GameNetworkBase> m_gameNetwork;
     DebugRendererGuard m_debugGuard;
 };

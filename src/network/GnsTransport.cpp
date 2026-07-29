@@ -89,7 +89,8 @@ struct GnsTransport::Impl {
                 break;
             }
             Message message{ConnectionId{incoming->m_conn},
-                            std::vector<std::byte>(incoming->m_cbSize)};
+                            std::vector<std::byte>(incoming->m_cbSize),
+                            (incoming->m_nFlags & k_nSteamNetworkingSend_Reliable) != 0};
             std::memcpy(message.m_data.data(), incoming->m_pData,
                         static_cast<std::size_t>(incoming->m_cbSize));
             out.push_back(std::move(message));
@@ -191,11 +192,15 @@ void GnsTransport::poll() {
 void GnsTransport::send(ConnectionId connection, std::span<const std::byte> data,
                         bool reliable) {
     assert(connection != ConnectionId{0});
-    m_impl->m_interface->SendMessageToConnection(
+    EResult result{m_impl->m_interface->SendMessageToConnection(
         static_cast<HSteamNetConnection>(connection), data.data(),
         static_cast<uint32>(data.size()),
         reliable ? k_nSteamNetworkingSend_Reliable : k_nSteamNetworkingSend_Unreliable,
-        nullptr);
+        nullptr)};
+    if (result != k_EResultOK) {  // temp: diagnose grid-scaling send drops
+        std::cout << "[net] send rejected result=" << static_cast<int>(result)
+                  << " size=" << data.size() << " reliable=" << reliable << std::endl;
+    }
 }
 
 std::vector<INetworkTransport::Event> GnsTransport::drainEvents() {

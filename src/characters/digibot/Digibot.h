@@ -57,6 +57,7 @@ public:
 
     // Controller access
     DigibotController* getController() { return m_digibotController.get(); }
+    const DigibotController* getController() const { return m_digibotController.get(); }
 
     // Walking sensor (trigger ball around the body) for game-layer proximity queries
     std::weak_ptr<Collider> getWalkingSensor() const;

@@ -1,6 +1,7 @@
 // ColorTool.cpp
 #include "ColorTool.h"
 #include "../GameBase.h"
+#include "../StructuralCommand.h"
 #include "graphics/GraphicsEngine.h"
 #include "../RadialMenu.h"
 #include "../Grid.h"
@@ -176,10 +177,12 @@ void ColorTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
                     updateColorPreviews();
                 }
                 if (m_doPaste) {
-                    // Convert current HSV color to RGB and apply to block
+                    // Convert current HSV color to RGB and request the recolor.
                     glm::dvec3 hsv = glm::dvec3(m_currentColor.x, m_currentColor.y, m_currentColor.z);
                     glm::dvec3 rgb = ColorUtils::hsvToRgb(hsv);
-                    targetGrid->setColor(hitPos, glm::dvec4(rgb.r, rgb.g, rgb.b, m_currentColor.w));
+                    glm::dvec4 rgba{rgb.r, rgb.g, rgb.b, m_currentColor.w};
+                    m_gameBase->requestStructuralEdit(
+                        StructuralCommand::setColor(targetGrid->uniqueId, hitPos, rgba));
                 }
             }
         }

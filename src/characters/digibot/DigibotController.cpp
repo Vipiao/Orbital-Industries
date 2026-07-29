@@ -22,6 +22,35 @@ DigibotController::DigibotController(DigibotPhysics* physics, PhysicsEngine* phy
     }
 }
 
+void DigibotController::applyInput(const DigibotInput& input,
+                                  const std::weak_ptr<RigidBody>& lockTargetBody) {
+    setMovementDirection(input.m_movementDirection);
+    setViewDirection(input.m_viewDirection);
+    setRollInput(input.m_rollInput);
+    setLockUpDirection(input.m_upDirectionLocked);
+    setJetpackEnabled(input.m_jetpackEnabled);
+
+    if (input.m_lockState == DigibotLockState::UNLOCKED) {
+        unlock();
+    } else {
+        setLockState(input.m_lockState);
+        setTargetRigidBody(lockTargetBody);
+    }
+}
+
+DigibotInput DigibotController::captureInput() const {
+    DigibotInput input{};
+    input.m_movementDirection = m_movementDirection;
+    input.m_viewDirection = m_viewDirection;
+    input.m_rollInput = m_rollInput;
+    input.m_upDirectionLocked = m_isUpDirectionLocked;
+    input.m_jetpackEnabled = m_isJetpackEnabled;
+    input.m_lockState = m_lockState;
+    // Left unset; the caller that owns id mapping fills in the real target.
+    input.m_lockTargetGridId = DigibotInput::k_noLockTargetGridId;
+    return input;
+}
+
 void DigibotController::setViewDirection(const glm::dvec3& viewDirection) {
     // Normalize to ensure it's a unit direction vector
     m_viewDirection = glm::normalize(viewDirection);
@@ -35,7 +64,13 @@ void DigibotController::setRollInput(int rollInput) {
     m_rollInput = rollInput;
 }
 
+// The state setters are idempotent: transition work (and its logging) fires only on
+// an actual change, so level-driven callers may restate the current state every tick.
+
 void DigibotController::setJetpackEnabled(bool enabled) {
+    if (enabled == m_isJetpackEnabled) {
+        return;
+    }
     m_isJetpackEnabled = enabled;
     if (enabled) {
         m_walkingMode.resetContactState();
@@ -44,11 +79,17 @@ void DigibotController::setJetpackEnabled(bool enabled) {
 }
 
 void DigibotController::setTargetRigidBody(std::weak_ptr<RigidBody> rigidBody) {
+    if (m_targetRigidBody.lock() == rigidBody.lock()) {
+        return;
+    }
     m_targetRigidBody = rigidBody;
     std::cout << "Target rigid body set" << std::endl;
 }
 
 void DigibotController::unlock() {
+    if (m_lockState == DigibotLockState::UNLOCKED && !m_targetRigidBody.lock()) {
+        return;
+    }
     m_targetRigidBody.reset();
     m_lockState = DigibotLockState::UNLOCKED;
     std::cout << "Unlocked" << std::endl;
@@ -92,6 +133,13 @@ void DigibotController::requestUnseat() {
         m_dockingState = DockingState::DOCKED;
         m_dockingMode.disarmSeatCapture();
         std::cout << "Unseated: back in the docking corridor" << std::endl;
+    }
+}
+
+void DigibotController::forceSeat() {
+    if (m_dockingState == DockingState::DOCKED) {
+        m_dockingState = DockingState::SEATED;
+        std::cout << "Seated in cockpit" << std::endl;
     }
 }
 
@@ -210,6 +258,8 @@ void DigibotController::applyWrench(const std::weak_ptr<RigidBody>& bodyWeak,
 }
 
 void DigibotController::stepControl() {
+    m_desiredTransition = DockingTransition::NONE;
+
     auto rigidBodyWeak = m_physics->getRigidBody();
     auto rigidBody = rigidBodyWeak.lock();
     if (!rigidBody) {
@@ -237,8 +287,7 @@ void DigibotController::stepControl() {
             applyWrench(rigidBodyWeak, rigidBody, result.m_wrench, 1.0);
             if (result.m_wantRelease) {
                 // Restraint overwhelmed - thrown back into the corridor
-                m_dockingState = DockingState::DOCKED;
-                m_dockingMode.disarmSeatCapture();
+                m_desiredTransition = DockingTransition::UNSEAT;
             }
             return;
         }
@@ -251,10 +300,9 @@ void DigibotController::stepControl() {
                 rigidBody, gridBody, m_dockingTarget, inputs)};
             applyWrench(rigidBodyWeak, rigidBody, result.m_wrench, 1.0);
             if (result.m_wantRelease) {
-                releaseDocking();
+                m_desiredTransition = DockingTransition::RELEASE;
             } else if (result.m_wantSeat) {
-                m_dockingState = DockingState::SEATED;
-                std::cout << "Seated in cockpit" << std::endl;
+                m_desiredTransition = DockingTransition::SEAT;
             }
             return;
         }

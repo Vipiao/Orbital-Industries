@@ -48,7 +48,7 @@ public:
     const std::vector<glm::dvec3>& getFilterNormals() const;
 
     // Type identification
-    static constexpr int TYPE_ID = Hash::hashColliderName("PolyhedronCollider");
+    static constexpr int TYPE_ID = Hash::hashName("PolyhedronCollider");
 
 protected:
     std::vector<glm::dvec3> m_localVertices;

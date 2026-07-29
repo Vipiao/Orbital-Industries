@@ -7,7 +7,10 @@
 #include <vector>
 #include <functional>
 #include <chrono>
+#include <cstdint>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include "GridSplitPiece.h"
 #include "utils/Generator.h"
 #include "utils/HashFunctions.h"
 
@@ -25,15 +28,24 @@ class GridSplitter {
 public:
     /**
      * @brief Constructor
-     * @param createGridCallback Callback to create new grid: (position, orientation) -> weak_ptr<Grid>
-     * @param removeGridCallback Callback to remove grid: (grid) -> void
+     * @param allocateGridIdCallback Allocate a fresh grid id for a split piece
+     * @param createGridCallback Create a grid with a given id: (id, position, orientation)
      * @param timeHandler Pointer to time handler for timing checks
      */
     GridSplitter(
-        std::function<std::weak_ptr<Grid>(const glm::dvec3&, const glm::dquat&)> createGridCallback,
-        std::function<void(std::weak_ptr<Grid>)> removeGridCallback,
+        std::function<uint64_t()> allocateGridIdCallback,
+        std::function<std::weak_ptr<Grid>(uint64_t, const glm::dvec3&, const glm::dquat&)>
+            createGridCallback,
         TimeHandler* timeHandler
     );
+
+    // Realise a split on sourceGrid: create each piece with its id, move its cells over
+    // (preserving type, vertices, colour, thruster throttle), and give it the source's
+    // motion at the piece's centre of mass. Momentum-preserving; the largest partition
+    // is not a piece and stays as the source. Used by local detection and decoded
+    // commands alike.
+    void applySplit(const std::shared_ptr<Grid>& sourceGrid,
+                    const std::vector<GridSplitPiece>& pieces);
 
     ~GridSplitter();
 
@@ -52,6 +64,9 @@ public:
      */
     bool handlePendingSplits(std::chrono::time_point<std::chrono::high_resolution_clock> endTime);
 
+    // Splits realised since the last drain, in the order they completed.
+    std::vector<GridSplitResult> drainCompletedSplits();
+
 private:
     // A scheduled split check: the grid to analyze and the edge coordinates
     // near removed blocks
@@ -61,13 +76,17 @@ private:
     };
 
     // Callbacks for grid operations
-    std::function<std::weak_ptr<Grid>(const glm::dvec3&, const glm::dquat&)> m_createGridCallback;
-    std::function<void(std::weak_ptr<Grid>)> m_removeGridCallback;
+    std::function<uint64_t()> m_allocateGridIdCallback;
+    std::function<std::weak_ptr<Grid>(uint64_t, const glm::dvec3&, const glm::dquat&)>
+        m_createGridCallback;
 
     TimeHandler* m_timeHandler;
 
     // Newly scheduled splits, keyed by grid unique id so edge coords deduplicate per grid
     std::unordered_map<uint64_t, PendingSplit> m_pendingGridSplits;
+
+    // Realised splits awaiting drain by the caller.
+    std::vector<GridSplitResult> m_completedSplits;
 
     // Current drain, processed one grid at a time from the back
     std::vector<PendingSplit> m_splitQueue;

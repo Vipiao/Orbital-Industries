@@ -2,6 +2,7 @@
 #include "GridSubsystem.h"
 #include "BlockResourceCache.h"
 #include "../physics/PhysicsEngine.h"
+#include "../physics/RigidBody.h"
 #include "../physics/SensorCollider.h"
 #include "../physics/GridCollider.h"
 #include "graphics/GraphicsEngine.h"
@@ -32,13 +33,9 @@ GridSubsystem::GridSubsystem(
 
     // Create GridSplitter with callbacks to this subsystem
     m_gridSplitter = std::make_unique<GridSplitter>(
-        // Create grid callback
-        [this](const glm::dvec3& pos, const glm::dquat& ori) {
-            return createGrid(pos, ori);
-        },
-        // Remove grid callback
-        [this](std::weak_ptr<Grid> grid) {
-            removeGrid(grid);
+        [this]() { return allocateGridId(); },
+        [this](uint64_t id, const glm::dvec3& pos, const glm::dquat& ori) {
+            return createGrid(id, pos, ori);
         },
         m_timeHandler
     );
@@ -54,7 +51,15 @@ GridSubsystem::~GridSubsystem() {
 }
 
 std::weak_ptr<Grid> GridSubsystem::createGrid(const glm::dvec3& position, const glm::dquat& orientation) {
+    return createGrid(allocateGridId(), position, orientation);
+}
+
+std::weak_ptr<Grid> GridSubsystem::createGrid(uint64_t uniqueId, const glm::dvec3& position,
+                                              const glm::dquat& orientation) {
+    m_nextGridId = std::max(m_nextGridId, uniqueId + 1);
+
     auto grid = std::make_shared<Grid>(
+        uniqueId,
         m_physics,
         m_graphics,
         m_jobManager,
@@ -63,7 +68,7 @@ std::weak_ptr<Grid> GridSubsystem::createGrid(const glm::dvec3& position, const 
         position,
         orientation
     );
-    
+
     m_grids.push_back(std::move(grid));
     std::weak_ptr<Grid> gridPtr = m_grids.back();
     
@@ -124,6 +129,58 @@ bool GridSubsystem::handlePendingSplits(std::chrono::time_point<std::chrono::hig
     return m_gridSplitter->handlePendingSplits(endTime);
 }
 
+std::vector<glm::ivec3> GridSubsystem::removeCell(uint64_t gridId, const glm::ivec3& coord) {
+    std::shared_ptr<Grid> grid{getGridById(gridId).lock()};
+    if (!grid) {
+        return {};
+    }
+    return grid->removeCell(coord);
+}
+
+void GridSubsystem::despawnGrid(uint64_t gridId) {
+    removeGrid(getGridById(gridId));
+}
+
+bool GridSubsystem::modifyCell(uint64_t gridId, const glm::ivec3& coord, int cornerIndex,
+                               const glm::ivec3& direction) {
+    std::shared_ptr<Grid> grid{getGridById(gridId).lock()};
+    if (!grid) {
+        return false;
+    }
+    return grid->nudgeCellVertex(coord, cornerIndex, direction);
+}
+
+void GridSubsystem::scheduleSplitCheck(uint64_t gridId,
+                                       const std::vector<glm::ivec3>& seedCoords) {
+    std::shared_ptr<Grid> grid{getGridById(gridId).lock()};
+    if (!grid || seedCoords.empty()) {
+        return;
+    }
+    // Each seed and its neighbours are where a split could show up. Including the seed
+    // itself covers a modified cell (still present); an emptied cell simply has no cell
+    // there and is ignored by the analysis.
+    static const glm::ivec3 s_directions[6]{{1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
+                                            {0, -1, 0}, {0, 0, 1},  {0, 0, -1}};
+    std::vector<glm::ivec3> edgeCoords{};
+    edgeCoords.reserve(seedCoords.size() * 7);
+    for (const glm::ivec3& seed : seedCoords) {
+        edgeCoords.push_back(seed);
+        for (const glm::ivec3& direction : s_directions) {
+            edgeCoords.push_back(seed + direction);
+        }
+    }
+    scheduleGridSplitCheck(grid, edgeCoords);
+}
+
+void GridSubsystem::applySplit(uint64_t sourceGridId,
+                               const std::vector<GridSplitPiece>& pieces) {
+    std::shared_ptr<Grid> sourceGrid{getGridById(sourceGridId).lock()};
+    if (!sourceGrid) {
+        return;
+    }
+    m_gridSplitter->applySplit(sourceGrid, pieces);
+}
+
 void GridSubsystem::scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGrid, const std::vector<glm::ivec3>& edgeCoords) {
     m_gridSplitter->scheduleGridSplitCheck(sourceGrid, edgeCoords);
 }
@@ -153,6 +210,15 @@ std::weak_ptr<Grid> GridSubsystem::getGridFromCollider(Collider* collider) const
         return {};
     }
     return it->second;
+}
+
+std::weak_ptr<Grid> GridSubsystem::getGridFromBody(const std::weak_ptr<RigidBody>& body) const {
+    std::shared_ptr<RigidBody> lockedBody{body.lock()};
+    if (!lockedBody) {
+        return {};
+    }
+    std::shared_ptr<Collider> collider{lockedBody->getPrimaryCollider().lock()};
+    return collider ? getGridFromCollider(collider.get()) : std::weak_ptr<Grid>{};
 }
 
 size_t GridSubsystem::computeHash() const {

@@ -106,6 +106,127 @@ void GameBase::scheduleGridSplitCheck(std::weak_ptr<Grid> sourceGridWeak, const 
     m_gridSubsystem->scheduleGridSplitCheck(sourceGridWeak, edgeCoords);
 }
 
+void GameBase::applySplit(uint64_t sourceGridId, const std::vector<GridSplitPiece>& pieces) {
+    m_gridSubsystem->applySplit(sourceGridId, pieces);
+}
+
+void GameBase::applyStructural(const StructuralCommand& command) {
+    switch (command.m_op) {
+        case StructuralOp::SetColor: {
+            std::shared_ptr<Grid> grid{
+                m_gridSubsystem->getGridById(command.m_gridId).lock()};
+            if (grid) {
+                grid->setColor(command.m_coord, command.m_color);
+            }
+            break;
+        }
+        case StructuralOp::AddCell: {
+            std::shared_ptr<Grid> grid{
+                m_gridSubsystem->getGridById(command.m_gridId).lock()};
+            if (grid) {
+                grid->addCell(command.m_coord);
+            }
+            break;
+        }
+        case StructuralOp::RemoveCell:
+            removeCell(command.m_gridId, command.m_coord);
+            break;
+        case StructuralOp::ModifyCell:
+            modifyCell(command.m_gridId, command.m_coord, command.m_cornerIndex,
+                       command.m_direction);
+            break;
+        case StructuralOp::AddThruster: {
+            std::shared_ptr<Grid> grid{
+                m_gridSubsystem->getGridById(command.m_gridId).lock()};
+            if (grid) {
+                grid->addThruster(command.m_coord, command.m_orientation);
+            }
+            break;
+        }
+        case StructuralOp::AddCockpit: {
+            std::shared_ptr<Grid> grid{
+                m_gridSubsystem->getGridById(command.m_gridId).lock()};
+            if (grid) {
+                grid->addCockpit(command.m_coord, command.m_orientation);
+            }
+            break;
+        }
+        case StructuralOp::SplitGrid:
+            applySplit(command.m_gridId, command.m_pieces);
+            break;
+        case StructuralOp::SpawnGrid: {
+            std::shared_ptr<Grid> grid{
+                m_gridSubsystem->createGrid(command.m_gridId, command.m_position).lock()};
+            if (grid) {
+                switch (command.m_cellType) {
+                    case CellType::THRUSTER:
+                        grid->addThruster(glm::ivec3{0, 0, 0}, command.m_orientation);
+                        break;
+                    case CellType::COCKPIT:
+                        grid->addCockpit(glm::ivec3{0, 0, 0}, command.m_orientation);
+                        break;
+                    default:
+                        grid->addCell(glm::ivec3{0, 0, 0});
+                        break;
+                }
+            }
+            break;
+        }
+        case StructuralOp::DespawnGrid:
+            m_gridSubsystem->despawnGrid(command.m_gridId);
+            break;
+    }
+}
+
+std::vector<StructuralCommand> GameBase::resolveStructuralEdit(StructuralCommand& command) {
+    std::vector<StructuralCommand> followUps{};
+    switch (command.m_op) {
+        case StructuralOp::RemoveCell: {
+            std::vector<glm::ivec3> removed{removeCell(command.m_gridId, command.m_coord)};
+            std::shared_ptr<Grid> grid{
+                m_gridSubsystem->getGridById(command.m_gridId).lock()};
+            if (grid && grid->isEmpty()) {
+                m_gridSubsystem->despawnGrid(command.m_gridId);
+                followUps.push_back(StructuralCommand::despawnGrid(command.m_gridId));
+            } else if (grid) {
+                scheduleSplitCheck(command.m_gridId, removed);
+            }
+            break;
+        }
+        case StructuralOp::ModifyCell:
+            if (modifyCell(command.m_gridId, command.m_coord, command.m_cornerIndex,
+                           command.m_direction)) {
+                scheduleSplitCheck(command.m_gridId, {command.m_coord});
+            }
+            break;
+        case StructuralOp::SpawnGrid:
+            command.m_gridId = m_gridSubsystem->allocateGridId();
+            applyStructural(command);
+            break;
+        default:
+            applyStructural(command);
+            break;
+    }
+    return followUps;
+}
+
+std::vector<GridSplitResult> GameBase::drainSplitResults() {
+    return m_gridSubsystem->drainCompletedSplits();
+}
+
+std::vector<glm::ivec3> GameBase::removeCell(uint64_t gridId, const glm::ivec3& coord) {
+    return m_gridSubsystem->removeCell(gridId, coord);
+}
+
+void GameBase::scheduleSplitCheck(uint64_t gridId, const std::vector<glm::ivec3>& seedCoords) {
+    m_gridSubsystem->scheduleSplitCheck(gridId, seedCoords);
+}
+
+bool GameBase::modifyCell(uint64_t gridId, const glm::ivec3& coord, int cornerIndex,
+                          const glm::ivec3& direction) {
+    return m_gridSubsystem->modifyCell(gridId, coord, cornerIndex, direction);
+}
+
 GameBase::FrameStatus GameBase::advanceFrame() {
     switch (m_framePhase) {
     case FramePhase::FRAME_BEGIN:
@@ -171,6 +292,12 @@ void GameBase::prepareFrame() {
 
     // Update characters pre-render
     m_characterSubsystem->framePreRenderAll(m_graphicsEngine->getFrameNum(), timeRemainder);
+}
+
+void GameBase::nudgePhysicsSchedule(double ticks) {
+    m_nextPhysicsTime += std::chrono::duration_cast<
+        std::chrono::high_resolution_clock::duration>(
+        std::chrono::duration<double>(ticks * m_physicsTimeStep));
 }
 
 void GameBase::beginPhysicsWindow() {
@@ -274,6 +401,10 @@ GameBase::StepResult GameBase::updatePhysics(
             }
 
             m_characterSubsystem->stepControlAll();
+
+            // Docking transitions the controllers' physics asked for this step,
+            // applied before integration; the coordinator owns the state machine.
+            m_cockpitDockingCoordinator->applyDesiredTransitions();
 
             m_physicsUpdateState = PhysicsUpdateState::PHYSICS;
             [[fallthrough]];

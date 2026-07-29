@@ -200,6 +200,19 @@ void DebugVisualization::setPosition(const std::string& name, const glm::dvec3& 
     }
 }
 
+void DebugVisualization::setVelocity(const std::string& name, const glm::dvec3& velocity,
+                                     std::uint64_t timeStep) {
+    auto it = m_nameToId.find(name);
+    if (it != m_nameToId.end()) {
+        auto propsIt = m_meshProperties.find(it->second);
+        if (propsIt != m_meshProperties.end()) {
+            propsIt->second.velocity = velocity;
+            propsIt->second.timeStep = timeStep;
+            updateMeshTransform(it->second);
+        }
+    }
+}
+
 void DebugVisualization::setOrientation(const std::string& name, const glm::dquat& orientation) {
     auto it = m_nameToId.find(name);
     if (it != m_nameToId.end()) {
@@ -282,7 +295,7 @@ void DebugVisualization::updateMeshTransform(int id) {
         m_ssboManager->updateMeshTransform(
             meshIndex,
             props.position,
-            glm::dvec3(0.0),                      // velocity
+            props.velocity,
             props.orientation,
             glm::dvec3(0.0, 1.0, 0.0),           // angVelAxis
             0.0,                                  // angVel
@@ -291,7 +304,7 @@ void DebugVisualization::updateMeshTransform(int id) {
             -1,                                   // colorTextureUnit (handled by instance)
             -1,                                   // normalTextureUnit
             -1,                                   // materialTextureUnit
-            0,                                    // time
+            props.timeStep,
             1.0                                   // emissiveScalar
         );
     }

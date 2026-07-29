@@ -40,7 +40,7 @@ public:
     void setHalfScale(const glm::dvec3& halfScale) { m_halfScale = halfScale; }
     
     // Type identification
-    static constexpr int TYPE_ID = Hash::hashColliderName("SensorCollider");
+    static constexpr int TYPE_ID = Hash::hashName("SensorCollider");
 
 private:
     glm::dvec3 m_halfScale; // Half-widths in each axis (x, y, z)

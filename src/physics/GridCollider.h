@@ -111,7 +111,7 @@ public:
     std::unordered_map<glm::ivec3, Collider*, Hash::IVec3Hash> m_edgeCells;
 
     // Type identification  
-    static constexpr int TYPE_ID = Hash::hashColliderName("GridCollider");
+    static constexpr int TYPE_ID = Hash::hashName("GridCollider");
 
 private:
     /**
