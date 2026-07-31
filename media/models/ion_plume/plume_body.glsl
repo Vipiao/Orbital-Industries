@@ -87,7 +87,7 @@ float density(vec3 point, vec3 axisBase, vec3 axisDir)
     //float ring = sin(radialParam * PI*4.0 - 1.57)+1.;                 // rings; tune the 16
     float density = 0.5-radialParam;
     // Fade toward end.
-    density *= pow(2.-axialDist, 2.0);
+    density *= pow(2.-axialDist, 4.0);
     // Round the ring.
     float ff = 1.0;//sin(iTime)*0.5 + 0.5;
     density *= sin(radialDist * 4. * PI - ff*PI/2.) + ff;
@@ -155,6 +155,9 @@ RayVolumeResult rayVolumeShade(
    // Throttle scales the optical depth (a thinner plume rather than a uniform
    // transparency fade): the dense core fades last, the fringes first.
    depth *= thrust;
+
+   depth *= (sin(mod(physicsTime(), 2. * PI) + frameTime()) + 
+      sin(mod(physicsTime() * 0.77, 2. * PI) + frameTime() * 0.77)) * 0.125 + 0.75;
 
    res.color       = color.rgb + opaqueColor;
    res.alpha       = 1.0 - exp(-depth);
