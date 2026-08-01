@@ -163,7 +163,6 @@ private:
 
     static constexpr int s_maxStepsPerFrame{4};
 
-    std::chrono::time_point<std::chrono::high_resolution_clock> m_lastFrameTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_nextPhysicsTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_currentFrameStartTime;
     std::chrono::time_point<std::chrono::high_resolution_clock> m_targetFrameEnd;

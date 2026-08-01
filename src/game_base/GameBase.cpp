@@ -24,7 +24,12 @@ GameBase::GameBase(
     GraphicsEngineBase::Mode controlMode)
     : m_timeHandler(timeHandler)
 {
+    if (!m_timeHandler) {
+        throw std::runtime_error("TimeHandler cannot be null");
+    }
+
     m_graphicsEngine = std::make_unique<GraphicsEngine>(
+        m_timeHandler,
         screenWidth, 
         screenHeight, 
         windowTitle,
@@ -58,16 +63,11 @@ GameBase::GameBase(
     // Create cockpit docking coordinator (world-level, mode-independent)
     m_cockpitDockingCoordinator = std::make_unique<CockpitDockingCoordinator>();
 
-    if (!m_timeHandler) {
-        throw std::runtime_error("TimeHandler cannot be null");
-    }
-    
-    m_lastFrameTime = m_timeHandler->now();
-    m_nextPhysicsTime = m_lastFrameTime + 
+    m_nextPhysicsTime = m_timeHandler->now() +
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(m_physicsTimeStep));
-    
-    int refreshRate = m_graphicsEngine->getFrameRate();
+
+    int refreshRate = m_graphicsEngine->getMonitorRefreshRate();
     
     m_physicsTimeStep = 1.0 / static_cast<double>(m_physicsEngine->getPhysicsHz());
 
@@ -272,8 +272,9 @@ void GameBase::prepareFrame() {
     if (!m_timeHandler) {
         throw std::runtime_error("TimeHandler cannot be null");
     }
-    m_currentFrameStartTime = m_timeHandler->now();
-    m_lastFrameTime = m_currentFrameStartTime;
+    // The engine opened the frame and stamped its start; physics schedules
+    // against that same instant rather than sampling the clock a second time.
+    m_currentFrameStartTime = m_graphicsEngine->getFrameStartTime();
 
     auto timeSinceLastPhysics = std::chrono::duration<double>(
         m_currentFrameStartTime - m_physicsEngine->getLastPhysicsStepTime()).count();
@@ -305,7 +306,11 @@ void GameBase::beginPhysicsWindow() {
         throw std::runtime_error("TimeHandler cannot be null");
     }
 
-    double targetFrameDuration = 1.0 / static_cast<double>(m_graphicsEngine->getFrameRate());
+    // Paces work against the display, so it wants the mode's rate: deriving the
+    // budget from the measured rate would feed back on itself, a slow frame
+    // granting a larger budget that makes the next frame slower still.
+    double targetFrameDuration =
+        1.0 / static_cast<double>(m_graphicsEngine->getMonitorRefreshRate());
     m_targetFrameEnd = m_currentFrameStartTime +
         std::chrono::duration_cast<std::chrono::high_resolution_clock::duration>(
             std::chrono::duration<double>(targetFrameDuration));

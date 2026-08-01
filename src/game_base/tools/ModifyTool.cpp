@@ -154,8 +154,8 @@ void ModifyTool::framePreRender(bool doModify, bool doCancel) {
     updateMarkerPositions();
 
     // Update wrench animation angles
-    int frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
-    double deltaTime = 1.0 / static_cast<double>(frameRate);
+    double frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
+    double deltaTime = 1.0 / frameRate;
     // Target angle lerps toward 0 at 2% per frame (small decay)
     //m_targetAngle = m_targetAngle * 0.95;
     m_targetAngle = m_targetAngle * glm::exp(-8 * deltaTime);

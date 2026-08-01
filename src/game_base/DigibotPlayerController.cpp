@@ -155,7 +155,7 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
         KeyboardHandler* keyboard = m_graphics->getKeyboardHandler();
         if (keyboard) {
             // Calculate full lock threshold (0.3 seconds worth of frames)
-            uint64_t fullLockThreshold = static_cast<uint64_t>(0.3 * static_cast<double>(m_graphics->getFrameRate()));
+            uint64_t fullLockThreshold = static_cast<uint64_t>(0.3 * m_graphics->getFrameRate());
             
             // Get current lock state
             DigibotLockState lockState = controller->getLockState();

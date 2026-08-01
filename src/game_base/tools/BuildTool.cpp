@@ -151,8 +151,8 @@ void BuildTool::framePreRender(bool doCreate, bool doRemove) {
     }
 
     // --- Exponential slerp of rendered orientation toward target ---
-    int    frameRate  = m_gameBase->m_graphicsEngine->getFrameRate();
-    double deltaTime  = 1.0 / static_cast<double>(frameRate > 0 ? frameRate : 60);
+    double frameRate  = m_gameBase->m_graphicsEngine->getFrameRate();
+    double deltaTime  = 1.0 / (frameRate > 0.0 ? frameRate : 60.0);
     double slerpAlpha = 1.0 - glm::exp(-k_orientationSlerpRate * deltaTime);
     m_renderedOrientation = glm::normalize(
         glm::slerp(m_renderedOrientation, m_targetOrientation, slerpAlpha));

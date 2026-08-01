@@ -63,7 +63,7 @@ void Digibot::framePreRender(uint64_t frameNum, double timeRemainder) {
         animCtx.m_digibotWorldOrientation = rigidBodyForAnim->m_orientation;
         animCtx.m_digibotWorldVelocity    = rigidBodyForAnim->m_velocity;
         animCtx.m_deltaTime               = static_cast<double>(m_physics->getPhysicsHz())
-            / static_cast<double>(m_graphicsEngine->getFrameRate());
+            / m_graphicsEngine->getFrameRate();
 
         DigibotController::DockingState dockingState =
             m_digibotController->getDockingState();

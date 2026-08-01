@@ -406,8 +406,8 @@ void Creative::processInputLogic() {
     // TEST END
     
     // Get frame timing for deltaTime calculation
-    int frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
-    double deltaTime = 1.0 / static_cast<double>(frameRate);
+    double frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
+    double deltaTime = 1.0 / frameRate;
     
     // Structural analysis with G key
     if (keyboard->m_g.justPressed()) {

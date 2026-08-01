@@ -20,7 +20,10 @@ struct DigibotAnimationContext {
     // World velocity, displacement per physics step (like RigidBody::m_velocity)
     glm::dvec3 m_digibotWorldVelocity{0.0, 0.0, 0.0};
 
-    // Nominal frame duration in physics-step units (physicsHz / frameRate)
+    // Measured frame duration in physics-step units (physicsHz / frameRate).
+    // Must track the frame rate actually achieved: the swing advances by this
+    // much per frame, so a nominal value ties the swing's real duration to how
+    // far the achieved rate happens to sit from it.
     double m_deltaTime{0.0};
 
     // Ground contact info — valid when m_mode == Walking and m_hasGroundContact == true
