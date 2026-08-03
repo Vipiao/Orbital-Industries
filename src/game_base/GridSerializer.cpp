@@ -108,8 +108,8 @@ void GridSerializer::serialize(const Grid& grid, ByteWriter& writer) {
     glm::dquat orientation{1.0, 0.0, 0.0, 0.0};
     std::shared_ptr<RigidBody> body{grid.getRigidBody().lock()};
     if (body) {
-        position = body->m_position;
-        orientation = body->m_orientation;
+        position = body->getPosition();
+        orientation = body->getOrientation();
     }
     writer.write(position.x);
     writer.write(position.y);

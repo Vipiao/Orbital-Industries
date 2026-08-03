@@ -3,6 +3,8 @@
 #include "utils/HashFunctions.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/norm.hpp>
+#include <cassert>
+#include <limits>
 
 // RigidBody cached getter implementations
 const glm::dmat3& RigidBody::getOrientationMatrix() const {
@@ -30,8 +32,43 @@ const glm::dvec3& RigidBody::getAngularVelocityWorld() const {
 }
 
 void RigidBody::setAngularVelocityBody(glm::dvec3 angularVelocity) {
+    assert(RigidBodyDetail::isFinite(angularVelocity) && "angular velocity must be finite");
     m_angularMomentumBody = m_inertiaTensor * angularVelocity;
     invalidateAngularMomentum();
+}
+
+void RigidBody::setMassProperties(double mass, const glm::dvec3& centerOfMassLocal,
+                                  const glm::dmat3& inertiaTensor) {
+    assert(std::isfinite(mass) && "mass must be finite");
+    assert(mass >= 0.0 && "negative mass: a cell was probably removed twice");
+    assert(RigidBodyDetail::isFinite(centerOfMassLocal) && "center of mass must be finite");
+    assert(RigidBodyDetail::isFinite(inertiaTensor) && "inertia tensor must be finite");
+    m_mass = mass;
+    m_centerOfMassLocal = centerOfMassLocal;
+    m_inertiaTensor = inertiaTensor;
+    refreshInverses();
+    invalidateInertiaTensor();
+    m_worldCenterOfMassDirty = true;
+}
+
+void RigidBody::setStatic(bool isStatic) {
+    m_isStatic = isStatic;
+    refreshInverses();
+    invalidateInertiaTensor();
+}
+
+void RigidBody::refreshInverses() {
+    if (m_isStatic) {
+        // Infinite effective mass: impulses and corrections leave the body untouched.
+        m_invMass = 0.0;
+        m_invInertiaTensor = glm::dmat3{0.0};
+        return;
+    }
+    m_invMass = (m_mass > 1e-15) ? (1.0 / m_mass) : std::numeric_limits<double>::max();
+    double determinant{glm::determinant(m_inertiaTensor)};
+    m_invInertiaTensor = (determinant > 1e-15)
+                             ? glm::inverse(m_inertiaTensor)
+                             : glm::dmat3{std::numeric_limits<double>::max()};
 }
 
 const glm::dmat3& RigidBody::getWorldInertiaTensor() const {
@@ -72,12 +109,23 @@ glm::dquat RigidBody::integrateOrientation(const glm::dquat& orientation,
         glm::angleAxis(speed * dtTicks, angularVelocityWorld / speed) * orientation);
 }
 
+void RigidBody::rotateAboutCenterOfMass(const glm::dquat& rotation) {
+    assert(RigidBodyDetail::isUnitQuaternion(rotation) &&
+           "rotation must be normalized or it would rescale the body");
+    glm::dvec3 worldCenterOfMass{getWorldCenterOfMass()};
+    m_orientation = glm::normalize(rotation * m_orientation);
+    invalidateOrientation();  // also dirties the world COM cache for the write below
+    m_position = worldCenterOfMass - m_orientation * m_centerOfMassLocal;
+}
+
 void RigidBody::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition,
                                         glm::dquat& outOrientation) const {
-    // timeRemainder: fraction of a tick since the last physics update.
-    outPosition = m_position + m_velocity * timeRemainder;
+    // timeRemainder: fraction of a tick since the last physics update. The center
+    // of mass travels linearly and the body rotates about it; the origin follows.
     outOrientation = integrateOrientation(m_orientation, getAngularVelocityWorld(),
                                           timeRemainder);
+    outPosition = getWorldCenterOfMass() + m_velocity * timeRemainder -
+                  outOrientation * m_centerOfMassLocal;
 }
 
 // RigidBody invalidation methods
@@ -86,6 +134,7 @@ void RigidBody::invalidateOrientation() {
     m_angularVelocityWorldDirty = true;  // world = R * body; body unchanged
     m_worldInertiaTensorDirty = true;
     m_worldInvInertiaTensorDirty = true;
+    m_worldCenterOfMassDirty = true;     // world COM = position + R * local COM
 }
 
 void RigidBody::invalidateAngularMomentum() {
@@ -97,6 +146,7 @@ size_t RigidBody::computeHash() const {
     size_t hash = 0;
     
     hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_position));
+    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_centerOfMassLocal));
     hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_velocity));
     hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_forces));
     hash = Hash::combineHashes(hash, Hash::DQuatHash{}(m_orientation));

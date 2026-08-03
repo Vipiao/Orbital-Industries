@@ -26,15 +26,23 @@ namespace {
 const double k_manifestIntervalTicks{PhysicsUnits::seconds(5.0)};
 
 // A state advanced dtTicks along its own velocity and spin, for sub-tick time
-// alignment. invInertiaTensor (body space) turns its angular momentum into spin.
+// alignment. The body supplies the inverse inertia that turns angular momentum into
+// spin, and the centre-of-mass offset the motion is built around: the velocity
+// carries the centre of mass while the body turns about it, and the origin the
+// state stores follows from the two. Mirrors RigidBody::getInterpolatedTransform.
 RigidBodyState shiftedInTime(const RigidBodyState& state, double dtTicks,
-                             const glm::dmat3& invInertiaTensor) {
+                             const RigidBody& body) {
     RigidBodyState result{state};
-    result.m_position += state.m_velocity * dtTicks;
-    glm::dvec3 angularVelocityWorld{
-        glm::mat3_cast(state.m_orientation) * (invInertiaTensor * state.m_angularMomentumBody)};
+    glm::dvec3 angularVelocityWorld{glm::mat3_cast(state.m_orientation) *
+                                    (body.getInvInertiaTensor() * state.m_angularMomentumBody)};
     result.m_orientation = RigidBody::integrateOrientation(state.m_orientation,
                                                            angularVelocityWorld, dtTicks);
+
+    const glm::dvec3& centerOfMassLocal{body.getCenterOfMassLocal()};
+    glm::dvec3 centerOfMass{state.m_position +
+                            glm::mat3_cast(state.m_orientation) * centerOfMassLocal};
+    result.m_position = centerOfMass + state.m_velocity * dtTicks -
+                        glm::mat3_cast(result.m_orientation) * centerOfMassLocal;
     return result;
 }
 
@@ -160,7 +168,7 @@ void GameNetworkClient::stepApplyRole() {
     if (m_localControlsCharacter && m_hasPredictionAnchor) {
         std::weak_ptr<RigidBody> bodyWeak{findCharacterBody(m_localPlayerId)};
         if (std::shared_ptr<RigidBody> body{bodyWeak.lock()}) {
-            m_predictionAnchor = shiftedInTime(m_predictionAnchor, 1.0, body->m_invInertiaTensor);
+            m_predictionAnchor = shiftedInTime(m_predictionAnchor, 1.0, *body);
             DigibotController* controller{findDigibotController(m_localPlayerId)};
             bool standingStill{controller && !controller->isJetpackEnabled() &&
                                controller->hasGroundContact() &&
@@ -309,7 +317,7 @@ void GameNetworkClient::applyStateSnapshot(const std::vector<std::byte>& data) {
         }
         std::weak_ptr<RigidBody> bodyWeak{findGridBody(entry.m_id)};
         if (std::shared_ptr<RigidBody> body{bodyWeak.lock()}) {
-            shiftedInTime(entry.m_state, drift, body->m_invInertiaTensor)
+            shiftedInTime(entry.m_state, drift, *body)
                 .apply(bodyWeak, *m_gameBase->m_physicsEngine);
         }
     }
@@ -329,7 +337,7 @@ void GameNetworkClient::applyStateSnapshot(const std::vector<std::byte>& data) {
             // This client predicts the character and is its input source: feed the
             // authority to reconciliation as an anchor, time-aligned to the current
             // tick, and ignore the relayed input and docking (its own echo).
-            RigidBodyState anchor{shiftedInTime(state, drift, body->m_invInertiaTensor)};
+            RigidBodyState anchor{shiftedInTime(state, drift, *body)};
             if (resync) {
                 // Prediction restarts wholesale from the anchor.
                 m_prediction.reset();
@@ -341,7 +349,7 @@ void GameNetworkClient::applyStateSnapshot(const std::vector<std::byte>& data) {
             // A character controlled elsewhere: the pose is authoritative, while
             // the relayed input and docking status drive this peer's copy so its
             // mode, animation and cockpit engagement follow.
-            shiftedInTime(state, drift, body->m_invInertiaTensor)
+            shiftedInTime(state, drift, *body)
                 .apply(bodyWeak, *m_gameBase->m_physicsEngine);
             applyResolvedInput(id, entry.m_input);
             forceDockingStatus(id, entry.m_docking);

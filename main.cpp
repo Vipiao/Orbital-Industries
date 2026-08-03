@@ -59,7 +59,7 @@ static void buildTestWorld(GameBase* gameBase) {
                 // Close above the platform surface, so walking mode engages
                 // right away instead of a long flying approach. Spaced wide
                 // enough that neither stands on the other's sensor collider.
-                body->m_position = glm::dvec3{ii * 5.0, 0.0, -1.0};
+                body->setPosition(glm::dvec3{ii * 5.0, 0.0, -1.0});
                 body->m_velocity = worldVelocity;
             }
             // Start in walking mode (jetpack off); both peers build the same
@@ -74,7 +74,7 @@ static void buildTestWorld(GameBase* gameBase) {
 // They must move together: a faithful replay needs all three fed from the same
 // run's recordings.
 enum class SessionMode { NONE, RECORD, PLAY };
-static constexpr SessionMode s_sessionMode{SessionMode::RECORD};
+static constexpr SessionMode s_sessionMode{SessionMode::NONE};
 
 int main() {
     try {

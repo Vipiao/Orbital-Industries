@@ -131,9 +131,6 @@ public:
      */
     RayIntersectionResult intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const;
     
-    // Center of mass in local space. Get m_rigidBody->m_position to get the world center of mass.
-    glm::dvec3 m_centerOfMass{0.0, 0.0, 0.0};
-
     // Structural block access (for StochasticAnalyzer and vertex/color data)
     const std::unordered_map<glm::ivec3, StructuralBlock, Hash::IVec3Hash>& getCells() const { return m_cells; }
     StructuralBlock* getCell(const glm::ivec3& coord);
@@ -213,8 +210,11 @@ private:
     void removeNeighborConnections(const glm::ivec3& coord);
     
     // Face visibility and mesh management methods
-    void updateCellMassContribution(const glm::ivec3& coord, double sign);
-    void updateRigidBodyInverses();
+    // angularVelocityWorld: the angular velocity the whole edit happens at. Callers
+    // preserve it across the edit (capture before, restore after), so the momentum
+    // fix must use that one value even when an edit spans several contributions.
+    void updateCellMassContribution(const glm::ivec3& coord, double sign,
+                                    const glm::dvec3& angularVelocityWorld);
 
     // Mesh generation and filtering
     PolyhedronProcessor::MeshData generateFilteredMeshData(const glm::ivec3& coord);

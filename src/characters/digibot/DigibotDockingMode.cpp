@@ -10,9 +10,9 @@
 DigibotDockingMode::SeatFrame DigibotDockingMode::seatFrameWorld(
     const RigidBody& gridBody, const Target& target) {
     SeatFrame frame{};
-    frame.m_position = gridBody.m_position +
-                       gridBody.m_orientation * target.m_seatPositionLocal;
-    frame.m_orientation = gridBody.m_orientation * target.m_seatOrientationLocal;
+    frame.m_position = gridBody.getPosition() +
+                       gridBody.getOrientation() * target.m_seatPositionLocal;
+    frame.m_orientation = gridBody.getOrientation() * target.m_seatOrientationLocal;
     frame.m_forward = frame.m_orientation * glm::dvec3{0.0, 1.0, 0.0};
     frame.m_up = frame.m_orientation * glm::dvec3{0.0, 0.0, 1.0};
     return frame;
@@ -23,7 +23,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     const std::shared_ptr<RigidBody>& gridBody,
     const Target& target, const DigibotModeInputs& inputs) {
     Result result{};
-    if (!rigidBody || !gridBody || rigidBody->m_mass <= 0.0) {
+    if (!rigidBody || !gridBody || rigidBody->getMass() <= 0.0) {
         result.m_wantRelease = true;
         return result;
     }
@@ -35,8 +35,8 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     SeatFrame seat{seatFrameWorld(*gridBody, target)};
 
     // Corridor endpoints in world space: entry (door) -> seat.
-    glm::dvec3 entryPoint{gridBody->m_position +
-                          gridBody->m_orientation * target.m_entryPositionLocal};
+    glm::dvec3 entryPoint{gridBody->getPosition() +
+                          gridBody->getOrientation() * target.m_entryPositionLocal};
     glm::dvec3 seatPoint{seat.m_position};
     glm::dvec3 axisVec{seatPoint - entryPoint};
     double axisLength{glm::length(axisVec)};
@@ -47,10 +47,10 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     glm::dvec3 axis{axisLength > 1e-9 ? axisVec / axisLength : seat.m_forward};
 
     // Project the body onto the entry->seat line.
-    glm::dvec3 fromEntry{rigidBody->m_position - entryPoint};
+    glm::dvec3 fromEntry{rigidBody->getPosition() - entryPoint};
     double along{glm::dot(fromEntry, axis)};             // 0 at entry, axisLength at seat
     glm::dvec3 nearestOnLine{entryPoint + along * axis};
-    glm::dvec3 tangentialOffset{rigidBody->m_position - nearestOnLine};
+    glm::dvec3 tangentialOffset{rigidBody->getPosition() - nearestOnLine};
     double alongClamped{glm::clamp(along, 0.0, axisLength)};
     double projToSeat{axisLength - alongClamped};
     double projToEntry{alongClamped};
@@ -59,7 +59,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     // Velocity relative to the grid material frame at the body position.
     glm::dvec3 relativeVelocity{
         rigidBody->m_velocity -
-        RotatingFrameUtils::velocityAtPoint(*gridBody, rigidBody->m_position)};
+        RotatingFrameUtils::velocityAtPoint(*gridBody, rigidBody->getPosition())};
     double axialVelocity{glm::dot(relativeVelocity, axis)};
     glm::dvec3 tangentialVelocity{relativeVelocity - axialVelocity * axis};
 
@@ -120,13 +120,13 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     // ========== Combine, add frame compensation ==========
     glm::dvec3 controlAcceleration{axis * axialAcceleration + tangentialAcceleration};
     glm::dvec3 compensation{RotatingFrameUtils::centrifugalCoriolisCompensation(
-        rigidBody->m_mass, gridBody->getAngularVelocityWorld(),
-        rigidBody->m_position - gridBody->m_position, relativeVelocity)};
-    result.m_wrench.m_force = controlAcceleration * rigidBody->m_mass + compensation;
+        rigidBody->getMass(), gridBody->getAngularVelocityWorld(),
+        rigidBody->getPosition() - gridBody->getWorldCenterOfMass(), relativeVelocity)};
+    result.m_wrench.m_force = controlAcceleration * rigidBody->getMass() + compensation;
 
     // ========== Orientation: bang-bang, fully locked to the seat pose ==========
     glm::dvec3 targetAngularVelocity{MotionServo::towardOrientation(
-        rigidBody->m_orientation, seat.m_orientation, m_angularAccelerationMax, 0.5,
+        rigidBody->getOrientation(), seat.m_orientation, m_angularAccelerationMax, 0.5,
         0.1)};
     glm::dmat3 inertia{RotatingFrameUtils::effectiveInertia(*rigidBody, gridBody.get())};
     result.m_wrench.m_torque = MotionServo::torque(
@@ -154,7 +154,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
     const std::shared_ptr<RigidBody>& gridBody,
     const Target& target) {
     Result result{};
-    if (!rigidBody || !gridBody || rigidBody->m_mass <= 0.0) {
+    if (!rigidBody || !gridBody || rigidBody->getMass() <= 0.0) {
         result.m_wantRelease = true;
         return result;
     }
@@ -165,7 +165,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
 
     SeatFrame seat{seatFrameWorld(*gridBody, target)};
 
-    glm::dvec3 toSeat{seat.m_position - rigidBody->m_position};
+    glm::dvec3 toSeat{seat.m_position - rigidBody->getPosition()};
     double distance{glm::length(toSeat)};
 
     // Restraint overwhelmed - the pilot is thrown back into the docking corridor.
@@ -198,26 +198,26 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
     }
 
     // Effective mass along the control direction (reaction lands on the grid)
-    double effectiveMass{rigidBody->m_mass};
+    double effectiveMass{rigidBody->getMass()};
     if (restraintMagnitude > 1e-9) {
         effectiveMass = RotatingFrameUtils::effectiveMass(
             *rigidBody, gridBody.get(), restraintAcceleration / restraintMagnitude,
-            rigidBody->m_position - gridBody->m_position);
+            rigidBody->getPosition() - gridBody->getWorldCenterOfMass());
     }
 
     // Feed-forward for the rotating frame so the restraint only carries
     // disturbances, not the steady-state centripetal load.
     glm::dvec3 relativeVelocity{
         rigidBody->m_velocity -
-        RotatingFrameUtils::velocityAtPoint(*gridBody, rigidBody->m_position)};
+        RotatingFrameUtils::velocityAtPoint(*gridBody, rigidBody->getPosition())};
     glm::dvec3 compensation{RotatingFrameUtils::centrifugalCoriolisCompensation(
-        rigidBody->m_mass, gridBody->getAngularVelocityWorld(),
-        rigidBody->m_position - gridBody->m_position, relativeVelocity)};
+        rigidBody->getMass(), gridBody->getAngularVelocityWorld(),
+        rigidBody->getPosition() - gridBody->getWorldCenterOfMass(), relativeVelocity)};
 
     // Hard restraint-strength limit on the total force: the seat can only hold on
     // so hard - anything beyond this shows up as sway (and eventually unseats).
     glm::dvec3 force{restraintAcceleration * effectiveMass + compensation};
-    double forceLimit{m_seatMaxAcceleration * rigidBody->m_mass};
+    double forceLimit{m_seatMaxAcceleration * rigidBody->getMass()};
     double forceMagnitude{glm::length(force)};
     if (forceMagnitude > forceLimit) {
         force = force * (forceLimit / forceMagnitude);
@@ -229,7 +229,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
     // Same sqrt(2ad) servo as walking. The angular acceleration limit inside the
     // servo caps the restraint torque at inertia * m_seatAngularAcceleration.
     glm::dvec3 targetAngularVelocity{MotionServo::towardOrientation(
-        rigidBody->m_orientation, seat.m_orientation, m_seatAngularAcceleration, 0.5,
+        rigidBody->getOrientation(), seat.m_orientation, m_seatAngularAcceleration, 0.5,
         0.1)};
     glm::dmat3 inertia{RotatingFrameUtils::effectiveInertia(*rigidBody, gridBody.get())};
     result.m_wrench.m_torque = MotionServo::torque(

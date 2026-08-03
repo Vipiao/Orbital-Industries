@@ -187,37 +187,26 @@ void GridSplitter::applySplit(const std::shared_ptr<Grid>& sourceGrid,
         return;
     }
 
-    // Captured once from the un-mutated source: every piece inherits this motion, and
-    // world centres of mass must be read before any cells move (removals shift the
-    // source's centre of mass).
+    // Captured once from the un-mutated source: every piece inherits this motion.
+    // The velocity field is anchored at the source's centre of mass, which must be
+    // read before any cells move (removals shift it).
     glm::dvec3 originalVelocity{sourceBody->m_velocity};
     glm::dvec3 originalAngularVelocity{sourceBody->getAngularVelocityWorld()};
-    glm::dquat originalOrientation{sourceBody->m_orientation};
-    glm::dvec3 originalCenterOfMass{sourceBody->m_position};
-
-    std::vector<glm::dvec3> pieceCenterOfMass(pieces.size());
-    for (size_t ii = 0; ii < pieces.size(); ii++) {
-        glm::dvec3 weightedSum{0.0};
-        double totalMass{0.0};
-        for (const glm::ivec3& coord : pieces[ii].m_coords) {
-            const GridCell* cell{sourceGrid->getCellFromRegistry(coord)};
-            if (!cell) {
-                continue;
-            }
-            auto [blockMass, localCenterOfMass, inertiaTensor] = cell->getMassProperties();
-            if (blockMass <= 0.0) {
-                continue;  // massless secondary cells
-            }
-            weightedSum += sourceGrid->gridToWorld(glm::dvec3(coord) + localCenterOfMass) * blockMass;
-            totalMass += blockMass;
-        }
-        assert(totalMass > 0.0);
-        pieceCenterOfMass[ii] = weightedSum / totalMass;
-    }
+    glm::dquat originalOrientation{sourceBody->getOrientation()};
+    glm::dvec3 originalCenterOfMass{sourceBody->getWorldCenterOfMass()};
+    // Every piece is built in this frame. Removing the piece's cells shifts the
+    // source's centre of mass but must leave its origin alone, or the pieces
+    // already built would no longer line up with the ones still to come.
+    const glm::dvec3 originalOrigin{sourceBody->getPosition()};
 
     for (size_t ii = 0; ii < pieces.size(); ii++) {
+        assert(sourceBody->getPosition() == originalOrigin &&
+               "source origin drifted while splitting; piece placement would be wrong");
+        // A piece keeps the source's origin frame, so its cells keep their lattice
+        // coords and world placement; only the mass properties are its own.
         std::shared_ptr<Grid> newGrid{
-            m_createGridCallback(pieces[ii].m_newGridId, glm::dvec3{0.0}, originalOrientation).lock()};
+            m_createGridCallback(pieces[ii].m_newGridId, originalOrigin,
+                                 originalOrientation).lock()};
         assert(newGrid);
 
         for (const glm::ivec3& coord : pieces[ii].m_coords) {
@@ -260,15 +249,15 @@ void GridSplitter::applySplit(const std::shared_ptr<Grid>& sourceGrid,
 
         std::shared_ptr<RigidBody> newBody{newGrid->getRigidBody().lock()};
         assert(newBody);
-        newBody->m_position = pieceCenterOfMass[ii];
+        assert(newBody->getMass() > 0.0);
         newBody->m_velocity = originalVelocity +
-            glm::cross(originalAngularVelocity, pieceCenterOfMass[ii] - originalCenterOfMass);
+            glm::cross(originalAngularVelocity,
+                       newBody->getWorldCenterOfMass() - originalCenterOfMass);
         newBody->setAngularVelocityBody(glm::conjugate(originalOrientation) * originalAngularVelocity);
-        newBody->m_orientation = originalOrientation;
     }
 
     // The source lost mass; refresh its angular momentum from the preserved velocity.
-    sourceBody->setAngularVelocityBody(glm::conjugate(sourceBody->m_orientation) *
+    sourceBody->setAngularVelocityBody(glm::conjugate(sourceBody->getOrientation()) *
                                        originalAngularVelocity);
 }
 

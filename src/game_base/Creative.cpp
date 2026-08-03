@@ -115,7 +115,7 @@ std::weak_ptr<Digibot> Creative::desiredCharacter() const {
         if (!body) {
             continue;
         }
-        double distance{glm::length(body->m_position - cameraPos)};
+        double distance{glm::length(body->getPosition() - cameraPos)};
         if (!nearest || distance < nearestDistance) {
             nearest = digibot;
             nearestDistance = distance;
@@ -154,8 +154,8 @@ void Creative::stepControl() {
             gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
             
             // Transform world ray to interpolated grid-local space
-            glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
-            glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+            glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri);
+            glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri);
             
             // Perform ray intersection in grid-local space
             RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
@@ -203,7 +203,7 @@ void Creative::stepControl() {
                     if (body) {
                         // Apply force in the view direction (acceleration * mass)
                         const double forceStrength =
-                            PhysicsUnits::metersPerSecondSquared(4.096) * body->m_mass * forceMultiplier;
+                            PhysicsUnits::metersPerSecondSquared(4.096) * body->getMass() * forceMultiplier;
                         // Get body interpolated transform
                         glm::dvec3 interpolatedPos;
                         glm::dquat interpolatedOri;
@@ -247,7 +247,7 @@ void Creative::stepControl() {
         std::shared_ptr<RigidBody> body{
             boundDigibot ? boundDigibot->getRigidBody().lock() : nullptr};
         if (body) {
-            anchor = body->m_position + body->m_velocity;
+            anchor = body->getPosition() + body->m_velocity;
         }
         sensor->m_position = anchor + forward * (m_interactionRange / 2.0);
         sensor->m_orientation = m_gameBase->m_graphicsEngine->getCamOri();
@@ -308,7 +308,7 @@ void Creative::applyDragForces() {
     // Get all rigid bodies from the physics engine
     for (const auto& weak : m_gameBase->m_physicsEngine->getRigidBodies()) {
         auto bodyPtr = weak.lock();
-        if (!bodyPtr || bodyPtr->m_isStatic) {
+        if (!bodyPtr || bodyPtr->isStatic()) {
             continue;
         }
 
@@ -317,11 +317,11 @@ void Creative::applyDragForces() {
         const double dragCoefficient = PhysicsUnits::perSecond(0.128) * 0.;
 
         if (glm::length(bodyPtr->m_velocity) > 0.0) {
-            glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->m_mass;
+            glm::dvec3 dragForce = -dragCoefficient * bodyPtr->m_velocity * bodyPtr->getMass();
             m_gameBase->m_physicsEngine->applyForce(weak, dragForce);
         }
 
-        if (glm::length(bodyPtr->m_angularMomentumBody) > 0.0) {
+        if (glm::length(bodyPtr->getAngularMomentumBody()) > 0.0) {
             glm::dvec3 angularDrag = -dragCoefficient * bodyPtr->getWorldInertiaTensor()
                                      * bodyPtr->getAngularVelocityWorld();
             m_gameBase->m_physicsEngine->applyTorque(weak, angularDrag);

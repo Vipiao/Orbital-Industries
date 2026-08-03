@@ -54,12 +54,12 @@ void ThrusterControl::applyThrustForces(PhysicsEngine* physicsEngine, Grid& grid
         double magnitude{thruster.m_thrustLevel *
                          PhysicsUnits::newtons(ThrusterBlock::THRUST_FORCE_NEWTONS)};
 
-        // Body-local frame shares the lattice axes with the origin at the centre
-        // of mass. The force acts at the centre of the 1x2x1 thruster unit; any
-        // point on the thrust axis gives the same torque.
+        // Body-local frame is the grid lattice. The force acts at the centre of
+        // the 1x2x1 thruster unit; any point on the thrust axis gives the same
+        // torque.
         glm::dvec3 axis{ThrusterBlock::dominantAxis(thruster.m_orientation)};
         glm::dvec3 localPoint{glm::dvec3{coord} + ThrusterBlock::MODEL_CENTRE +
-                              axis * 0.5 - grid.m_centerOfMass};
+                              axis * 0.5};
         physicsEngine->applyLocalForceAtPoint(body, forceDir * magnitude, localPoint);
     }
 }

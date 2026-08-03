@@ -199,9 +199,9 @@ void BuildTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
         gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
 
         glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(
-            startPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+            startPos, interpolatedPos, interpolatedOri);
         glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(
-            endPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+            endPos, interpolatedPos, interpolatedOri);
 
         RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
 
@@ -387,9 +387,9 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
         grid->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
 
         glm::dvec3 localStart = GridGeometry::worldToGrid(
-            camPos, interpolatedPos, interpolatedOri, grid->m_centerOfMass);
+            camPos, interpolatedPos, interpolatedOri);
         glm::dvec3 localEnd = GridGeometry::worldToGrid(
-            endPos, interpolatedPos, interpolatedOri, grid->m_centerOfMass);
+            endPos, interpolatedPos, interpolatedOri);
 
         RayIntersectionResult result = grid->intersectRay(localStart, localEnd);
         if (result.t < 0.0 || (hitFound && result.t >= closestT)) continue;

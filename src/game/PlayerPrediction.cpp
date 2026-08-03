@@ -52,7 +52,7 @@ void PlayerPrediction::correct(const std::weak_ptr<RigidBody>& bodyWeak,
     }
 
     // Strong band with hysteresis: engages above engage, releases below release.
-    double positionError{glm::length(anchor.m_position - body->m_position)};
+    double positionError{glm::length(anchor.m_position - body->getPosition())};
     if (m_correcting) {
         if (positionError < s_releaseThreshold) {
             m_correcting = false;
@@ -90,14 +90,14 @@ void PlayerPrediction::correct(const std::weak_ptr<RigidBody>& bodyWeak,
     // pull keeps the world mutually consistent (multiplayer_design.md §5).
     double blend{1.0 - std::exp(-1.0 / tau)};
 
-    body->m_position += blend * (anchor.m_position - body->m_position);
+    body->setPosition(body->getPosition() +
+                      blend * (anchor.m_position - body->getPosition()));
     body->m_velocity += blend * (anchor.m_velocity - body->m_velocity);
-    body->m_orientation = glm::normalize(glm::slerp(body->m_orientation,
-                                                    anchor.m_orientation, blend));
-    body->invalidateOrientation();
-    body->m_angularMomentumBody +=
-        blend * (anchor.m_angularMomentumBody - body->m_angularMomentumBody);
-    body->invalidateAngularMomentum();
+    body->setOrientation(glm::normalize(glm::slerp(body->getOrientation(),
+                                                   anchor.m_orientation, blend)));
+    body->setAngularMomentumBody(
+        body->getAngularMomentumBody() +
+        blend * (anchor.m_angularMomentumBody - body->getAngularMomentumBody()));
 
     physicsEngine.updateColliderTransform(bodyWeak);
 }

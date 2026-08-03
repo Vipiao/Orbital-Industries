@@ -197,7 +197,7 @@ void DigibotController::frameUpdate(double deltaTimeRemainder) {
         return;
     }
 
-    glm::dvec3 bodyUp{rigidBody->m_orientation * glm::dvec3{0.0, 0.0, 1.0}};
+    glm::dvec3 bodyUp{rigidBody->getOrientation() * glm::dvec3{0.0, 0.0, 1.0}};
 
     // Decompose view direction into planar and up components
     glm::dvec3 upComponent{glm::dot(m_viewDirection, bodyUp) * bodyUp};
@@ -213,7 +213,7 @@ void DigibotController::frameUpdate(double deltaTimeRemainder) {
         // Handle edge case: if planar is near-zero, add small offset
         double planarLength{};
         if (planarLengthSq < 1e-9) {
-            glm::dvec3 bodyForward{rigidBody->m_orientation * glm::dvec3{0.0, 1.0, 0.0}};
+            glm::dvec3 bodyForward{rigidBody->getOrientation() * glm::dvec3{0.0, 1.0, 0.0}};
             planarComponent += 0.01 * bodyForward;
             planarLength = glm::length(planarComponent);
         } else {
@@ -252,7 +252,7 @@ void DigibotController::applyWrench(const std::weak_ptr<RigidBody>& bodyWeak,
     // Equal and opposite reaction so momentum and angular momentum are conserved.
     if (!wrench.m_reactionBody.expired()) {
         m_physicsEngine->applyForceAtPoint(wrench.m_reactionBody, -force,
-                                           body->m_position);
+                                           body->getPosition());
         m_physicsEngine->applyTorque(wrench.m_reactionBody, -torque);
     }
 }

@@ -40,7 +40,7 @@ public:
      * @brief Attach a collider to a rigid body
      * @param body Rigid body to attach to
      * @param colliderWeak Collider to attach
-     * @param localPosition Position of collider relative to center of mass (body space)
+     * @param localPosition Position of collider relative to body position (body space)
      * @param localOrientation Orientation offset in body space
      * @param isTrigger If true, collider detects but doesn't respond physically
      * @throws std::runtime_error if collider is already attached to a body
@@ -62,7 +62,7 @@ public:
     // Remove a rigid body from the simulation
     void removeRigidBody(std::weak_ptr<RigidBody> bodyWeak);
     
-    // Apply a force at the center of mass
+    // Apply a force through the center of mass (no torque)
     void applyForce(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& force);
     
     // Apply a force at a specific point (will generate torque)

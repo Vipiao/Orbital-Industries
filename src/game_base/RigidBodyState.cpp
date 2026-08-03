@@ -6,8 +6,8 @@
 #include <cmath>
 
 RigidBodyState RigidBodyState::capture(const RigidBody& body) {
-    return RigidBodyState{body.m_position, body.m_orientation, body.m_velocity,
-                          body.m_angularMomentumBody};
+    return RigidBodyState{body.getPosition(), body.getOrientation(), body.m_velocity,
+                          body.getAngularMomentumBody()};
 }
 
 void RigidBodyState::apply(const std::weak_ptr<RigidBody>& bodyWeak,
@@ -16,12 +16,10 @@ void RigidBodyState::apply(const std::weak_ptr<RigidBody>& bodyWeak,
     if (!body) {
         return;
     }
-    body->m_position = m_position;
+    body->setPosition(m_position);
     body->m_velocity = m_velocity;
-    body->m_orientation = m_orientation;
-    body->invalidateOrientation();
-    body->m_angularMomentumBody = m_angularMomentumBody;
-    body->invalidateAngularMomentum();
+    body->setOrientation(m_orientation);
+    body->setAngularMomentumBody(m_angularMomentumBody);
     physicsEngine.updateColliderTransform(bodyWeak);
 }
 

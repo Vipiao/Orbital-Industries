@@ -5,7 +5,7 @@
 namespace RotatingFrameUtils {
 
 glm::dvec3 velocityAtPoint(const RigidBody& body, const glm::dvec3& worldPoint) {
-    glm::dvec3 radius{worldPoint - body.m_position};
+    glm::dvec3 radius{worldPoint - body.getWorldCenterOfMass()};
     return body.m_velocity + glm::cross(body.getAngularVelocityWorld(), radius);
 }
 
@@ -23,18 +23,18 @@ glm::dvec3 centrifugalCoriolisCompensation(double mass,
 double effectiveMass(const RigidBody& body, const RigidBody* other,
                      const glm::dvec3& direction, const glm::dvec3& reactionOffset) {
     if (!other) {
-        return body.m_mass;
+        return body.getMass();
     }
     // Force at `body`'s COM has no rotational contribution for `body` itself.
     glm::dvec3 rCrossDir{glm::cross(reactionOffset, direction)};
     glm::dvec3 rotContribution{other->getWorldInvInertiaTensor() * rCrossDir};
     double rotTerm{glm::dot(rCrossDir, rotContribution)};
-    double invEffectiveMass{body.m_invMass + other->m_invMass + rotTerm};
+    double invEffectiveMass{body.getInvMass() + other->getInvMass() + rotTerm};
     return 1.0 / invEffectiveMass;
 }
 
 glm::dmat3 effectiveInertia(const RigidBody& body, const RigidBody* other) {
-    if (!other || other->m_isStatic) {
+    if (!other || other->isStatic()) {
         return body.getWorldInertiaTensor();
     }
     glm::dmat3 invInertiaSum{body.getWorldInvInertiaTensor() +

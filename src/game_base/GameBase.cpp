@@ -15,8 +15,36 @@
 #include "debug/DebugRenderer.h"
 #include <algorithm>
 #include <cassert>
+#include <fstream>
+#include <iomanip>
 #include <iostream>
 #include "../game_base/JobPriorities.h"
+
+// Per-tick world-state journal for replay equivalence checks: every body's
+// world-space center of mass, orientation, velocity and angular momentum, in
+// engine order, at full precision so two runs can be diffed numerically.
+static constexpr bool k_stateLogEnabled{false};
+
+static void logWorldState(const PhysicsEngine& physics) {
+    static std::ofstream s_file{"state_log.txt", std::ios::trunc};
+    s_file << std::setprecision(17);
+    s_file << "tick " << physics.getCurrentPhysicsTimeStep() << '\n';
+    for (const std::weak_ptr<RigidBody>& bodyWeak : physics.getRigidBodies()) {
+        std::shared_ptr<RigidBody> body{bodyWeak.lock()};
+        if (!body) {
+            continue;
+        }
+        const glm::dvec3 com{body->getWorldCenterOfMass()};
+        const glm::dquat& ori{body->getOrientation()};
+        const glm::dvec3& vel{body->m_velocity};
+        const glm::dvec3& ang{body->getAngularMomentumBody()};
+        s_file << "com " << com.x << ' ' << com.y << ' ' << com.z
+               << " ori " << ori.w << ' ' << ori.x << ' ' << ori.y << ' ' << ori.z
+               << " vel " << vel.x << ' ' << vel.y << ' ' << vel.z
+               << " L " << ang.x << ' ' << ang.y << ' ' << ang.z
+               << " m " << body->getMass() << '\n';
+    }
+}
 
 GameBase::GameBase(
     int screenWidth, int screenHeight, const std::string& windowTitle,
@@ -418,6 +446,10 @@ GameBase::StepResult GameBase::updatePhysics(
             // Run physics engine
             if (m_physicsEngine->runUntil(endTime)) {
                 return StepResult::OUT_OF_TIME; // Step needs more time
+            }
+
+            if (k_stateLogEnabled) {
+                logWorldState(*m_physicsEngine);
             }
 
             // Publish the new step's state to graphics so rendering

@@ -402,7 +402,7 @@ std::vector<std::byte> GameNetworkServer::buildConnectionSnapshot(
     for (const auto& [characterId, owner] : m_characterOwners) {
         if (owner == connection) {
             if (std::shared_ptr<RigidBody> body{findCharacterBody(characterId).lock()}) {
-                refPos = body->m_position;
+                refPos = body->getPosition();
                 refVel = body->m_velocity;
             }
             break;
@@ -433,7 +433,10 @@ std::vector<std::byte> GameNetworkServer::buildConnectionSnapshot(
         if (tick < state.m_nextSendTick) {
             continue;
         }
-        glm::dvec3 toPlayer{refPos - body->m_position};
+        // Measured to the centre of mass, not the body origin: the origin is the
+        // lattice anchor and can sit well outside a grid that has been built out
+        // or cut down, which would misjudge how close and how big the grid looks.
+        glm::dvec3 toPlayer{refPos - body->getWorldCenterOfMass()};
         double distance{glm::length(toPlayer)};
         double radius{grid->getApproximateRadius()};
         double angular{radius / std::max(distance, radius)};

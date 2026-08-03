@@ -217,8 +217,8 @@ void ModifyTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGr
         gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
         
         // Transform world ray to interpolated grid-local space
-        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
-        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri);
+        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri);
         
         // Perform ray intersection in grid-local space
         RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
@@ -431,7 +431,7 @@ void ModifyTool::updateMarkerPositions() {
     // Check if camera is too far from the selected block
     glm::dvec3 blockGridCenter = glm::dvec3(m_selectedBlockCoord) + glm::dvec3(0.5, 0.5, 0.5);
     glm::dvec3 blockWorldPos = GridGeometry::gridToWorld(blockGridCenter, interpolatedPos, 
-                                                         interpolatedOri, selectedGrid->m_centerOfMass);
+                                                         interpolatedOri);
     glm::dvec3 cameraPos = m_gameBase->m_graphicsEngine->getCamPos();
     double distanceToBlock = glm::length(blockWorldPos - cameraPos);
     if (distanceToBlock > m_interactionRange) {
@@ -500,7 +500,7 @@ void ModifyTool::updateMarkerPositions() {
                 glm::dvec3 scaledDirection = glm::dvec3(unitDirections[i]) * offset;
                 glm::dvec3 corner = glm::dvec3(m_selectedBlockCoord) + normalizedVertex + scaledDirection;
                 cornerPositions.push_back(GridGeometry::gridToWorld(corner, interpolatedPos, 
-                                                                    interpolatedOri, selectedGrid->m_centerOfMass));
+                                                                    interpolatedOri));
                 cornerIndexData.push_back(cornerIndex);
                 directionData.push_back(unitDirections[i]);
             }
@@ -552,7 +552,7 @@ void ModifyTool::updateMarkerPositions() {
     // Calculate distances for 3D arrows (convert local to world space)
     for (size_t i = 0; i < arrowLocalPositions.size(); ++i) {
         glm::dvec3 worldPos = GridGeometry::gridToWorld(arrowLocalPositions[i], interpolatedPos,
-                                                        interpolatedOri, selectedGrid->m_centerOfMass);
+                                                        interpolatedOri);
         double dist = glm::length(worldPos - cameraPos);
         arrowDistances.push_back(dist);
         minDist = glm::min(minDist, dist);

@@ -58,9 +58,9 @@ void Digibot::framePreRender(uint64_t frameNum, double timeRemainder) {
         // mesh_vertex_shader.vert). The animation's localToWorld/worldToLocal must use the
         // same rotated offset, otherwise feet computed in world space drift by
         // (orientation - identity) * m_graphicsPosition as the surface/grid rotates.
-        animCtx.m_digibotWorldPos         = rigidBodyForAnim->m_position
-            + rigidBodyForAnim->m_orientation * m_graphicsPosition;
-        animCtx.m_digibotWorldOrientation = rigidBodyForAnim->m_orientation;
+        animCtx.m_digibotWorldPos         = rigidBodyForAnim->getPosition()
+            + rigidBodyForAnim->getOrientation() * m_graphicsPosition;
+        animCtx.m_digibotWorldOrientation = rigidBodyForAnim->getOrientation();
         animCtx.m_digibotWorldVelocity    = rigidBodyForAnim->m_velocity;
         animCtx.m_deltaTime               = static_cast<double>(m_physics->getPhysicsHz())
             / m_graphicsEngine->getFrameRate();
@@ -145,15 +145,14 @@ void Digibot::updateVisualTransform() {
 
     uint64_t currentPhysicsTimeStep = m_physics->getCurrentPhysicsTimeStep();
 
-    // Calculate mesh position (rigid body position offset by center of mass)
-    //glm::dvec3 meshPosition = rigidBody->m_position - m_centerOfMass;
-    glm::dvec3 meshPosition = rigidBody->m_position + m_graphicsPosition;
+    // Calculate mesh position (rigid body position offset by the graphics anchor)
+    glm::dvec3 meshPosition = rigidBody->getPosition() + m_graphicsPosition;
 
     // Update graphics subsystem with current transform
     m_digibotGraphics->updateWorldTransform(
         meshPosition,
         rigidBody->m_velocity,
-        rigidBody->m_orientation,
+        rigidBody->getOrientation(),
         angVelAxis,
         angVelMagnitude,
         -m_graphicsPosition,

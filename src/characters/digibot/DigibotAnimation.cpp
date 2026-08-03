@@ -35,12 +35,12 @@ glm::dvec3 DigibotAnimation::worldToLocal(const glm::dvec3& world, const Digibot
 
 glm::dvec3 DigibotAnimation::worldToGrid(const glm::dvec3& world, const std::shared_ptr<RigidBody>& body) {
     if (!body) return world;
-    return glm::conjugate(body->m_orientation) * (world - body->m_position);
+    return glm::conjugate(body->getOrientation()) * (world - body->getPosition());
 }
 
 glm::dvec3 DigibotAnimation::gridToWorld(const glm::dvec3& grid, const std::shared_ptr<RigidBody>& body) {
     if (!body) return grid;
-    return body->m_position + body->m_orientation * grid;
+    return body->getPosition() + body->getOrientation() * grid;
 }
 
 glm::dvec3 DigibotAnimation::projectOntoPlane(
@@ -101,7 +101,7 @@ void DigibotAnimation::initFeet(const DigibotAnimationContext& context) {
     // Feet start directly below the hips, projected onto the surface plane (grid space).
     glm::dvec3 surfaceGridPosition = worldToGrid(context.m_surfacePoint, body);
     glm::dvec3 upGridDirection = body
-        ? glm::conjugate(body->m_orientation) * context.m_surfaceNormal
+        ? glm::conjugate(body->getOrientation()) * context.m_surfaceNormal
         : context.m_surfaceNormal;
 
     auto place = [&](FootState& foot, const glm::dvec3& hipLocal) {
@@ -139,7 +139,7 @@ DigibotPose DigibotAnimation::walkingPose(const DigibotAnimationContext& context
     // --- Inputs, all lifted into grid space (the single source of truth) ---
     glm::dvec3 surfaceGridPosition = worldToGrid(context.m_surfacePoint, body);
     glm::dvec3 upGridDirection = body
-        ? glm::conjugate(body->m_orientation) * context.m_surfaceNormal
+        ? glm::conjugate(body->getOrientation()) * context.m_surfaceNormal
         : context.m_surfaceNormal;
 
     glm::dvec3 idealRightGridPosition = projectOntoPlane(
@@ -154,10 +154,10 @@ DigibotPose DigibotAnimation::walkingPose(const DigibotAnimationContext& context
     if (body) {
         relativeWorldVelocity -= body->m_velocity
             + glm::cross(body->getAngularVelocityWorld(),
-                         context.m_digibotWorldPos - body->m_position);
+                         context.m_digibotWorldPos - body->getPosition());
     }
     glm::dvec3 gridVelocity = body
-        ? glm::conjugate(body->m_orientation) * relativeWorldVelocity
+        ? glm::conjugate(body->getOrientation()) * relativeWorldVelocity
         : relativeWorldVelocity;
     gridVelocity -= glm::dot(gridVelocity, upGridDirection) * upGridDirection;
 

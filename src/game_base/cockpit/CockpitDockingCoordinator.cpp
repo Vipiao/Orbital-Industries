@@ -16,20 +16,16 @@
 
 namespace {
 
-// Entry (door) and seat in the grid rigid body's local frame (grid lattice minus
-// centre of mass, matching the worldToGrid/gridToWorld convention).
-glm::dvec3 entryLocal(const Grid& grid, const CockpitBlock& cockpit) {
+// Entry (door) and seat in the grid rigid body's local frame, which is the grid
+// lattice itself (matching the worldToGrid/gridToWorld convention).
+glm::dvec3 entryLocal(const CockpitBlock& cockpit) {
     glm::dvec3 centreLattice{glm::dvec3{cockpit.coordinates} + CockpitBlock::MODEL_CENTRE};
-    glm::dvec3 lattice{centreLattice +
-                       cockpit.m_orientation * CockpitBlock::ENTRY_POINT_CANONICAL};
-    return lattice - grid.m_centerOfMass;
+    return centreLattice + cockpit.m_orientation * CockpitBlock::ENTRY_POINT_CANONICAL;
 }
 
-glm::dvec3 seatLocal(const Grid& grid, const CockpitBlock& cockpit) {
+glm::dvec3 seatLocal(const CockpitBlock& cockpit) {
     glm::dvec3 centreLattice{glm::dvec3{cockpit.coordinates} + CockpitBlock::MODEL_CENTRE};
-    glm::dvec3 lattice{centreLattice +
-                       cockpit.m_orientation * CockpitBlock::SEAT_POSITION_CANONICAL};
-    return lattice - grid.m_centerOfMass;
+    return centreLattice + cockpit.m_orientation * CockpitBlock::SEAT_POSITION_CANONICAL;
 }
 
 // Build the controller-facing docking target from a cockpit block on a grid.
@@ -55,8 +51,8 @@ std::vector<Collider*> resolveCockpitCells(const Grid& grid, const CockpitBlock&
 DigibotDockingMode::Target makeTarget(const Grid& grid, const CockpitBlock& cockpit) {
     DigibotDockingMode::Target target{};
     target.m_gridBody = grid.getRigidBody();
-    target.m_entryPositionLocal = entryLocal(grid, cockpit);
-    target.m_seatPositionLocal = seatLocal(grid, cockpit);
+    target.m_entryPositionLocal = entryLocal(cockpit);
+    target.m_seatPositionLocal = seatLocal(cockpit);
     target.m_seatOrientationLocal = cockpit.m_orientation;
     target.m_seatArriveDistance = CockpitBlock::SEAT_ARRIVE_DISTANCE;
     target.m_exitBodyDistance = CockpitBlock::EXIT_BODY_DISTANCE;
@@ -286,7 +282,7 @@ double CockpitDockingCoordinator::entryDistance(const Grid& grid,
                                                 const glm::dvec3& bodyUpWorld) {
     // Work in grid-lattice space; distances there equal world distances (rigid).
     glm::dvec3 bodyLattice{grid.worldToGrid(bodyWorldPos)};
-    glm::dvec3 entryLattice{entryLocal(grid, cockpit) + grid.m_centerOfMass};
+    glm::dvec3 entryLattice{entryLocal(cockpit)};
     double distance{glm::length(bodyLattice - entryLattice)};
     if (distance > CockpitBlock::ENTER_RADIUS) {
         return -1.0;
@@ -300,7 +296,7 @@ double CockpitDockingCoordinator::entryDistance(const Grid& grid,
         return -1.0;
     }
     glm::dvec3 cockpitUpLattice{cockpit.m_orientation * glm::dvec3{0.0, 0.0, 1.0}};
-    glm::dvec3 bodyUpLattice{glm::conjugate(gridBody->m_orientation) * bodyUpWorld};
+    glm::dvec3 bodyUpLattice{glm::conjugate(gridBody->getOrientation()) * bodyUpWorld};
     if (glm::dot(bodyUpLattice, cockpitUpLattice) < CockpitBlock::ENTRY_UP_ALIGNMENT_MIN) {
         return -1.0;
     }
@@ -318,8 +314,8 @@ CockpitDockingCoordinator::Candidate CockpitDockingCoordinator::scan(
     if (!rigidBody || !sensor) {
         return best;
     }
-    glm::dvec3 bodyPos{rigidBody->m_position};
-    glm::dvec3 bodyUp{rigidBody->m_orientation * glm::dvec3{0.0, 0.0, 1.0}};
+    glm::dvec3 bodyPos{rigidBody->getPosition()};
+    glm::dvec3 bodyUp{rigidBody->getOrientation() * glm::dvec3{0.0, 0.0, 1.0}};
 
     // Evaluate one cell: if it belongs to a cockpit whose entry point the body is
     // close to (and aligned with), keep it as the deterministic best.

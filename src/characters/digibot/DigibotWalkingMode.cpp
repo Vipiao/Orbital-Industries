@@ -38,7 +38,7 @@ glm::dvec3 DigibotWalkingMode::getGroundContactPoint() const {
     if (!body) {
         return m_groundContactPointLocal;
     }
-    return body->m_position + body->m_orientation * m_groundContactPointLocal;
+    return body->getPosition() + body->getOrientation() * m_groundContactPointLocal;
 }
 
 glm::dvec3 DigibotWalkingMode::getGroundSurfaceNormal() const {
@@ -46,7 +46,7 @@ glm::dvec3 DigibotWalkingMode::getGroundSurfaceNormal() const {
     if (!body) {
         return m_groundSurfaceNormalLocal;
     }
-    return body->m_orientation * m_groundSurfaceNormalLocal;
+    return body->getOrientation() * m_groundSurfaceNormalLocal;
 }
 
 DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigidBody,
@@ -56,12 +56,12 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     // Clear walking target at start (will be set if we find ground contact)
     m_walkingTargetRigidBody.reset();
 
-    if (!rigidBody || rigidBody->m_mass <= 0.0) {
+    if (!rigidBody || rigidBody->getMass() <= 0.0) {
         return wrench;
     }
 
     // Calculate reference down direction from body orientation
-    glm::dvec3 downDirection{-(rigidBody->m_orientation * glm::dvec3{0.0, 0.0, 1.0})};
+    glm::dvec3 downDirection{-(rigidBody->getOrientation() * glm::dvec3{0.0, 0.0, 1.0})};
 
     // Handle cached modified up direction
     glm::dvec3 modifiedUp{0.0, 0.0, 0.0};
@@ -85,7 +85,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
 
             if (isValid) {
                 // Transform cached direction from rigid body local to world
-                modifiedUp = cachedRigidBody->m_orientation * m_cachedModifiedUp;
+                modifiedUp = cachedRigidBody->getOrientation() * m_cachedModifiedUp;
                 usingCache = true;
             } else {
                 // Cached rigid body was destroyed - clear cache and recalculate
@@ -96,8 +96,8 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
 
     // Calculate fresh modifiedUp if needed
     if (!usingCache) {
-        glm::dvec3 bodyUpDirection{rigidBody->m_orientation * glm::dvec3{0.0, 0.0, 1.0}};
-        glm::dvec3 robotRight{rigidBody->m_orientation * glm::dvec3{1.0, 0.0, 0.0}};
+        glm::dvec3 bodyUpDirection{rigidBody->getOrientation() * glm::dvec3{0.0, 0.0, 1.0}};
+        glm::dvec3 robotRight{rigidBody->getOrientation() * glm::dvec3{1.0, 0.0, 0.0}};
         modifiedUp = glm::cross(robotRight, inputs.m_viewDirection);
         double modifiedUpLengthSq{glm::length2(modifiedUp)};
         if (modifiedUpLengthSq < 1e-12) {
@@ -149,7 +149,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
             // (e.g. a network state apply).
             glm::dvec3 contactPoint{
                 collision.otherCollider->localToWorld(collision.contactPointsLocalB[k])};
-            double distance{glm::length(rigidBody->m_position - contactPoint)};
+            double distance{glm::length(rigidBody->getPosition() - contactPoint)};
 
             if (distance < 1e-6) {
                 continue; // Skip degenerate case
@@ -158,7 +158,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
             // Geometric surface normal from the collision pass, oriented toward the
             // body. A property of the surface, not of the body's live position.
             glm::dvec3 normal{collision.contactData[k].normal};
-            if (glm::dot(normal, rigidBody->m_position - contactPoint) < 0.0) {
+            if (glm::dot(normal, rigidBody->getPosition() - contactPoint) < 0.0) {
                 normal = -normal;
             }
             candidates.push_back({contactPoint, normal, distance, otherRigidBody});
@@ -271,8 +271,8 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     // would follow the frozen orientation up instead of the surface when the grid
     // rotates.
     if (targetRigidBody) {
-        glm::dquat toLocal{glm::conjugate(targetRigidBody->m_orientation)};
-        m_groundContactPointLocal = toLocal * (closestPoint - targetRigidBody->m_position);
+        glm::dquat toLocal{glm::conjugate(targetRigidBody->getOrientation())};
+        m_groundContactPointLocal = toLocal * (closestPoint - targetRigidBody->getPosition());
         m_groundSurfaceNormalLocal = toLocal * normal;
     } else {
         m_groundContactPointLocal = closestPoint;
@@ -282,7 +282,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     // Set orientation cache when establishing new lock (not using cache yet)
     if (!usingCache && targetRigidBody) {
         m_cachedRigidBody = targetRigidBody;
-        m_cachedModifiedUp = glm::conjugate(targetRigidBody->m_orientation) * normal;
+        m_cachedModifiedUp = glm::conjugate(targetRigidBody->getOrientation()) * normal;
     }
 
     // ========== Accumulators for Force/Torque ==========
@@ -299,7 +299,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     glm::dvec3 targetForward{};
     if (projectedViewLengthSq < 1e-12) {
         // View is aligned with normal - keep current forward direction
-        targetForward = rigidBody->m_orientation * glm::dvec3{0.0, 1.0, 0.0};
+        targetForward = rigidBody->getOrientation() * glm::dvec3{0.0, 1.0, 0.0};
         targetForward = targetForward -
                         glm::dot(targetForward, targetUpDirection) * targetUpDirection;
         double targetForwardLengthSq{glm::length2(targetForward)};
@@ -329,7 +329,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     glm::dquat targetOrientation{glm::quat_cast(targetRotationMatrix)};
 
     glm::dvec3 targetAngularVelocity{MotionServo::towardOrientation(
-        rigidBody->m_orientation, targetOrientation, m_angularAccelerationMax, 0.5,
+        rigidBody->getOrientation(), targetOrientation, m_angularAccelerationMax, 0.5,
         0.1)};
 
     // Add grid's angular velocity if walking on moving surface
@@ -349,7 +349,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     glm::dvec3 targetPosition{closestPoint + targetUpDirection * m_targetHoverHeight};
 
     // Calculate position error along target up direction only
-    glm::dvec3 positionError{targetPosition - rigidBody->m_position};
+    glm::dvec3 positionError{targetPosition - rigidBody->getPosition()};
     double distanceAlongNormal{glm::dot(positionError, targetUpDirection)};
 
     // Velocity relative to the surface at the contact point, along the up direction
@@ -382,7 +382,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     // Effective mass for hover control (force at digibot COM, reaction on ground)
     glm::dvec3 reactionOffset{0.0, 0.0, 0.0};
     if (targetRigidBody) {
-        reactionOffset = rigidBody->m_position - targetRigidBody->m_position;
+        reactionOffset = rigidBody->getPosition() - targetRigidBody->getWorldCenterOfMass();
     }
     double effectiveMass{RotatingFrameUtils::effectiveMass(
         *rigidBody, targetRigidBody.get(), targetUpDirection, reactionOffset)};
@@ -411,7 +411,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     glm::dvec3 surfaceVelocityAtBody{0.0, 0.0, 0.0};
     if (targetRigidBody) {
         surfaceVelocityAtBody =
-            RotatingFrameUtils::velocityAtPoint(*targetRigidBody, rigidBody->m_position);
+            RotatingFrameUtils::velocityAtPoint(*targetRigidBody, rigidBody->getPosition());
     }
 
     // Calculate relative velocity in tangent plane (remove normal component)
@@ -438,7 +438,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     glm::dvec3 velocityError{targetVelocityDirection - relativeVelocityTangent};
 
     // Effective mass for movement control in the direction of the velocity error
-    double effectiveMassForMovement{rigidBody->m_mass};
+    double effectiveMassForMovement{rigidBody->getMass()};
     if (targetRigidBody && glm::length(velocityError) > 1e-6) {
         glm::dvec3 movementDirection{glm::normalize(velocityError)};
         effectiveMassForMovement = RotatingFrameUtils::effectiveMass(

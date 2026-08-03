@@ -167,7 +167,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     );
 
     // 4. Attach collider to rigid body
-    // Collider local position relative to center of mass (negative of old offset)
+    // Collider local position relative to the body position (body space)
     glm::dquat colliderLocalOrientation(1.0, 0.0, 0.0, 0.0);
     m_physics->attachCollider(
         m_rigidBody,
@@ -182,7 +182,7 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
         throw std::runtime_error("DigibotPhysics: Failed to lock RigidBody immediately after creation");
     }
     m_walkingSensor = m_physics->getCollisionDetector().addBallCollider(
-        rigidBody->m_position,
+        rigidBody->getPosition(),
         m_walkingSensorRadius);
 
     // Attach sensor as a trigger (detects but doesn't respond physically)
@@ -317,12 +317,12 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         angVelMagnitude = 0.0;
     }
     
-    glm::dvec3 meshPosition = rigidBody->m_position + rigidBody->m_orientation * m_colliderLocalPosition;
+    glm::dvec3 meshPosition = rigidBody->getPosition() + rigidBody->getOrientation() * m_colliderLocalPosition;
     graphics->updateMeshTransform(
         m_collisionBoxMeshId,
         meshPosition,
         rigidBody->m_velocity,
-        rigidBody->m_orientation,
+        rigidBody->getOrientation(),
         angVelAxis,
         angVelMagnitude,
         -m_colliderLocalPosition,  // Pass negative to maintain old offset semantics for graphics
@@ -340,8 +340,8 @@ glm::dvec3 DigibotPhysics::worldToLocal(const glm::dvec3& worldPos) const {
     }
     return GridGeometry::worldToGrid(
         worldPos,
-        rigidBody->m_position,
-        rigidBody->m_orientation,
+        rigidBody->getPosition(),
+        rigidBody->getOrientation(),
         -m_colliderLocalPosition
     );
 }
@@ -353,8 +353,8 @@ glm::dvec3 DigibotPhysics::localToWorld(const glm::dvec3& localPos) const {
     }
     return GridGeometry::gridToWorld(
         localPos,
-        rigidBody->m_position,
-        rigidBody->m_orientation,
+        rigidBody->getPosition(),
+        rigidBody->getOrientation(),
         -m_colliderLocalPosition
     );
 }

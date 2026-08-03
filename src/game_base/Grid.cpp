@@ -52,14 +52,9 @@ Grid::Grid(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
         glm::dmat3(0.0),   // Inertia tensor (will be updated when cells are added)
         false);            // Not static
     
-    // Attach collider to rigid body
-    // localPosition is negative of center of mass (collider position relative to COM)
-    m_physics->attachCollider(
-        m_rigidBody, 
-        m_colliderWeak,
-        -m_centerOfMass,                             // localPosition (collider relative to COM)
-        glm::dquat(1.0, 0.0, 0.0, 0.0),             // localOrientation (identity)
-        false);                                      // isTrigger = false
+    // Attach collider to rigid body. The collider's lattice shares the body's
+    // origin frame, so the attachment offset is zero for the grid's lifetime.
+    m_physics->attachCollider(m_rigidBody, m_colliderWeak);
 
     // Create graphics subsystem
     m_gridGraphics = std::make_unique<GridGraphics>(graphics, jobManager, blockResources);
@@ -133,10 +128,11 @@ void Grid::addCell(const glm::ivec3& coord) {
     }
     
     glm::dvec3 originalAngularVelocity = rigidBody->getAngularVelocityBody();
-    
+    glm::dvec3 angularVelocityWorld = rigidBody->getAngularVelocityWorld();
+
     // Add mass contribution
-    updateCellMassContribution(coord, 1.0);
-    
+    updateCellMassContribution(coord, 1.0, angularVelocityWorld);
+
     rigidBody->setAngularVelocityBody(originalAngularVelocity);
 
     // Schedule mesh updates for this cell and neighbors
@@ -165,7 +161,7 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
     auto rigidBody = m_rigidBody.lock();
     if (!rigidBody) throw std::runtime_error("Grid::removeCell: RigidBody has been destroyed");
     const glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
-    updateCellMassContribution(anchorCoord, -1.0);
+    updateCellMassContribution(anchorCoord, -1.0, rigidBody->getAngularVelocityWorld());
     rigidBody->setAngularVelocityBody(angVel);
 
     std::vector<glm::ivec3> removed;
@@ -248,7 +244,7 @@ void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientat
     auto rigidBody = m_rigidBody.lock();
     if (!rigidBody) throw std::runtime_error("Grid::addThruster: RigidBody has been destroyed");
     glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
-    updateCellMassContribution(anchorCoord, 1.0);
+    updateCellMassContribution(anchorCoord, 1.0, rigidBody->getAngularVelocityWorld());
     rigidBody->setAngularVelocityBody(angVel);
     m_structureVersion++;
 }
@@ -303,7 +299,7 @@ void Grid::addCockpit(const glm::ivec3& anchorCoord, const glm::dquat& orientati
     auto rigidBody = m_rigidBody.lock();
     if (!rigidBody) throw std::runtime_error("Grid::addCockpit: RigidBody has been destroyed");
     glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
-    updateCellMassContribution(anchorCoord, 1.0);
+    updateCellMassContribution(anchorCoord, 1.0, rigidBody->getAngularVelocityWorld());
     rigidBody->setAngularVelocityBody(angVel);
     m_structureVersion++;
 }
@@ -352,9 +348,12 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     }
     
     glm::dvec3 originalAngularVelocity = rigidBody->getAngularVelocityBody();
+    // One fixed angular velocity for the whole modification: the remove and re-add
+    // below both shift the centre of mass, and both fixes must see the same spin.
+    glm::dvec3 angularVelocityWorld = rigidBody->getAngularVelocityWorld();
 
     // Remove old mass contribution
-    updateCellMassContribution(coord, -1.0);
+    updateCellMassContribution(coord, -1.0, angularVelocityWorld);
 
     // Update the block's vertices
     bool success = block.setVertices(newVertices);
@@ -384,8 +383,8 @@ bool Grid::modifyCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& 
     scheduleMeshUpdatesForCellAndNeighbors(coord);
 
     // Add new mass contribution
-    updateCellMassContribution(coord, 1.0);
-     
+    updateCellMassContribution(coord, 1.0, angularVelocityWorld);
+
     // Restore angular velocity after entire modification
     rigidBody->setAngularVelocityBody(originalAngularVelocity);
 
@@ -616,14 +615,18 @@ bool Grid::isEmpty() const {
     return m_cellRegistry.empty();
 }
 
-void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
+void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign,
+                                      const glm::dvec3& angularVelocityWorld) {
     auto rigidBody = m_rigidBody.lock();
     if (!rigidBody) {
         throw std::runtime_error("Grid::updateCellMassContribution: RigidBody has been destroyed");
     }
-    
-    glm::dvec3 oldCM = m_centerOfMass;
-    
+
+    assert(RigidBodyDetail::isFinite(angularVelocityWorld) &&
+           "caller must supply the finite angular velocity the edit happens at");
+    const glm::dvec3 originBefore{rigidBody->getPosition()};
+    glm::dvec3 oldWorldCenterOfMass{rigidBody->getWorldCenterOfMass()};
+
     // Lambda to get cell properties with sign applied (works for all cell types)
     auto getProperties = [this, sign](const glm::ivec3& cellCoord) -> std::tuple<double, glm::dvec3, glm::dmat3> {
         auto regIt = m_cellRegistry.find(cellCoord);
@@ -633,45 +636,28 @@ void Grid::updateCellMassContribution(const glm::ivec3& coord, double sign) {
         }
         return {0.0, glm::dvec3(0.0), glm::dmat3(0.0)};
     };
-    
+
     // Update mass contribution using coordinate-based calculation
+    double mass{rigidBody->getMass()};
+    glm::dvec3 centerOfMassLocal{rigidBody->getCenterOfMassLocal()};
+    glm::dmat3 inertiaTensor{rigidBody->getInertiaTensor()};
     MassInertiaCalculator::calculateInertiaForCoords(
-        {coord}, getProperties,
-        &rigidBody->m_mass, &m_centerOfMass, &rigidBody->m_inertiaTensor);
-    
-    // Update physics body with momentum conservation: the stored linear velocity
-    // tracks the center of mass, so as it shifts it takes on that new point's velocity.
-    glm::dvec3 worldShift = rigidBody->m_orientation * (m_centerOfMass - oldCM);
-    rigidBody->m_velocity = rigidBody->velocityAtPoint(rigidBody->m_position + worldShift);
-    rigidBody->m_position += worldShift;
-    
-    updateRigidBodyInverses();
+        {coord}, getProperties, &mass, &centerOfMassLocal, &inertiaTensor);
 
-    // Update attachment local position to match new center of mass
-    if (!rigidBody->m_attachments.empty()) {
-        // Find the grid collider attachment and update its local position
-        for (auto& attachment : rigidBody->m_attachments) {
-            auto collider = attachment->collider.lock();
-            if (collider && collider.get() == m_colliderWeak.lock().get()) {
-                attachment->localPosition = -m_centerOfMass;
-                break;
-            }
-        }
-    }
-}
+    // Momentum conservation: the stored linear velocity tracks the center of mass,
+    // so as it shifts it takes on that new point's velocity, spinning at the
+    // caller-fixed angular velocity. The origin stays put.
+    glm::dvec3 newWorldCenterOfMass{rigidBody->getPosition() +
+                                    rigidBody->getOrientationMatrix() * centerOfMassLocal};
+    rigidBody->m_velocity += glm::cross(angularVelocityWorld,
+                                        newWorldCenterOfMass - oldWorldCenterOfMass);
 
-void Grid::updateRigidBodyInverses() {
-    auto rigidBody = m_rigidBody.lock();
-    if (!rigidBody) {
-        throw std::runtime_error("Grid::updateRigidBodyInverses: RigidBody has been destroyed");
-    }
+    rigidBody->setMassProperties(mass, centerOfMassLocal, inertiaTensor);
 
-    // Update inverse values with safety checks
-    rigidBody->m_invMass = (rigidBody->m_mass > 1e-15) ? (1.0 / rigidBody->m_mass) : std::numeric_limits<double>::max();
-
-    // Update inverse inertia tensor with safety check
-    double determinant = glm::determinant(rigidBody->m_inertiaTensor);
-    rigidBody->m_invInertiaTensor = (determinant > 1e-15) ? glm::inverse(rigidBody->m_inertiaTensor) : glm::dmat3(std::numeric_limits<double>::max());
+    // The whole point of anchoring the body frame at the lattice origin: cells may
+    // come and go, but every offset stored against the origin stays valid.
+    assert(rigidBody->getPosition() == originBefore &&
+           "a mass change must never move the body origin");
 }
 
 // Convert world coordinates to grid-local coordinates
@@ -681,7 +667,7 @@ glm::dvec3 Grid::worldToGrid(const glm::dvec3& worldPos) const {
         throw std::runtime_error("ERROR: Failed to convert world to grid coordinates: Rigid body not found");
     }
     
-    return GridGeometry::worldToGrid(worldPos, rigidBody->m_position, rigidBody->m_orientation, m_centerOfMass);
+    return GridGeometry::worldToGrid(worldPos, rigidBody->getPosition(), rigidBody->getOrientation());
 }
 
 // Convert grid-local coordinates to world coordinates
@@ -691,7 +677,7 @@ glm::dvec3 Grid::gridToWorld(const glm::dvec3& gridPos) const {
         throw std::runtime_error("ERROR: Failed to convert grid to world coordinates: Rigid body not found");
     }
     
-    return GridGeometry::gridToWorld(gridPos, rigidBody->m_position, rigidBody->m_orientation, m_centerOfMass);
+    return GridGeometry::gridToWorld(gridPos, rigidBody->getPosition(), rigidBody->getOrientation());
 }
 
 void Grid::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition, glm::dquat& outOrientation) const {
@@ -748,11 +734,11 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
     
     m_gridGraphics->updateGraphics(
         cameraPos,
-        rigidBody->m_position,
-        rigidBody->m_orientation,
+        rigidBody->getWorldCenterOfMass(),
+        rigidBody->getOrientation(),
         rigidBody->m_velocity,
         rigidBody->getAngularVelocityWorld(),
-        m_centerOfMass,
+        rigidBody->getCenterOfMassLocal(),
         currentPhysicsTimeStep,
         getApproximateRadius()
     );
@@ -766,9 +752,6 @@ size_t Grid::computeHash() const {
     if (rigidBody) {
         hash = Hash::combineHashes(hash, rigidBody->computeHash());
     }
-
-    // Hash center of mass
-    hash = Hash::combineHashes(hash, Hash::DVec3Hash{}(m_centerOfMass));
 
     // Hash all cells via the combined registry (IVec3Hash keys → deterministic iteration order)
     for (const auto& [coord, cell] : m_cellRegistry) {

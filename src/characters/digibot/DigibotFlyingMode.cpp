@@ -10,7 +10,7 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
                                         DigibotLockState lockState,
                                         const std::shared_ptr<RigidBody>& lockTarget) {
     DigibotWrench wrench{};
-    if (!rigidBody || rigidBody->m_mass <= 0.0) {
+    if (!rigidBody || rigidBody->getMass() <= 0.0) {
         return wrench;
     }
 
@@ -18,7 +18,7 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
     double lockForceScale{0.4};
 
     // ========== Calculate View Orientation ==========
-    glm::dvec3 bodyUpDirection{rigidBody->m_orientation * glm::dvec3{0.0, 0.0, 1.0}};
+    glm::dvec3 bodyUpDirection{rigidBody->getOrientation() * glm::dvec3{0.0, 0.0, 1.0}};
 
     // Note: conjugate because lookAt gives the inverse of the orientation from vectors.
     glm::dquat viewOrientation{glm::conjugate(
@@ -34,7 +34,7 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
             direction = glm::normalize(direction);
             // Transform direction from local to world space using view orientation
             direction = viewOrientation * direction;
-            double forceMagnitude{m_thrustStrength * rigidBody->m_mass};
+            double forceMagnitude{m_thrustStrength * rigidBody->getMass()};
             movementForce = direction * forceMagnitude;
         }
     }
@@ -44,7 +44,7 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
     if (lockState == DigibotLockState::TRANSLATION_LOCK && lockTarget) {
         glm::dvec3 relativeVelocity{rigidBody->m_velocity - lockTarget->m_velocity};
         glm::dvec3 correctionForce{-relativeVelocity * m_translationLockStrength *
-                                   rigidBody->m_mass};
+                                   rigidBody->getMass()};
 
         // Project correction force to plane orthogonal to movement force
         if (glm::length(movementForce) > 1e-6) {
@@ -56,18 +56,18 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
         lockForce = correctionForce;
 
         double lockForceMagnitude{glm::length(lockForce)};
-        double lockForceLimit{lockForceScale * m_thrustStrength * rigidBody->m_mass};
+        double lockForceLimit{lockForceScale * m_thrustStrength * rigidBody->getMass()};
         if (lockForceMagnitude > lockForceLimit) {
             lockForce = lockForce * (lockForceLimit / lockForceMagnitude);
         }
     } else if (lockState == DigibotLockState::FULL_LOCK && lockTarget) {
         // Match the velocity of the material point of the grid at our position.
         glm::dvec3 targetLinearVelocity{
-            RotatingFrameUtils::velocityAtPoint(*lockTarget, rigidBody->m_position)};
+            RotatingFrameUtils::velocityAtPoint(*lockTarget, rigidBody->getPosition())};
         glm::dvec3 relativeLinearVelocity{rigidBody->m_velocity - targetLinearVelocity};
 
         glm::dvec3 correctionForce{-relativeLinearVelocity * m_translationLockStrength *
-                                   rigidBody->m_mass};
+                                   rigidBody->getMass()};
 
         // Project correction force to plane orthogonal to movement force
         if (glm::length(movementForce) > 1e-6) {
@@ -79,20 +79,20 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
         lockForce = correctionForce;
 
         double lockForceMagnitude{glm::length(lockForce)};
-        double lockForceLimit{lockForceScale * m_thrustStrength * rigidBody->m_mass};
+        double lockForceLimit{lockForceScale * m_thrustStrength * rigidBody->getMass()};
         if (lockForceMagnitude > lockForceLimit) {
             lockForce = lockForce * (lockForceLimit / lockForceMagnitude);
         }
 
         // Compensate centrifugal and coriolis forces of the co-rotating frame.
-        glm::dvec3 radiusVector{rigidBody->m_position - lockTarget->m_position};
+        glm::dvec3 radiusVector{rigidBody->getPosition() - lockTarget->getWorldCenterOfMass()};
         lockForce += RotatingFrameUtils::centrifugalCoriolisCompensation(
-            rigidBody->m_mass, lockTarget->getAngularVelocityWorld(), radiusVector,
+            rigidBody->getMass(), lockTarget->getAngularVelocityWorld(), radiusVector,
             relativeLinearVelocity);
     }
 
     // ========== Combine and Clamp Forces ==========
-    double maxForce{m_thrustStrength * rigidBody->m_mass};
+    double maxForce{m_thrustStrength * rigidBody->getMass()};
     glm::dvec3 totalForce{movementForce + lockForce};
     double totalForceMagnitude{glm::length(totalForce)};
     if (totalForceMagnitude > maxForce) {
@@ -104,7 +104,7 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
 
     // ========== View Direction Rotation ==========
     glm::dvec3 currentForward{
-        glm::normalize(rigidBody->m_orientation * glm::dvec3{0.0, 1.0, 0.0})};
+        glm::normalize(rigidBody->getOrientation() * glm::dvec3{0.0, 1.0, 0.0})};
     glm::dvec3 targetForward{glm::normalize(inputs.m_viewDirection)};
 
     glm::dvec3 targetAngularVelocity{MotionServo::towardDirection(

@@ -109,8 +109,8 @@ void DigibotPlayerController::stepControl(DigibotController* controller, const s
         gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
         
         // Transform world ray to interpolated grid-local space
-        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(rayStart, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
-        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(rayEnd, interpolatedPos, interpolatedOri, gridShared->m_centerOfMass);
+        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(rayStart, interpolatedPos, interpolatedOri);
+        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(rayEnd, interpolatedPos, interpolatedOri);
         
         // Perform ray intersection in grid-local space
         RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
