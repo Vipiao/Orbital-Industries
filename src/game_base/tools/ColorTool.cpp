@@ -11,7 +11,8 @@
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "graphics/MeshManager2D/Instance2D.h"
-#include "utils/GridGeometry.h"
+#include "../GridRaycast.h"
+#include <optional>
 
 ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {
@@ -116,12 +117,6 @@ void ColorTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
         return;
     }
     
-    // Perform ray casting against all grids
-    std::weak_ptr<Grid> targetGridWeak;
-    glm::ivec3 hitPos;
-    bool blockFound = false;
-    double closestT = -1.0;
-    
     // Camera position and direction
     glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
     glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
@@ -129,45 +124,15 @@ void ColorTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
 
     // Get interpolation time for accurate raycasting
     auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
-    
-    // Find closest ray intersection across all grids
-    for (const auto& gridWeak : availableGrids) {
-        auto gridShared = gridWeak.lock();
-        if (!gridShared) continue;
 
-        // Get interpolated transform once per grid
-        glm::dvec3 interpolatedPos;
-        glm::dquat interpolatedOri;
-        gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
-        
-        // Transform world ray to interpolated grid-local space
-        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri);
-        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri);
-        
-        // Perform ray intersection in grid-local space
-        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-        
-        // Check if this is a closer hit than what we have so far
-        if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
-            closestT = result.t;
-            blockFound = true;
-            targetGridWeak = gridShared;
-            
-            // Calculate intersection point with small epsilon to ensure we're inside the hit cell
-            const double epsilon = 1e-6;
-            double adjustedT = result.t + epsilon;
-            glm::dvec3 gridLocalIntersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
-            
-            // Floor to get hit cell (already in grid coordinates)
-            hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
-        }
-    }
-    
+    std::optional<GridRayHit> hit{
+        GridRaycast::closestHit(availableGrids, startPos, endPos, timeRemainder)};
+
     // Handle copy/paste operations with found target
-    if (blockFound) {
-        auto targetGrid = targetGridWeak.lock();
+    if (hit) {
+        auto targetGrid = hit->m_grid.lock();
         if (targetGrid) {
-            StructuralBlock* targetBlock = targetGrid->getCell(hitPos);
+            StructuralBlock* targetBlock = targetGrid->getCell(hit->m_hitCoord);
             if (targetBlock) {
                 if (m_doCopy) {
                     // Convert RGB color to HSV and store in current color
@@ -182,12 +147,12 @@ void ColorTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
                     glm::dvec3 rgb = ColorUtils::hsvToRgb(hsv);
                     glm::dvec4 rgba{rgb.r, rgb.g, rgb.b, m_currentColor.w};
                     m_gameBase->requestStructuralEdit(
-                        StructuralCommand::setColor(targetGrid->uniqueId, hitPos, rgba));
+                        StructuralCommand::setColor(targetGrid->uniqueId, hit->m_hitCoord, rgba));
                 }
             }
         }
     }
-    
+
     // Reset flags
     m_doCopy = false;
     m_doPaste = false;

@@ -12,6 +12,52 @@ static bool readQuat(ByteReader& reader, glm::dquat& quat) {
            reader.read(quat.y) && reader.read(quat.z);
 }
 
+static constexpr glm::dvec4 k_defaultColor{1.0, 1.0, 1.0, 1.0};
+
+// An unshaped cube is by far the common case, so it costs a flag rather than a
+// full vertex set on the wire.
+static void writeVertices(ByteWriter& writer, const std::array<glm::ivec3, 8>& vertices) {
+    const bool isShaped{vertices != PolyhedronProcessor::DEFAULT_VERTICES};
+    writer.write(isShaped);
+    if (isShaped) {
+        writer.write(vertices);
+    }
+}
+
+// Placed blocks are usually left the default colour, so that case costs a flag
+// rather than four doubles.
+static void writeColor(ByteWriter& writer, const glm::dvec4& color) {
+    const bool isTinted{color != k_defaultColor};
+    writer.write(isTinted);
+    if (isTinted) {
+        writer.write(color);
+    }
+}
+
+static bool readColor(ByteReader& reader, glm::dvec4& color) {
+    bool isTinted{false};
+    if (!reader.read(isTinted)) {
+        return false;
+    }
+    if (!isTinted) {
+        color = k_defaultColor;
+        return true;
+    }
+    return reader.read(color);
+}
+
+static bool readVertices(ByteReader& reader, std::array<glm::ivec3, 8>& vertices) {
+    bool isShaped{false};
+    if (!reader.read(isShaped)) {
+        return false;
+    }
+    if (!isShaped) {
+        vertices = PolyhedronProcessor::DEFAULT_VERTICES;
+        return true;
+    }
+    return reader.read(vertices);
+}
+
 void StructuralCommand::serialize(ByteWriter& writer) const {
     writer.write(m_op);
     writer.write(m_gridId);
@@ -41,6 +87,8 @@ void StructuralCommand::serialize(ByteWriter& writer) const {
             writer.write(m_position.z);
             writer.write(m_cellType);
             writeQuat(writer, m_orientation);
+            writeVertices(writer, m_vertices);
+            writeColor(writer, m_color);
             break;
         case StructuralOp::SplitGrid:
             writer.write(static_cast<std::uint32_t>(m_pieces.size()));
@@ -55,6 +103,9 @@ void StructuralCommand::serialize(ByteWriter& writer) const {
             }
             break;
         case StructuralOp::AddCell:
+            writeVertices(writer, m_vertices);
+            writeColor(writer, m_color);
+            break;
         case StructuralOp::RemoveCell:
         case StructuralOp::DespawnGrid:
             break;
@@ -79,7 +130,8 @@ bool StructuralCommand::deserialize(ByteReader& reader) {
         case StructuralOp::SpawnGrid:
             return reader.read(m_position.x) && reader.read(m_position.y) &&
                    reader.read(m_position.z) && reader.read(m_cellType) &&
-                   readQuat(reader, m_orientation);
+                   readQuat(reader, m_orientation) && readVertices(reader, m_vertices) &&
+                   readColor(reader, m_color);
         case StructuralOp::SplitGrid: {
             std::uint32_t pieceCount{0};
             if (!reader.read(pieceCount)) {
@@ -104,6 +156,7 @@ bool StructuralCommand::deserialize(ByteReader& reader) {
             return true;
         }
         case StructuralOp::AddCell:
+            return readVertices(reader, m_vertices) && readColor(reader, m_color);
         case StructuralOp::RemoveCell:
         case StructuralOp::DespawnGrid:
             return true;
@@ -116,8 +169,16 @@ StructuralCommand StructuralCommand::setColor(std::uint64_t gridId, const glm::i
     return StructuralCommand{StructuralOp::SetColor, gridId, coord, color};
 }
 
-StructuralCommand StructuralCommand::addCell(std::uint64_t gridId, const glm::ivec3& coord) {
-    return StructuralCommand{StructuralOp::AddCell, gridId, coord};
+StructuralCommand StructuralCommand::addCell(std::uint64_t gridId, const glm::ivec3& coord,
+                                             const std::array<glm::ivec3, 8>& vertices,
+                                             const glm::dvec4& color) {
+    StructuralCommand command{};
+    command.m_op = StructuralOp::AddCell;
+    command.m_gridId = gridId;
+    command.m_coord = coord;
+    command.m_vertices = vertices;
+    command.m_color = color;
+    return command;
 }
 
 StructuralCommand StructuralCommand::removeCell(std::uint64_t gridId, const glm::ivec3& coord) {
@@ -167,12 +228,16 @@ StructuralCommand StructuralCommand::splitGrid(std::uint64_t sourceGridId,
 }
 
 StructuralCommand StructuralCommand::spawnGrid(const glm::dvec3& position, CellType cellType,
-                                               const glm::dquat& orientation) {
+                                               const glm::dquat& orientation,
+                                               const std::array<glm::ivec3, 8>& vertices,
+                                               const glm::dvec4& color) {
     StructuralCommand command{};
     command.m_op = StructuralOp::SpawnGrid;
     command.m_position = position;
     command.m_cellType = cellType;
     command.m_orientation = orientation;
+    command.m_vertices = vertices;
+    command.m_color = color;
     return command;  // id stays 0: the server allocates it
 }
 

@@ -14,7 +14,9 @@
 #include <iostream>
 #include "utils/PolyhedronProcessor.h"
 #include <algorithm>
+#include <optional>
 #include "utils/GridGeometry.h"
+#include "../GridRaycast.h"
 
 ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentNodeId, double interactionRange)
     : m_gameBase(gameBase), m_radialMenu(radialMenu), m_interactionRange(interactionRange) {
@@ -192,78 +194,42 @@ void ModifyTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGr
     
     
     // Handle configure mode logic (similar to Creative::handleConfigureMode)
-    // Perform ray casting against all grids
-    std::weak_ptr<Grid> targetGridWeak;
-    glm::ivec3 hitPos;
-    bool blockFound = false;
-    double closestT = -1.0;
-    
     // Camera position and direction
     glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
     glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
     glm::dvec3 endPos = startPos + forward * m_interactionRange;
-    
+
     // Get interpolation time for accurate raycasting
     auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
 
-    // Find closest ray intersection across all grids
-    for (const auto& gridWeak : availableGrids) {
-        auto gridShared = gridWeak.lock();
-        if (!gridShared) continue;
-        
-        // Get interpolated transform once per grid
-        glm::dvec3 interpolatedPos;
-        glm::dquat interpolatedOri;
-        gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
-        
-        // Transform world ray to interpolated grid-local space
-        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri);
-        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri);
-        
-        // Perform ray intersection in grid-local space
-        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-        
-        // Check if this is a closer hit than what we have so far
-        if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
-            closestT = result.t;
-            blockFound = true;
-            targetGridWeak = gridWeak;
-            
-            // Calculate intersection point with small epsilon to ensure we're inside the hit cell
-            const double epsilon = 1e-6;
-            double adjustedT = result.t + epsilon;
-            glm::dvec3 gridLocalIntersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
-            
-            // Floor to get hit cell (already in grid coordinates)
-            hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
-        }
-    }
-    
-    if (!blockFound && !m_cursorNearMarker) {
+    std::optional<GridRayHit> hit{
+        GridRaycast::closestHit(availableGrids, startPos, endPos, timeRemainder)};
+
+    if (!hit && !m_cursorNearMarker) {
         // No block found and not near marker, but don't unselect unless cancelled
         m_doModify = false;
         m_doCancel = false;
         return;
     }
-    
-    auto targetGrid = targetGridWeak.lock();
+
+    auto targetGrid = hit ? hit->m_grid.lock() : nullptr;
     if (!targetGrid && !m_cursorNearMarker) {
         m_doModify = false;
         m_doCancel = false;
         return;
     }
-    
+
     // Check if this is the same block we already have selected
-    bool isSameBlock = m_hasSelectedBlock && 
+    bool isSameBlock = m_hasSelectedBlock &&
                       !m_selectedGrid.expired() &&
                       m_selectedGrid.lock().get() == targetGrid.get() &&
-                      m_selectedBlockCoord == hitPos;
-    
-    if (!isSameBlock && !m_cursorNearMarker && blockFound) {
+                      hit && m_selectedBlockCoord == hit->m_hitCoord;
+
+    if (!isSameBlock && !m_cursorNearMarker && targetGrid) {
         // New block selected
         m_hasSelectedBlock = true;
-        m_selectedGrid = targetGridWeak;
-        m_selectedBlockCoord = hitPos;
+        m_selectedGrid = hit->m_grid;
+        m_selectedBlockCoord = hit->m_hitCoord;
         m_doModify = false;
         m_doCancel = false;
         return;

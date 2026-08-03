@@ -24,6 +24,8 @@
 #include "tools/ColorTool.h"
 #include "tools/ModifyTool.h"
 #include "tools/BuildTool.h"
+#include "GridRaycast.h"
+#include <optional>
 #include "utils/ColorUtils.h"
 #include <float.h>
 #include "../physics/SensorCollider.h"
@@ -130,12 +132,6 @@ bool Creative::hasBoundCharacter() const {
 
 void Creative::stepControl() {
     if (doForce || doTrackSpeed) {
-        // Perform ray casting for force and speed tracking only
-        std::weak_ptr<Grid> targetGridWeak;
-        glm::ivec3 hitPos;
-        bool blockFound = false;
-        double closestT = -1.0;
-        
         // Camera position and direction
         glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
         glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
@@ -143,42 +139,14 @@ void Creative::stepControl() {
 
         // Get interpolation time for accurate raycasting
         auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
-        
-        // Find closest ray intersection across all grids
-        for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
-            if (!gridShared) continue; // Safety check
-            
-            // Get interpolated transform once per grid
-            glm::dvec3 interpolatedPos;
-            glm::dquat interpolatedOri;
-            gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
-            
-            // Transform world ray to interpolated grid-local space
-            glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(startPos, interpolatedPos, interpolatedOri);
-            glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(endPos, interpolatedPos, interpolatedOri);
-            
-            // Perform ray intersection in grid-local space
-            RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-            
-            // Check if this is a closer hit than what we have so far
-            if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
-                closestT = result.t;
-                blockFound = true;
-                targetGridWeak = gridShared;
-                
-                // Calculate intersection point with small epsilon to ensure we're inside the hit cell
-                const double epsilon = 1e-6;
-                double adjustedT = result.t + epsilon;
-                glm::dvec3 gridLocalIntersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
-                
-                // Floor to get hit cell (already in grid coordinates)
-                hitPos = glm::ivec3(glm::floor(gridLocalIntersectionPoint));
-            }
-        }
+
+        std::optional<GridRayHit> hit{GridRaycast::closestHit(
+            m_gameBase->getGridSubsystem()->getGrids(), startPos, endPos, timeRemainder)};
+        bool blockFound = hit.has_value();
 
         if (doTrackSpeed) {
             if (blockFound) {
-                auto targetGrid = targetGridWeak.lock();
+                auto targetGrid = hit->m_grid.lock();
                 if (targetGrid) {
                     auto bodyWeak = targetGrid->getRigidBody();
                     auto body = bodyWeak.lock();
@@ -196,7 +164,7 @@ void Creative::stepControl() {
         
         if (doForce) {
             if (blockFound) {
-                auto targetGrid = targetGridWeak.lock();
+                auto targetGrid = hit->m_grid.lock();
                 if (targetGrid) {
                     auto bodyWeak = targetGrid->getRigidBody();
                     auto body = bodyWeak.lock();
@@ -409,8 +377,8 @@ void Creative::processInputLogic() {
     double frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
     double deltaTime = 1.0 / frameRate;
     
-    // Structural analysis with G key
-    if (keyboard->m_g.justPressed()) {
+    // Structural analysis with I key
+    if (keyboard->m_i.justPressed()) {
         for (const auto& gridShared : m_gameBase->getGridSubsystem()->getGrids()) {
             if (gridShared) gridShared->visualizeStructuralIntegrity();
         }
@@ -538,6 +506,10 @@ void Creative::processInputLogic() {
         }
     }
 
+    // Read unconditionally: the keyboard state is recorded per query, so a branch
+    // around it would desynchronise input playback.
+    bool doCopyBlock = keyboard->m_g.justPressed();
+
     // Only pass mouse clicks to tools if menu didn't consume them
     if (!radialMenuConsumedMouse) {
         // Color tool uses right click for copy, left click for paste
@@ -551,17 +523,20 @@ void Creative::processInputLogic() {
         m_modifyTool->framePreRender(doModify, doCancel);
 
 
-        // BuildTool uses the classic right click to create, left click to remove
-        bool doCreate = mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32);
-        bool doRemove = mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
-        m_buildTool->framePreRender(doCreate, doRemove);
+        // BuildTool uses the classic right click to create, left click to remove,
+        // and G to copy the block being aimed at
+        BuildTool::Input buildInput{};
+        buildInput.m_create = mouseHandler->rightClick() || (mouseHandler->getRightDown() && mouseHandler->getTimeRightDown() > 32);
+        buildInput.m_remove = mouseHandler->leftClick() || (mouseHandler->getLeftDown() && mouseHandler->getTimeLeftDown() > 32);
+        buildInput.m_copy = doCopyBlock;
+        m_buildTool->framePreRender(buildInput);
 
         // Character selection tool doesn't need input for now (toggle handled by radial menu)
         m_characterSelectionTool->framePreRender(false);
     } else{
         m_colorTool->framePreRender(false, false);
         m_modifyTool->framePreRender(false, false);
-        m_buildTool->framePreRender(false, false);
+        m_buildTool->framePreRender(BuildTool::Input{});
         m_characterSelectionTool->framePreRender(false);
     }
 }

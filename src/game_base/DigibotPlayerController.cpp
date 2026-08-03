@@ -12,6 +12,8 @@
 #include <iostream>
 #include "utils/GridGeometry.h"
 #include "InputSettings.h"
+#include "GridRaycast.h"
+#include <optional>
 
 DigibotPlayerController::DigibotPlayerController(GraphicsEngine* graphics)
     : m_graphics(graphics)
@@ -91,42 +93,16 @@ void DigibotPlayerController::stepControl(DigibotController* controller, const s
     glm::dvec3 rayStart = cameraPos;
     glm::dvec3 rayEnd = cameraPos + forward * interactionRange;
     
-    std::weak_ptr<Grid> closestGrid;
-    bool gridFound = false;
-    double closestT = -1.0;
-
     // Get interpolation time for accurate raycasting
     auto [_, timeRemainder] = m_graphics->getRenderParameters();
-    
-    // Find closest ray intersection across available grids
-    for (const auto& gridWeak : availableGrids) {
-        auto gridShared = gridWeak.lock();
-        if (!gridShared) continue;
-        
-        // Get interpolated transform once per grid
-        glm::dvec3 interpolatedPos;
-        glm::dquat interpolatedOri;
-        gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
-        
-        // Transform world ray to interpolated grid-local space
-        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(rayStart, interpolatedPos, interpolatedOri);
-        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(rayEnd, interpolatedPos, interpolatedOri);
-        
-        // Perform ray intersection in grid-local space
-        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-        
-        // Check if this is a closer hit than what we have so far
-        if (result.t >= 0.0 && (!gridFound || result.t < closestT)) {
-            closestT = result.t;
-            gridFound = true;
-            closestGrid = gridWeak;
-        }
-    }
-    
+
+    std::optional<GridRayHit> hit{
+        GridRaycast::closestHit(availableGrids, rayStart, rayEnd, timeRemainder)};
+
     // Lock to the closest grid if found (the controller only needs its rigid body)
-    if (gridFound) {
+    if (hit) {
         std::weak_ptr<RigidBody> targetBody;
-        if (auto lockedGrid = closestGrid.lock()) {
+        if (auto lockedGrid = hit->m_grid.lock()) {
             targetBody = lockedGrid->getRigidBody();
         }
         if (m_needsFullLockRaycast) {

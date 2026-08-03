@@ -13,13 +13,17 @@
 #include "graphics/MeshManager2D/Instance2D.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
 #include "graphics/KeyboardHandler.h"
+#include "StructuralGhostGeometry.h"
 #include <iostream>
 #include <optional>
 #include <functional>
-#include "utils/GridGeometry.h"
+#include "../GridRaycast.h"
 
 // Exponential decay constant for orientation slerp animation (radians/second feel).
 static constexpr double k_orientationSlerpRate = 20.0;
+
+// Opacity every ghost is drawn with.
+static constexpr double k_ghostTransparency = 0.45;
 
 // Tries to place a multi-cell block whose cells sit at (anchor + offsets[i]).
 // Iterates each offset as the "aimed-at" cell, shifting the anchor accordingly.
@@ -59,6 +63,11 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     }
 
     auto* ge = m_gameBase->m_graphicsEngine.get();
+
+    // Built up front, like the ghost models below, so the first block placed does
+    // not pay for the mesh upload.
+    m_structuralGhost = std::make_unique<StructuralGhostGeometry>(ge);
+    m_structuralGhost->get(m_structuralShape);
 
     // Icon textures
     m_blockIconTextureIndex    = ge->createInstanceTexture("../media/2d_graphics/07_block_icon.png");
@@ -110,13 +119,14 @@ void BuildTool::deactivate() {
     hideCrosshair();
 }
 
-void BuildTool::framePreRender(bool doCreate, bool doRemove) {
+void BuildTool::framePreRender(const Input& input) {
     if (!m_active) {
         return;
     }
 
-    if (doCreate) m_doCreate = true;
-    if (doRemove) m_doRemove = true;
+    if (input.m_create) m_pendingInput.m_create = true;
+    if (input.m_remove) m_pendingInput.m_remove = true;
+    if (input.m_copy)   m_pendingInput.m_copy = true;
 
     // --- Orientation cycling (only relevant for thruster) ---
     // Insert/Delete  → ±90° around world Y
@@ -173,16 +183,9 @@ void BuildTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
         return;
     }
 
-    if (!m_doCreate && !m_doRemove) {
+    if (!m_pendingInput.m_create && !m_pendingInput.m_remove && !m_pendingInput.m_copy) {
         return;
     }
-
-    // Perform ray casting against all grids
-    std::weak_ptr<Grid> targetGridWeak;
-    glm::ivec3 targetPos;
-    glm::ivec3 hitPos;
-    bool   blockFound = false;
-    double closestT   = -1.0;
 
     glm::dvec3 startPos = m_gameBase->m_graphicsEngine->getCamPos();
     glm::dvec3 forward  = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
@@ -190,69 +193,72 @@ void BuildTool::stepControl(const std::vector<std::weak_ptr<Grid>>& availableGri
 
     auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
 
-    for (const auto& gridWeak : availableGrids) {
-        auto gridShared = gridWeak.lock();
-        if (!gridShared) continue;
+    std::optional<GridRayHit> hit{
+        GridRaycast::closestHit(availableGrids, startPos, endPos, timeRemainder)};
+    std::shared_ptr<Grid> targetGrid{hit ? hit->m_grid.lock() : nullptr};
 
-        glm::dvec3 interpolatedPos;
-        glm::dquat interpolatedOri;
-        gridShared->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
-
-        glm::dvec3 gridLocalRayStart = GridGeometry::worldToGrid(
-            startPos, interpolatedPos, interpolatedOri);
-        glm::dvec3 gridLocalRayEnd = GridGeometry::worldToGrid(
-            endPos, interpolatedPos, interpolatedOri);
-
-        RayIntersectionResult result = gridShared->intersectRay(gridLocalRayStart, gridLocalRayEnd);
-
-        if (result.t >= 0.0 && (!blockFound || result.t < closestT)) {
-            closestT   = result.t;
-            blockFound = true;
-            targetGridWeak = gridWeak;
-
-            const double epsilon = 1e-6;
-            double adjustedT = result.t + epsilon;
-            glm::dvec3 intersectionPoint = gridLocalRayStart + adjustedT * (gridLocalRayEnd - gridLocalRayStart);
-            hitPos = glm::ivec3(glm::floor(intersectionPoint));
-
-            glm::dvec3 absNormal = glm::abs(result.surfaceNormal);
-            glm::ivec3 dominantAxis;
-            if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z)
-                dominantAxis = {result.surfaceNormal.x > 0 ? 1 : -1, 0, 0};
-            else if (absNormal.y >= absNormal.z)
-                dominantAxis = {0, result.surfaceNormal.y > 0 ? 1 : -1, 0};
-            else
-                dominantAxis = {0, 0, result.surfaceNormal.z > 0 ? 1 : -1};
-
-            targetPos = hitPos + dominantAxis;
-        }
+    if (m_pendingInput.m_copy && targetGrid) {
+        copyBlockAt(*targetGrid, hit->m_hitCoord);
     }
 
-    if (m_doCreate) {
-        if (blockFound) {
-            auto targetGrid = targetGridWeak.lock();
-            if (targetGrid) {
-                addGridBlock(targetGrid.get(), targetPos.x, targetPos.y, targetPos.z);
-            }
-        } else {
+    if (m_pendingInput.m_create) {
+        if (targetGrid) {
+            addGridBlock(targetGrid.get(), hit->m_placeCoord.x, hit->m_placeCoord.y,
+                         hit->m_placeCoord.z);
+        } else if (!hit) {
             glm::dvec3 newGridPos = startPos + forward * 2.0 - glm::dvec3{0.5};
             m_gameBase->requestStructuralEdit(StructuralCommand::spawnGrid(
-                newGridPos, toCellType(m_selectedBlockType), m_targetOrientation));
+                newGridPos, toCellType(m_selectedBlockType), m_targetOrientation,
+                StructuralBlock::rotatedVertices(m_structuralShape, m_targetOrientation),
+                m_structuralColor));
         }
     }
 
-    if (m_doRemove) {
-        if (blockFound) {
-            auto targetGrid = targetGridWeak.lock();
-            if (targetGrid) {
-                m_gameBase->requestStructuralEdit(
-                    StructuralCommand::removeCell(targetGrid->uniqueId, hitPos));
-            }
+    if (m_pendingInput.m_remove && targetGrid) {
+        m_gameBase->requestStructuralEdit(
+            StructuralCommand::removeCell(targetGrid->uniqueId, hit->m_hitCoord));
+    }
+
+    m_pendingInput = Input{};
+}
+
+void BuildTool::copyBlockAt(Grid& grid, const glm::ivec3& coord) {
+    const GridCell* cell = grid.getCellFromRegistry(coord);
+    if (!cell) return;
+
+    const glm::ivec3 anchorCoord{cell->getAnchorCoord()};
+
+    switch (cell->type) {
+        case CellType::STRUCTURAL_BLOCK: {
+            const StructuralBlock* block = grid.getCell(coord);
+            if (!block) return;
+            m_selectedBlockType = BlockType::STRUCTURAL_BLOCK;
+            m_structuralShape   = block->m_localVertices;
+            m_structuralColor   = block->m_color;
+            // The shape already sits the way the source block does in its grid, so
+            // the copy starts unrotated and matches what the player is aiming at.
+            m_targetOrientation = glm::dquat{1.0, 0.0, 0.0, 0.0};
+            break;
+        }
+        case CellType::THRUSTER:
+        case CellType::THRUSTER_SECONDARY: {
+            auto it = grid.getThrusterCells().find(anchorCoord);
+            if (it == grid.getThrusterCells().end()) return;
+            m_selectedBlockType = BlockType::THRUSTER;
+            m_targetOrientation = it->second.m_orientation;
+            break;
+        }
+        case CellType::COCKPIT:
+        case CellType::COCKPIT_SECONDARY: {
+            auto it = grid.getCockpitCells().find(anchorCoord);
+            if (it == grid.getCockpitCells().end()) return;
+            m_selectedBlockType = BlockType::COCKPIT;
+            m_targetOrientation = it->second.m_orientation;
+            break;
         }
     }
 
-    m_doCreate = false;
-    m_doRemove = false;
+    showCrosshair();
 }
 
 void BuildTool::createMenuStructure(int64_t parentNodeId) {
@@ -265,8 +271,14 @@ void BuildTool::createMenuStructure(int64_t parentNodeId) {
     m_centerNodeId = m_radialMenu->createNode(
         m_buildToolParentId, -1, activateCallback, deactivateCallback);
 
+    // Picking the plain block from the menu also drops any copied shape.
     m_radialMenu->createNode(m_buildToolParentId, m_blockIconTextureIndex,
-        [this]() { m_selectedBlockType = BlockType::STRUCTURAL_BLOCK; activate(); },
+        [this]() {
+            m_selectedBlockType = BlockType::STRUCTURAL_BLOCK;
+            m_structuralShape   = PolyhedronProcessor::DEFAULT_VERTICES;
+            m_structuralColor   = glm::dvec4{1.0, 1.0, 1.0, 1.0};
+            activate();
+        },
         deactivateCallback);
 
     m_radialMenu->createNode(m_buildToolParentId, m_thrusterIconTextureIndex,
@@ -321,8 +333,10 @@ void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
     const auto& registry = grid->getCellRegistry();
 
     if (m_selectedBlockType == BlockType::STRUCTURAL_BLOCK) {
-        m_gameBase->requestStructuralEdit(
-            StructuralCommand::addCell(grid->uniqueId, targetPos));
+        m_gameBase->requestStructuralEdit(StructuralCommand::addCell(
+            grid->uniqueId, targetPos,
+            StructuralBlock::rotatedVertices(m_structuralShape, m_targetOrientation),
+            m_structuralColor));
     } else if (m_selectedBlockType == BlockType::THRUSTER) {
         auto anchor = findMultiCellAnchor(
             targetPos, ThrusterBlock::footprintOffsets(m_targetOrientation),
@@ -343,84 +357,48 @@ void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
 }
 
 void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGrids) {
-    if (m_selectedBlockType != BlockType::THRUSTER && m_selectedBlockType != BlockType::COCKPIT) {
-        hideGhost();
-        return;
-    }
-
     std::weak_ptr<Geometry> desiredGeometry;
     int colorTexUnit = -1;
     std::vector<glm::ivec3> footprint;
     glm::dvec3 modelCentre;
+    glm::dvec3 ghostTint{1.0, 1.0, 1.0};
 
     if (m_selectedBlockType == BlockType::THRUSTER) {
         desiredGeometry = m_thrusterGhostGeometry;
         colorTexUnit    = m_thrusterGhostColorTextureUnit;
         footprint       = ThrusterBlock::footprintOffsets(m_targetOrientation);
         modelCentre     = ThrusterBlock::MODEL_CENTRE;
-    } else {
+    } else if (m_selectedBlockType == BlockType::COCKPIT) {
         desiredGeometry = m_cockpitGhostGeometry;
         colorTexUnit    = m_cockpitGhostColorTextureUnit;
         footprint       = CockpitBlock::footprintOffsets(m_targetOrientation);
         modelCentre     = CockpitBlock::MODEL_CENTRE;
+    } else {
+        // A structural block is the single-cell case: its ghost is built from the
+        // shape being placed and tinted rather than textured.
+        desiredGeometry = m_structuralGhost->get(m_structuralShape);
+        footprint       = {glm::ivec3{0, 0, 0}};
+        modelCentre     = glm::dvec3{0.5};
+        ghostTint       = glm::dvec3{m_structuralColor};
     }
 
     auto geom = desiredGeometry.lock();
-    if (!geom) return;
+    if (!geom) { hideGhost(); return; }
 
     auto [_, timeRemainder] = m_gameBase->m_graphicsEngine->getRenderParameters();
     glm::dvec3 camPos  = m_gameBase->m_graphicsEngine->getCamPos();
     glm::dvec3 forward = m_gameBase->m_graphicsEngine->getCamOri() * glm::dvec3(0.0, 1.0, 0.0);
     glm::dvec3 endPos  = camPos + forward * m_interactionRange;
 
-    std::weak_ptr<Grid> bestGridWeak;
-    glm::ivec3 targetPos;
-    bool   hitFound = false;
-    double closestT = -1.0;
+    std::optional<GridRayHit> hit{
+        GridRaycast::closestHit(availableGrids, camPos, endPos, timeRemainder)};
+    if (!hit) { hideGhost(); return; }
 
-    for (const auto& gridWeak : availableGrids) {
-        auto grid = gridWeak.lock();
-        if (!grid) continue;
-
-        glm::dvec3 interpolatedPos;
-        glm::dquat interpolatedOri;
-        grid->getInterpolatedTransform(timeRemainder, interpolatedPos, interpolatedOri);
-
-        glm::dvec3 localStart = GridGeometry::worldToGrid(
-            camPos, interpolatedPos, interpolatedOri);
-        glm::dvec3 localEnd = GridGeometry::worldToGrid(
-            endPos, interpolatedPos, interpolatedOri);
-
-        RayIntersectionResult result = grid->intersectRay(localStart, localEnd);
-        if (result.t < 0.0 || (hitFound && result.t >= closestT)) continue;
-
-        closestT = result.t;
-        hitFound = true;
-        bestGridWeak = gridWeak;
-
-        const double epsilon = 1e-6;
-        glm::dvec3 intersection = localStart + (result.t + epsilon) * (localEnd - localStart);
-        glm::ivec3 hitPos = glm::ivec3(glm::floor(intersection));
-
-        glm::dvec3 absNormal = glm::abs(result.surfaceNormal);
-        glm::ivec3 surfaceAxis;
-        if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z)
-            surfaceAxis = {result.surfaceNormal.x > 0 ? 1 : -1, 0, 0};
-        else if (absNormal.y >= absNormal.z)
-            surfaceAxis = {0, result.surfaceNormal.y > 0 ? 1 : -1, 0};
-        else
-            surfaceAxis = {0, 0, result.surfaceNormal.z > 0 ? 1 : -1};
-
-        targetPos = hitPos + surfaceAxis;
-    }
-
-    if (!hitFound) { hideGhost(); return; }
-
-    auto bestGrid = bestGridWeak.lock();
+    auto bestGrid = hit->m_grid.lock();
     if (!bestGrid) { hideGhost(); return; }
 
     const auto& registry = bestGrid->getCellRegistry();
-    auto anchorOpt = findMultiCellAnchor(targetPos, footprint,
+    auto anchorOpt = findMultiCellAnchor(hit->m_placeCoord, footprint,
         [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
 
     if (!anchorOpt) { hideGhost(); return; }
@@ -437,9 +415,10 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
         m_currentGhostSsboIndex = -1;
     }
 
+    const glm::dvec4 ghostColor{ghostTint.r, ghostTint.g, ghostTint.b, k_ghostTransparency};
+
     if (!m_ghostInstance.lock()) {
-        m_ghostInstance = geom->addInstance(ssboIndex, colorTexUnit, -1, -1,
-                                            glm::dvec4{1.0, 1.0, 1.0, 0.45}, -1);
+        m_ghostInstance = geom->addInstance(ssboIndex, colorTexUnit, -1, -1, ghostColor, -1);
         m_currentGhostSsboIndex = ssboIndex;
     }
 
@@ -450,6 +429,7 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
                                - glm::dvec3{m_renderedOrientation * modelCentre};
     inst->m_localOrientation = m_renderedOrientation;
     inst->m_localScale       = glm::dvec3{1.0, 1.0, 1.0};
+    inst->m_color            = ghostColor;
     geom->updateInstanceInBuffer(inst.get());
 }
 

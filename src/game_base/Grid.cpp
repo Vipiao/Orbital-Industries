@@ -140,6 +140,18 @@ void Grid::addCell(const glm::ivec3& coord) {
     m_structureVersion++;
 }
 
+void Grid::addCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& vertices,
+                   const glm::dvec4& color) {
+    if (hasCell(coord)) {
+        return;  // an occupied coord keeps the block already there, shape and colour
+    }
+    addCell(coord);
+    if (canModifyCell(coord, vertices)) {
+        modifyCell(coord, vertices);
+    }
+    setColor(coord, color);
+}
+
 // Remove a cell (structural block or special block) from the grid.
 // Returns all coordinates that were removed.
 std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {

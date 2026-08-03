@@ -152,7 +152,7 @@ void GameBase::applyStructural(const StructuralCommand& command) {
             std::shared_ptr<Grid> grid{
                 m_gridSubsystem->getGridById(command.m_gridId).lock()};
             if (grid) {
-                grid->addCell(command.m_coord);
+                grid->addCell(command.m_coord, command.m_vertices, command.m_color);
             }
             break;
         }
@@ -194,7 +194,8 @@ void GameBase::applyStructural(const StructuralCommand& command) {
                         grid->addCockpit(glm::ivec3{0, 0, 0}, command.m_orientation);
                         break;
                     default:
-                        grid->addCell(glm::ivec3{0, 0, 0});
+                        grid->addCell(glm::ivec3{0, 0, 0}, command.m_vertices,
+                                      command.m_color);
                         break;
                 }
             }

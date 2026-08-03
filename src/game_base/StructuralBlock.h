@@ -45,6 +45,19 @@ public:
     static bool validateVertices(const std::array<glm::ivec3, 8>& vertices, int maxSize = 4);
     
     /**
+     * @brief Rotate a vertex configuration about the cell centre
+     *
+     * Corner slots are permuted along with the positions, so slot i keeps naming the
+     * corner PolyhedronProcessor::CubeVertex says it does. The orientation must map
+     * the cell onto itself, i.e. be a multiple of 90 degrees about a grid axis.
+     * @param vertices Vertex configuration to rotate
+     * @param orientation Axis-aligned rotation to apply
+     * @return The rotated vertex configuration
+     */
+    static std::array<glm::ivec3, 8> rotatedVertices(const std::array<glm::ivec3, 8>& vertices,
+                                                     const glm::dquat& orientation);
+
+    /**
      * @brief Get normalized vertices in local coordinates
      * @return Vector of vertices in local coordinates (normalized by m_maxSize)
      */
@@ -55,6 +68,15 @@ public:
      * @return PolyhedronProcessor::MeshData containing all vertex attributes for rendering
      */
     PolyhedronProcessor::MeshData generateTriangleMeshData() const;
+
+    /**
+     * @brief Generate triangle mesh data for a vertex configuration
+     *
+     * Positions are cell local, in [0, 1], as the grid builds its cells.
+     * @param vertices Vertex configuration to build the mesh from
+     */
+    static PolyhedronProcessor::MeshData generateTriangleMeshData(
+        const std::array<glm::ivec3, 8>& vertices);
 
     /**
      * @brief Get mass properties of this structural block

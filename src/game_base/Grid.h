@@ -42,6 +42,13 @@ public:
     
     // Cell management methods
     void addCell(const glm::ivec3& coord);
+
+    // Add a structural block that already has a shape and colour. Invalid vertex
+    // sets leave a default cube, so a shape arriving over the wire or from a file
+    // cannot corrupt the grid.
+    void addCell(const glm::ivec3& coord, const std::array<glm::ivec3, 8>& vertices,
+                 const glm::dvec4& color = glm::dvec4{1.0, 1.0, 1.0, 1.0});
+
     void addThruster(const glm::ivec3& anchorCoord,
                      const glm::dquat& orientation = glm::dquat{1.0, 0.0, 0.0, 0.0});
     void addCockpit(const glm::ivec3& anchorCoord,

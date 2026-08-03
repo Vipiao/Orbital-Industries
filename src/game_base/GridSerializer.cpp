@@ -186,9 +186,7 @@ std::weak_ptr<Grid> GridSerializer::deserialize(ByteReader& reader,
         if (!ok) {
             return grid;
         }
-        grid->addCell(coord);
-        grid->modifyCell(coord, vertices);
-        grid->setColor(coord, color);
+        grid->addCell(coord, vertices, color);
     }
 
     std::uint32_t thrusterCount{0};
