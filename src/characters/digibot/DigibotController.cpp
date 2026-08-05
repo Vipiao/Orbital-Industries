@@ -26,6 +26,7 @@ void DigibotController::applyInput(const DigibotInput& input,
                                   const std::weak_ptr<RigidBody>& lockTargetBody) {
     setMovementDirection(input.m_movementDirection);
     setViewDirection(input.m_viewDirection);
+    setRotationCommand(input.m_rotationCommand);
     setRollInput(input.m_rollInput);
     setLockUpDirection(input.m_upDirectionLocked);
     setJetpackEnabled(input.m_jetpackEnabled);
@@ -42,6 +43,7 @@ DigibotInput DigibotController::captureInput() const {
     DigibotInput input{};
     input.m_movementDirection = m_movementDirection;
     input.m_viewDirection = m_viewDirection;
+    input.m_rotationCommand = m_rotationCommand;
     input.m_rollInput = m_rollInput;
     input.m_upDirectionLocked = m_isUpDirectionLocked;
     input.m_jetpackEnabled = m_isJetpackEnabled;

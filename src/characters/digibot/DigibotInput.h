@@ -19,8 +19,15 @@ struct DigibotInput {
     static constexpr std::uint64_t k_noLockTargetGridId{
         std::numeric_limits<std::uint64_t>::max()};
 
+    // Largest rotation command accepted, in rad/s^2. Deserialized input is
+    // untrusted, and this one is a floating point value straight off a mouse.
+    static constexpr double k_maxRotationCommand{1.0e3};
+
     glm::ivec3 m_movementDirection{0, 0, 0};
     glm::dvec3 m_viewDirection{0.0, 1.0, 0.0};
+    // Rotation the pilot asks of the ship they are seated in, as an angular
+    // acceleration in the cockpit's frame (rad/s^2). Zero when not seated.
+    glm::dvec3 m_rotationCommand{0.0, 0.0, 0.0};
     int m_rollInput{0};
     bool m_upDirectionLocked{false};
     bool m_jetpackEnabled{true};
@@ -37,6 +44,9 @@ struct DigibotInput {
         writer.write(m_viewDirection.x);
         writer.write(m_viewDirection.y);
         writer.write(m_viewDirection.z);
+        writer.write(m_rotationCommand.x);
+        writer.write(m_rotationCommand.y);
+        writer.write(m_rotationCommand.z);
         writer.write(m_rollInput);
         writer.write(m_upDirectionLocked);
         writer.write(m_jetpackEnabled);
@@ -48,6 +58,8 @@ struct DigibotInput {
         return reader.read(m_movementDirection.x) && reader.read(m_movementDirection.y) &&
                reader.read(m_movementDirection.z) && reader.read(m_viewDirection.x) &&
                reader.read(m_viewDirection.y) && reader.read(m_viewDirection.z) &&
+               reader.read(m_rotationCommand.x) && reader.read(m_rotationCommand.y) &&
+               reader.read(m_rotationCommand.z) &&
                reader.read(m_rollInput) && reader.read(m_upDirectionLocked) &&
                reader.read(m_jetpackEnabled) && reader.read(m_lockState) &&
                reader.read(m_lockTargetGridId);
@@ -63,6 +75,9 @@ struct DigibotInput {
                std::isfinite(m_viewDirection.x) && std::isfinite(m_viewDirection.y) &&
                std::isfinite(m_viewDirection.z) &&
                glm::length(m_viewDirection) > 1e-6 &&
+               std::isfinite(m_rotationCommand.x) && std::isfinite(m_rotationCommand.y) &&
+               std::isfinite(m_rotationCommand.z) &&
+               glm::length(m_rotationCommand) <= k_maxRotationCommand &&
                m_lockState >= DigibotLockState::UNLOCKED &&
                m_lockState <= DigibotLockState::FULL_LOCK;
     }

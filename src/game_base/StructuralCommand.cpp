@@ -79,6 +79,7 @@ void StructuralCommand::serialize(ByteWriter& writer) const {
             break;
         case StructuralOp::AddThruster:
         case StructuralOp::AddCockpit:
+        case StructuralOp::AddReactionWheel:
             writeQuat(writer, m_orientation);
             break;
         case StructuralOp::SpawnGrid:
@@ -126,6 +127,7 @@ bool StructuralCommand::deserialize(ByteReader& reader) {
                    reader.read(m_direction.y) && reader.read(m_direction.z);
         case StructuralOp::AddThruster:
         case StructuralOp::AddCockpit:
+        case StructuralOp::AddReactionWheel:
             return readQuat(reader, m_orientation);
         case StructuralOp::SpawnGrid:
             return reader.read(m_position.x) && reader.read(m_position.y) &&
@@ -212,6 +214,17 @@ StructuralCommand StructuralCommand::addCockpit(std::uint64_t gridId,
                                                 const glm::dquat& orientation) {
     StructuralCommand command{};
     command.m_op = StructuralOp::AddCockpit;
+    command.m_gridId = gridId;
+    command.m_coord = anchorCoord;
+    command.m_orientation = orientation;
+    return command;
+}
+
+StructuralCommand StructuralCommand::addReactionWheel(std::uint64_t gridId,
+                                                      const glm::ivec3& anchorCoord,
+                                                      const glm::dquat& orientation) {
+    StructuralCommand command{};
+    command.m_op = StructuralOp::AddReactionWheel;
     command.m_gridId = gridId;
     command.m_coord = anchorCoord;
     command.m_orientation = orientation;

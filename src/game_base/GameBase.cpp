@@ -9,6 +9,7 @@
 #include "GridSubsystem.h"
 #include "cockpit/CockpitDockingCoordinator.h"
 #include "thruster/ThrusterControl.h"
+#include "reaction_wheel/ReactionWheelControl.h"
 #include "../characters/digibot/Digibot.h"
 #include "../characters/digibot/DigibotController.h"
 #include "utils/TimeHandler.h"
@@ -179,6 +180,14 @@ void GameBase::applyStructural(const StructuralCommand& command) {
             }
             break;
         }
+        case StructuralOp::AddReactionWheel: {
+            std::shared_ptr<Grid> grid{
+                m_gridSubsystem->getGridById(command.m_gridId).lock()};
+            if (grid) {
+                grid->addReactionWheel(command.m_coord, command.m_orientation);
+            }
+            break;
+        }
         case StructuralOp::SplitGrid:
             applySplit(command.m_gridId, command.m_pieces);
             break;
@@ -192,6 +201,9 @@ void GameBase::applyStructural(const StructuralCommand& command) {
                         break;
                     case CellType::COCKPIT:
                         grid->addCockpit(glm::ivec3{0, 0, 0}, command.m_orientation);
+                        break;
+                    case CellType::REACTION_WHEEL:
+                        grid->addReactionWheel(glm::ivec3{0, 0, 0}, command.m_orientation);
                         break;
                     default:
                         grid->addCell(glm::ivec3{0, 0, 0}, command.m_vertices,
@@ -419,19 +431,24 @@ GameBase::StepResult GameBase::updatePhysics(
                 m_characterSubsystem.get(), m_physicsEngine.get(),
                 m_gridSubsystem.get());
 
-            // Seated pilots command their grid's thrusters, then the stored
-            // throttles burn on every grid -- a burn persists with no one in
-            // the seat until the next command overwrites it.
+            // Seated pilots command their grid's thrusters and reaction wheels.
+            // A burn persists with no one in the seat until the next command
+            // overwrites it; the wheels instead recompute every step on every
+            // grid, so an empty seat reads as no rotation asked for and they
+            // bring the ship to rest.
             m_cockpitDockingCoordinator->forEachSeatedPilot(
                 [](Digibot& digibot, Grid& grid, const CockpitBlock& cockpit) {
                     DigibotController* controller{digibot.getController()};
                     if (controller) {
                         ThrusterControl::setPilotCommand(
                             grid, cockpit, controller->getMovementDirection());
+                        ReactionWheelControl::setPilotCommand(
+                            grid, cockpit, controller->getRotationCommand());
                     }
                 });
             for (const std::shared_ptr<Grid>& grid : m_gridSubsystem->getGrids()) {
                 ThrusterControl::applyThrustForces(m_physicsEngine.get(), *grid);
+                ReactionWheelControl::stepControl(m_physicsEngine.get(), *grid);
             }
 
             m_characterSubsystem->stepControlAll();

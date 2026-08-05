@@ -2,6 +2,7 @@
 #include "BlockResourceCache.h"
 #include "thruster/ThrusterBlock.h"
 #include "cockpit/CockpitBlock.h"
+#include "reaction_wheel/ReactionWheelBlock.h"
 #include "graphics/GraphicsEngine.h"
 #include <stdexcept>
 
@@ -26,6 +27,13 @@ BlockResourceCache::BlockResourceCache(GraphicsEngine* graphics)
             CockpitBlock::geometryParts(),
             std::string{CockpitBlock::COLOR_TEX_PATH},
             std::string{CockpitBlock::NORMAL_TEX_PATH}));
+
+    m_resources.emplace(CellType::REACTION_WHEEL,
+        std::make_unique<BlockResources>(
+            graphics,
+            ReactionWheelBlock::geometryParts(),
+            std::string{ReactionWheelBlock::COLOR_TEX_PATH},
+            std::string{ReactionWheelBlock::NORMAL_TEX_PATH}));
 
     // Shared ion-plume ray-volume material (injected placeholder body) and proxy.
     m_plumeMaterial = graphics->createRayVolumeMaterial(

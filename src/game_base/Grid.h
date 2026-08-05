@@ -10,6 +10,7 @@
 #include "SecondaryCell.h"
 #include "thruster/ThrusterBlock.h"
 #include "cockpit/CockpitBlock.h"
+#include "reaction_wheel/ReactionWheelBlock.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
@@ -53,6 +54,8 @@ public:
                      const glm::dquat& orientation = glm::dquat{1.0, 0.0, 0.0, 0.0});
     void addCockpit(const glm::ivec3& anchorCoord,
                     const glm::dquat& orientation = glm::dquat{1.0, 0.0, 0.0, 0.0});
+    void addReactionWheel(const glm::ivec3& anchorCoord,
+                          const glm::dquat& orientation = glm::dquat{1.0, 0.0, 0.0, 0.0});
 
     // Returns all coords removed (1 for structural block, 2 for thruster anchor+secondary)
     std::vector<glm::ivec3> removeCell(const glm::ivec3& coord);
@@ -156,15 +159,48 @@ public:
         return m_cockpitCells;
     }
 
+    // Reaction wheel anchors (owning map); commands are driven via
+    // setReactionWheelCommand.
+    const std::unordered_map<glm::ivec3, ReactionWheelBlock, Hash::IVec3Hash>&
+    getReactionWheelCells() const {
+        return m_reactionWheelCells;
+    }
+
     // Set the stored throttle [0, 1] of the thruster anchored at the coord
     // (no-op if there is no thruster there).
     void setThrusterLevel(const glm::ivec3& anchorCoord, double level);
+
+    // Set the stored torque command of the reaction wheel anchored at the coord,
+    // in grid-local space as a fraction of the wheel's maximum (no-op if there is
+    // no wheel there).
+    void setReactionWheelCommand(const glm::ivec3& anchorCoord, const glm::dvec3& command);
+
+    // Rotation a seated pilot asks of this grid, as an angular acceleration in
+    // grid-local space (rad/s^2). Written while a pilot is seated and taken by the
+    // reaction wheels in the same step, so an empty seat leaves nothing behind.
+    void setPilotAngularAcceleration(const glm::dvec3& acceleration) {
+        m_pilotAngularAcceleration = acceleration;
+    }
+    glm::dvec3 takePilotAngularAcceleration() {
+        const glm::dvec3 acceleration{m_pilotAngularAcceleration};
+        m_pilotAngularAcceleration = glm::dvec3{0.0};
+        return acceleration;
+    }
 
     // IHashable interface
     virtual size_t computeHash() const override;
 
 private:
+    // Place a special block: types differ only in the cells they fill, the model
+    // they draw and the map that owns them, all declared by the block type itself.
+    // No-op if any cell of the footprint is occupied.
+    template <typename BlockT>
+    void addBlock(std::unordered_map<glm::ivec3, BlockT, Hash::IVec3Hash>& anchors,
+                  const glm::ivec3& anchorCoord, const glm::dquat& orientation);
+
     uint64_t m_structureVersion{0};
+
+    glm::dvec3 m_pilotAngularAcceleration{0.0, 0.0, 0.0};
 
     // Job management
     JobManager* m_jobManager;
@@ -182,6 +218,7 @@ private:
     // Special block anchor cells (owning, one map per concrete type)
     std::unordered_map<glm::ivec3, ThrusterBlock, Hash::IVec3Hash> m_thrusterCells;
     std::unordered_map<glm::ivec3, CockpitBlock,  Hash::IVec3Hash> m_cockpitCells;
+    std::unordered_map<glm::ivec3, ReactionWheelBlock, Hash::IVec3Hash> m_reactionWheelCells;
 
     // All secondary cells across every block type (owning, unified map)
     std::unordered_map<glm::ivec3, SecondaryCell, Hash::IVec3Hash> m_secondaryCells;

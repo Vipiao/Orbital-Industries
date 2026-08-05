@@ -1,5 +1,6 @@
 #include "GridSerializer.h"
 
+#include "CoordOrder.h"
 #include "Grid.h"
 #include "GridSubsystem.h"
 #include "StructuralBlock.h"
@@ -14,21 +15,6 @@
 #include <unordered_map>
 #include <vector>
 
-// Coordinate-sorted keys of a coord-keyed map: the canonical iteration order for
-// hashing and serialization, independent of container history.
-template <typename Map>
-static std::vector<glm::ivec3> sortedKeys(const Map& map) {
-    std::vector<glm::ivec3> keys{};
-    keys.reserve(map.size());
-    for (const auto& [coord, value] : map) {
-        keys.push_back(coord);
-    }
-    std::sort(keys.begin(), keys.end(), [](const glm::ivec3& a, const glm::ivec3& b) {
-        return std::tie(a.x, a.y, a.z) < std::tie(b.x, b.y, b.z);
-    });
-    return keys;
-}
-
 static void writeQuat(ByteWriter& writer, const glm::dquat& quat) {
     writer.write(quat.w);
     writer.write(quat.x);
@@ -41,13 +27,56 @@ static bool readQuat(ByteReader& reader, glm::dquat& quat) {
            reader.read(quat.y) && reader.read(quat.z);
 }
 
+// Coord and orientation are all any special block needs to be rebuilt, so one
+// anchor map is handled the same way whatever type of block it holds. The tag
+// separates the sections: a thruster and a cockpit anchored at the same coord
+// with the same orientation must not hash alike.
+template <typename Map>
+static std::size_t hashAnchors(std::size_t hash, int tag, const Map& anchors) {
+    hash = Hash::combineHashes(hash, std::hash<int>{}(tag));
+    for (const glm::ivec3& coord : sortedCoords(anchors)) {
+        hash = Hash::combineHashes(hash, Hash::IVec3Hash{}(coord));
+        hash = Hash::combineHashes(hash, Hash::DQuatHash{}(anchors.at(coord).m_orientation));
+    }
+    return hash;
+}
+
+template <typename Map>
+static void writeAnchors(ByteWriter& writer, const Map& anchors) {
+    writer.write(static_cast<std::uint32_t>(anchors.size()));
+    for (const glm::ivec3& coord : sortedCoords(anchors)) {
+        writer.write(coord.x);
+        writer.write(coord.y);
+        writer.write(coord.z);
+        writeQuat(writer, anchors.at(coord).m_orientation);
+    }
+}
+
+// Rebuild one section through the grid's own placement method. Returns false on
+// malformed data, leaving the grid built as far as the stream was readable.
+static bool readAnchors(ByteReader& reader, Grid& grid,
+                        void (Grid::*placeBlock)(const glm::ivec3&, const glm::dquat&)) {
+    std::uint32_t count{0};
+    if (!reader.read(count)) {
+        return false;
+    }
+    for (std::uint32_t ii = 0; ii < count; ii++) {
+        glm::ivec3 coord{0};
+        glm::dquat orientation{1.0, 0.0, 0.0, 0.0};
+        if (!(reader.read(coord.x) && reader.read(coord.y) && reader.read(coord.z) &&
+              readQuat(reader, orientation))) {
+            return false;
+        }
+        (grid.*placeBlock)(coord, orientation);
+    }
+    return true;
+}
+
 static std::size_t computeStructureHash(const Grid& grid) {
     std::size_t hash{0};
 
-    // Distinct tags per section: a thruster and a cockpit at the same coord with
-    // the same orientation must not hash alike.
     hash = Hash::combineHashes(hash, std::hash<int>{}(1));
-    for (const glm::ivec3& coord : sortedKeys(grid.getCells())) {
+    for (const glm::ivec3& coord : sortedCoords(grid.getCells())) {
         const StructuralBlock& block{grid.getCells().at(coord)};
         hash = Hash::combineHashes(hash, Hash::IVec3Hash{}(coord));
         for (const glm::ivec3& vertex : block.m_localVertices) {
@@ -58,19 +87,9 @@ static std::size_t computeStructureHash(const Grid& grid) {
         }
     }
 
-    hash = Hash::combineHashes(hash, std::hash<int>{}(2));
-    for (const glm::ivec3& coord : sortedKeys(grid.getThrusterCells())) {
-        hash = Hash::combineHashes(hash, Hash::IVec3Hash{}(coord));
-        hash = Hash::combineHashes(
-            hash, Hash::DQuatHash{}(grid.getThrusterCells().at(coord).m_orientation));
-    }
-
-    hash = Hash::combineHashes(hash, std::hash<int>{}(3));
-    for (const glm::ivec3& coord : sortedKeys(grid.getCockpitCells())) {
-        hash = Hash::combineHashes(hash, Hash::IVec3Hash{}(coord));
-        hash = Hash::combineHashes(
-            hash, Hash::DQuatHash{}(grid.getCockpitCells().at(coord).m_orientation));
-    }
+    hash = hashAnchors(hash, 2, grid.getThrusterCells());
+    hash = hashAnchors(hash, 3, grid.getCockpitCells());
+    hash = hashAnchors(hash, 4, grid.getReactionWheelCells());
 
     return hash;
 }
@@ -117,7 +136,7 @@ void GridSerializer::serialize(const Grid& grid, ByteWriter& writer) {
     writeQuat(writer, orientation);
 
     writer.write(static_cast<std::uint32_t>(grid.getCells().size()));
-    for (const glm::ivec3& coord : sortedKeys(grid.getCells())) {
+    for (const glm::ivec3& coord : sortedCoords(grid.getCells())) {
         const StructuralBlock& block{grid.getCells().at(coord)};
         writer.write(coord.x);
         writer.write(coord.y);
@@ -132,21 +151,9 @@ void GridSerializer::serialize(const Grid& grid, ByteWriter& writer) {
         }
     }
 
-    writer.write(static_cast<std::uint32_t>(grid.getThrusterCells().size()));
-    for (const glm::ivec3& coord : sortedKeys(grid.getThrusterCells())) {
-        writer.write(coord.x);
-        writer.write(coord.y);
-        writer.write(coord.z);
-        writeQuat(writer, grid.getThrusterCells().at(coord).m_orientation);
-    }
-
-    writer.write(static_cast<std::uint32_t>(grid.getCockpitCells().size()));
-    for (const glm::ivec3& coord : sortedKeys(grid.getCockpitCells())) {
-        writer.write(coord.x);
-        writer.write(coord.y);
-        writer.write(coord.z);
-        writeQuat(writer, grid.getCockpitCells().at(coord).m_orientation);
-    }
+    writeAnchors(writer, grid.getThrusterCells());
+    writeAnchors(writer, grid.getCockpitCells());
+    writeAnchors(writer, grid.getReactionWheelCells());
 }
 
 std::weak_ptr<Grid> GridSerializer::deserialize(ByteReader& reader,
@@ -189,32 +196,13 @@ std::weak_ptr<Grid> GridSerializer::deserialize(ByteReader& reader,
         grid->addCell(coord, vertices, color);
     }
 
-    std::uint32_t thrusterCount{0};
-    if (!reader.read(thrusterCount)) {
-        return grid;
-    }
-    for (std::uint32_t ii = 0; ii < thrusterCount; ii++) {
-        glm::ivec3 coord{0};
-        glm::dquat blockOrientation{1.0, 0.0, 0.0, 0.0};
-        if (!(reader.read(coord.x) && reader.read(coord.y) && reader.read(coord.z) &&
-              readQuat(reader, blockOrientation))) {
+    // Sections follow the order they were written in; a truncated stream simply
+    // stops the rebuild where it ran out.
+    for (void (Grid::*placeBlock)(const glm::ivec3&, const glm::dquat&) :
+         {&Grid::addThruster, &Grid::addCockpit, &Grid::addReactionWheel}) {
+        if (!readAnchors(reader, *grid, placeBlock)) {
             return grid;
         }
-        grid->addThruster(coord, blockOrientation);
-    }
-
-    std::uint32_t cockpitCount{0};
-    if (!reader.read(cockpitCount)) {
-        return grid;
-    }
-    for (std::uint32_t ii = 0; ii < cockpitCount; ii++) {
-        glm::ivec3 coord{0};
-        glm::dquat blockOrientation{1.0, 0.0, 0.0, 0.0};
-        if (!(reader.read(coord.x) && reader.read(coord.y) && reader.read(coord.z) &&
-              readQuat(reader, blockOrientation))) {
-            return grid;
-        }
-        grid->addCockpit(coord, blockOrientation);
     }
 
     return grid;

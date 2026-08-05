@@ -3,6 +3,7 @@
 #include "../characters/digibot/Digibot.h"
 #include "../characters/digibot/DigibotController.h"
 #include "../physics/PhysicsEngine.h"
+#include "../physics/PhysicsUnits.h"
 #include "../physics/RigidBody.h"
 #include "../game_base/Grid.h"
 #include "graphics/GraphicsEngine.h"
@@ -79,11 +80,52 @@ glm::dvec3 DigibotPlayerController::getSurfaceAngularVelocity() const {
     return controller->getSurfaceAngularVelocity();
 }
 
+glm::dvec3 DigibotPlayerController::pilotRotationCommand(bool seated) {
+    // Drained whether or not it is used, so travel from before the seat was taken
+    // cannot arrive as a lurch on the first seated step.
+    const glm::dvec2 travel{m_pilotMouseTravel};
+    m_pilotMouseTravel = glm::dvec2{0.0, 0.0};
+
+    if (!seated) {
+        return glm::dvec3{0.0, 0.0, 0.0};
+    }
+
+    KeyboardHandler* keyboard = m_graphics->getKeyboardHandler();
+    const int roll{keyboard ? (keyboard->m_e.isDown() ? 1 : 0) - (keyboard->m_q.isDown() ? 1 : 0)
+                            : 0};
+
+    // The mouse travel is a step's worth of angular velocity, so as an angular
+    // acceleration held for that one step it delivers exactly that much.
+    constexpr double k_stepSeconds{1.0 / PhysicsUnits::s_tickRateHz};
+    const glm::dvec2 fromMouse{travel * InputSettings::PILOT_MOUSE_SENSITIVITY / k_stepSeconds};
+
+    // Cockpit frame: x right, y forward, z up. Moving the mouse up pitches the
+    // nose up, moving it right yaws right, and E rolls right.
+    glm::dvec3 command{-fromMouse.y,
+                       roll * InputSettings::PILOT_ROLL_ACCELERATION,
+                       -fromMouse.x};
+
+    // A violent mouse jump must not produce a command the receiving peer rejects
+    // as out of range; clamp by magnitude so the commanded direction survives.
+    const double magnitude{glm::length(command)};
+    if (magnitude > DigibotInput::k_maxRotationCommand) {
+        command *= DigibotInput::k_maxRotationCommand / magnitude;
+    }
+    return command;
+}
+
 void DigibotPlayerController::stepControl(DigibotController* controller, const std::vector<std::weak_ptr<Grid>>& availableGrids, double interactionRange) {
-    if (!m_needsRaycast || !controller || !m_graphics) {
+    if (!controller || !m_graphics) {
         return;
     }
-    
+
+    controller->setRotationCommand(pilotRotationCommand(
+        controller->getDockingState() == DigibotController::DockingState::SEATED));
+
+    if (!m_needsRaycast) {
+        return;
+    }
+
     // Reset flag
     m_needsRaycast = false;
     
@@ -275,8 +317,15 @@ void DigibotPlayerController::update(DigibotController* controller, glm::dvec3& 
     // Get current view direction (already includes surface rotation from framePreRender)
     glm::dvec3 currentViewDir = controller->getViewDirection();
 
-    // Apply mouse input to view direction
-    if (mouseHandler->getMouseLock()) {
+    // Seated in a cockpit the mouse flies the ship instead of panning the view:
+    // the head rides the seat, and the movement is gathered for the reaction
+    // wheels (see pilotRotationCommand).
+    if (controller->getDockingState() == DigibotController::DockingState::SEATED) {
+        if (mouseHandler->getMouseLock()) {
+            m_pilotMouseTravel += mouseHandler->getMouseMovement();
+        }
+        currentViewDir = interpolatedOrientation * glm::dvec3(0.0, 1.0, 0.0);
+    } else if (mouseHandler->getMouseLock()) {
         // Step 1: Create orientation quaternion using look-at function
         glm::dquat viewQuat = glm::conjugate(ArticulationUtils::quatLookAtYForward(currentViewDir, upVector));
         

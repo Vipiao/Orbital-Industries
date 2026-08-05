@@ -25,15 +25,7 @@ std::vector<glm::ivec3> CockpitBlock::footprintOffsets(const glm::dquat& /*orien
 }
 
 std::vector<glm::ivec3> CockpitBlock::secondaryCoords() const {
-    return {
-        coordinates + glm::ivec3{1, 0, 0},
-        coordinates + glm::ivec3{0, 1, 0},
-        coordinates + glm::ivec3{0, 0, 1},
-        coordinates + glm::ivec3{1, 1, 0},
-        coordinates + glm::ivec3{1, 0, 1},
-        coordinates + glm::ivec3{0, 1, 1},
-        coordinates + glm::ivec3{1, 1, 1},
-    };
+    return secondariesOf(footprintOffsets(m_orientation));
 }
 
 std::tuple<double, glm::dvec3, glm::dmat3> CockpitBlock::getMassProperties() const {

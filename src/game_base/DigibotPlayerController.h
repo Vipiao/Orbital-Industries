@@ -66,4 +66,14 @@ private:
     // Lock state
     bool m_needsRaycast{false};
     bool m_needsFullLockRaycast{false};
+
+    // Mouse movement gathered while seated in a cockpit, in pixels. Frames and
+    // physics steps run at their own rates, so the movement is summed per frame
+    // and drained once per step: no sample is dropped and the ship answers to the
+    // distance the mouse travelled rather than to the frame rate it travelled at.
+    glm::dvec2 m_pilotMouseTravel{0.0, 0.0};
+
+    // The pilot's rotation intent for the ship, from the mouse travel above and
+    // the roll keys. Zero whenever the character is not seated.
+    glm::dvec3 pilotRotationCommand(bool seated);
 };

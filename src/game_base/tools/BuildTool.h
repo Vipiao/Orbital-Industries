@@ -24,7 +24,8 @@ public:
     enum class BlockType {
         STRUCTURAL_BLOCK,
         THRUSTER,
-        COCKPIT
+        COCKPIT,
+        REACTION_WHEEL
     };
 
     // What the player asked of the tool this frame; consumed by the next control step.
@@ -83,6 +84,9 @@ private:
     std::weak_ptr<Geometry> m_cockpitGhostGeometry;
     int m_cockpitGhostColorTextureUnit{-1};
 
+    std::weak_ptr<Geometry> m_reactionWheelGhostGeometry;
+    int m_reactionWheelGhostColorTextureUnit{-1};
+
     // Active ghost instance state (one instance at a time)
     std::weak_ptr<Geometry> m_activeGhostGeometry;
     std::weak_ptr<Instance> m_ghostInstance;
@@ -98,6 +102,7 @@ private:
     std::weak_ptr<Geometry2D> m_blockCrosshairGeometry;
     std::weak_ptr<Geometry2D> m_thrusterCrosshairGeometry;
     std::weak_ptr<Geometry2D> m_cockpitCrosshairGeometry;
+    std::weak_ptr<Geometry2D> m_reactionWheelCrosshairGeometry;
 
     std::weak_ptr<Geometry2D> m_activeCrosshairGeometry;
     std::weak_ptr<Instance2D> m_buildCrosshairInstance;
@@ -109,6 +114,7 @@ private:
     int m_blockIconTextureIndex{-1};
     int m_thrusterIconTextureIndex{-1};
     int m_cockpitIconTextureIndex{-1};
+    int m_reactionWheelIconTextureIndex{-1};
 
     // Helper methods
     void createMenuStructure(int64_t parentNodeId);

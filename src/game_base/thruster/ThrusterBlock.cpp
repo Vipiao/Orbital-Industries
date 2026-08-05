@@ -23,10 +23,6 @@ glm::ivec3 ThrusterBlock::dominantAxis(const glm::dquat& orientation) {
     return {0, 0, rotated.z > 0.0 ? 1 : -1};
 }
 
-glm::ivec3 ThrusterBlock::secondCoord(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
-    return anchorCoord + dominantAxis(orientation);
-}
-
 glm::ivec3 ThrusterBlock::thrustForceDirection(const glm::dquat& orientation) {
     return -dominantAxis(orientation);
 }
@@ -37,7 +33,7 @@ ThrusterBlock::ThrusterBlock(const glm::ivec3& anchorCoord, const glm::dquat& or
 }
 
 std::vector<glm::ivec3> ThrusterBlock::secondaryCoords() const {
-    return {secondCoord(coordinates, m_orientation)};
+    return secondariesOf(footprintOffsets(m_orientation));
 }
 
 std::tuple<double, glm::dvec3, glm::dmat3> ThrusterBlock::getMassProperties() const {

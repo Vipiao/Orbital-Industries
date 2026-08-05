@@ -52,4 +52,9 @@ inline constexpr double newtons(double force) {
     return force / (s_tickRateHz * s_tickRateHz);
 }
 
+// N*m (kg*m^2/s^2) -> kg*m^2/tick^2. A torque accumulated into RigidBody::m_torques.
+inline constexpr double newtonMeters(double torque) {
+    return torque / (s_tickRateHz * s_tickRateHz);
+}
+
 }

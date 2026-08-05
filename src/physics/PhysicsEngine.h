@@ -73,6 +73,9 @@ public:
 
     // Apply a torque directly
     void applyTorque(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& torque);
+
+    // Apply a torque expressed in the body's own frame
+    void applyLocalTorque(std::weak_ptr<RigidBody> bodyWeak, const glm::dvec3& localTorque);
     
     // Set gravity
     void setGravity(const glm::dvec3& gravity);

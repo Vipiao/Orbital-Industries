@@ -6,6 +6,7 @@
 #include "CellType.h"
 #include "thruster/ThrusterBlock.h"
 #include "cockpit/CockpitBlock.h"
+#include "reaction_wheel/ReactionWheelBlock.h"
 #include "utils/PartitionCalculator.h"
 #include "utils/TimeHandler.h"
 #include "../physics/RigidBody.h"
@@ -241,8 +242,16 @@ void GridSplitter::applySplit(const std::shared_ptr<Grid>& sourceGrid,
                 newGrid->addCockpit(coord, orientation);
                 break;
             }
-            case CellType::THRUSTER_SECONDARY:
-            case CellType::COCKPIT_SECONDARY:
+            case CellType::REACTION_WHEEL: {
+                glm::dquat orientation{
+                    static_cast<const ReactionWheelBlock*>(cell)->m_orientation};
+                sourceGrid->removeCell(coord);
+                // The command is recomputed on the new grid's next step, against
+                // its own inertia and wheel count, so there is nothing to carry.
+                newGrid->addReactionWheel(coord, orientation);
+                break;
+            }
+            case CellType::SECONDARY:
                 break;  // moved with their anchor cell
             }
         }

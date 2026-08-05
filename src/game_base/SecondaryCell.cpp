@@ -1,8 +1,8 @@
 // SecondaryCell.cpp
 #include "SecondaryCell.h"
 
-SecondaryCell::SecondaryCell(const glm::ivec3& coord, const glm::ivec3& anchorCoord, CellType type)
-    : GridCell{coord, type}, m_anchorCoord{anchorCoord}
+SecondaryCell::SecondaryCell(const glm::ivec3& coord, const glm::ivec3& anchorCoord)
+    : GridCell{coord, CellType::SECONDARY}, m_anchorCoord{anchorCoord}
 {
 }
 

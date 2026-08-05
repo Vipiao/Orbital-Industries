@@ -23,4 +23,18 @@ public:
 
 protected:
     BlockAnchor() = default;
+
+    // Absolute coordinates of every footprint offset except the anchor's own.
+    // A block type describes the cells it fills once, as a footprint; passing that
+    // footprint here satisfies secondaryCoords() without restating the shape.
+    std::vector<glm::ivec3> secondariesOf(const std::vector<glm::ivec3>& offsets) const {
+        std::vector<glm::ivec3> coords{};
+        coords.reserve(offsets.size());
+        for (const glm::ivec3& offset : offsets) {
+            if (offset != glm::ivec3{0, 0, 0}) {
+                coords.push_back(coordinates + offset);
+            }
+        }
+        return coords;
+    }
 };

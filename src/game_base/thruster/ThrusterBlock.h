@@ -36,9 +36,6 @@ public:
     // Returns the grid axis that the model's +Y maps to under the given orientation.
     static glm::ivec3 dominantAxis(const glm::dquat& orientation);
 
-    // Convenience: anchorCoord + dominantAxis(orientation).
-    static glm::ivec3 secondCoord(const glm::ivec3& anchorCoord, const glm::dquat& orientation);
-
     // Direction the thruster pushes the grid, in grid-local space. The plume
     // exits along the model's +Y (the nozzle), so the force is the opposite axis.
     static glm::ivec3 thrustForceDirection(const glm::dquat& orientation);

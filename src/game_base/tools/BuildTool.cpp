@@ -9,6 +9,7 @@
 #include "../StructuralCommand.h"
 #include "../thruster/ThrusterBlock.h"
 #include "../cockpit/CockpitBlock.h"
+#include "../reaction_wheel/ReactionWheelBlock.h"
 #include "graphics/MeshManager2D/MeshManager2D.h"
 #include "graphics/MeshManager2D/Instance2D.h"
 #include "graphics/instanceHandler/InstanceHandler.h"
@@ -46,9 +47,10 @@ static std::optional<glm::ivec3> findMultiCellAnchor(
 
 static CellType toCellType(BuildTool::BlockType blockType) {
     switch (blockType) {
-        case BuildTool::BlockType::THRUSTER: return CellType::THRUSTER;
-        case BuildTool::BlockType::COCKPIT:  return CellType::COCKPIT;
-        default:                             return CellType::STRUCTURAL_BLOCK;
+        case BuildTool::BlockType::THRUSTER:       return CellType::THRUSTER;
+        case BuildTool::BlockType::COCKPIT:        return CellType::COCKPIT;
+        case BuildTool::BlockType::REACTION_WHEEL: return CellType::REACTION_WHEEL;
+        default:                                   return CellType::STRUCTURAL_BLOCK;
     }
 }
 
@@ -73,6 +75,8 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     m_blockIconTextureIndex    = ge->createInstanceTexture("../media/2d_graphics/07_block_icon.png");
     m_thrusterIconTextureIndex = ge->createInstanceTexture("../media/2d_graphics/09_thruster_icon.png");
     m_cockpitIconTextureIndex  = ge->createInstanceTexture("../media/2d_graphics/10_cockpit_icon.png");
+    m_reactionWheelIconTextureIndex =
+        ge->createInstanceTexture("../media/2d_graphics/11_reaction_wheel_icon.png");
 
     // Thruster ghost
     m_thrusterGhostColorTextureUnit = ge->createInstanceTexture("../media/models/thruster/albedo_ghost.png");
@@ -83,6 +87,12 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     m_cockpitGhostColorTextureUnit = ge->createInstanceTexture("../media/models/cockpit/albedo_ghost.png");
     m_cockpitGhostGeometry = ge->createInstanceGeometry(
         "../media/models/cockpit/model_ghost.obj", RenderLayer::Transparent);
+
+    // Reaction wheel ghost
+    m_reactionWheelGhostColorTextureUnit =
+        ge->createInstanceTexture("../media/models/reaction_wheel/albedo_ghost.png");
+    m_reactionWheelGhostGeometry = ge->createInstanceGeometry(
+        "../media/models/reaction_wheel/frame.obj", RenderLayer::Transparent);
 
     // Calculate crosshair offset and scale
     m_crosshairScale = glm::dvec2(0.1, 0.1);
@@ -101,6 +111,9 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
         "../media/blender/03_face.obj", "../media/2d_graphics/09_thruster_icon.png", -1, true);
     m_cockpitCrosshairGeometry = meshManager2D->loadMesh(
         "../media/blender/03_face.obj", "../media/2d_graphics/10_cockpit_icon.png", -1, true);
+    m_reactionWheelCrosshairGeometry = meshManager2D->loadMesh(
+        "../media/blender/03_face.obj", "../media/2d_graphics/11_reaction_wheel_icon.png", -1,
+        true);
 }
 
 BuildTool::~BuildTool() {
@@ -226,11 +239,17 @@ void BuildTool::copyBlockAt(Grid& grid, const glm::ivec3& coord) {
     const GridCell* cell = grid.getCellFromRegistry(coord);
     if (!cell) return;
 
+    // Aiming at any cell of a block copies the whole block, so resolve to the
+    // anchor: it is the cell that carries the block's type and orientation.
     const glm::ivec3 anchorCoord{cell->getAnchorCoord()};
+    const GridCell* anchor = grid.getCellFromRegistry(anchorCoord);
+    if (!anchor) return;
 
-    switch (cell->type) {
+    switch (anchor->type) {
+        case CellType::SECONDARY:
+            return;  // an anchor is never a secondary cell
         case CellType::STRUCTURAL_BLOCK: {
-            const StructuralBlock* block = grid.getCell(coord);
+            const StructuralBlock* block = grid.getCell(anchorCoord);
             if (!block) return;
             m_selectedBlockType = BlockType::STRUCTURAL_BLOCK;
             m_structuralShape   = block->m_localVertices;
@@ -240,19 +259,24 @@ void BuildTool::copyBlockAt(Grid& grid, const glm::ivec3& coord) {
             m_targetOrientation = glm::dquat{1.0, 0.0, 0.0, 0.0};
             break;
         }
-        case CellType::THRUSTER:
-        case CellType::THRUSTER_SECONDARY: {
+        case CellType::THRUSTER: {
             auto it = grid.getThrusterCells().find(anchorCoord);
             if (it == grid.getThrusterCells().end()) return;
             m_selectedBlockType = BlockType::THRUSTER;
             m_targetOrientation = it->second.m_orientation;
             break;
         }
-        case CellType::COCKPIT:
-        case CellType::COCKPIT_SECONDARY: {
+        case CellType::COCKPIT: {
             auto it = grid.getCockpitCells().find(anchorCoord);
             if (it == grid.getCockpitCells().end()) return;
             m_selectedBlockType = BlockType::COCKPIT;
+            m_targetOrientation = it->second.m_orientation;
+            break;
+        }
+        case CellType::REACTION_WHEEL: {
+            auto it = grid.getReactionWheelCells().find(anchorCoord);
+            if (it == grid.getReactionWheelCells().end()) return;
+            m_selectedBlockType = BlockType::REACTION_WHEEL;
             m_targetOrientation = it->second.m_orientation;
             break;
         }
@@ -285,6 +309,10 @@ void BuildTool::createMenuStructure(int64_t parentNodeId) {
         [this]() { m_selectedBlockType = BlockType::THRUSTER; activate(); },
         deactivateCallback);
 
+    m_radialMenu->createNode(m_buildToolParentId, m_reactionWheelIconTextureIndex,
+        [this]() { m_selectedBlockType = BlockType::REACTION_WHEEL; activate(); },
+        deactivateCallback);
+
     m_radialMenu->createNode(m_buildToolParentId, m_cockpitIconTextureIndex,
         [this]() { m_selectedBlockType = BlockType::COCKPIT; activate(); },
         deactivateCallback);
@@ -292,8 +320,9 @@ void BuildTool::createMenuStructure(int64_t parentNodeId) {
 
 std::weak_ptr<Geometry2D> BuildTool::crosshairGeometryFor(BlockType blockType) const {
     switch (blockType) {
-        case BlockType::THRUSTER: return m_thrusterCrosshairGeometry;
-        case BlockType::COCKPIT:  return m_cockpitCrosshairGeometry;
+        case BlockType::THRUSTER:       return m_thrusterCrosshairGeometry;
+        case BlockType::COCKPIT:        return m_cockpitCrosshairGeometry;
+        case BlockType::REACTION_WHEEL: return m_reactionWheelCrosshairGeometry;
         default:                  return m_blockCrosshairGeometry;
     }
 }
@@ -353,6 +382,14 @@ void BuildTool::addGridBlock(Grid* grid, int x, int y, int z) {
             m_gameBase->requestStructuralEdit(StructuralCommand::addCockpit(
                 grid->uniqueId, *anchor, m_targetOrientation));
         }
+    } else if (m_selectedBlockType == BlockType::REACTION_WHEEL) {
+        auto anchor = findMultiCellAnchor(
+            targetPos, ReactionWheelBlock::footprintOffsets(m_targetOrientation),
+            [&registry](const glm::ivec3& pos) { return registry.count(pos) > 0; });
+        if (anchor) {
+            m_gameBase->requestStructuralEdit(StructuralCommand::addReactionWheel(
+                grid->uniqueId, *anchor, m_targetOrientation));
+        }
     }
 }
 
@@ -373,6 +410,11 @@ void BuildTool::updateGhost(const std::vector<std::weak_ptr<Grid>>& availableGri
         colorTexUnit    = m_cockpitGhostColorTextureUnit;
         footprint       = CockpitBlock::footprintOffsets(m_targetOrientation);
         modelCentre     = CockpitBlock::MODEL_CENTRE;
+    } else if (m_selectedBlockType == BlockType::REACTION_WHEEL) {
+        desiredGeometry = m_reactionWheelGhostGeometry;
+        colorTexUnit    = m_reactionWheelGhostColorTextureUnit;
+        footprint       = ReactionWheelBlock::footprintOffsets(m_targetOrientation);
+        modelCentre     = ReactionWheelBlock::MODEL_CENTRE;
     } else {
         // A structural block is the single-cell case: its ghost is built from the
         // shape being placed and tinted rather than textured.

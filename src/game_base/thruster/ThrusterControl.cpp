@@ -1,6 +1,7 @@
 // ThrusterControl.cpp
 #include "ThrusterControl.h"
 #include "ThrusterBlock.h"
+#include "../CoordOrder.h"
 #include "../Grid.h"
 #include "../cockpit/CockpitBlock.h"
 #include "../../physics/PhysicsEngine.h"
@@ -35,17 +36,7 @@ void ThrusterControl::applyThrustForces(PhysicsEngine* physicsEngine, Grid& grid
 
     // Coordinate-sorted iteration so the force accumulation order (and thus the
     // floating-point sum) is reproducible.
-    std::vector<glm::ivec3> coords{};
-    coords.reserve(thrusters.size());
-    for (const auto& [coord, thruster] : thrusters) {
-        coords.push_back(coord);
-    }
-    std::sort(coords.begin(), coords.end(),
-              [](const glm::ivec3& a, const glm::ivec3& b) {
-                  return std::tie(a.x, a.y, a.z) < std::tie(b.x, b.y, b.z);
-              });
-
-    for (const glm::ivec3& coord : coords) {
+    for (const glm::ivec3& coord : sortedCoords(thrusters)) {
         const ThrusterBlock& thruster{thrusters.at(coord)};
         if (thruster.m_thrustLevel <= 0.0) {
             continue;

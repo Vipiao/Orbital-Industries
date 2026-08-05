@@ -50,6 +50,13 @@ public:
     // to drive ship thrusters while this digibot is seated in a cockpit.
     const glm::ivec3& getMovementDirection() const { return m_movementDirection; }
 
+    // Rotation asked of the ship this digibot is seated in, as an angular
+    // acceleration in the cockpit's frame (rad/s^2). Held here beside the movement
+    // input; the digibot's own body ignores it, the game layer reads it to drive
+    // the ship's reaction wheels.
+    void setRotationCommand(const glm::dvec3& command) { m_rotationCommand = command; }
+    const glm::dvec3& getRotationCommand() const { return m_rotationCommand; }
+
     // Set the view direction (world space)
     void setViewDirection(const glm::dvec3& viewDirection);
 
@@ -133,6 +140,7 @@ private:
 
     // Shared input state
     glm::ivec3 m_movementDirection{0, 0, 0};
+    glm::dvec3 m_rotationCommand{0.0, 0.0, 0.0};
     int m_rollInput{0};
     glm::dvec3 m_viewDirection{0.0, 1.0, 0.0};
     bool m_isUpDirectionLocked{false};

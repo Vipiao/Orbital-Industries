@@ -17,7 +17,7 @@
 
 enum class StructuralOp : std::uint8_t {
     SetColor, AddCell, RemoveCell, ModifyCell, AddThruster, AddCockpit,
-    SplitGrid, SpawnGrid, DespawnGrid
+    AddReactionWheel, SplitGrid, SpawnGrid, DespawnGrid
 };
 
 struct StructuralCommand {
@@ -27,7 +27,8 @@ struct StructuralCommand {
     glm::dvec4 m_color{1.0, 1.0, 1.0, 1.0};   // SetColor/AddCell/SpawnGrid
     int m_cornerIndex{0};                     // ModifyCell: which corner (0-7)
     glm::ivec3 m_direction{0, 0, 0};          // ModifyCell: how to nudge that corner
-    glm::dquat m_orientation{1.0, 0.0, 0.0, 0.0};  // AddThruster/AddCockpit/SpawnGrid seed
+    // AddThruster/AddCockpit/AddReactionWheel/SpawnGrid seed
+    glm::dquat m_orientation{1.0, 0.0, 0.0, 0.0};
     glm::dvec3 m_position{0.0, 0.0, 0.0};     // SpawnGrid: where the new grid appears
     CellType m_cellType{CellType::STRUCTURAL_BLOCK};  // SpawnGrid: block seeding the grid
     std::vector<GridSplitPiece> m_pieces{};   // SplitGrid: pieces breaking off m_gridId
@@ -50,6 +51,9 @@ struct StructuralCommand {
                                          const glm::dquat& orientation);
     static StructuralCommand addCockpit(std::uint64_t gridId, const glm::ivec3& anchorCoord,
                                         const glm::dquat& orientation);
+    static StructuralCommand addReactionWheel(std::uint64_t gridId,
+                                              const glm::ivec3& anchorCoord,
+                                              const glm::dquat& orientation);
     static StructuralCommand splitGrid(std::uint64_t sourceGridId,
                                        std::vector<GridSplitPiece> pieces);
     // A new grid seeded with the given block at its origin. Sent with id 0; the

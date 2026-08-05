@@ -10,7 +10,7 @@ class SecondaryCell : public GridCell {
 public:
     glm::ivec3 m_anchorCoord;
 
-    SecondaryCell(const glm::ivec3& coord, const glm::ivec3& anchorCoord, CellType type);
+    SecondaryCell(const glm::ivec3& coord, const glm::ivec3& anchorCoord);
     virtual ~SecondaryCell() = default;
 
     virtual std::tuple<double, glm::dvec3, glm::dmat3> getMassProperties() const override;

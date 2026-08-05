@@ -204,6 +204,14 @@ void PhysicsEngine::applyTorque(std::weak_ptr<RigidBody> bodyWeak, const glm::dv
     }
 }
 
+void PhysicsEngine::applyLocalTorque(std::weak_ptr<RigidBody> bodyWeak,
+                                     const glm::dvec3& localTorque) {
+    auto body = bodyWeak.lock();
+    if (body && !body->isStatic()) {
+        body->m_torques += body->getOrientation() * localTorque;
+    }
+}
+
 void PhysicsEngine::setGravity(const glm::dvec3& gravity) {
     m_gravity = gravity;
 }

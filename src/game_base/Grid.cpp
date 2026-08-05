@@ -162,10 +162,7 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
 
     // Secondary cells delegate mass ownership to their anchor; structural blocks and
     // anchor cells are their own physics representative.
-    const glm::ivec3 anchorCoord =
-        (cell->type == CellType::THRUSTER_SECONDARY || cell->type == CellType::COCKPIT_SECONDARY)
-        ? static_cast<SecondaryCell*>(cell)->m_anchorCoord
-        : coord;
+    const glm::ivec3 anchorCoord{cell->getAnchorCoord()};
 
     cancelStructuralAnalysis();
 
@@ -210,8 +207,9 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
         }
 
         // Type-specific erase from the anchor's owning map
-        if (anchor->type == CellType::THRUSTER)     m_thrusterCells.erase(anchorCoord);
-        else if (anchor->type == CellType::COCKPIT) m_cockpitCells.erase(anchorCoord);
+        if (anchor->type == CellType::THRUSTER)            m_thrusterCells.erase(anchorCoord);
+        else if (anchor->type == CellType::COCKPIT)        m_cockpitCells.erase(anchorCoord);
+        else if (anchor->type == CellType::REACTION_WHEEL) m_reactionWheelCells.erase(anchorCoord);
 
         removed = {anchorCoord};
         removed.insert(removed.end(), secondaries.begin(), secondaries.end());
@@ -222,43 +220,54 @@ std::vector<glm::ivec3> Grid::removeCell(const glm::ivec3& coord) {
     return removed;
 }
 
-void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
-    glm::ivec3 secondCoord = ThrusterBlock::secondCoord(anchorCoord, orientation);
+template <typename BlockT>
+void Grid::addBlock(std::unordered_map<glm::ivec3, BlockT, Hash::IVec3Hash>& anchors,
+                    const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
+    const std::vector<glm::ivec3> offsets{BlockT::footprintOffsets(orientation)};
 
-    // Both coords must be free
-    if (m_cellRegistry.count(anchorCoord) || m_cellRegistry.count(secondCoord)) return;
+    // Every cell the block fills must be free
+    for (const glm::ivec3& offset : offsets) {
+        if (m_cellRegistry.count(anchorCoord + offset)) return;
+    }
 
     auto collider = m_colliderWeak.lock();
-    if (!collider) throw std::runtime_error("Grid::addThruster: Collider has been destroyed");
+    if (!collider) throw std::runtime_error("Grid::addBlock: Collider has been destroyed");
+    auto rigidBody = m_rigidBody.lock();
+    if (!rigidBody) throw std::runtime_error("Grid::addBlock: RigidBody has been destroyed");
 
     cancelStructuralAnalysis();
 
-    collider->addCubeCell(anchorCoord, 1.0);
-    collider->addCubeCell(secondCoord, 1.0);
+    for (const glm::ivec3& offset : offsets) {
+        collider->addCubeCell(anchorCoord + offset, 1.0);
+    }
 
     // Emplace into owning maps — unordered_map guarantees stable references even after rehash
-    auto [anchorIt, _a] = m_thrusterCells.emplace(anchorCoord, ThrusterBlock{anchorCoord, orientation});
-
-    auto [secIt, _s] = m_secondaryCells.emplace(
-        secondCoord, SecondaryCell{secondCoord, anchorCoord, CellType::THRUSTER_SECONDARY});
-
+    auto [anchorIt, _a] = anchors.emplace(anchorCoord, BlockT{anchorCoord, orientation});
     m_cellRegistry[anchorCoord] = &anchorIt->second;
-    m_cellRegistry[secondCoord] = &secIt->second;
 
-    m_gridGraphics->addBlockInstance(
-        CellType::THRUSTER, anchorCoord, orientation, ThrusterBlock::MODEL_CENTRE);
+    for (const glm::ivec3& secondary : anchorIt->second.secondaryCoords()) {
+        auto [secIt, _s] = m_secondaryCells.emplace(
+            secondary, SecondaryCell{secondary, anchorCoord});
+        m_cellRegistry[secondary] = &secIt->second;
+    }
+
+    m_gridGraphics->addBlockInstance(BlockT::TYPE, anchorCoord, orientation, BlockT::MODEL_CENTRE);
 
     scheduleStructuralAnalysis();
 
-    updateNeighborConnections(anchorCoord);
-    updateNeighborConnections(secondCoord);
+    for (const glm::ivec3& offset : offsets) {
+        updateNeighborConnections(anchorCoord + offset);
+    }
 
-    auto rigidBody = m_rigidBody.lock();
-    if (!rigidBody) throw std::runtime_error("Grid::addThruster: RigidBody has been destroyed");
-    glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
+    // Preserve angular velocity across the mass change
+    const glm::dvec3 angularVelocityBody{rigidBody->getAngularVelocityBody()};
     updateCellMassContribution(anchorCoord, 1.0, rigidBody->getAngularVelocityWorld());
-    rigidBody->setAngularVelocityBody(angVel);
+    rigidBody->setAngularVelocityBody(angularVelocityBody);
     m_structureVersion++;
+}
+
+void Grid::addThruster(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
+    addBlock(m_thrusterCells, anchorCoord, orientation);
 }
 
 void Grid::setThrusterLevel(const glm::ivec3& anchorCoord, double level) {
@@ -273,47 +282,19 @@ void Grid::setThrusterLevel(const glm::ivec3& anchorCoord, double level) {
 }
 
 void Grid::addCockpit(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
-    const std::vector<glm::ivec3> offsets = CockpitBlock::footprintOffsets(orientation);
+    addBlock(m_cockpitCells, anchorCoord, orientation);
+}
 
-    for (const auto& offset : offsets) {
-        if (m_cellRegistry.count(anchorCoord + offset)) return;
+void Grid::addReactionWheel(const glm::ivec3& anchorCoord, const glm::dquat& orientation) {
+    addBlock(m_reactionWheelCells, anchorCoord, orientation);
+}
+
+void Grid::setReactionWheelCommand(const glm::ivec3& anchorCoord, const glm::dvec3& command) {
+    auto it = m_reactionWheelCells.find(anchorCoord);
+    if (it == m_reactionWheelCells.end()) {
+        return;
     }
-
-    auto collider = m_colliderWeak.lock();
-    if (!collider) throw std::runtime_error("Grid::addCockpit: Collider has been destroyed");
-
-    cancelStructuralAnalysis();
-
-    for (const auto& offset : offsets) {
-        collider->addCubeCell(anchorCoord + offset, 1.0);
-    }
-
-    auto [anchorIt, _a] = m_cockpitCells.emplace(anchorCoord, CockpitBlock{anchorCoord, orientation});
-    m_cellRegistry[anchorCoord] = &anchorIt->second;
-
-    for (const auto& offset : offsets) {
-        if (offset == glm::ivec3{0, 0, 0}) continue;
-        const glm::ivec3 sc = anchorCoord + offset;
-        auto [secIt, _s] = m_secondaryCells.emplace(
-            sc, SecondaryCell{sc, anchorCoord, CellType::COCKPIT_SECONDARY});
-        m_cellRegistry[sc] = &secIt->second;
-    }
-
-    m_gridGraphics->addBlockInstance(
-        CellType::COCKPIT, anchorCoord, orientation, CockpitBlock::MODEL_CENTRE);
-
-    scheduleStructuralAnalysis();
-
-    for (const auto& offset : offsets) {
-        updateNeighborConnections(anchorCoord + offset);
-    }
-
-    auto rigidBody = m_rigidBody.lock();
-    if (!rigidBody) throw std::runtime_error("Grid::addCockpit: RigidBody has been destroyed");
-    glm::dvec3 angVel = rigidBody->getAngularVelocityBody();
-    updateCellMassContribution(anchorCoord, 1.0, rigidBody->getAngularVelocityWorld());
-    rigidBody->setAngularVelocityBody(angVel);
-    m_structureVersion++;
+    it->second.m_torqueCommand = command;
 }
 
 bool Grid::nudgeCellVertex(const glm::ivec3& coord, int cornerIndex,
