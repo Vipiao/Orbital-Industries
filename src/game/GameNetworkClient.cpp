@@ -227,8 +227,9 @@ void GameNetworkClient::applyGridData(const std::vector<std::byte>& data) {
     // Peek the id so an existing copy is replaced rather than refused.
     ByteReader peek{data};
     std::uint8_t rawType{0};
+    std::uint64_t capturedTick{0};
     std::uint64_t id{0};
-    if (!peek.read(rawType) || !peek.read(id)) {
+    if (!peek.read(rawType) || !peek.read(capturedTick) || !peek.read(id)) {
         return;
     }
     if (m_gameBase->getGridSubsystem()->getGridById(id).lock()) {
@@ -237,8 +238,23 @@ void GameNetworkClient::applyGridData(const std::vector<std::byte>& data) {
 
     ByteReader reader{data};
     reader.read(rawType);
-    if (!GridSerializer::deserialize(reader, *m_gameBase->getGridSubsystem()).lock()) {
+    reader.read(capturedTick);
+    std::shared_ptr<Grid> grid{
+        GridSerializer::deserialize(reader, *m_gameBase->getGridSubsystem()).lock()};
+    if (!grid) {
         std::cout << "[net] dropped malformed grid data" << std::endl;
+        return;
+    }
+
+    // The payload was captured a round trip ago, while the rest of this client's
+    // world stands at the last applied snapshot. Carry the rebuilt body forward to
+    // that same moment, so it does not join the world a round trip behind it.
+    std::weak_ptr<RigidBody> bodyWeak{grid->getRigidBody()};
+    std::shared_ptr<RigidBody> body{bodyWeak.lock()};
+    if (body && m_lastAppliedSnapshotTick > capturedTick) {
+        double staleness{static_cast<double>(m_lastAppliedSnapshotTick - capturedTick)};
+        shiftedInTime(RigidBodyState::capture(*body), staleness, *body)
+            .apply(bodyWeak, *m_gameBase->m_physicsEngine);
     }
 }
 
@@ -279,13 +295,12 @@ void GameNetworkClient::applyStateSnapshot(const std::vector<std::byte>& data) {
 
     // temp: a jump in the server tick between applied snapshots means the ones in
     // between were dropped on the wire.
-    static std::uint64_t s_lastAppliedServerTick{0};
-    if (s_lastAppliedServerTick != 0 && snapshot.m_tick > s_lastAppliedServerTick + 1) {
-        std::cout << "[net] snapshot gap: " << (snapshot.m_tick - s_lastAppliedServerTick - 1)
+    if (m_lastAppliedSnapshotTick != 0 && snapshot.m_tick > m_lastAppliedSnapshotTick + 1) {
+        std::cout << "[net] snapshot gap: " << (snapshot.m_tick - m_lastAppliedSnapshotTick - 1)
                   << " dropped before tick " << snapshot.m_tick << " (grids="
                   << snapshot.m_grids.size() << ")" << std::endl;
     }
-    s_lastAppliedServerTick = snapshot.m_tick;
+    m_lastAppliedSnapshotTick = snapshot.m_tick;
 
     // The drift plays two roles. It nudges the next physics step, bleeding the
     // offset off gradually (the clock controller). It also time-aligns this

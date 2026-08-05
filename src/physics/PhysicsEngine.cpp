@@ -582,6 +582,13 @@ void PhysicsEngine::separateOverlaps(std::shared_ptr<RigidBody> bodyShared) {
                 if (overlap <= 0) {
                     continue;
                 }
+
+                // A body placed by an authority (network correction) can arrive
+                // metres deep. Separating that in one step throws it, and a wrongly
+                // signed normal at that depth digs in instead, so pace the correction
+                // at contact depths and let repeated steps do the rest.
+                constexpr double k_maxOverlapPerStep{0.5};
+                overlap = glm::min(overlap, k_maxOverlapPerStep);
                 
                 // Calculate collision mass
                 double collisionMass = getCollisionMass(body, otherBody.get(), contactPoint, normal);

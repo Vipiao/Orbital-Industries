@@ -359,8 +359,13 @@ void GameNetworkServer::processManifests() {
             }
             ByteWriter writer{};
             writer.write(static_cast<std::uint8_t>(MessageType::GridData));
+            writer.write(tick);  // capture moment, so the receiver can align the pose
             GridSerializer::serialize(*grid, writer);
             m_transport->send(connection, writer.take(), true);
+            // The client rebuilds the body from that payload, one round trip stale.
+            // Due it immediately so the next snapshot re-anchors it, rather than
+            // leaving it to coast until its paced turn comes around.
+            m_gridSync[connection][grid->uniqueId].m_nextSendTick = 0;
             std::cout << "[net] grid " << grid->uniqueId
                       << " corrected via full resend" << std::endl;
         }

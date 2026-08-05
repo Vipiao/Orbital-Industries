@@ -3,6 +3,7 @@
 #include "CoordOrder.h"
 #include "Grid.h"
 #include "GridSubsystem.h"
+#include "RigidBodyState.h"
 #include "StructuralBlock.h"
 #include "cockpit/CockpitBlock.h"
 #include "thruster/ThrusterBlock.h"
@@ -72,6 +73,39 @@ static bool readAnchors(ByteReader& reader, Grid& grid,
     return true;
 }
 
+// Cells then anchor blocks, in the order they were written. A truncated stream
+// simply stops the rebuild where it ran out.
+static void readStructure(ByteReader& reader, Grid& grid) {
+    std::uint32_t cellCount{0};
+    if (!reader.read(cellCount)) {
+        return;
+    }
+    for (std::uint32_t ii = 0; ii < cellCount; ii++) {
+        glm::ivec3 coord{0};
+        std::array<glm::ivec3, 8> vertices{};
+        glm::dvec4 color{1.0};
+        bool ok{reader.read(coord.x) && reader.read(coord.y) && reader.read(coord.z)};
+        for (glm::ivec3& vertex : vertices) {
+            ok = ok && reader.read(vertex.x) && reader.read(vertex.y) &&
+                 reader.read(vertex.z);
+        }
+        for (int jj = 0; jj < 4; jj++) {
+            ok = ok && reader.read(color[jj]);
+        }
+        if (!ok) {
+            return;
+        }
+        grid.addCell(coord, vertices, color);
+    }
+
+    for (void (Grid::*placeBlock)(const glm::ivec3&, const glm::dquat&) :
+         {&Grid::addThruster, &Grid::addCockpit, &Grid::addReactionWheel}) {
+        if (!readAnchors(reader, grid, placeBlock)) {
+            return;
+        }
+    }
+}
+
 static std::size_t computeStructureHash(const Grid& grid) {
     std::size_t hash{0};
 
@@ -123,17 +157,13 @@ std::size_t GridSerializer::structureHash(const Grid& grid) {
 void GridSerializer::serialize(const Grid& grid, ByteWriter& writer) {
     writer.write(grid.uniqueId);
 
-    glm::dvec3 position{0.0};
-    glm::dquat orientation{1.0, 0.0, 0.0, 0.0};
-    std::shared_ptr<RigidBody> body{grid.getRigidBody().lock()};
-    if (body) {
-        position = body->getPosition();
-        orientation = body->getOrientation();
+    // Motion travels with the pose: the receiver rebuilds the body from this alone,
+    // and a grid restored at rest would coast away from the world it belongs to.
+    RigidBodyState state{};
+    if (std::shared_ptr<RigidBody> body{grid.getRigidBody().lock()}) {
+        state = RigidBodyState::capture(*body);
     }
-    writer.write(position.x);
-    writer.write(position.y);
-    writer.write(position.z);
-    writeQuat(writer, orientation);
+    state.serialize(writer);
 
     writer.write(static_cast<std::uint32_t>(grid.getCells().size()));
     for (const glm::ivec3& coord : sortedCoords(grid.getCells())) {
@@ -159,51 +189,31 @@ void GridSerializer::serialize(const Grid& grid, ByteWriter& writer) {
 std::weak_ptr<Grid> GridSerializer::deserialize(ByteReader& reader,
                                                 GridSubsystem& gridSubsystem) {
     std::uint64_t id{0};
-    glm::dvec3 position{0.0};
-    glm::dquat orientation{1.0, 0.0, 0.0, 0.0};
-    if (!reader.read(id) || !reader.read(position.x) || !reader.read(position.y) ||
-        !reader.read(position.z) || !readQuat(reader, orientation)) {
+    RigidBodyState state{};
+    // Screened here, at the ingress: the rigid body asserts on non-finite and
+    // off-unit state, so decoded garbage must never reach it.
+    if (!reader.read(id) || !state.deserialize(reader) || !state.isFinite() ||
+        !RigidBodyDetail::isUnitQuaternion(state.m_orientation)) {
         return {};
     }
     if (gridSubsystem.getGridById(id).lock()) {
         return {};  // occupied id; the caller decides whether to despawn first
     }
 
-    std::shared_ptr<Grid> grid{gridSubsystem.createGrid(id, position, orientation).lock()};
+    std::shared_ptr<Grid> grid{
+        gridSubsystem.createGrid(id, state.m_position, state.m_orientation).lock()};
     if (!grid) {
         return {};
     }
+    readStructure(reader, *grid);
 
-    std::uint32_t cellCount{0};
-    if (!reader.read(cellCount)) {
-        return grid;
+    // Motion last: angular velocity is momentum over inertia, and a grid whose cells
+    // are not in place yet has none, so any momentum set before this reads as an
+    // overflowing spin.
+    if (std::shared_ptr<RigidBody> body{grid->getRigidBody().lock()}) {
+        body->m_velocity = state.m_velocity;
+        body->setAngularMomentumBody(state.m_angularMomentumBody);
     }
-    for (std::uint32_t ii = 0; ii < cellCount; ii++) {
-        glm::ivec3 coord{0};
-        std::array<glm::ivec3, 8> vertices{};
-        glm::dvec4 color{1.0};
-        bool ok{reader.read(coord.x) && reader.read(coord.y) && reader.read(coord.z)};
-        for (glm::ivec3& vertex : vertices) {
-            ok = ok && reader.read(vertex.x) && reader.read(vertex.y) &&
-                 reader.read(vertex.z);
-        }
-        for (int jj = 0; jj < 4; jj++) {
-            ok = ok && reader.read(color[jj]);
-        }
-        if (!ok) {
-            return grid;
-        }
-        grid->addCell(coord, vertices, color);
-    }
-
-    // Sections follow the order they were written in; a truncated stream simply
-    // stops the rebuild where it ran out.
-    for (void (Grid::*placeBlock)(const glm::ivec3&, const glm::dquat&) :
-         {&Grid::addThruster, &Grid::addCockpit, &Grid::addReactionWheel}) {
-        if (!readAnchors(reader, *grid, placeBlock)) {
-            return grid;
-        }
-    }
-
     return grid;
 }
+

@@ -40,11 +40,15 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
     glm::dvec3 seatPoint{seat.m_position};
     glm::dvec3 axisVec{seatPoint - entryPoint};
     double axisLength{glm::length(axisVec)};
-    // A degenerate corridor means the CockpitBlock has entry == seat (bad config).
-    // Release builds fall back to the seat forward; debug builds catch it here.
-    assert(axisLength > 1e-6 &&
-           "docking corridor degenerate: entry and seat points coincide");
-    glm::dvec3 axis{axisLength > 1e-9 ? axisVec / axisLength : seat.m_forward};
+    // The corridor is a fixed length in the cockpit's frame, so it can only collapse
+    // if the grid pose has reached coordinates where double resolution swallows it.
+    // Nothing left to steer along: hand the pilot back to free movement. Negated so
+    // a non-finite pose leaves through the same door.
+    if (!(axisLength > 1e-6)) {
+        result.m_wantRelease = true;
+        return result;
+    }
+    glm::dvec3 axis{axisVec / axisLength};
 
     // Project the body onto the entry->seat line.
     glm::dvec3 fromEntry{rigidBody->getPosition() - entryPoint};

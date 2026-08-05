@@ -44,6 +44,9 @@ private:
     // Newest unapplied snapshot per sender; fresher arrivals overwrite it.
     std::map<INetworkTransport::ConnectionId, std::vector<std::byte>> m_pendingSnapshots{};
     std::map<INetworkTransport::ConnectionId, std::uint64_t> m_lastSnapshotTick{};
+    // Server tick of the last applied snapshot: the moment the world this client
+    // holds is standing at, so a grid rebuilt from an older payload can join it.
+    std::uint64_t m_lastAppliedSnapshotTick{0};
 
     // Aligns snapshot states to the local tick timeline; consumed in
     // applyStateSnapshot. Session-scoped: reset on disconnect.
