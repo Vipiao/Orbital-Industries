@@ -26,23 +26,16 @@ namespace {
 // comfortably exceed a round trip plus one manifest.
 const double k_recentEditWindowTicks{PhysicsUnits::seconds(3.0)};
 
-// Grid position-sync scheduler (per connection). A grid's send priority is its
-// on-screen size times how wrong the client's coasting is getting, so the snapshot
-// spends its byte budget where the player would actually notice.
-//   angular  = radius / max(distance, radius)          — how much of the view it fills
-//   envelope = peak-held |velocity − lastSentVelocity|  — coasting-error rate (frame free)
-//   closing  = max(0, (gridVel − charVel)·dirToPlayer)  — approaching, so soon relevant
-//   score    = angular · (base + wEnv·envelope/vRef + wClose·closing/vRef)
-//   interval = baseInterval / (1 + score), clamped      — ticks until the next resend
-// Even a score of zero resends every baseInterval, the keyframe floor that heals a
-// lost update for a quiet grid and bounds worst-case staleness.
+// Grid position-sync scheduler (per connection). A grid comes due when its stale
+// copy on the client would have drifted k_syncAngularTolerance off where the viewer
+// sees it, so the snapshot spends its byte budget where the error is visible.
 const std::size_t k_gridSnapshotBudgetBytes{6000};
-const double k_baseIntervalTicks{PhysicsUnits::seconds(2.0)};
-const double k_minIntervalTicks{0.5};
-const double k_syncVelReference{PhysicsUnits::metersPerSecond(20.0)};
-const double k_syncBaseWeight{0.5};
-const double k_syncEnvelopeWeight{8.0};
-const double k_syncClosingWeight{1.0};
+const double k_syncAngularTolerance{0.0087};  // rad, half a degree of apparent drift
+// The keyframe interval: the deadline for a grid the client is coasting perfectly,
+// which heals a lost update and bounds worst-case staleness. A snapshot is built
+// once per tick, so one tick is the shortest deadline that means anything.
+const double k_keyframeIntervalTicks{PhysicsUnits::seconds(2.0)};
+const double k_minIntervalTicks{1.0};
 // Peak-held envelope decay per tick, derived from a half-life in seconds (several
 // round trips) so a grid that just slowed stays urgent long enough that a lost
 // "slowed down" update is resent before the client's stale high velocity carries
@@ -51,6 +44,37 @@ const double k_syncEnvelopeHalfLifeTicks{PhysicsUnits::seconds(0.5)};
 const double k_syncEnvelopeDecay{std::pow(0.5, 1.0 / k_syncEnvelopeHalfLifeTicks)};
 // A grid entry is id + RigidBodyState; used to stop filling before the byte budget.
 const std::size_t k_gridEntryBytes{sizeof(std::uint64_t) + 13 * sizeof(double)};
+
+// Ticks until the viewer would see the client's coasting copy of the grid drift
+// k_syncAngularTolerance off the truth. envelope is the coasting-error rate in metres
+// per tick, so envelope·T is the drift by the deadline and tolerance·range is what the
+// range absorbs; solving those equal at the range the grid will have *then* prices
+// approach exactly rather than by a tuned weight, and for straight line relative
+// motion closes to  T = range / (closing + sqrt(referenceSpeed² − transverse²)).
+// A rate at or below zero means the grid recedes faster than the closing range
+// tightens the budget, so it never comes due on drift alone and waits for its keyframe.
+// Flooring the root does the same for a transverse sweep quicker than referenceSpeed,
+// settling for the arrival time — early rather than late, and rare at that speed.
+double resendDeadline(const Grid& grid, const RigidBody& body, const glm::dvec3& viewerPos,
+                      const glm::dvec3& viewerVel, double envelope) {
+    // Measured to the centre of mass, not the body origin: the origin is the lattice
+    // anchor and can sit well outside a grid that has been built out or cut down. The
+    // near surface is what betrays a position error, so the radius comes back off.
+    glm::dvec3 toViewer{viewerPos - body.getWorldCenterOfMass()};
+    double centreRange{glm::length(toViewer)};
+    double range{centreRange - grid.getApproximateRadius()};
+    if (range <= 0.0) {
+        return 0.0;  // the viewer is within the grid, where any drift is its widest
+    }
+    glm::dvec3 lineOfSight{toViewer / centreRange};
+    glm::dvec3 relative{body.m_velocity - viewerVel};
+    double closing{glm::dot(relative, lineOfSight)};
+    double transverse{glm::length(relative - closing * lineOfSight)};
+    double referenceSpeed{envelope / k_syncAngularTolerance};
+    double radialSquared{referenceSpeed * referenceSpeed - transverse * transverse};
+    double rate{closing + std::sqrt(std::max(radialSquared, 0.0))};
+    return rate > 0.0 ? range / rate : k_keyframeIntervalTicks;
+}
 
 }  // namespace
 
@@ -414,12 +438,12 @@ std::vector<std::byte> GameNetworkServer::buildConnectionSnapshot(
         }
     }
 
-    // Score every grid, retire sync state for grids that no longer exist, and
+    // Deadline every grid, retire sync state for grids that no longer exist, and
     // collect the ones due to send.
     std::map<std::uint64_t, GridSyncState>& sync{m_gridSync[connection]};
     struct Candidate {
         std::uint64_t m_id{0};
-        double m_score{0.0};
+        double m_deadline{0.0};
         RigidBodyState m_state{};
     };
     std::vector<Candidate> due{};
@@ -438,31 +462,20 @@ std::vector<std::byte> GameNetworkServer::buildConnectionSnapshot(
         if (tick < state.m_nextSendTick) {
             continue;
         }
-        // Measured to the centre of mass, not the body origin: the origin is the
-        // lattice anchor and can sit well outside a grid that has been built out
-        // or cut down, which would misjudge how close and how big the grid looks.
-        glm::dvec3 toPlayer{refPos - body->getWorldCenterOfMass()};
-        double distance{glm::length(toPlayer)};
-        double radius{grid->getApproximateRadius()};
-        double angular{radius / std::max(distance, radius)};
-        double closing{distance > 0.0
-                           ? std::max(0.0, glm::dot(body->m_velocity - refVel,
-                                                    toPlayer / distance))
-                           : 0.0};
-        double score{angular *
-                     (k_syncBaseWeight +
-                      k_syncEnvelopeWeight * state.m_disturbanceEnvelope / k_syncVelReference +
-                      k_syncClosingWeight * closing / k_syncVelReference)};
-        due.push_back({grid->uniqueId, score, RigidBodyState::capture(*body)});
+        due.push_back({grid->uniqueId,
+                       resendDeadline(*grid, *body, refPos, refVel, state.m_disturbanceEnvelope),
+                       RigidBodyState::capture(*body)});
     }
     std::erase_if(sync, [&living](const auto& entry) {
         return std::find(living.begin(), living.end(), entry.first) == living.end();
     });
 
-    // Highest score first; grid id breaks ties so the order is reproducible. Fill
-    // the snapshot until the byte budget is spent, then reschedule what was sent.
+    // Soonest deadline first; grid id breaks ties so the order is reproducible. The
+    // sort reads the raw deadline, not the clamped one, so grids pinned to the floor
+    // still order among themselves instead of being handed out by id. Fill the
+    // snapshot until the byte budget is spent, then reschedule what was sent.
     std::sort(due.begin(), due.end(), [](const Candidate& a, const Candidate& b) {
-        return a.m_score != b.m_score ? a.m_score > b.m_score : a.m_id < b.m_id;
+        return a.m_deadline != b.m_deadline ? a.m_deadline < b.m_deadline : a.m_id < b.m_id;
     });
     std::size_t budget{k_gridSnapshotBudgetBytes};
     for (const Candidate& candidate : due) {
@@ -471,8 +484,8 @@ std::vector<std::byte> GameNetworkServer::buildConnectionSnapshot(
         }
         budget -= k_gridEntryBytes;
         snapshot.m_grids.push_back({candidate.m_id, candidate.m_state});
-        double interval{std::clamp(k_baseIntervalTicks / (1.0 + candidate.m_score),
-                                   k_minIntervalTicks, k_baseIntervalTicks)};
+        double interval{std::clamp(candidate.m_deadline, k_minIntervalTicks,
+                                   k_keyframeIntervalTicks)};
         GridSyncState& state{sync[candidate.m_id]};
         state.m_lastSentVelocity = candidate.m_state.m_velocity;
         state.m_nextSendTick = tick + static_cast<std::uint64_t>(interval);
