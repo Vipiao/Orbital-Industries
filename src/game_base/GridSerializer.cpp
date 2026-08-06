@@ -192,8 +192,7 @@ std::weak_ptr<Grid> GridSerializer::deserialize(ByteReader& reader,
     RigidBodyState state{};
     // Screened here, at the ingress: the rigid body asserts on non-finite and
     // off-unit state, so decoded garbage must never reach it.
-    if (!reader.read(id) || !state.deserialize(reader) || !state.isFinite() ||
-        !RigidBodyDetail::isUnitQuaternion(state.m_orientation)) {
+    if (!reader.read(id) || !state.deserialize(reader) || !state.isValid()) {
         return {};
     }
     if (gridSubsystem.getGridById(id).lock()) {

@@ -43,7 +43,12 @@ RigidBodyState shiftedInTime(const RigidBodyState& state, double dtTicks,
                             glm::mat3_cast(state.m_orientation) * centerOfMassLocal};
     result.m_position = centerOfMass + state.m_velocity * dtTicks -
                         glm::mat3_cast(result.m_orientation) * centerOfMassLocal;
-    return result;
+
+    // Screened state and a live body's mass properties can only shift into a usable
+    // pose, so an unusable one means one of those two broke. Leaving the state where
+    // it stands costs a round trip of staleness; carrying it on poisons the body.
+    assert(result.isValid() && "time shift produced unusable body state");
+    return result.isValid() ? result : state;
 }
 
 }  // namespace
@@ -327,7 +332,7 @@ void GameNetworkClient::applyStateSnapshot(const std::vector<std::byte>& data) {
 
     // Grids are not predicted yet, so always applied directly on the client.
     for (const StateSnapshot::GridEntry& entry : snapshot.m_grids) {
-        if (!entry.m_state.isFinite()) {
+        if (!entry.m_state.isValid()) {
             continue;
         }
         std::weak_ptr<RigidBody> bodyWeak{findGridBody(entry.m_id)};
@@ -340,7 +345,7 @@ void GameNetworkClient::applyStateSnapshot(const std::vector<std::byte>& data) {
     for (const StateSnapshot::CharacterEntry& entry : snapshot.m_characters) {
         std::int32_t id{entry.m_id};
         const RigidBodyState& state{entry.m_state};
-        if (!state.isFinite() || !entry.m_input.isValid() || !entry.m_docking.isValid()) {
+        if (!state.isValid() || !entry.m_input.isValid() || !entry.m_docking.isValid()) {
             continue;
         }
         std::weak_ptr<RigidBody> bodyWeak{findCharacterBody(id)};

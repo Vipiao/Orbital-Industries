@@ -28,7 +28,8 @@ struct RigidBodyState {
     void serialize(ByteWriter& writer) const;
     bool deserialize(ByteReader& reader);
 
-    // A non-finite value poisons the integrator for good, so decoded or loaded
-    // state is screened with this before being applied.
-    bool isFinite() const;
+    // A non-finite value poisons the integrator for good, and an orientation off the
+    // unit sphere rescales whatever it rotates, so decoded or loaded state is screened
+    // with this before being applied.
+    bool isValid() const;
 };

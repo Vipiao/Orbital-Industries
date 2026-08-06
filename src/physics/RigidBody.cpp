@@ -4,7 +4,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/norm.hpp>
 #include <cassert>
-#include <limits>
 
 // RigidBody cached getter implementations
 const glm::dmat3& RigidBody::getOrientationMatrix() const {
@@ -58,17 +57,16 @@ void RigidBody::setStatic(bool isStatic) {
 }
 
 void RigidBody::refreshInverses() {
-    if (m_isStatic) {
-        // Infinite effective mass: impulses and corrections leave the body untouched.
-        m_invMass = 0.0;
-        m_invInertiaTensor = glm::dmat3{0.0};
-        return;
-    }
-    m_invMass = (m_mass > 1e-15) ? (1.0 / m_mass) : std::numeric_limits<double>::max();
-    double determinant{glm::determinant(m_inertiaTensor)};
-    m_invInertiaTensor = (determinant > 1e-15)
+    // A zero inverse is infinite effective mass: impulses and corrections leave the
+    // body untouched. Static bodies read that way, and so does a body carrying no
+    // mass yet (a grid before its cells arrive). The inverse of "no inertia" must be
+    // zero and never a large sentinel: a sentinel overflows to infinity on the first
+    // multiply, and the spin it implies turns into NaN as soon as it is normalized.
+    bool responds{!m_isStatic};
+    m_invMass = (responds && m_mass > 1e-15) ? 1.0 / m_mass : 0.0;
+    m_invInertiaTensor = (responds && glm::determinant(m_inertiaTensor) > 1e-15)
                              ? glm::inverse(m_inertiaTensor)
-                             : glm::dmat3{std::numeric_limits<double>::max()};
+                             : glm::dmat3{0.0};
 }
 
 const glm::dmat3& RigidBody::getWorldInertiaTensor() const {
@@ -113,9 +111,8 @@ void RigidBody::rotateAboutCenterOfMass(const glm::dquat& rotation) {
     assert(RigidBodyDetail::isUnitQuaternion(rotation) &&
            "rotation must be normalized or it would rescale the body");
     glm::dvec3 worldCenterOfMass{getWorldCenterOfMass()};
-    m_orientation = glm::normalize(rotation * m_orientation);
-    invalidateOrientation();  // also dirties the world COM cache for the write below
-    m_position = worldCenterOfMass - m_orientation * m_centerOfMassLocal;
+    setOrientation(glm::normalize(rotation * m_orientation));
+    setPosition(worldCenterOfMass - m_orientation * m_centerOfMassLocal);
 }
 
 void RigidBody::getInterpolatedTransform(double timeRemainder, glm::dvec3& outPosition,

@@ -74,7 +74,7 @@ static void buildTestWorld(GameBase* gameBase) {
 // They must move together: a faithful replay needs all three fed from the same
 // run's recordings.
 enum class SessionMode { NONE, RECORD, PLAY };
-static constexpr SessionMode s_sessionMode{SessionMode::NONE};
+static constexpr SessionMode s_sessionMode{SessionMode::RECORD};
 
 int main() {
     try {

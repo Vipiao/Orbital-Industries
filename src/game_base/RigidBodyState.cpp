@@ -50,13 +50,13 @@ bool RigidBodyState::deserialize(ByteReader& reader) {
            reader.read(m_angularMomentumBody.z);
 }
 
-bool RigidBodyState::isFinite() const {
+bool RigidBodyState::isValid() const {
     return std::isfinite(m_position.x) && std::isfinite(m_position.y) &&
-           std::isfinite(m_position.z) && std::isfinite(m_orientation.w) &&
-           std::isfinite(m_orientation.x) && std::isfinite(m_orientation.y) &&
-           std::isfinite(m_orientation.z) && std::isfinite(m_velocity.x) &&
+           std::isfinite(m_position.z) && std::isfinite(m_velocity.x) &&
            std::isfinite(m_velocity.y) && std::isfinite(m_velocity.z) &&
            std::isfinite(m_angularMomentumBody.x) &&
            std::isfinite(m_angularMomentumBody.y) &&
-           std::isfinite(m_angularMomentumBody.z);
+           std::isfinite(m_angularMomentumBody.z) &&
+           RigidBodyDetail::isFinite(m_orientation) &&
+           RigidBodyDetail::isUnitQuaternion(m_orientation);
 }
