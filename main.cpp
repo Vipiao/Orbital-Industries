@@ -9,12 +9,12 @@
 #include "src/network/INetworkTransport.h"
 #include "src/network/ReplayTransport.h"
 #include "src/network/StartupPrompt.h"
-#include "src/physics/PhysicsUnits.h"
 #include "src/physics/RigidBody.h"
 #include "utils/TimeHandler.h"
 #include "debug/DebugRenderer.h"
 #include "debug/DebugGlobals.h"
 #include "graphics/GraphicsEngine.h"
+#include "graphics/SSBOManager.h"
 #include <glm/glm.hpp>
 #include <filesystem>
 #include <iostream>
@@ -32,10 +32,6 @@ IHashable* DebugGlobals::g_gameBase = nullptr;
 // the same order, so every object id matches deterministically and the network
 // layer can sync purely by id.
 static void buildTestWorld(GameBase* gameBase) {
-    // The platform and both characters share a fast downward velocity, so
-    // prediction and anchoring are exercised at speed from the first tick.
-    glm::dvec3 worldVelocity{0.0, 0.0, -PhysicsUnits::metersPerSecond(2000.0)};
-
     std::shared_ptr<Grid> ground{gameBase->createGrid(glm::dvec3{0.0, 0.0, 0.0}).lock()};
     if (ground) {
         int size{10};
@@ -43,9 +39,6 @@ static void buildTestWorld(GameBase* gameBase) {
             for (int jj = -size; jj < size; jj++) {
                 ground->addCell(glm::ivec3{ii, jj, -3});
             }
-        }
-        if (std::shared_ptr<RigidBody> body{ground->getRigidBody().lock()}) {
-            body->m_velocity = worldVelocity;
         }
     }
 
@@ -60,13 +53,39 @@ static void buildTestWorld(GameBase* gameBase) {
                 // right away instead of a long flying approach. Spaced wide
                 // enough that neither stands on the other's sensor collider.
                 body->setPosition(glm::dvec3{ii * 5.0, 0.0, -1.0});
-                body->m_velocity = worldVelocity;
             }
             // Start in walking mode (jetpack off); both peers build the same
             // state, and the input sync carries the flag from there.
             digibot->getController()->setJetpackEnabled(false);
         }
     }
+
+    // A CDLOD body parked off to the side, purely to look at. It has no physics
+    // and no game representation yet; it is placed through the shared transform
+    // SSBO like any other renderable, and given a slow spin so the vertex
+    // stage's frame interpolation is visible on it.
+    GraphicsEngine* graphicsEngine{gameBase->m_graphicsEngine.get()};
+    // SSAO works from the depth buffer, which holds the coarse displaced
+    // triangles, rather than the per-pixel normals the surface is shaded with.
+    // On a surface this steep the two disagree enough that it darkens facets.
+    graphicsEngine->setSsaoEnabled(false);
+
+    const int asteroidSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
+    const size_t asteroidSurface{
+        graphicsEngine->createCdlodSurface("../media/surfaces/sinusoid_surface.glsl")};
+    graphicsEngine->createCdlodBody(asteroidSsboIndex, CdlodConfig{60.0}, asteroidSurface);
+    graphicsEngine->updateMeshTransform(
+        asteroidSsboIndex,
+        glm::dvec3{0.0, 160.0, 0.0},                 // position
+        glm::dvec3{0.0},                             // velocity
+        glm::dquat{1.0, 0.0, 0.0, 0.0},              // orientation
+        glm::normalize(glm::dvec3{0.2, 1.0, 0.35}),  // spin axis
+        0.002,                                       // radians per physics step
+        glm::dvec3{0.0},                             // center of rotation
+        glm::dvec3{1.0},                             // scale
+        -1, -1, -1,                                  // colour/normal/material textures
+        0,                                           // physics time step
+        0.0);                                        // lit, not emissive
 }
 
 // One switch drives record/playback for the whole session. The time, control and

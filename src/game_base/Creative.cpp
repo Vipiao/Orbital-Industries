@@ -389,6 +389,14 @@ void Creative::processInputLogic() {
         m_gameBase->m_graphicsEngine->toggleFullscreen();
     }
 
+    // Toggle the CDLOD subdivision debug view with K key
+    if (keyboard->m_k.justPressed()) {
+        GraphicsEngine* graphicsEngine{m_gameBase->m_graphicsEngine.get()};
+        bool wireframe{!graphicsEngine->getCdlodWireframe()};
+        graphicsEngine->setCdlodWireframe(wireframe);
+        std::cout << "CDLOD wireframe " << (wireframe ? "on" : "off") << std::endl;
+    }
+
     // Toggle mouse lock with M key
     if (keyboard->m_m.justPressed()) {
         bool isLocked = mouseHandler->getMouseLock();
