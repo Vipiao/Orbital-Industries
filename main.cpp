@@ -71,9 +71,9 @@ static void buildTestWorld(GameBase* gameBase) {
     graphicsEngine->setSsaoEnabled(false);
 
     const int asteroidSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
-    const size_t asteroidSurface{
+    const std::weak_ptr<CdlodSurface> asteroidSurface{
         graphicsEngine->createCdlodSurface("../media/surfaces/sinusoid_surface.glsl")};
-    graphicsEngine->createCdlodBody(asteroidSsboIndex, CdlodConfig{60.0}, asteroidSurface);
+    graphicsEngine->createCdlodInstance(asteroidSsboIndex, CdlodConfig{60.0}, asteroidSurface);
     graphicsEngine->updateMeshTransform(
         asteroidSsboIndex,
         glm::dvec3{0.0, 160.0, 0.0},                 // position
