@@ -1,7 +1,8 @@
 // triplanar_noise_surface.glsl
 //
-// Terrain read out of a baked, tileable height map instead of evaluated in
-// closed form. The map is flat and square; this is what wraps it onto a sphere.
+// Terrain read out of a baked, tileable noise map instead of evaluated in
+// closed form. The map is flat, square and dimensionless; this is what gives it
+// a size and a height and wraps it onto a sphere.
 //
 // Three planar projections, one per axis, blended by how squarely the surface
 // faces each. A point's projection onto the x plane is simply its y and z, with
@@ -16,12 +17,24 @@
 // different levels would displace their shared edge to different places and
 // reopen the seam that morphing exists to close.
 
-uniform sampler2D u_elevationMap;  // R16 unorm, one tile
-uniform sampler2D u_slopeMap;      // RG16 unorm, squashed slope, same tile
+uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
+uniform sampler2D u_gradientMap;  // RG16 unorm, squashed gradient, same tile
 
-uniform float u_tileSizeMetres;    // metres one tile of the map spans
-uniform float u_elevationMinMetres; // metres the unorm 0 of the map stands for
-uniform float u_elevationRangeMetres;
+// Metres one tile of the map spans. One tile across the body's full width, so
+// every projected coordinate lands inside a single tile and the map's wrap is
+// never reached: the terrain does not visibly repeat. Tracks the body's
+// half extent, which is half of this.
+const float k_tileSizeMetres = 120.0;
+
+// Metres between the map's floor and its ceiling. The map is unsigned, so the
+// terrain rises from the sphere rather than straddling it, and this is the full
+// depth of the relief.
+//
+// Deep against a body this size, to see the surface rather than the sphere.
+// Level selection measures distance to the *undisplaced* sphere, so relief this
+// large is tessellated for a shape it no longer has: expect steep faces to look
+// coarser than flat ones.
+const float k_reliefMetres = 30.0;
 
 // How sharply the three projections give way to each other. Raising it narrows
 // the band where two planes both contribute, which is where their unrelated
@@ -36,16 +49,23 @@ vec3 triplanarWeights(vec3 spherePosition) {
 }
 
 float sampleElevation(vec2 planeCoord) {
-   float unorm = textureLod(u_elevationMap, planeCoord / u_tileSizeMetres, 0.0).r;
-   return u_elevationMinMetres + unorm * u_elevationRangeMetres;
+   return textureLod(u_noiseMap, planeCoord / k_tileSizeMetres, 0.0).r * k_reliefMetres;
 }
 
+// Gradient of one plane's elevation, in metres per metre.
+//
 // Undoes the bake's e = g / (1 + |g|). Fixed point cannot hold an unbounded
-// slope, and the squash also spends its bits where they turn the normal most:
-// the normal's angle is atan(g), which moves fastest per unit of slope near flat.
+// gradient, and the squash also spends its bits where they turn the normal
+// most: the normal's angle is atan(g), which moves fastest per unit of gradient
+// near flat.
+//
+// What comes back is per unit of tile, matching the map it was differenced
+// from, so the same two constants that give the elevation its metres give the
+// gradient its own: rise over run.
 vec2 sampleSlope(vec2 planeCoord) {
-   vec2 encoded = textureLod(u_slopeMap, planeCoord / u_tileSizeMetres, 0.0).rg * 2.0 - 1.0;
-   return encoded / (1.0 - abs(encoded));
+   vec2 encoded =
+      textureLod(u_gradientMap, planeCoord / k_tileSizeMetres, 0.0).rg * 2.0 - 1.0;
+   return (encoded / (1.0 - abs(encoded))) * k_reliefMetres / k_tileSizeMetres;
 }
 
 float cdlodSurfaceElevation(vec3 spherePosition) {
