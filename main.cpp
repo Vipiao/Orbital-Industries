@@ -11,6 +11,7 @@
 #include "src/network/StartupPrompt.h"
 #include "src/physics/RigidBody.h"
 #include "utils/TimeHandler.h"
+#include "math/TileableHeightMap.h"
 #include "debug/DebugRenderer.h"
 #include "debug/DebugGlobals.h"
 #include "graphics/GraphicsEngine.h"
@@ -70,10 +71,59 @@ static void buildTestWorld(GameBase* gameBase) {
     // On a surface this steep the two disagree enough that it darkens facets.
     graphicsEngine->setSsaoEnabled(false);
 
+    const double asteroidHalfExtent{60.0};
     const int asteroidSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
     const std::weak_ptr<CdlodSurface> asteroidSurface{
-        graphicsEngine->createCdlodSurface("../media/surfaces/sinusoid_surface.glsl")};
-    graphicsEngine->createCdlodInstance(asteroidSsboIndex, CdlodConfig{60.0}, asteroidSurface);
+        graphicsEngine->createCdlodSurface("../media/surfaces/triplanar_noise_surface.glsl")};
+
+    // The terrain the snippet reads, baked once here. The engine is handed two
+    // textures and three numbers under the names the snippet declares; that the
+    // one is a height field and the other its slope, and that both are projected
+    // triplanarly, are facts that live only in the GLSL.
+    TileableHeightMapConfig terrainConfig{};
+    terrainConfig.m_resolution = 1024;
+    terrainConfig.m_octaveCount = 7;
+    terrainConfig.m_baseFrequency = 2;
+    terrainConfig.m_gain = 0.45;
+    // Deep against the body, to see the surface rather than the sphere. Level
+    // selection measures distance to the *undisplaced* sphere, so relief this
+    // large is tessellated for a shape it no longer has: expect steep faces to
+    // look coarser than flat ones. Scaling here rather than in the snippet keeps
+    // the baked slopes a true derivative of the baked heights, which two
+    // separate multipliers in the GLSL would not.
+    terrainConfig.m_amplitudeMetres = 30.0;
+    // One tile across the body's full width. Every projected coordinate then
+    // lands inside a single tile and the map's wrap is never reached, so the
+    // terrain does not visibly repeat.
+    terrainConfig.m_tileSizeMetres = 2.0 * asteroidHalfExtent;
+    terrainConfig.m_seed = 20260811;
+
+    const TileableHeightMap terrain{terrainConfig};
+    const TileableHeightMap::ElevationBake elevationBake{terrain.bakeElevation()};
+    const std::vector<uint16_t> slopeBake{terrain.bakeSlope()};
+
+    TextureSpec mapSpec{};
+    mapSpec.m_width = terrainConfig.m_resolution;
+    mapSpec.m_height = terrainConfig.m_resolution;
+    mapSpec.m_format = TextureSpec::Format::R16;
+    mapSpec.m_pixels = elevationBake.m_texels.data();
+    graphicsEngine->setCdlodSurfaceTexture(asteroidSurface, "u_elevationMap", mapSpec);
+
+    mapSpec.m_format = TextureSpec::Format::RG16;
+    mapSpec.m_pixels = slopeBake.data();
+    graphicsEngine->setCdlodSurfaceTexture(asteroidSurface, "u_slopeMap", mapSpec);
+
+    // The constants the bake normalized against, so the snippet reads its own
+    // maps back in metres rather than repeating these numbers in GLSL.
+    graphicsEngine->setCdlodSurfaceUniform(asteroidSurface, "u_tileSizeMetres",
+                                           static_cast<float>(terrainConfig.m_tileSizeMetres));
+    graphicsEngine->setCdlodSurfaceUniform(asteroidSurface, "u_elevationMinMetres",
+                                           static_cast<float>(elevationBake.m_minMetres));
+    graphicsEngine->setCdlodSurfaceUniform(asteroidSurface, "u_elevationRangeMetres",
+                                           static_cast<float>(elevationBake.m_rangeMetres));
+
+    graphicsEngine->createCdlodInstance(asteroidSsboIndex, CdlodConfig{asteroidHalfExtent},
+                                        asteroidSurface);
     graphicsEngine->updateMeshTransform(
         asteroidSsboIndex,
         glm::dvec3{0.0, 160.0, 0.0},                 // position
@@ -83,7 +133,6 @@ static void buildTestWorld(GameBase* gameBase) {
         0.002,                                       // radians per physics step
         glm::dvec3{0.0},                             // center of rotation
         glm::dvec3{1.0},                             // scale
-        -1, -1, -1,                                  // colour/normal/material textures
         0,                                           // physics time step
         0.0);                                        // lit, not emissive
 }

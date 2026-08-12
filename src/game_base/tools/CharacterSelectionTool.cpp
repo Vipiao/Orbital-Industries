@@ -20,7 +20,7 @@ CharacterSelectionTool::CharacterSelectionTool(GameBase* gameBase, RadialMenu* r
     }
 
     // Load icon texture
-    m_playIconTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture("../media/2d_graphics/08_play_icon.png");
+    m_playIconTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture(m_radialMenu->getGeometry(), "../media/2d_graphics/08_play_icon.png");
 
     // Create menu node with toggle callback
     auto toggleCallback = [this]() {

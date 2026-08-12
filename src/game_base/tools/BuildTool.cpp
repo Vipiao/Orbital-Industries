@@ -71,28 +71,32 @@ BuildTool::BuildTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     m_structuralGhost = std::make_unique<StructuralGhostGeometry>(ge);
     m_structuralGhost->get(m_structuralShape);
 
-    // Icon textures
-    m_blockIconTextureIndex    = ge->createInstanceTexture("../media/2d_graphics/07_block_icon.png");
-    m_thrusterIconTextureIndex = ge->createInstanceTexture("../media/2d_graphics/09_thruster_icon.png");
-    m_cockpitIconTextureIndex  = ge->createInstanceTexture("../media/2d_graphics/10_cockpit_icon.png");
+    // Icon textures. Drawn as symbols on the radial menu's own geometry, so
+    // that is where their units live.
+    const std::weak_ptr<Geometry> menuGeometry = m_radialMenu->getGeometry();
+    m_blockIconTextureIndex    = ge->createInstanceTexture(menuGeometry, "../media/2d_graphics/07_block_icon.png");
+    m_thrusterIconTextureIndex = ge->createInstanceTexture(menuGeometry, "../media/2d_graphics/09_thruster_icon.png");
+    m_cockpitIconTextureIndex  = ge->createInstanceTexture(menuGeometry, "../media/2d_graphics/10_cockpit_icon.png");
     m_reactionWheelIconTextureIndex =
-        ge->createInstanceTexture("../media/2d_graphics/11_reaction_wheel_icon.png");
+        ge->createInstanceTexture(menuGeometry, "../media/2d_graphics/11_reaction_wheel_icon.png");
 
-    // Thruster ghost
-    m_thrusterGhostColorTextureUnit = ge->createInstanceTexture("../media/models/thruster/albedo_ghost.png");
+    // Ghost models. The geometry comes first now: a texture unit belongs to the
+    // geometry that draws it, so there is nothing to register it against until
+    // the mesh exists.
     m_thrusterGhostGeometry = ge->createInstanceGeometry(
         "../media/models/thruster/thruster_ghost.obj", RenderLayer::Transparent);
+    m_thrusterGhostColorTextureUnit = ge->createInstanceTexture(
+        m_thrusterGhostGeometry, "../media/models/thruster/albedo_ghost.png");
 
-    // Cockpit ghost
-    m_cockpitGhostColorTextureUnit = ge->createInstanceTexture("../media/models/cockpit/albedo_ghost.png");
     m_cockpitGhostGeometry = ge->createInstanceGeometry(
         "../media/models/cockpit/model_ghost.obj", RenderLayer::Transparent);
+    m_cockpitGhostColorTextureUnit = ge->createInstanceTexture(
+        m_cockpitGhostGeometry, "../media/models/cockpit/albedo_ghost.png");
 
-    // Reaction wheel ghost
-    m_reactionWheelGhostColorTextureUnit =
-        ge->createInstanceTexture("../media/models/reaction_wheel/albedo_ghost.png");
     m_reactionWheelGhostGeometry = ge->createInstanceGeometry(
         "../media/models/reaction_wheel/frame.obj", RenderLayer::Transparent);
+    m_reactionWheelGhostColorTextureUnit = ge->createInstanceTexture(
+        m_reactionWheelGhostGeometry, "../media/models/reaction_wheel/albedo_ghost.png");
 
     // Calculate crosshair offset and scale
     m_crosshairScale = glm::dvec2(0.1, 0.1);

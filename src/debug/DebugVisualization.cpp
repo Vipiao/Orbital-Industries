@@ -66,8 +66,9 @@ void DebugVisualization::loadSharedResources() {
         m_sphereGeometry = m_graphics->createInstanceGeometry(
             "../media/blender/02_sphere.obj", RenderLayer::Overlay);
 
-        // Load shared texture
-        m_textureIndex = m_graphics->createInstanceTexture("../media/debug_red_transparent.png");
+        // Load shared texture, on the geometry that draws it
+        m_textureIndex = m_graphics->createInstanceTexture(
+            m_sphereGeometry, "../media/debug_red_transparent.png");
 
         m_resourcesLoaded = true;
         std::cout << "Debug visualization shared resources loaded successfully" << std::endl;
@@ -122,9 +123,6 @@ int DebugVisualization::createSphere(const glm::dvec3& position, double radius) 
         0.0,                                  // angVel
         glm::dvec3(0.0),                     // centerOfRotation
         glm::dvec3(radius),                  // scale
-        -1,                                   // colorTextureUnit (handled by instance)
-        -1,                                   // normalTextureUnit
-        -1,                                   // materialTextureUnit
         0,                                    // time
         1.0                                   // emissiveScalar
     );
@@ -301,9 +299,6 @@ void DebugVisualization::updateMeshTransform(int id) {
             0.0,                                  // angVel
             glm::dvec3(0.0),                     // centerOfRotation
             props.scale,
-            -1,                                   // colorTextureUnit (handled by instance)
-            -1,                                   // normalTextureUnit
-            -1,                                   // materialTextureUnit
             props.timeStep,
             1.0                                   // emissiveScalar
         );

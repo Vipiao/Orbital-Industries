@@ -28,17 +28,6 @@ DigibotResources::~DigibotResources() {
 }
 
 void DigibotResources::loadResources() {
-    // Load shared texture atlas
-    m_colorTextureUnit = m_graphics->createInstanceTexture("../media/textures/robot/atlas.png");
-    m_normalTextureUnit = m_graphics->createInstanceTexture("../media/textures/robot/atlas_normal.png");
-    
-    if (m_colorTextureUnit == -1 || m_normalTextureUnit == -1) {
-        throw std::runtime_error("Failed to load Digibot textures");
-    }
-    
-    std::cout << "DigibotResources: Loaded textures - Color unit: " << m_colorTextureUnit 
-              << ", Normal unit: " << m_normalTextureUnit << std::endl;
-    
     // File paths for all 16 body parts
     const char* filePaths[16] = {
         "../media/characters/left_foot.obj",
@@ -67,8 +56,25 @@ void DigibotResources::loadResources() {
         if (geometry.expired()) {
             throw std::runtime_error("Failed to load Digibot geometry: " + std::string(filePaths[i]));
         }
+
+        // Texture units are per geometry, so every part registers the shared
+        // atlas against itself. The pixels are loaded once and shared; each part
+        // spends a unit of its own. Registered in the same order everywhere, so
+        // one unit number is right for all of them.
+        const int colorUnit = m_graphics->createInstanceTexture(
+            geometry, "../media/textures/robot/atlas.png");
+        const int normalUnit = m_graphics->createInstanceTexture(
+            geometry, "../media/textures/robot/atlas_normal.png");
+        if (colorUnit == -1 || normalUnit == -1) {
+            throw std::runtime_error("Failed to load Digibot textures");
+        }
+        m_colorTextureUnit = colorUnit;
+        m_normalTextureUnit = normalUnit;
+
         m_bodyPartGeometries.push_back(geometry);
     }
-    
+
+    std::cout << "DigibotResources: Loaded textures - Color unit: " << m_colorTextureUnit
+              << ", Normal unit: " << m_normalTextureUnit << std::endl;
     std::cout << "DigibotResources: Loaded " << m_bodyPartGeometries.size() << " body part geometries" << std::endl;
 }

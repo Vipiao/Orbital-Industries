@@ -172,7 +172,6 @@ void DigibotGraphics::updateWorldTransform(
         angVelMagnitude,
         centerOfRotation,
         glm::dvec3(1.0, 1.0, 1.0),  // scale
-        -1, -1, -1,                  // no textures
         physicsTimeStep,
         0.0                          // emissiveScalar
     );

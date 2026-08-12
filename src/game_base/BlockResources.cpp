@@ -19,17 +19,6 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
         throw std::runtime_error{"BlockResources: block must have at least one part"};
     }
 
-    m_colorTextureUnit  = m_graphics->createInstanceTexture(colorTexturePath);
-    m_normalTextureUnit = m_graphics->createInstanceTexture(normalTexturePath);
-
-    if (m_colorTextureUnit == -1 || m_normalTextureUnit == -1) {
-        throw std::runtime_error{"BlockResources: failed to load textures from " + colorTexturePath};
-    }
-
-    if (maskTexturePath) {
-        m_maskTextureUnit = m_graphics->createInstanceTexture(*maskTexturePath);
-    }
-
     m_parts.reserve(parts.size());
     for (const BlockGeometryPart& part : parts) {
         assert(part.alpha > 0.0 && part.alpha <= 1.0 &&
@@ -43,6 +32,22 @@ BlockResources::BlockResources(GraphicsEngine* graphics,
             throw std::runtime_error{"BlockResources: failed to load geometry from "
                                      + part.geometryPath};
         }
+
+        // Texture units are per geometry, so every part registers this block's
+        // textures against itself. The pixels are loaded once for the whole
+        // engine; each part spends units of its own. Registered in the same
+        // order for every part, so one unit number describes all of them.
+        m_colorTextureUnit  = m_graphics->createInstanceTexture(geometry, colorTexturePath);
+        m_normalTextureUnit = m_graphics->createInstanceTexture(geometry, normalTexturePath);
+        if (m_colorTextureUnit == -1 || m_normalTextureUnit == -1) {
+            releaseGeometries();
+            throw std::runtime_error{"BlockResources: failed to load textures from "
+                                     + colorTexturePath};
+        }
+        if (maskTexturePath) {
+            m_maskTextureUnit = m_graphics->createInstanceTexture(geometry, *maskTexturePath);
+        }
+
         m_parts.push_back(Part{geometry, part.alpha});
     }
 }

@@ -327,7 +327,6 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         angVelMagnitude,
         -m_colliderLocalPosition,  // Pass negative to maintain old offset semantics for graphics
         glm::dvec3(1.0, 1.0, 1.0),
-        -1, -1, -1,
         currentPhysicsTimeStep,
         0.0
     );

@@ -73,7 +73,7 @@ void RadialMenu::loadAllTextures() {
     for (int i = 0; i <= 8; ++i) {
         std::string textureName = "u" + std::to_string(i);
         std::string texturePath = "../media/radial_menu_graphics_generator/" + textureName + ".png";
-        m_textures[i] = m_graphics->createInstanceTexture(texturePath);
+        m_textures[i] = m_graphics->createInstanceTexture(m_geometry, texturePath);
     }
 }
 
@@ -445,8 +445,6 @@ void RadialMenu::updateMeshTransform() {
         glm::dvec3(0.0, 1.0, 0.0), 0.0,              // angular velocity (axis, magnitude)
         glm::dvec3(0.0),                              // center of rotation
         glm::dvec3(1.0),                              // scale
-        -1, -1,                                       // no default textures
-        -1,                                           // no material texture
         0,                                            // time
         1.0);                                         // emissive scalar
 }

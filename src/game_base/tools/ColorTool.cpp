@@ -26,10 +26,10 @@ ColorTool::ColorTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t parentN
     }
 
     // Load symbol textures
-    m_hueTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture("../media/radial_menu_graphics_generator/icon_hue_v2.png");
-    m_saturationTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture("../media/radial_menu_graphics_generator/icon_saturation_v2.png");
-    m_valueTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture("../media/radial_menu_graphics_generator/icon_value_v2.png");
-    m_paintIconTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture("../media/2d_graphics/03_crosshair_paint_v4.png");
+    m_hueTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture(m_radialMenu->getGeometry(), "../media/radial_menu_graphics_generator/icon_hue_v2.png");
+    m_saturationTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture(m_radialMenu->getGeometry(), "../media/radial_menu_graphics_generator/icon_saturation_v2.png");
+    m_valueTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture(m_radialMenu->getGeometry(), "../media/radial_menu_graphics_generator/icon_value_v2.png");
+    m_paintIconTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture(m_radialMenu->getGeometry(), "../media/2d_graphics/03_crosshair_paint_v4.png");
 
     // Create menu structure with loaded textures
     

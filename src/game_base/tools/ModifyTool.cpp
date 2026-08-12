@@ -44,7 +44,7 @@ ModifyTool::ModifyTool(GameBase* gameBase, RadialMenu* radialMenu, int64_t paren
     // 9x12 pixels of a 64x64 image where the wrench center is located
 
     // Load modify icon texture
-    m_modifyIconTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture("../media/2d_graphics/06_modify_icon.png");
+    m_modifyIconTextureIndex = m_gameBase->m_graphicsEngine->createInstanceTexture(m_radialMenu->getGeometry(), "../media/2d_graphics/06_modify_icon.png");
     m_crosshairOffset.x = 2.0 * (0.5 - 9.0/64.0) * m_crosshairScale.x;
     m_crosshairOffset.y = 2.0 * (0.5 - 12.0/64.0) * m_crosshairScale.y;
 

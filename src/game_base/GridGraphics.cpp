@@ -173,10 +173,17 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
         // Create color vector with same size as positions
         std::vector<glm::dvec4> colors(transformedMeshData.positions.size(), color);
 
+        // Materials travel with the vertices rather than with the grid's
+        // transform, so one grid mesh is free to mix them per cell.
+        const std::vector<uint32_t> textureUnits(
+            transformedMeshData.positions.size(),
+            MeshHandler::packTextureUnits(s_colorTextureUnit, s_normalTextureUnit, -1,
+                                          s_maskTextureUnit));
+
         cell.triangleIds = m_graphics->appendTrianglesToMesh(
-            m_ssboIndex, &transformedMeshData.positions, &transformedMeshData.normals, 
-            &transformedMeshData.tangents, &transformedMeshData.uvs, 
-            nullptr, &colors);
+            m_ssboIndex, &transformedMeshData.positions, &transformedMeshData.normals,
+            &transformedMeshData.tangents, &transformedMeshData.uvs,
+            nullptr, &colors, &textureUnits);
     }
 }
 
@@ -328,12 +335,8 @@ void GridGraphics::updateGraphics(
         angVelMagnitude,
         gridCenter,
         glm::dvec3(1.0, 1.0, 1.0),      // Default scale
-        s_colorTextureUnit,
-        s_normalTextureUnit,
-        -1,
         currentTimeStep,
-        0.0,                            // Grid blocks non-emissive by default
-        s_maskTextureUnit
+        0.0                             // Grid blocks non-emissive by default
     );
 
     // Update tracking variables with current grid state
