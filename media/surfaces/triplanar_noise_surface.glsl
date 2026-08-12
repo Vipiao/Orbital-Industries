@@ -12,13 +12,18 @@
 // derivative bounded, and the weight retires each plane long before its
 // projection degenerates.
 //
-// Sampled with textureLod at level 0 throughout. The elevation must be a pure
-// function of position across every quadtree level, or two patches meeting at
-// different levels would displace their shared edge to different places and
-// reopen the seam that morphing exists to close.
+// Sampled with texture(), whose level the two stages resolve differently and
+// deliberately. A vertex stage has no derivatives and so takes level 0, which is
+// what geometry requires: the elevation must be a pure function of position
+// across every quadtree level, or two patches meeting at different levels would
+// displace their shared edge to different places and reopen the seam that
+// morphing exists to close. The fragment stage does have derivatives and picks
+// the level its pixel covers, which is what keeps per-pixel normals from
+// sparkling once the terrain's detail falls below a pixel, and what keeps the
+// lookups inside the texture cache when the body is small on screen.
 
 uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
-uniform sampler2D u_gradientMap;  // RG16 unorm, squashed gradient, same tile
+uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 
 // Metres one tile of the map spans. One tile across the body's full width, so
 // every projected coordinate lands inside a single tile and the map's wrap is
@@ -49,23 +54,17 @@ vec3 triplanarWeights(vec3 spherePosition) {
 }
 
 float sampleElevation(vec2 planeCoord) {
-   return textureLod(u_noiseMap, planeCoord / k_tileSizeMetres, 0.0).r * k_reliefMetres;
+   return texture(u_noiseMap, planeCoord / k_tileSizeMetres).r * k_reliefMetres;
 }
 
 // Gradient of one plane's elevation, in metres per metre.
 //
-// Undoes the bake's e = g / (1 + |g|). Fixed point cannot hold an unbounded
-// gradient, and the squash also spends its bits where they turn the normal
-// most: the normal's angle is atan(g), which moves fastest per unit of gradient
-// near flat.
-//
-// What comes back is per unit of tile, matching the map it was differenced
-// from, so the same two constants that give the elevation its metres give the
-// gradient its own: rise over run.
+// The map holds the gradient as it stands, per unit of tile, matching the field
+// it was differenced from. So the same two constants that give the elevation its
+// metres give the gradient its own, and their ratio is exactly rise over run.
 vec2 sampleSlope(vec2 planeCoord) {
-   vec2 encoded =
-      textureLod(u_gradientMap, planeCoord / k_tileSizeMetres, 0.0).rg * 2.0 - 1.0;
-   return (encoded / (1.0 - abs(encoded))) * k_reliefMetres / k_tileSizeMetres;
+   vec2 perTile = texture(u_gradientMap, planeCoord / k_tileSizeMetres).rg;
+   return perTile * k_reliefMetres / k_tileSizeMetres;
 }
 
 float cdlodSurfaceElevation(vec3 spherePosition) {

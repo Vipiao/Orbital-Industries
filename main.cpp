@@ -93,16 +93,21 @@ static void buildTestWorld(GameBase* gameBase) {
 
     const TileableNoiseMap terrain{terrainConfig};
     const std::vector<uint16_t> noiseBake{terrain.bake()};
-    const std::vector<uint16_t> gradientBake{terrain.bakeGradient()};
+    const std::vector<float> gradientBake{terrain.bakeGradient()};
 
     TextureSpec mapSpec{};
     mapSpec.m_width = terrainConfig.m_resolution;
     mapSpec.m_height = terrainConfig.m_resolution;
+    // The fragment stage samples both maps once per pixel, so a body small on
+    // screen would otherwise stride whole texels between neighbouring pixels:
+    // aliased normals, and a working set far too large to stay in the texture
+    // cache. The vertex stage takes level 0 regardless and is unaffected.
+    mapSpec.m_generateMipmaps = true;
     mapSpec.m_format = TextureSpec::Format::R16;
     mapSpec.m_pixels = noiseBake.data();
     graphicsEngine->setCdlodSurfaceTexture(asteroidSurface, "u_noiseMap", mapSpec);
 
-    mapSpec.m_format = TextureSpec::Format::RG16;
+    mapSpec.m_format = TextureSpec::Format::RG16F;
     mapSpec.m_pixels = gradientBake.data();
     graphicsEngine->setCdlodSurfaceTexture(asteroidSurface, "u_gradientMap", mapSpec);
 
