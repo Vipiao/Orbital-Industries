@@ -29,17 +29,18 @@ uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 // every projected coordinate lands inside a single tile and the map's wrap is
 // never reached: the terrain does not visibly repeat. Tracks the body's
 // half extent, which is half of this.
-const float k_tileSizeMetres = 120.0;
+const float k_tileSizeMetres = 12742000.0 * 0.0001;
 
 // Metres between the map's floor and its ceiling. The map is unsigned, so the
 // terrain rises from the sphere rather than straddling it, and this is the full
 // depth of the relief.
 //
-// Deep against a body this size, to see the surface rather than the sphere.
-// Level selection measures distance to the *undisplaced* sphere, so relief this
-// large is tessellated for a shape it no longer has: expect steep faces to look
-// coarser than flat ones.
-const float k_reliefMetres = 30.0;
+// Tiny against a planet's radius, so the body reads as a sphere and the relief
+// shows in the shading rather than the silhouette. The knob to raise for
+// exaggerated terrain; the cost is that level selection measures distance to the
+// *undisplaced* sphere, so tall relief is tessellated for a shape it no longer
+// has.
+const float k_reliefMetres = 400.0;
 
 // How sharply the three projections give way to each other. Raising it narrows
 // the band where two planes both contribute, which is where their unrelated

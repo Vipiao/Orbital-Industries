@@ -64,18 +64,22 @@ static void buildTestWorld(GameBase* gameBase) {
     // A CDLOD body parked off to the side, purely to look at. It has no physics
     // and no game representation yet; it is placed through the shared transform
     // SSBO like any other renderable, and given a slow spin so the vertex
-    // stage's frame interpolation is visible on it.
+    // stage's frame interpolation is visible on it. Sized as a planet, which is
+    // what the surface and the LOD tree have to survive.
     GraphicsEngine* graphicsEngine{gameBase->m_graphicsEngine.get()};
     // SSAO works from the depth buffer, which holds the coarse displaced
     // triangles, rather than the per-pixel normals the surface is shaded with.
-    // On a surface this steep the two disagree enough that it darkens facets.
+    // Where the two disagree it darkens facets.
     graphicsEngine->setSsaoEnabled(false);
 
-    // The surface snippet lays its tile down across the body's full width, so
-    // its k_tileSizeMetres is twice this and the two move together.
-    const double asteroidHalfExtent{60.0};
-    const int asteroidSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
-    const std::weak_ptr<CdlodSurface> asteroidSurface{
+    // Triangles per selected patch, shared by every CDLOD body.
+    graphicsEngine->setCdlodPatchQuads(16);
+
+    // Earth's radius. How wide the snippet lays its tile down is decided there,
+    // independently of this.
+    const double planetRadius{6371000.0};
+    const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
+    const std::weak_ptr<CdlodSurface> planetSurface{
         graphicsEngine->createCdlodSurface("../media/surfaces/triplanar_noise_surface.glsl")};
 
     // The noise the snippet reads, baked once here. Both maps are dimensionless
@@ -100,26 +104,33 @@ static void buildTestWorld(GameBase* gameBase) {
     mapSpec.m_height = terrainConfig.m_resolution;
     // The fragment stage samples both maps once per pixel, so a body small on
     // screen would otherwise stride whole texels between neighbouring pixels:
-    // aliased normals, and a working set far too large to stay in the texture
-    // cache. The vertex stage takes level 0 regardless and is unaffected.
+    // aliased normals, and a working set too large for the texture cache. The
+    // vertex stage takes level 0 regardless and is unaffected.
     mapSpec.m_generateMipmaps = true;
     mapSpec.m_format = TextureSpec::Format::R16;
     mapSpec.m_pixels = noiseBake.data();
-    graphicsEngine->setCdlodSurfaceTexture(asteroidSurface, "u_noiseMap", mapSpec);
+    graphicsEngine->setCdlodSurfaceTexture(planetSurface, "u_noiseMap", mapSpec);
 
     mapSpec.m_format = TextureSpec::Format::RG16F;
     mapSpec.m_pixels = gradientBake.data();
-    graphicsEngine->setCdlodSurfaceTexture(asteroidSurface, "u_gradientMap", mapSpec);
+    graphicsEngine->setCdlodSurfaceTexture(planetSurface, "u_gradientMap", mapSpec);
 
-    graphicsEngine->createCdlodInstance(asteroidSsboIndex, CdlodConfig{asteroidHalfExtent},
-                                        asteroidSurface);
+    graphicsEngine->createCdlodInstance(planetSsboIndex, CdlodConfig{planetRadius},
+                                        planetSurface);
+    // The snippet's own k_reliefMetres, which the engine never sees: it places
+    // the sphere, and the terrain stands off it by this much.
+    const double planetReliefMetres{400.0};
+    // Gap between the platform and the highest the terrain can reach.
+    const double platformClearanceMetres{200.0};
+
     graphicsEngine->updateMeshTransform(
-        asteroidSsboIndex,
-        glm::dvec3{0.0, 160.0, 0.0},                 // position
+        planetSsboIndex,
+        // Centred so the terrain's ceiling sits just above the platform.
+        glm::dvec3{0.0, planetRadius + planetReliefMetres + platformClearanceMetres, 0.0},
         glm::dvec3{0.0},                             // velocity
         glm::dquat{1.0, 0.0, 0.0, 0.0},              // orientation
         glm::normalize(glm::dvec3{0.2, 1.0, 0.35}),  // spin axis
-        0.002,                                       // radians per physics step
+        0.00000001,                                       // radians per physics step
         glm::dvec3{0.0},                             // center of rotation
         glm::dvec3{1.0},                             // scale
         0,                                           // physics time step
