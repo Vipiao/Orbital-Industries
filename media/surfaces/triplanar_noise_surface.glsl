@@ -4,6 +4,12 @@
 // closed form. The map is flat, square and dimensionless; this is what gives it
 // a size and a height and wraps it onto a sphere.
 //
+// The GPU half of the body's shape. src/world/PlanetSurface.cpp is the other
+// half and must be kept in step: the same crude point, the same position and
+// normal. Every constant and every function below has a twin there. Change one
+// side alone and the surface moves out from under the bounds the quadtree
+// measures by, which is what closes the seams between patches.
+//
 // Three planar projections, one per axis, blended by how squarely the surface
 // faces each. A point's projection onto the x plane is simply its y and z, with
 // no divide by x: dividing would be the cube-map parameterization, whose uv runs
@@ -23,8 +29,6 @@
 // lookups inside the texture cache when the body is small on screen.
 
 // Metres from the body's centre to the sphere the cube projects onto.
-// CubeSphereBounds is the CPU twin and must carry the same radius, and
-// k_reliefMetres below as its ceiling.
 const float k_radiusMetres = 6371000.0;
 
 uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
@@ -40,9 +44,9 @@ const float k_tileSizeMetres = 12742000.0 * 0.0001;
 //
 // Tiny against a planet's radius, so the body reads as a sphere and the relief
 // shows in the shading rather than the silhouette. The knob to raise for
-// exaggerated terrain, and the ceiling CubeSphereBounds pads its spheres by:
-// raising it here without raising it there lets the surface escape the bound the
-// tree measures to.
+// exaggerated terrain, at the cost of a steeper surface: against k_tileSizeMetres
+// this sets the slope, and the slope is what the quadtree's ranges have to keep
+// up with.
 const float k_reliefMetres = 400.0;
 
 // How sharply the three projections give way to each other. Raising it narrows

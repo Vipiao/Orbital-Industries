@@ -13,6 +13,7 @@
 #include "utils/TimeHandler.h"
 #include "src/world/CdlodCubeFaces.h"
 #include "src/world/CubeSphereBounds.h"
+#include "src/world/PlanetSurface.h"
 #include "math/TileableNoiseMap.h"
 #include "debug/DebugRenderer.h"
 #include "debug/DebugGlobals.h"
@@ -77,23 +78,19 @@ static void buildTestWorld(GameBase* gameBase) {
     // Triangles per selected patch, shared by every CDLOD body.
     graphicsEngine->setCdlodPatchQuads(16);
 
-    // The body's shape is decided in three places, all of them here: the cube the
-    // tree subdivides, the bounds its patches are measured by, and the snippet
-    // that draws them. The renderer knows none of these numbers.
-    const double planetRadius{6371000.0};
-    // The snippet's own k_reliefMetres. Overstating it is safe; understating it
-    // puts the surface outside the bound the tree measures to.
-    const double planetReliefMetres{400.0};
-    const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
-    const std::weak_ptr<CdlodSurface> planetSurface{
-        graphicsEngine->createCdlodSurface("../media/surfaces/triplanar_noise_surface.glsl")};
+    // The body's shape is written twice, here and in the snippet, and the two
+    // must agree: this side is what the bounds measure and what the physics will
+    // eventually collide against, the snippet is what the vertex stages draw. The
+    // renderer knows none of these numbers, and nothing below reads them again --
+    // the planet is asked instead.
+    const double planetRadius{6371000.0};       // the snippet's k_radiusMetres
+    const double planetTileSizeMetres{1274.2};  // the snippet's k_tileSizeMetres
+    const double planetReliefMetres{400.0};     // the snippet's k_reliefMetres
 
-    // The noise the snippet reads, baked once here. Both maps are dimensionless
-    // -- the field spans exactly [0, 1] and its gradient is per unit of tile --
-    // so they need nothing alongside them to be read back; that they are a
-    // height field and its derivative, how many metres tall they stand, how wide
-    // they are laid down and that they are projected triplanarly are facts that
-    // live only in the GLSL.
+    // The noise both sides read, generated once. The map is dimensionless -- the
+    // field spans exactly [0, 1] and its gradient is per unit of tile -- so it
+    // needs nothing alongside it to be read back, and the three constants above
+    // are what give it a size on either side.
     TileableNoiseMapConfig terrainConfig{};
     terrainConfig.m_resolution = 1024;
     terrainConfig.m_octaveCount = 7;
@@ -101,13 +98,19 @@ static void buildTestWorld(GameBase* gameBase) {
     terrainConfig.m_gain = 0.45;
     terrainConfig.m_seed = 20260811;
 
-    const TileableNoiseMap terrain{terrainConfig};
-    const std::vector<uint16_t> noiseBake{terrain.bake()};
-    const std::vector<float> gradientBake{terrain.bakeGradient()};
+    const std::shared_ptr<PlanetSurface> planetSurface{std::make_shared<PlanetSurface>(
+        planetRadius, planetTileSizeMetres, planetReliefMetres, terrainConfig)};
+
+    const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
+    const std::weak_ptr<CdlodSurface> planetSnippet{
+        graphicsEngine->createCdlodSurface("../media/surfaces/triplanar_noise_surface.glsl")};
+
+    const std::vector<uint16_t> noiseBake{planetSurface->bakeElevation()};
+    const std::vector<float> gradientBake{planetSurface->bakeGradient()};
 
     TextureSpec mapSpec{};
-    mapSpec.m_width = terrainConfig.m_resolution;
-    mapSpec.m_height = terrainConfig.m_resolution;
+    mapSpec.m_width = planetSurface->mapResolution();
+    mapSpec.m_height = planetSurface->mapResolution();
     // The fragment stage samples both maps once per pixel, so a body small on
     // screen would otherwise stride whole texels between neighbouring pixels:
     // aliased normals, and a working set too large for the texture cache. The
@@ -115,17 +118,16 @@ static void buildTestWorld(GameBase* gameBase) {
     mapSpec.m_generateMipmaps = true;
     mapSpec.m_format = TextureSpec::Format::R16;
     mapSpec.m_pixels = noiseBake.data();
-    graphicsEngine->setCdlodSurfaceTexture(planetSurface, "u_noiseMap", mapSpec);
+    graphicsEngine->setCdlodSurfaceTexture(planetSnippet, "u_noiseMap", mapSpec);
 
     mapSpec.m_format = TextureSpec::Format::RG16F;
     mapSpec.m_pixels = gradientBake.data();
-    graphicsEngine->setCdlodSurfaceTexture(planetSurface, "u_gradientMap", mapSpec);
+    graphicsEngine->setCdlodSurfaceTexture(planetSnippet, "u_gradientMap", mapSpec);
 
     graphicsEngine->createCdlodInstance(
         planetSsboIndex, CdlodConfig{},
-        CdlodCubeFaces::cubeRootFrames(planetRadius),
-        std::make_shared<CubeSphereBounds>(planetRadius, planetReliefMetres),
-        planetSurface);
+        CdlodCubeFaces::cubeRootFrames(planetSurface->radius()),
+        std::make_shared<CubeSphereBounds>(planetSurface), planetSnippet);
 
     // Gap between the platform and the highest the terrain can reach.
     const double platformClearanceMetres{200.0};
@@ -133,7 +135,7 @@ static void buildTestWorld(GameBase* gameBase) {
     graphicsEngine->updateMeshTransform(
         planetSsboIndex,
         // Centred so the terrain's ceiling sits just above the platform.
-        glm::dvec3{0.0, planetRadius + planetReliefMetres + platformClearanceMetres, 0.0},
+        glm::dvec3{0.0, planetSurface->maxRadius() + platformClearanceMetres, 0.0},
         glm::dvec3{0.0},                             // velocity
         glm::dquat{1.0, 0.0, 0.0, 0.0},              // orientation
         glm::normalize(glm::dvec3{0.2, 1.0, 0.35}),  // spin axis

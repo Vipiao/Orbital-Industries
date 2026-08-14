@@ -1,27 +1,31 @@
 // CubeSphereBounds.h
 #pragma once
 
+#include <memory>
 #include "graphics/cdlod/CdlodPatchBounds.h"
 
+class PlanetSurface;
+
 /**
- * @brief Where a cube-sphere body's patches land, for the CDLOD tree.
+ * @brief Where a body's patches land, measured on the surface itself.
  *
- * The CPU twin of the shape half of triplanar_noise_surface.glsl, written apart
- * only because they run in different languages. Agreement between them means
- * containment, not equality: the snippet decides where a point goes, this only
- * promises it lands inside -- which is why relief enters as a ceiling rather
- * than as the height field itself.
+ * Asks the surface where the patch's centre goes, and takes the reach from the
+ * smooth sphere the terrain stands on. One elevation lookup per patch: enough to
+ * put the ball in the right place, which is what stops it carrying the whole
+ * body's relief down to the finest level.
+ *
+ * The reach ignores what the terrain does across the patch, so a patch can stand
+ * a little outside its own ball. cdlod_patch.glsl holds a margin at both ends of
+ * the morph band to cover it.
  */
 class CubeSphereBounds : public ICdlodPatchBounds {
 public:
-    // radius is the sphere the cube projects onto; reliefMetres is the furthest
-    // the surface can stand off it, which the snippet decides and this must not
-    // undercut.
-    CubeSphereBounds(double radius, double reliefMetres);
+    // Held rather than borrowed: the tree keeps these for its whole life, and a
+    // surface that expired would leave every patch unmeasurable.
+    explicit CubeSphereBounds(std::shared_ptr<const PlanetSurface> surface);
 
     CdlodPatchBounds patchBounds(const CdlodPatchFrame& frame) const override;
 
 private:
-    double m_radius{1.0};
-    double m_relief{0.0};
+    std::shared_ptr<const PlanetSurface> m_surface;
 };
