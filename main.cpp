@@ -11,6 +11,8 @@
 #include "src/network/StartupPrompt.h"
 #include "src/physics/RigidBody.h"
 #include "utils/TimeHandler.h"
+#include "src/world/CdlodCubeFaces.h"
+#include "src/world/CubeSphereBounds.h"
 #include "math/TileableNoiseMap.h"
 #include "debug/DebugRenderer.h"
 #include "debug/DebugGlobals.h"
@@ -75,9 +77,13 @@ static void buildTestWorld(GameBase* gameBase) {
     // Triangles per selected patch, shared by every CDLOD body.
     graphicsEngine->setCdlodPatchQuads(16);
 
-    // Earth's radius. How wide the snippet lays its tile down is decided there,
-    // independently of this.
+    // The body's shape is decided in three places, all of them here: the cube the
+    // tree subdivides, the bounds its patches are measured by, and the snippet
+    // that draws them. The renderer knows none of these numbers.
     const double planetRadius{6371000.0};
+    // The snippet's own k_reliefMetres. Overstating it is safe; understating it
+    // puts the surface outside the bound the tree measures to.
+    const double planetReliefMetres{400.0};
     const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
     const std::weak_ptr<CdlodSurface> planetSurface{
         graphicsEngine->createCdlodSurface("../media/surfaces/triplanar_noise_surface.glsl")};
@@ -115,11 +121,12 @@ static void buildTestWorld(GameBase* gameBase) {
     mapSpec.m_pixels = gradientBake.data();
     graphicsEngine->setCdlodSurfaceTexture(planetSurface, "u_gradientMap", mapSpec);
 
-    graphicsEngine->createCdlodInstance(planetSsboIndex, CdlodConfig{planetRadius},
-                                        planetSurface);
-    // The snippet's own k_reliefMetres, which the engine never sees: it places
-    // the sphere, and the terrain stands off it by this much.
-    const double planetReliefMetres{400.0};
+    graphicsEngine->createCdlodInstance(
+        planetSsboIndex, CdlodConfig{},
+        CdlodCubeFaces::cubeRootFrames(planetRadius),
+        std::make_shared<CubeSphereBounds>(planetRadius, planetReliefMetres),
+        planetSurface);
+
     // Gap between the platform and the highest the terrain can reach.
     const double platformClearanceMetres{200.0};
 

@@ -22,13 +22,16 @@
 // sparkling once the terrain's detail falls below a pixel, and what keeps the
 // lookups inside the texture cache when the body is small on screen.
 
+// Metres from the body's centre to the sphere the cube projects onto.
+// CubeSphereBounds is the CPU twin and must carry the same radius, and
+// k_reliefMetres below as its ceiling.
+const float k_radiusMetres = 6371000.0;
+
 uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
 uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 
-// Metres one tile of the map spans. One tile across the body's full width, so
-// every projected coordinate lands inside a single tile and the map's wrap is
-// never reached: the terrain does not visibly repeat. Tracks the body's
-// half extent, which is half of this.
+// Metres one tile of the map spans. Below the body's width the tile repeats,
+// which is what puts detail on a planet the map could never cover in one pass.
 const float k_tileSizeMetres = 12742000.0 * 0.0001;
 
 // Metres between the map's floor and its ceiling. The map is unsigned, so the
@@ -37,9 +40,9 @@ const float k_tileSizeMetres = 12742000.0 * 0.0001;
 //
 // Tiny against a planet's radius, so the body reads as a sphere and the relief
 // shows in the shading rather than the silhouette. The knob to raise for
-// exaggerated terrain; the cost is that level selection measures distance to the
-// *undisplaced* sphere, so tall relief is tessellated for a shape it no longer
-// has.
+// exaggerated terrain, and the ceiling CubeSphereBounds pads its spheres by:
+// raising it here without raising it there lets the surface escape the bound the
+// tree measures to.
 const float k_reliefMetres = 400.0;
 
 // How sharply the three projections give way to each other. Raising it narrows
@@ -68,7 +71,7 @@ vec2 sampleSlope(vec2 planeCoord) {
    return perTile * k_reliefMetres / k_tileSizeMetres;
 }
 
-float cdlodSurfaceElevation(vec3 spherePosition) {
+float elevationAt(vec3 spherePosition) {
    vec3 weights = triplanarWeights(spherePosition);
 
    return weights.x * sampleElevation(spherePosition.yz)
@@ -85,11 +88,11 @@ float cdlodSurfaceElevation(vec3 spherePosition) {
 // normal is not.
 //
 // The weights' own variation is left out. Keeping it would add a term along the
-// outward direction, which cdlodDisplacedNormal discards anyway, plus a
+// outward direction, which cdlodSurfaceNormal discards anyway, plus a
 // tangential term proportional to the difference between the planes' elevations
 // -- real, but confined to the bands where the blend is already fading one
 // unrelated piece of terrain into another.
-vec3 cdlodSurfaceGradient(vec3 spherePosition) {
+vec3 gradientAt(vec3 spherePosition) {
    vec3 weights = triplanarWeights(spherePosition);
 
    vec2 slopeX = sampleSlope(spherePosition.yz);
@@ -99,4 +102,30 @@ vec3 cdlodSurfaceGradient(vec3 spherePosition) {
    return weights.x * vec3(0.0, slopeX.x, slopeX.y)
         + weights.y * vec3(slopeY.y, 0.0, slopeY.x)
         + weights.z * vec3(slopeZ.x, slopeZ.y, 0.0);
+}
+
+// The cube the tree subdivides, projected onto the sphere: the only place crude
+// space is given a meaning.
+vec3 spherePointOf(vec3 crudePoint) {
+   return normalize(crudePoint) * k_radiusMetres;
+}
+
+// Where a crude point is drawn: the sphere, raised along its outward direction.
+// A scalar height rather than a free displacement, so the normal below can be
+// its gradient rather than a second opinion about the same surface.
+vec3 cdlodSurfacePoint(vec3 crudePoint) {
+   vec3 spherePosition = spherePointOf(crudePoint);
+   return spherePosition + normalize(spherePosition) * elevationAt(spherePosition);
+}
+
+// The unit normal of that surface. Only the tangential part of the gradient tilts
+// it; the radial part moves the point without turning it. The tangent stretch as
+// the surface rises is left out -- it scales the tilt by 1 / (1 + height/radius),
+// a part in a hundred thousand against a planet.
+vec3 cdlodSurfaceNormal(vec3 crudePoint) {
+   vec3 spherePosition = spherePointOf(crudePoint);
+   vec3 sphereNormal = normalize(spherePosition);
+   vec3 gradient = gradientAt(spherePosition);
+
+   return normalize(sphereNormal - (gradient - sphereNormal * dot(sphereNormal, gradient)));
 }
