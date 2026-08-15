@@ -27,16 +27,33 @@
 // the level its pixel covers, which is what keeps per-pixel normals from
 // sparkling once the terrain's detail falls below a pixel, and what keeps the
 // lookups inside the texture cache when the body is small on screen.
+//
+// The position runs in a wide float and the normal in an ordinary one. A point
+// on this sphere is 6.4e6 metres from the origin, where a float's spacing is
+// half a metre; a normal is only a direction. The twin is double throughout,
+// being under no such pressure.
+//
+// Df3 and its arithmetic arrive already in scope, from the graphics engine's
+// src/graphics/shared_shaders/dekker_arithmetic.glsl -- this file is spliced
+// into a stage that has included it, so there is nothing to include here.
 
-// Metres from the body's centre to the sphere the cube projects onto.
+// Metres from the body's centre to the sphere the cube projects onto. Exact in a
+// float, so it needs nothing in a low part.
 const float k_radiusMetres = 6371000.0;
 
 uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
 uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 
-// Metres one tile of the map spans. Below the body's width the tile repeats,
-// which is what puts detail on a planet the map could never cover in one pass.
-const float k_tileSizeMetres = 12742000.0 * 0.0001;
+// Metres one tile of the map spans, as a ratio of two whole numbers a float
+// holds exactly. Below the body's width the tile repeats, which is what puts
+// detail on a planet the map could never cover in one pass.
+//
+// Written as the ratio rather than as 1274.2 because that value is not a float,
+// and the lookups need it to more than a float's worth: a plane coordinate is
+// thousands of tiles from the origin, so a part in ten million of the tile size
+// is a thousandth of a tile of drift by the time it gets there.
+const float k_tileSpanMetres = 12742000.0;
+const float k_tilesPerSpan = 10000.0;
 
 // Metres between the map's floor and its ceiling. The map is unsigned, so the
 // terrain rises from the sphere rather than straddling it, and this is the full
@@ -44,7 +61,7 @@ const float k_tileSizeMetres = 12742000.0 * 0.0001;
 //
 // Tiny against a planet's radius, so the body reads as a sphere and the relief
 // shows in the shading rather than the silhouette. The knob to raise for
-// exaggerated terrain, at the cost of a steeper surface: against k_tileSizeMetres
+// exaggerated terrain, at the cost of a steeper surface: against the tile size
 // this sets the slope, and the slope is what the quadtree's ranges have to keep
 // up with.
 const float k_reliefMetres = 400.0;
@@ -61,8 +78,12 @@ vec3 triplanarWeights(vec3 spherePosition) {
    return weights / (weights.x + weights.y + weights.z);
 }
 
-float sampleElevation(vec2 planeCoord) {
-   return texture(u_noiseMap, planeCoord / k_tileSizeMetres).r * k_reliefMetres;
+// Reduced to its tile before it is narrowed. The map wraps, so the fraction is
+// all that was ever read, and thousands of whole tiles would otherwise swamp it.
+// Two patches meeting at a level boundary then read the same texel.
+float sampleElevation(Df2 planeCoord, Df tilesPerMetre) {
+   vec2 tileUv = df2FractToVec(df2Scale(planeCoord, tilesPerMetre));
+   return texture(u_noiseMap, tileUv).r * k_reliefMetres;
 }
 
 // Gradient of one plane's elevation, in metres per metre.
@@ -70,17 +91,30 @@ float sampleElevation(vec2 planeCoord) {
 // The map holds the gradient as it stands, per unit of tile, matching the field
 // it was differenced from. So the same two constants that give the elevation its
 // metres give the gradient its own, and their ratio is exactly rise over run.
+// Float, and per pixel: this feeds a normal, which the last bits of a plane
+// coordinate barely move.
 vec2 sampleSlope(vec2 planeCoord) {
-   vec2 perTile = texture(u_gradientMap, planeCoord / k_tileSizeMetres).rg;
-   return perTile * k_reliefMetres / k_tileSizeMetres;
+   float tilesPerMetre = k_tilesPerSpan / k_tileSpanMetres;
+   vec2 perTile = texture(u_gradientMap, planeCoord * tilesPerMetre).rg;
+   return perTile * (k_reliefMetres * tilesPerMetre);
 }
 
-float elevationAt(vec3 spherePosition) {
-   vec3 weights = triplanarWeights(spherePosition);
+// Weights from the narrowed position: they follow the direction only, and a
+// height is at most the relief.
+float elevationAt(Df3 spherePosition) {
+   vec3 weights = triplanarWeights(df3ToVec(spherePosition));
 
-   return weights.x * sampleElevation(spherePosition.yz)
-        + weights.y * sampleElevation(spherePosition.zx)
-        + weights.z * sampleElevation(spherePosition.xy);
+   // Both operands are whole numbers a float holds exactly, so the reciprocal is
+   // as good as the wide divide can make it. Taken once for all three planes.
+   Df tilesPerMetre =
+      dfDiv(dfFromFloat(k_tilesPerSpan), dfFromFloat(k_tileSpanMetres));
+
+   return weights.x * sampleElevation(Df2(spherePosition.hi.yz, spherePosition.lo.yz),
+                                      tilesPerMetre)
+        + weights.y * sampleElevation(Df2(spherePosition.hi.zx, spherePosition.lo.zx),
+                                      tilesPerMetre)
+        + weights.z * sampleElevation(Df2(spherePosition.hi.xy, spherePosition.lo.xy),
+                                      tilesPerMetre);
 }
 
 // Gradient of the elevation above, in the body's own frame.
@@ -109,7 +143,8 @@ vec3 gradientAt(vec3 spherePosition) {
 }
 
 // The cube the tree subdivides, projected onto the sphere: the only place crude
-// space is given a meaning.
+// space is given a meaning. The position path inlines this, wanting the outward
+// direction the projection passes through anyway.
 vec3 spherePointOf(vec3 crudePoint) {
    return normalize(crudePoint) * k_radiusMetres;
 }
@@ -117,9 +152,22 @@ vec3 spherePointOf(vec3 crudePoint) {
 // Where a crude point is drawn: the sphere, raised along its outward direction.
 // A scalar height rather than a free displacement, so the normal below can be
 // its gradient rather than a second opinion about the same surface.
-vec3 cdlodSurfacePoint(vec3 crudePoint) {
-   vec3 spherePosition = spherePointOf(crudePoint);
-   return spherePosition + normalize(spherePosition) * elevationAt(spherePosition);
+//
+// The sphere term is the body-sized one and carries the width; the height rides
+// on it as a float, being at most the relief. Two patches meeting at a level
+// boundary reach the same crude point to a nanometre, so the seam the morph
+// closes in principle closes in the arithmetic as well.
+//
+// The outward direction is taken once and used twice: the projection is that
+// direction scaled to the radius, so normalizing the result would ask the same
+// question again -- and an inverse square root at this width has no hardware
+// behind it.
+Df3 cdlodSurfacePoint(Df3 crudePoint) {
+   Df3 outward = df3Normalize(crudePoint);
+   Df3 spherePosition = df3Scale(outward, dfFromFloat(k_radiusMetres));
+
+   return df3Add(spherePosition,
+                 df3Scale(outward, dfFromFloat(elevationAt(spherePosition))));
 }
 
 // The unit normal of that surface. Only the tangential part of the gradient tilts

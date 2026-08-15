@@ -16,6 +16,11 @@
  * Change one side alone and the bounds stop describing the surface being drawn,
  * which is what closes the seams between patches.
  *
+ * The snippet splits its widths -- double where it places a vertex, float where
+ * it shades one -- because a float cannot hold a body-sized position. Nothing
+ * here is under that pressure, so it is double throughout and matches either
+ * side of the split.
+ *
  * Owns the noise and bakes the maps the snippet samples from that same field, so
  * the two are reading one generation rather than two.
  *

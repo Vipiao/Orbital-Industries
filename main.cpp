@@ -84,7 +84,10 @@ static void buildTestWorld(GameBase* gameBase) {
     // renderer knows none of these numbers, and nothing below reads them again --
     // the planet is asked instead.
     const double planetRadius{6371000.0};       // the snippet's k_radiusMetres
-    const double planetTileSizeMetres{1274.2};  // the snippet's k_tileSizeMetres
+    // The ratio the snippet is written as, not the number it comes to: 1274.2 is
+    // not exact in either width, and taking the same two whole numbers apart the
+    // same way leaves both sides reading one map at one scale.
+    const double planetTileSizeMetres{12742000.0 / 10000.0};
     const double planetReliefMetres{400.0};     // the snippet's k_reliefMetres
 
     // The noise both sides read, generated once. The map is dimensionless -- the
