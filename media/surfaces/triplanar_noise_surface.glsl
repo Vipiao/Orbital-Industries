@@ -28,10 +28,13 @@
 // sparkling once the terrain's detail falls below a pixel, and what keeps the
 // lookups inside the texture cache when the body is small on screen.
 //
-// The position runs in a wide float and the normal in an ordinary one. A point
-// on this sphere is 6.4e6 metres from the origin, where a float's spacing is
-// half a metre; a normal is only a direction. The twin is double throughout,
-// being under no such pressure.
+// Both paths take the point in a wide float, and both reduce it to its tile
+// before narrowing. A point on this sphere is 6.4e6 metres from the origin,
+// where a float's spacing is half a metre -- two hundred texels of the finest
+// octave's map -- so a lookup taken from a narrow coordinate reads that lattice
+// rather than the terrain. What stays narrow is everything downstream of the
+// lookup: weights, slopes and the normal are directions and heights, not
+// positions. The twin is double throughout, being under no such pressure.
 //
 // Df3 and its arithmetic arrive already in scope, from the graphics engine's
 // src/graphics/shared_shaders/dekker_arithmetic.glsl -- this file is spliced
@@ -71,6 +74,37 @@ const float k_reliefMetres = 400.0;
 // terrain has to cross-fade and detail visibly softens.
 const float k_blendSharpness = 6.0;
 
+// The same map laid down at several scales and added up: frequency multiplier,
+// amplitude as a fraction of the relief, and a shift in tiles. Thirty-two to a
+// step, and amplitude runs as the reciprocal of frequency, which leaves every
+// octave the same rise over run -- the terrain gains detail without gaining
+// slope, so the quadtree's ranges answer for all of them at once.
+//
+// The coarsest is half the map's own scale, twice its height: the tile is what
+// the field was built at, not what the body wants to wear it at.
+//
+// Frequencies and amplitudes are powers of two, exact in a float, so the wide
+// scale a lookup is taken at is exact as well. The shift is what keeps the
+// layers off one lattice: each repeats a whole number of times per coarser tile
+// and would otherwise land on it with the same phase, every repeat reinforcing
+// the last.
+const int k_octaveCount = 3;
+const vec4 k_octaves[k_octaveCount] = vec4[k_octaveCount](
+   vec4(0.5, 2.0, 0.0, 0.0),
+   vec4(16.0, 1.0 / 16.0, 0.37, 0.71),
+   vec4(512.0, 1.0 / 512.0, 0.61, 0.19));
+
+// Octaves the drawn geometry carries. PlanetSurface.cpp must use this same
+// count: it is the surface the quadtree's bounds are measured on, and the
+// vertex and depth stages both reach it through here.
+const int k_positionOctaves = 2;
+
+// Octaves the shading carries, free to go finer than the geometry does. A
+// vertex stage takes level 0 and places vertices a quad apart, so detail below
+// a quad reaches it as noise; a fragment stage has derivatives to choose a mip
+// level with and resolves what a pixel covers.
+const int k_shadingOctaves = 3;
+
 // Weight of each plane, summing to one. Driven by the direction rather than the
 // position, so the split is a property of where on the body a point sits.
 vec3 triplanarWeights(vec3 spherePosition) {
@@ -79,10 +113,15 @@ vec3 triplanarWeights(vec3 spherePosition) {
 }
 
 // Reduced to its tile before it is narrowed. The map wraps, so the fraction is
-// all that was ever read, and thousands of whole tiles would otherwise swamp it.
+// all that was ever read, and millions of whole tiles would otherwise swamp it.
 // Two patches meeting at a level boundary then read the same texel.
-float sampleElevation(Df2 planeCoord, Df tilesPerMetre) {
-   vec2 tileUv = df2FractToVec(df2Scale(planeCoord, tilesPerMetre));
+//
+// The shift rides on the fraction rather than the coordinate, where it is under
+// a tile and costs nothing to hold, and the sampler's own wrap takes it home.
+// Full amplitude: the caller scales, having one weighted sum per octave to do it
+// to rather than three.
+float sampleElevation(Df2 planeCoord, Df tilesPerMetre, vec2 shift) {
+   vec2 tileUv = df2FractToVec(df2Scale(planeCoord, tilesPerMetre)) + shift;
    return texture(u_noiseMap, tileUv).r * k_reliefMetres;
 }
 
@@ -91,33 +130,51 @@ float sampleElevation(Df2 planeCoord, Df tilesPerMetre) {
 // The map holds the gradient as it stands, per unit of tile, matching the field
 // it was differenced from. So the same two constants that give the elevation its
 // metres give the gradient its own, and their ratio is exactly rise over run.
-// Float, and per pixel: this feeds a normal, which the last bits of a plane
-// coordinate barely move.
-vec2 sampleSlope(vec2 planeCoord) {
-   float tilesPerMetre = k_tilesPerSpan / k_tileSpanMetres;
-   vec2 perTile = texture(u_gradientMap, planeCoord * tilesPerMetre).rg;
-   return perTile * (k_reliefMetres * tilesPerMetre);
+//
+// Reduced to its tile while wide, exactly as the elevation above is and for the
+// same reason. That leaves the coordinate discontinuous at every tile boundary,
+// which is why the mip level comes from derivatives handed in rather than from
+// the coordinate itself: differencing this one across a pixel quad would read
+// the wrap as an infinite slope and pick the coarsest level along a line through
+// every tile.
+vec2 sampleSlope(Df2 planeCoord, Df tilesPerMetre, vec2 tileDerivX, vec2 tileDerivY,
+                 vec4 octave) {
+   vec2 tileUv = df2FractToVec(df2Scale(planeCoord, tilesPerMetre)) + octave.zw;
+   vec2 perTile = textureGrad(u_gradientMap, tileUv, tileDerivX, tileDerivY).rg;
+   return perTile * (k_reliefMetres * octave.y * dfToFloat(tilesPerMetre));
 }
 
 // Weights from the narrowed position: they follow the direction only, and a
-// height is at most the relief.
-float elevationAt(Df3 spherePosition) {
+// height is at most the relief. Shared across the octaves, being a property of
+// where on the body the point sits rather than of any one layer.
+float elevationAt(Df3 spherePosition, int octaveCount) {
    vec3 weights = triplanarWeights(df3ToVec(spherePosition));
 
    // Both operands are whole numbers a float holds exactly, so the reciprocal is
-   // as good as the wide divide can make it. Taken once for all three planes.
+   // as good as the wide divide can make it. Taken once for every lookup below.
    Df tilesPerMetre =
       dfDiv(dfFromFloat(k_tilesPerSpan), dfFromFloat(k_tileSpanMetres));
 
-   return weights.x * sampleElevation(Df2(spherePosition.hi.yz, spherePosition.lo.yz),
-                                      tilesPerMetre)
-        + weights.y * sampleElevation(Df2(spherePosition.hi.zx, spherePosition.lo.zx),
-                                      tilesPerMetre)
-        + weights.z * sampleElevation(Df2(spherePosition.hi.xy, spherePosition.lo.xy),
-                                      tilesPerMetre);
+   float elevation = 0.0;
+   for (int octave = 0; octave < octaveCount; ++octave) {
+      Df scale = dfMul(tilesPerMetre, dfFromFloat(k_octaves[octave].x));
+      vec2 shift = k_octaves[octave].zw;
+
+      elevation += k_octaves[octave].y
+         * (weights.x * sampleElevation(Df2(spherePosition.hi.yz, spherePosition.lo.yz),
+                                        scale, shift)
+          + weights.y * sampleElevation(Df2(spherePosition.hi.zx, spherePosition.lo.zx),
+                                        scale, shift)
+          + weights.z * sampleElevation(Df2(spherePosition.hi.xy, spherePosition.lo.xy),
+                                        scale, shift));
+   }
+
+   return elevation;
 }
 
-// Gradient of the elevation above, in the body's own frame.
+// Gradient of the elevation above, in the body's own frame. The metre
+// derivatives say how far a neighbouring pixel sits on the sphere, and are what
+// each lookup's mip level is chosen from.
 //
 // Each plane's map varies with only two of the three coordinates, so its
 // gradient has a zero in the axis it was projected along -- the x plane's
@@ -130,23 +187,41 @@ float elevationAt(Df3 spherePosition) {
 // tangential term proportional to the difference between the planes' elevations
 // -- real, but confined to the bands where the blend is already fading one
 // unrelated piece of terrain into another.
-vec3 gradientAt(vec3 spherePosition) {
-   vec3 weights = triplanarWeights(spherePosition);
+vec3 gradientAt(Df3 spherePosition, vec3 metreDerivX, vec3 metreDerivY,
+                int octaveCount) {
+   vec3 weights = triplanarWeights(df3ToVec(spherePosition));
 
-   vec2 slopeX = sampleSlope(spherePosition.yz);
-   vec2 slopeY = sampleSlope(spherePosition.zx);
-   vec2 slopeZ = sampleSlope(spherePosition.xy);
+   Df tilesPerMetre =
+      dfDiv(dfFromFloat(k_tilesPerSpan), dfFromFloat(k_tileSpanMetres));
 
-   return weights.x * vec3(0.0, slopeX.x, slopeX.y)
-        + weights.y * vec3(slopeY.y, 0.0, slopeY.x)
-        + weights.z * vec3(slopeZ.x, slopeZ.y, 0.0);
+   vec3 gradient = vec3(0.0);
+   for (int octave = 0; octave < octaveCount; ++octave) {
+      Df scale = dfMul(tilesPerMetre, dfFromFloat(k_octaves[octave].x));
+      float tileScale = dfToFloat(scale);
+
+      vec2 slopeX = sampleSlope(Df2(spherePosition.hi.yz, spherePosition.lo.yz), scale,
+                                metreDerivX.yz * tileScale, metreDerivY.yz * tileScale,
+                                k_octaves[octave]);
+      vec2 slopeY = sampleSlope(Df2(spherePosition.hi.zx, spherePosition.lo.zx), scale,
+                                metreDerivX.zx * tileScale, metreDerivY.zx * tileScale,
+                                k_octaves[octave]);
+      vec2 slopeZ = sampleSlope(Df2(spherePosition.hi.xy, spherePosition.lo.xy), scale,
+                                metreDerivX.xy * tileScale, metreDerivY.xy * tileScale,
+                                k_octaves[octave]);
+
+      gradient += weights.x * vec3(0.0, slopeX.x, slopeX.y)
+                + weights.y * vec3(slopeY.y, 0.0, slopeY.x)
+                + weights.z * vec3(slopeZ.x, slopeZ.y, 0.0);
+   }
+
+   return gradient;
 }
 
 // The cube the tree subdivides, projected onto the sphere: the only place crude
 // space is given a meaning. The position path inlines this, wanting the outward
 // direction the projection passes through anyway.
-vec3 spherePointOf(vec3 crudePoint) {
-   return normalize(crudePoint) * k_radiusMetres;
+Df3 spherePointOf(Df3 crudePoint) {
+   return df3Scale(df3Normalize(crudePoint), dfFromFloat(k_radiusMetres));
 }
 
 // Where a crude point is drawn: the sphere, raised along its outward direction.
@@ -166,18 +241,33 @@ Df3 cdlodSurfacePoint(Df3 crudePoint) {
    Df3 outward = df3Normalize(crudePoint);
    Df3 spherePosition = df3Scale(outward, dfFromFloat(k_radiusMetres));
 
-   return df3Add(spherePosition,
-                 df3Scale(outward, dfFromFloat(elevationAt(spherePosition))));
+   return df3Add(
+      spherePosition,
+      df3Scale(outward, dfFromFloat(elevationAt(spherePosition, k_positionOctaves))));
 }
 
 // The unit normal of that surface. Only the tangential part of the gradient tilts
 // it; the radial part moves the point without turning it. The tangent stretch as
 // the surface rises is left out -- it scales the tilt by 1 / (1 + height/radius),
 // a part in a hundred thousand against a planet.
-vec3 cdlodSurfaceNormal(vec3 crudePoint) {
-   vec3 spherePosition = spherePointOf(crudePoint);
-   vec3 sphereNormal = normalize(spherePosition);
-   vec3 gradient = gradientAt(spherePosition);
+//
+// Takes more octaves than the geometry does, so the normal is the gradient of a
+// finer surface than the one drawn. That is the point: the layers past
+// k_positionOctaves exist only in the shading, and are what a pixel can resolve
+// and a quad cannot.
+vec3 cdlodSurfaceNormal(Df3 crudePoint, vec3 crudeDerivX, vec3 crudeDerivY) {
+   Df3 spherePosition = spherePointOf(crudePoint);
+   vec3 sphereNormal = normalize(df3ToVec(spherePosition));
+
+   // The projection carried through to the derivatives: a step along the outward
+   // direction slides the crude point without moving its image on the sphere, and
+   // what is left of the step is scaled by how far the projection pulled the
+   // point in. Float, and a factor of two in it would cost half a mip level.
+   float pullIn = k_radiusMetres / length(df3ToVec(crudePoint));
+   vec3 metreDerivX = pullIn * (crudeDerivX - sphereNormal * dot(sphereNormal, crudeDerivX));
+   vec3 metreDerivY = pullIn * (crudeDerivY - sphereNormal * dot(sphereNormal, crudeDerivY));
+
+   vec3 gradient = gradientAt(spherePosition, metreDerivX, metreDerivY, k_shadingOctaves);
 
    return normalize(sphereNormal - (gradient - sphereNormal * dot(sphereNormal, gradient)));
 }

@@ -76,7 +76,7 @@ static void buildTestWorld(GameBase* gameBase) {
     graphicsEngine->setSsaoEnabled(false);
 
     // Triangles per selected patch, shared by every CDLOD body.
-    graphicsEngine->setCdlodPatchQuads(16);
+    graphicsEngine->setCdlodPatchQuads(32);
 
     // The body's shape is written twice, here and in the snippet, and the two
     // must agree: this side is what the bounds measure and what the physics will

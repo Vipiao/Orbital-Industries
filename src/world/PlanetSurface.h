@@ -12,9 +12,12 @@
  * The twin of media/surfaces/triplanar_noise_surface.glsl, written apart only
  * because the two run in different languages, and it must be kept in step with
  * it. Every constant here appears in the snippet as well -- the three the
- * constructor takes, and the blend sharpness -- and so does every function.
- * Change one side alone and the bounds stop describing the surface being drawn,
- * which is what closes the seams between patches.
+ * constructor takes, the blend sharpness, and the octave table -- and so does
+ * every function. Change one side alone and the bounds stop describing the
+ * surface being drawn, which is what closes the seams between patches.
+ *
+ * The shading octaves are the exception, and need not agree with anything: they
+ * tilt a normal without moving a vertex, and nothing measures a normal.
  *
  * The snippet splits its widths -- double where it places a vertex, float where
  * it shades one -- because a float cannot hold a body-sized position. Nothing
@@ -48,7 +51,7 @@ public:
     double radius() const { return m_radius; }
     // The highest the surface can reach from the body's centre, since the map is
     // unsigned and the terrain rises off the sphere rather than straddling it.
-    double maxRadius() const { return m_radius + m_relief; }
+    double maxRadius() const;
 
     // The maps the snippet samples, off the field read above.
     std::vector<uint16_t> bakeElevation() const { return m_noise.bake(); }
@@ -56,18 +59,22 @@ public:
     int mapResolution() const { return m_noise.config().m_resolution; }
 
 private:
-    double elevationAt(const glm::dvec3& spherePosition) const;
-    glm::dvec3 gradientAt(const glm::dvec3& spherePosition) const;
+    // The map summed over the first octaveCount layers of the table: zero is the
+    // bare sphere, and each further layer adds the same field at a finer scale.
+    double elevationAt(const glm::dvec3& spherePosition, int octaveCount) const;
+    glm::dvec3 gradientAt(const glm::dvec3& spherePosition, int octaveCount) const;
 
     // Weight of each of the three planar projections, summing to one.
     static glm::dvec3 triplanarWeights(const glm::dvec3& spherePosition);
 
-    double sampleElevation(const glm::dvec2& planeCoord) const;
-    glm::dvec2 sampleSlope(const glm::dvec2& planeCoord) const;
+    // One layer, at full amplitude. The octave carries its frequency, amplitude
+    // and shift.
+    double sampleElevation(const glm::dvec2& planeCoord, const glm::dvec4& octave) const;
+    glm::dvec2 sampleSlope(const glm::dvec2& planeCoord, const glm::dvec4& octave) const;
 
     // Bilinear over the wrapped field, at the texel centres GL samples between,
     // so a lookup here lands where the snippet's lookup does.
-    glm::dvec2 texelCoord(const glm::dvec2& planeCoord) const;
+    glm::dvec2 texelCoord(const glm::dvec2& planeCoord, const glm::dvec4& octave) const;
 
     double m_radius{1.0};
     double m_tileSize{1.0};
