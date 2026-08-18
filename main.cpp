@@ -76,7 +76,7 @@ static void buildTestWorld(GameBase* gameBase) {
     graphicsEngine->setSsaoEnabled(false);
 
     // Triangles per selected patch, shared by every CDLOD body.
-    graphicsEngine->setCdlodPatchQuads(32);
+    graphicsEngine->setCdlodPatchQuads(24);
 
     // The body's shape is written twice, here and in the snippet, and the two
     // must agree: this side is what the bounds measure and what the physics will
@@ -95,8 +95,8 @@ static void buildTestWorld(GameBase* gameBase) {
     // needs nothing alongside it to be read back, and the three constants above
     // are what give it a size on either side.
     TileableNoiseMapConfig terrainConfig{};
-    terrainConfig.m_resolution = 1024;
-    terrainConfig.m_octaveCount = 7;
+    terrainConfig.m_resolution = 2048;
+    terrainConfig.m_octaveCount = 8;
     terrainConfig.m_baseFrequency = 2;
     terrainConfig.m_gain = 0.45;
     terrainConfig.m_seed = 20260811;
@@ -154,7 +154,7 @@ static void buildTestWorld(GameBase* gameBase) {
 // They must move together: a faithful replay needs all three fed from the same
 // run's recordings.
 enum class SessionMode { NONE, RECORD, PLAY };
-static constexpr SessionMode s_sessionMode{SessionMode::RECORD};
+static constexpr SessionMode s_sessionMode{SessionMode::NONE};
 
 int main() {
     try {

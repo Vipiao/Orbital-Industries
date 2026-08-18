@@ -19,7 +19,7 @@
 
 Game::Game(TimeHandler* timeHandler, GraphicsEngineBase::Mode controlMode,
            std::unique_ptr<INetworkTransport> transport)
-    : m_transport{std::move(transport)} {
+    : m_timeHandler{timeHandler}, m_transport{std::move(transport)} {
     assert(m_transport != nullptr && timeHandler != nullptr);
 
     m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler,
@@ -112,6 +112,14 @@ void Game::onFrame() {
 void Game::run() {
     while (!m_gameBase->m_graphicsEngine->getGraphicsEngineBase()->shouldClose()) {
         onFrame();
+
+        // A replay is over when its recording is: past that point the clock is
+        // live and the input is empty, which is a different session than the one
+        // being replayed.
+        if (m_timeHandler->isPlaybackExhausted()) {
+            std::cout << "[replay] recording exhausted; closing" << std::endl;
+            break;
+        }
     }
 }
 

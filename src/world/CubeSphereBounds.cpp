@@ -28,5 +28,10 @@ CdlodPatchBounds CubeSphereBounds::patchBounds(const CdlodPatchFrame& frame) con
         radiusSquared = glm::max(radiusSquared, glm::dot(toCorner, toCorner));
     }
 
-    return CdlodPatchBounds{centre, glm::sqrt(radiusSquared)};
+    // How much of the frame survives the projection: the ratio of the two half
+    // diagonals, both corner to centre, so the shape's root two cancels.
+    const double reach{glm::sqrt(radiusSquared)};
+    const double frameReach{glm::length(frame.m_uAxis + frame.m_vAxis)};
+
+    return CdlodPatchBounds{centre, reach, reach / frameReach};
 }

@@ -30,6 +30,9 @@ public:
 private:
     void setupDebugVisualization();
 
+    // Non-owning; outlives Game. Consulted by the loop so a replay ends with its
+    // recording instead of carrying on live.
+    TimeHandler* m_timeHandler;
     std::unique_ptr<GameBase> m_gameBase;
     std::unique_ptr<DebugVisualization> m_debugViz;
     std::unique_ptr<Mode> m_mode;

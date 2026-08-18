@@ -19,6 +19,13 @@
  * The shading octaves are the exception, and need not agree with anything: they
  * tilt a normal without moving a vertex, and nothing measures a normal.
  *
+ * The snippet reads each octave at the mip level its samples resolve; this reads
+ * full detail throughout. That is the safe side rather than a drift to fix: a mip
+ * averages what full detail holds, so the bounds go on containing the geometry.
+ * They agree where it matters anyway, since the snippet coarsens only as its
+ * vertices spread, by which point a patch is kilometres across against metres of
+ * relief.
+ *
  * The snippet splits its widths -- double where it places a vertex, float where
  * it shades one -- because a float cannot hold a body-sized position. Nothing
  * here is under that pressure, so it is double throughout and matches either

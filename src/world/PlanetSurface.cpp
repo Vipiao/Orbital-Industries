@@ -9,19 +9,20 @@ namespace {
 constexpr double k_blendSharpness{6.0};
 
 // The snippet's k_octaves: frequency multiplier, amplitude as a fraction of the
-// relief, and a shift in tiles. The same map added up at several scales, thirty-
-// two to a step, with amplitude running as the reciprocal of frequency so every
+// relief, and a shift in tiles. The same map added up at several scales, sixteen
+// to a step, with amplitude running as the reciprocal of frequency so every
 // octave carries the same rise over run.
-constexpr int k_octaveCount{3};
+constexpr int k_octaveCount{4};
 const glm::dvec4 k_octaves[k_octaveCount]{
-    glm::dvec4{0.5, 2.0, 0.0, 0.0}, glm::dvec4{16.0, 1.0 / 16.0, 0.37, 0.71},
-    glm::dvec4{512.0, 1.0 / 512.0, 0.61, 0.19}};
+    glm::dvec4{0.25, 4.0, 0.0, 0.0}, glm::dvec4{4.0, 1.0 / 4.0, 0.37, 0.71},
+    glm::dvec4{64.0, 1.0 / 64.0, 0.61, 0.19},
+    glm::dvec4{1024.0, 1.0 / 1024.0, 0.13, 0.44}};
 
 // Octaves the geometry carries and octaves the shading carries. The snippet's
 // k_positionOctaves and k_shadingOctaves, and the first of the two is the one
 // that must agree: it is the surface the quadtree measures its bounds on.
 constexpr int k_positionOctaves{2};
-constexpr int k_shadingOctaves{3};
+constexpr int k_shadingOctaves{2};
 
 }  // namespace
 

@@ -18,15 +18,26 @@
 // derivative bounded, and the weight retires each plane long before its
 // projection degenerates.
 //
-// Sampled with texture(), whose level the two stages resolve differently and
-// deliberately. A vertex stage has no derivatives and so takes level 0, which is
-// what geometry requires: the elevation must be a pure function of position
-// across every quadtree level, or two patches meeting at different levels would
-// displace their shared edge to different places and reopen the seam that
-// morphing exists to close. The fragment stage does have derivatives and picks
-// the level its pixel covers, which is what keeps per-pixel normals from
-// sparkling once the terrain's detail falls below a pixel, and what keeps the
-// lookups inside the texture cache when the body is small on screen.
+// Every lookup is taken at the level its sampling resolves, and the two stages
+// arrive at that level differently because their samples are differently shaped.
+// The fragment stage has screen derivatives and asks for the level its pixel
+// covers. The vertex stage has none, and is handed the metres between
+// neighbouring vertices instead. A spacing rather than a distance: what a sample
+// resolves is how far it stands from the next one, and the two part company
+// wherever the terrain lifts the camera off the sphere -- a camera an arm's
+// length above ground that stands four hundred metres up is four hundred metres
+// from the sphere below it, and would read the ground through a level chosen for
+// a patch that size.
+//
+// Neither depends on which patch asked, which is what geometry requires: the
+// elevation must be a pure function of position across every quadtree level, or
+// two patches meeting at different levels would displace their shared edge to
+// different places and reopen the seam that morphing exists to close.
+//
+// What this buys is the same on both paths: detail finer than a sample arrives
+// as its average instead of as whichever point of it the sample landed on, so
+// neither normals nor vertices sparkle, and the lookups stay inside the texture
+// cache instead of striding a map that no longer fits it.
 //
 // Both paths take the point in a wide float, and both reduce it to its tile
 // before narrowing. A point on this sphere is 6.4e6 metres from the origin,
@@ -75,35 +86,37 @@ const float k_reliefMetres = 400.0;
 const float k_blendSharpness = 6.0;
 
 // The same map laid down at several scales and added up: frequency multiplier,
-// amplitude as a fraction of the relief, and a shift in tiles. Thirty-two to a
+// amplitude as a fraction of the relief, and a shift in tiles. Sixteen to a
 // step, and amplitude runs as the reciprocal of frequency, which leaves every
 // octave the same rise over run -- the terrain gains detail without gaining
 // slope, so the quadtree's ranges answer for all of them at once.
 //
-// The coarsest is half the map's own scale, twice its height: the tile is what
-// the field was built at, not what the body wants to wear it at.
+// The coarsest stretches the map over four of its own tiles at four times its
+// height: the tile is what the field was built at, not what the body wants to
+// wear it at.
 //
 // Frequencies and amplitudes are powers of two, exact in a float, so the wide
 // scale a lookup is taken at is exact as well. The shift is what keeps the
 // layers off one lattice: each repeats a whole number of times per coarser tile
 // and would otherwise land on it with the same phase, every repeat reinforcing
 // the last.
-const int k_octaveCount = 3;
+const int k_octaveCount = 4;
 const vec4 k_octaves[k_octaveCount] = vec4[k_octaveCount](
-   vec4(0.5, 2.0, 0.0, 0.0),
-   vec4(16.0, 1.0 / 16.0, 0.37, 0.71),
-   vec4(512.0, 1.0 / 512.0, 0.61, 0.19));
+   vec4(0.25, 4.0, 0.0, 0.0),
+   vec4(4.0, 1.0 / 4.0, 0.37, 0.71),
+   vec4(64.0, 1.0 / 64.0, 0.61, 0.19),
+   vec4(1024.0, 1.0 / 1024.0, 0.13, 0.44));
 
 // Octaves the drawn geometry carries. PlanetSurface.cpp must use this same
 // count: it is the surface the quadtree's bounds are measured on, and the
 // vertex and depth stages both reach it through here.
 const int k_positionOctaves = 2;
 
-// Octaves the shading carries, free to go finer than the geometry does. A
-// vertex stage takes level 0 and places vertices a quad apart, so detail below
-// a quad reaches it as noise; a fragment stage has derivatives to choose a mip
-// level with and resolves what a pixel covers.
-const int k_shadingOctaves = 3;
+// Octaves the shading carries. Free to differ from the count above -- both read
+// the same octaves and each stops where its own sampling does -- but matched to
+// it, so the normal is the gradient of the surface actually drawn rather than of
+// a finer or coarser one.
+const int k_shadingOctaves = 2;
 
 // Weight of each plane, summing to one. Driven by the direction rather than the
 // position, so the split is a property of where on the body a point sits.
@@ -120,9 +133,32 @@ vec3 triplanarWeights(vec3 spherePosition) {
 // a tile and costs nothing to hold, and the sampler's own wrap takes it home.
 // Full amplitude: the caller scales, having one weighted sum per octave to do it
 // to rather than three.
-float sampleElevation(Df2 planeCoord, Df tilesPerMetre, vec2 shift) {
+//
+// The level is given rather than derived: this is read from stages that have no
+// derivatives, and the caller knows how far apart its samples stand.
+float sampleElevation(Df2 planeCoord, Df tilesPerMetre, vec2 shift, float mipLevel) {
    vec2 tileUv = df2FractToVec(df2Scale(planeCoord, tilesPerMetre)) + shift;
-   return texture(u_noiseMap, tileUv).r * k_reliefMetres;
+   return textureLod(u_noiseMap, tileUv, mipLevel).r * k_reliefMetres;
+}
+
+// Levels sharper than the spacing each lookup is taken. At zero a texel matches
+// the spacing, already a level short of suppressing every wavelength the samples
+// cannot carry; raising it buys detail back, and what it buys moves as the
+// samples do.
+const float k_detailSharpening = 0.0;
+
+// The level at which one texel of an octave's map covers the spacing given. An
+// octave lays the map down k_octaves[].x times as often, so its texel is that
+// much smaller on the ground.
+//
+// Not clamped above: the sampler stops at its own 1x1 top, where an octave
+// returns the map's mean. So an octave retires by fading into its own average as
+// the samples spread past it, with nothing left to step when it does.
+float octaveMipLevel(float sampleSpacing, float octaveFrequency) {
+   float texelSpan = k_tileSpanMetres
+      / (k_tilesPerSpan * octaveFrequency * float(textureSize(u_noiseMap, 0).x));
+
+   return max(0.0, log2(sampleSpacing / texelSpan) - k_detailSharpening);
 }
 
 // Gradient of one plane's elevation, in metres per metre.
@@ -147,7 +183,13 @@ vec2 sampleSlope(Df2 planeCoord, Df tilesPerMetre, vec2 tileDerivX, vec2 tileDer
 // Weights from the narrowed position: they follow the direction only, and a
 // height is at most the relief. Shared across the octaves, being a property of
 // where on the body the point sits rather than of any one layer.
-float elevationAt(Df3 spherePosition, int octaveCount) {
+//
+// sampleSpacing is how far apart the samples reading this stand on the ground.
+// Every octave is read at the level that spacing resolves, so a layer finer than
+// the samples arrives as its own average rather than as whichever point of it
+// each sample landed on. What that removes was never terrain: it was the noise a
+// lattice makes.
+float elevationAt(Df3 spherePosition, int octaveCount, float sampleSpacing) {
    vec3 weights = triplanarWeights(df3ToVec(spherePosition));
 
    // Both operands are whole numbers a float holds exactly, so the reciprocal is
@@ -159,14 +201,15 @@ float elevationAt(Df3 spherePosition, int octaveCount) {
    for (int octave = 0; octave < octaveCount; ++octave) {
       Df scale = dfMul(tilesPerMetre, dfFromFloat(k_octaves[octave].x));
       vec2 shift = k_octaves[octave].zw;
+      float mipLevel = octaveMipLevel(sampleSpacing, k_octaves[octave].x);
 
       elevation += k_octaves[octave].y
          * (weights.x * sampleElevation(Df2(spherePosition.hi.yz, spherePosition.lo.yz),
-                                        scale, shift)
+                                        scale, shift, mipLevel)
           + weights.y * sampleElevation(Df2(spherePosition.hi.zx, spherePosition.lo.zx),
-                                        scale, shift)
+                                        scale, shift, mipLevel)
           + weights.z * sampleElevation(Df2(spherePosition.hi.xy, spherePosition.lo.xy),
-                                        scale, shift));
+                                        scale, shift, mipLevel));
    }
 
    return elevation;
@@ -237,13 +280,14 @@ Df3 spherePointOf(Df3 crudePoint) {
 // direction scaled to the radius, so normalizing the result would ask the same
 // question again -- and an inverse square root at this width has no hardware
 // behind it.
-Df3 cdlodSurfacePoint(Df3 crudePoint) {
+Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
    Df3 outward = df3Normalize(crudePoint);
    Df3 spherePosition = df3Scale(outward, dfFromFloat(k_radiusMetres));
 
    return df3Add(
       spherePosition,
-      df3Scale(outward, dfFromFloat(elevationAt(spherePosition, k_positionOctaves))));
+      df3Scale(outward, dfFromFloat(
+         elevationAt(spherePosition, k_positionOctaves, sampleSpacing))));
 }
 
 // The unit normal of that surface. Only the tangential part of the gradient tilts
@@ -251,10 +295,10 @@ Df3 cdlodSurfacePoint(Df3 crudePoint) {
 // the surface rises is left out -- it scales the tilt by 1 / (1 + height/radius),
 // a part in a hundred thousand against a planet.
 //
-// Takes more octaves than the geometry does, so the normal is the gradient of a
-// finer surface than the one drawn. That is the point: the layers past
-// k_positionOctaves exist only in the shading, and are what a pixel can resolve
-// and a quad cannot.
+// Reads the octaves the geometry carries, so this is the gradient of the surface
+// drawn rather than of a finer one. A pixel still resolves more of them than a
+// quad does: both stop where their own sampling stops, and the fragment stage
+// samples the finer of the two.
 vec3 cdlodSurfaceNormal(Df3 crudePoint, vec3 crudeDerivX, vec3 crudeDerivY) {
    Df3 spherePosition = spherePointOf(crudePoint);
    vec3 sphereNormal = normalize(df3ToVec(spherePosition));
