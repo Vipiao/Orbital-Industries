@@ -20,6 +20,7 @@
 #include "graphics/GraphicsEngine.h"
 #include "graphics/SSBOManager.h"
 #include <glm/glm.hpp>
+#include <cassert>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -164,7 +165,7 @@ static constexpr SessionMode s_sessionMode{SessionMode::NONE};
 // worth keeping, so no edit of the switch above can overwrite a session that
 // already is. Two roles recording at once want two scratch folders, every stream
 // but the network journal being per role.
-static const std::filesystem::path s_playbackDir{"../recordings/000_terrain_benchmark"};
+static const std::filesystem::path s_playbackDir{"../recordings/003_lattice_benchmark"};
 static const std::filesystem::path s_recordDir{"../recordings/999_scratch"};
 
 int main() {
@@ -172,6 +173,12 @@ int main() {
         // Choose network role before any engine/window init.
         NetworkStartupConfig netConfig{startupPrompt::prompt()};
         bool isServerRole{netConfig.m_role == NetworkStartupConfig::Role::Server};
+
+        // Recording deletes what it finds, so the two must never be one folder:
+        // a capture aimed at the session being replayed destroys it, and the
+        // journals are large enough to live outside the repository.
+        assert(s_playbackDir != s_recordDir &&
+               "A capture written where playback reads would delete the session");
 
         const std::filesystem::path& sessionDir{
             s_sessionMode == SessionMode::RECORD ? s_recordDir : s_playbackDir};

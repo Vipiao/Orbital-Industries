@@ -20,6 +20,7 @@ in `999_scratch` and is moved to a number of its own once it is worth keeping.
 | 000 | `terrain_benchmark` | 2026-08-16 | Single role, camera over the planet. Frame drops near a cube corner; the reference for terrain shading cost. |
 | 001 | `client_cockpit_crash` | 2026-08-06 | Both roles' network journals, one time stream. Captured for a crash on cockpit entry. |
 | 002 | `client_session` | 2026-08-06 | Client role only, no server journal. |
+| 003 | `lattice_benchmark` | 2026-08-19 | Single role, camera over the planet. The reference for the lattice terrain's shading cost, replacing 000 now that the surface reads four planes rather than three. |
 | 999 | `scratch` | — | Where `RECORD` writes. Overwritten by every capture. |
 
 Two roles recording at once want two folders: every stream but the network
