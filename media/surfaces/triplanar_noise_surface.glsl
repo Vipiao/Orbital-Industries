@@ -154,11 +154,20 @@ const float k_detailSharpening = 0.0;
 // Not clamped above: the sampler stops at its own 1x1 top, where an octave
 // returns the map's mean. So an octave retires by fading into its own average as
 // the samples spread past it, with nothing left to step when it does.
+//
+// Sized off the elevation map for both, the two being baked from one field at
+// one resolution.
 float octaveMipLevel(float sampleSpacing, float octaveFrequency) {
    float texelSpan = k_tileSpanMetres
       / (k_tilesPerSpan * octaveFrequency * float(textureSize(u_noiseMap, 0).x));
 
    return max(0.0, log2(sampleSpacing / texelSpan) - k_detailSharpening);
+}
+
+// The level at which a lookup covers the whole tile, so that what comes back is
+// the field's mean however the coordinate moves.
+float mapTopLevel() {
+   return log2(float(textureSize(u_noiseMap, 0).x));
 }
 
 // Gradient of one plane's elevation, in metres per metre.
@@ -169,15 +178,17 @@ float octaveMipLevel(float sampleSpacing, float octaveFrequency) {
 //
 // Reduced to its tile while wide, exactly as the elevation above is and for the
 // same reason. That leaves the coordinate discontinuous at every tile boundary,
-// which is why the mip level comes from derivatives handed in rather than from
-// the coordinate itself: differencing this one across a pixel quad would read
-// the wrap as an infinite slope and pick the coarsest level along a line through
-// every tile.
-vec2 sampleSlope(Df2 planeCoord, Df tilesPerMetre, vec2 tileDerivX, vec2 tileDerivY,
-                 vec4 octave) {
-   vec2 tileUv = df2FractToVec(df2Scale(planeCoord, tilesPerMetre)) + octave.zw;
-   vec2 perTile = textureGrad(u_gradientMap, tileUv, tileDerivX, tileDerivY).rg;
-   return perTile * (k_reliefMetres * octave.y * dfToFloat(tilesPerMetre));
+// so the level cannot be left to the sampler: differencing this one across a
+// pixel quad would read the wrap as an infinite slope and pick the coarsest
+// level along a line through every tile. It is given, as sampleElevation's is,
+// and by a caller that knows how far apart its samples stand.
+//
+// Full amplitude, again as sampleElevation is: the caller scales, having one
+// weighted sum per octave to do it to rather than three.
+vec2 sampleSlope(Df2 planeCoord, Df tilesPerMetre, vec2 shift, float mipLevel) {
+   vec2 tileUv = df2FractToVec(df2Scale(planeCoord, tilesPerMetre)) + shift;
+   vec2 perTile = textureLod(u_gradientMap, tileUv, mipLevel).rg;
+   return perTile * (k_reliefMetres * dfToFloat(tilesPerMetre));
 }
 
 // Weights from the narrowed position: they follow the direction only, and a
@@ -215,9 +226,9 @@ float elevationAt(Df3 spherePosition, int octaveCount, float sampleSpacing) {
    return elevation;
 }
 
-// Gradient of the elevation above, in the body's own frame. The metre
-// derivatives say how far a neighbouring pixel sits on the sphere, and are what
-// each lookup's mip level is chosen from.
+// Gradient of the elevation above, in the body's own frame. Reads at the level
+// the spacing given resolves, exactly as elevationAt does and through the same
+// function, the two stages differing only in how they arrive at a spacing.
 //
 // Each plane's map varies with only two of the three coordinates, so its
 // gradient has a zero in the axis it was projected along -- the x plane's
@@ -230,31 +241,39 @@ float elevationAt(Df3 spherePosition, int octaveCount, float sampleSpacing) {
 // tangential term proportional to the difference between the planes' elevations
 // -- real, but confined to the bands where the blend is already fading one
 // unrelated piece of terrain into another.
-vec3 gradientAt(Df3 spherePosition, vec3 metreDerivX, vec3 metreDerivY,
-                int octaveCount) {
+vec3 gradientAt(Df3 spherePosition, int octaveCount, float sampleSpacing) {
    vec3 weights = triplanarWeights(df3ToVec(spherePosition));
 
    Df tilesPerMetre =
       dfDiv(dfFromFloat(k_tilesPerSpan), dfFromFloat(k_tileSpanMetres));
+   float topLevel = mapTopLevel();
 
    vec3 gradient = vec3(0.0);
    for (int octave = 0; octave < octaveCount; ++octave) {
+      float mipLevel = octaveMipLevel(sampleSpacing, k_octaves[octave].x);
+
+      // Past the top the map returns the tile's mean, and the mean gradient of a
+      // field that wraps is zero: the octave has nothing left to tilt a normal
+      // with, so its three lookups are skipped rather than summed to nothing.
+      // The height path has no such exit, a mean elevation being a real offset.
+      if (mipLevel >= topLevel) {
+         continue;
+      }
+
       Df scale = dfMul(tilesPerMetre, dfFromFloat(k_octaves[octave].x));
-      float tileScale = dfToFloat(scale);
+      vec2 shift = k_octaves[octave].zw;
 
-      vec2 slopeX = sampleSlope(Df2(spherePosition.hi.yz, spherePosition.lo.yz), scale,
-                                metreDerivX.yz * tileScale, metreDerivY.yz * tileScale,
-                                k_octaves[octave]);
-      vec2 slopeY = sampleSlope(Df2(spherePosition.hi.zx, spherePosition.lo.zx), scale,
-                                metreDerivX.zx * tileScale, metreDerivY.zx * tileScale,
-                                k_octaves[octave]);
-      vec2 slopeZ = sampleSlope(Df2(spherePosition.hi.xy, spherePosition.lo.xy), scale,
-                                metreDerivX.xy * tileScale, metreDerivY.xy * tileScale,
-                                k_octaves[octave]);
+      vec2 slopeX = sampleSlope(Df2(spherePosition.hi.yz, spherePosition.lo.yz),
+                                scale, shift, mipLevel);
+      vec2 slopeY = sampleSlope(Df2(spherePosition.hi.zx, spherePosition.lo.zx),
+                                scale, shift, mipLevel);
+      vec2 slopeZ = sampleSlope(Df2(spherePosition.hi.xy, spherePosition.lo.xy),
+                                scale, shift, mipLevel);
 
-      gradient += weights.x * vec3(0.0, slopeX.x, slopeX.y)
-                + weights.y * vec3(slopeY.y, 0.0, slopeY.x)
-                + weights.z * vec3(slopeZ.x, slopeZ.y, 0.0);
+      gradient += k_octaves[octave].y
+         * (weights.x * vec3(0.0, slopeX.x, slopeX.y)
+          + weights.y * vec3(slopeY.y, 0.0, slopeY.x)
+          + weights.z * vec3(slopeZ.x, slopeZ.y, 0.0));
    }
 
    return gradient;
@@ -311,7 +330,13 @@ vec3 cdlodSurfaceNormal(Df3 crudePoint, vec3 crudeDerivX, vec3 crudeDerivY) {
    vec3 metreDerivX = pullIn * (crudeDerivX - sphereNormal * dot(sphereNormal, crudeDerivX));
    vec3 metreDerivY = pullIn * (crudeDerivY - sphereNormal * dot(sphereNormal, crudeDerivY));
 
-   vec3 gradient = gradientAt(spherePosition, metreDerivX, metreDerivY, k_shadingOctaves);
+   // The two screen axes reduced to the one number both stages pick a level by:
+   // how far this sample stands from the next. The wider axis sets it, so a
+   // footprint stretched by perspective is read at the level covering its length
+   // rather than its width, which is the side that would alias.
+   float sampleSpacing = max(length(metreDerivX), length(metreDerivY));
+
+   vec3 gradient = gradientAt(spherePosition, k_shadingOctaves, sampleSpacing);
 
    return normalize(sphereNormal - (gradient - sphereNormal * dot(sphereNormal, gradient)));
 }

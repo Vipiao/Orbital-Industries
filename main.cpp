@@ -156,11 +156,25 @@ static void buildTestWorld(GameBase* gameBase) {
 enum class SessionMode { NONE, RECORD, PLAY };
 static constexpr SessionMode s_sessionMode{SessionMode::NONE};
 
+// The session folders, holding the three streams a replay needs side by side.
+// Relative to the working directory the game runs from, as the media paths are.
+//
+// Read and written apart, because recording deletes what it finds: a capture
+// lands in the scratch folder and is moved to a number of its own once it is
+// worth keeping, so no edit of the switch above can overwrite a session that
+// already is. Two roles recording at once want two scratch folders, every stream
+// but the network journal being per role.
+static const std::filesystem::path s_playbackDir{"../recordings/000_terrain_benchmark"};
+static const std::filesystem::path s_recordDir{"../recordings/999_scratch"};
+
 int main() {
     try {
         // Choose network role before any engine/window init.
         NetworkStartupConfig netConfig{startupPrompt::prompt()};
         bool isServerRole{netConfig.m_role == NetworkStartupConfig::Role::Server};
+
+        const std::filesystem::path& sessionDir{
+            s_sessionMode == SessionMode::RECORD ? s_recordDir : s_playbackDir};
 
         // Each role journals its own file, so one multiplayer session yields two
         // recordings, each replayable on its own.
@@ -168,8 +182,9 @@ int main() {
             s_sessionMode == SessionMode::RECORD ? ReplayTransport::Mode::RECORD
             : s_sessionMode == SessionMode::PLAY ? ReplayTransport::Mode::PLAY
                                                  : ReplayTransport::Mode::NONE};
-        std::filesystem::path replayFile{isServerRole ? "recording_network/server.bin"
-                                                      : "recording_network/client.bin"};
+        std::filesystem::path replayFile{
+            sessionDir / (isServerRole ? "recording_network/server.bin"
+                                         : "recording_network/client.bin")};
 
         std::unique_ptr<INetworkTransport> transport{};
         if (replayMode == ReplayTransport::Mode::PLAY) {
@@ -206,14 +221,16 @@ int main() {
             s_sessionMode == SessionMode::RECORD ? TimeHandler::Mode::RECORD
             : s_sessionMode == SessionMode::PLAY ? TimeHandler::Mode::PLAY
                                                  : TimeHandler::Mode::NONE};
-        std::unique_ptr<TimeHandler> timeHandler{std::make_unique<TimeHandler>(timeMode)};
+        std::unique_ptr<TimeHandler> timeHandler{
+            std::make_unique<TimeHandler>(timeMode, sessionDir / "recording_time/time_data.bin")};
 
         GraphicsEngineBase::Mode controlMode{
             s_sessionMode == SessionMode::RECORD ? GraphicsEngineBase::Mode::RECORD
             : s_sessionMode == SessionMode::PLAY ? GraphicsEngineBase::Mode::PLAY
                                                  : GraphicsEngineBase::Mode::NONE};
 
-        Game game(timeHandler.get(), controlMode, std::move(transport));
+        Game game(timeHandler.get(), controlMode, std::move(transport),
+                  sessionDir / "recording_mouse_keyboard");
         buildTestWorld(game.getGameBase());
 
         // Each role starts nearest a different character, so the two peers'

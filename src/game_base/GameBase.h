@@ -11,6 +11,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <filesystem>
 #include <memory>
 #include <chrono>
 #include <utility>
@@ -27,13 +28,15 @@ class Grid;
 class TimeHandler;
 class DebugRenderer;
 class Digibot;
+class FrameProfiler;
 
 class GameBase : public IHashable {
 public:
     GameBase(int screenWidth = 800, int screenHeight = 600,
              const std::string& windowTitle = "Game", 
              TimeHandler* timeHandler = nullptr,
-             GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE);
+             GraphicsEngineBase::Mode controlMode = GraphicsEngineBase::Mode::NONE,
+             const std::filesystem::path& controlRecordingDir = "recording_mouse_keyboard");
     virtual ~GameBase();
     
     std::weak_ptr<Grid> createGrid(const glm::dvec3& position, const glm::dquat& orientation = glm::dquat(1.0, 0.0, 0.0, 0.0));
@@ -148,6 +151,10 @@ protected:
 
 private:
     std::vector<StructuralCommand> m_pendingEdits;
+
+    // Declared below the engine so it is torn down first, while the GL context
+    // its queries belong to is still current. Inert unless asked for by name.
+    std::unique_ptr<FrameProfiler> m_frameProfiler;
 
     // Sets up the frame's physics budget (lag discard, step counter).
     void beginPhysicsWindow();

@@ -6,6 +6,7 @@
 #include "graphics/GraphicsEngineBase.h"
 #include "debug/DebugGlobals.h"
 
+#include <filesystem>
 #include <memory>
 
 class GameBase;
@@ -19,7 +20,8 @@ class Game {
 public:
     // The transport must already be listening (server) or connecting (client).
     Game(TimeHandler* timeHandler, GraphicsEngineBase::Mode controlMode,
-         std::unique_ptr<INetworkTransport> transport);
+         std::unique_ptr<INetworkTransport> transport,
+         const std::filesystem::path& controlRecordingDir = "recording_mouse_keyboard");
     ~Game();
 
     GameBase* getGameBase() { return m_gameBase.get(); }

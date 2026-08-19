@@ -14,6 +14,7 @@
 #include "../characters/digibot/DigibotController.h"
 #include "utils/TimeHandler.h"
 #include "debug/DebugRenderer.h"
+#include "../debug/FrameProfiler.h"
 #include <algorithm>
 #include <cassert>
 #include <fstream>
@@ -50,7 +51,8 @@ static void logWorldState(const PhysicsEngine& physics) {
 GameBase::GameBase(
     int screenWidth, int screenHeight, const std::string& windowTitle,
     TimeHandler* timeHandler,
-    GraphicsEngineBase::Mode controlMode)
+    GraphicsEngineBase::Mode controlMode,
+    const std::filesystem::path& controlRecordingDir)
     : m_timeHandler(timeHandler)
 {
     if (!m_timeHandler) {
@@ -64,8 +66,16 @@ GameBase::GameBase(
         windowTitle,
         10000000,        // maxTriangles
         10000,          // maxMeshes
-        controlMode
+        controlMode,
+        controlRecordingDir
     );
+
+    // After the engine, which is what owns the GL context its queries live in.
+    m_frameProfiler = std::make_unique<FrameProfiler>();
+    if (m_frameProfiler->isEnabled()) {
+        // A throttled swap would put the display's pacing inside the timings.
+        m_graphicsEngine->getGraphicsEngineBase()->setSwapInterval(0);
+    }
 
     m_physicsEngine = std::make_unique<PhysicsEngine>(m_timeHandler);
 
@@ -306,7 +316,11 @@ void GameBase::beginFrame() {
 }
 
 void GameBase::render() {
+    // Around the scene only: the swap sits in endFrame, and a query spanning it
+    // would time the wait for the display rather than the drawing.
+    m_frameProfiler->beginFrame();
     m_graphicsEngine->render();
+    m_frameProfiler->endFrame();
 }
 
 void GameBase::prepareFrame() {

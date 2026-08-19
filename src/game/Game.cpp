@@ -18,12 +18,13 @@
 #include <iostream>
 
 Game::Game(TimeHandler* timeHandler, GraphicsEngineBase::Mode controlMode,
-           std::unique_ptr<INetworkTransport> transport)
+           std::unique_ptr<INetworkTransport> transport,
+           const std::filesystem::path& controlRecordingDir)
     : m_timeHandler{timeHandler}, m_transport{std::move(transport)} {
     assert(m_transport != nullptr && timeHandler != nullptr);
 
     m_gameBase = std::make_unique<GameBase>(800, 600, "3D Grid Demo", timeHandler,
-                                            controlMode);
+                                            controlMode, controlRecordingDir);
     if (m_transport->isServer()) {
         m_gameNetwork = std::make_unique<GameNetworkServer>(m_transport.get(), m_gameBase.get());
     } else {

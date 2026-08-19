@@ -56,8 +56,6 @@ CLAUDE.md
 # Generated artifacts (kept local)
 dependency_graph_generator/cpp_dependencies.graphml
 
-# Run-time recordings (input, timing, network journals and saved sessions)
-recording_mouse_keyboard/
-recording_network/
-recording_time/
-recordings_saved/
+# Recorded sessions: large binary journals, kept locally.
+/recordings/*
+!/recordings/README.md
