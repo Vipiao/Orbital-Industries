@@ -5,6 +5,12 @@ project(OrbitalIndustries)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# The compile database an editor's language server reads to parse a file with the
+# flags it is really built with. Covers the engine and utils sources too, since
+# they are added into this build, which is what lets a tool follow a symbol across
+# all three repos.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Set default build type to Release if not specified
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)

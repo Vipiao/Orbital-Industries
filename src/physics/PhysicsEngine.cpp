@@ -385,15 +385,6 @@ void PhysicsEngine::updatePositions() {
         // Transform angular velocity back to world space for orientation update
         glm::dvec3 angularVelocity = orientationMatrix * angularVelocityBody;
 
-        // Debug: Print global angular momentum to verify conservation
-        //static int debugCounter = 0;
-        //if (++debugCounter % 10 == 0) { // Print every ~2 seconds at 60fps
-        //    glm::dvec3 globalAngularMomentum = orientationMatrix * body->getAngularMomentumBody();
-        //    double globalMagnitude = glm::length(globalAngularMomentum);
-        //    std::cout << "Global L: (" << globalAngularMomentum.x << ", " << globalAngularMomentum.y << ", " << globalAngularMomentum.z 
-        //              << ") |L| = " << globalMagnitude << std::endl;
-        //}
-        
         body->setOrientation(
             RigidBody::integrateOrientation(body->getOrientation(), angularVelocity, 1.0));
 

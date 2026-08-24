@@ -187,7 +187,7 @@ void DigibotGraphics::updateBodyPartPositions(const DigibotPose& targetPose) {
         && isFinite(targetPose.leftHand.position) && isFinite(targetPose.rightHand.position)
         && "updateBodyPartPositions received a non-finite IK target");
 
-    // ========== SETUP ARRAYS ==========
+    // Paired left/right so the limb solve below runs once per side.
     glm::dvec3* elbows[2] = {&m_rightElbowPoint, &m_leftElbowPoint};
     glm::dvec3* knees[2] = {&m_rightKneePoint, &m_leftKneePoint};
     

@@ -19,7 +19,6 @@ public:
     virtual bool checkAABBCollision(const Collider* other) const override;
     virtual RayIntersectionResult intersectRay(const glm::dvec3& rayStart, const glm::dvec3& rayEnd) const override;
     
-    // Public member variable
     double m_radius;
 
     // Type identification

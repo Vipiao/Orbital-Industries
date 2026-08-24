@@ -71,9 +71,7 @@ protected:
     JobManager* m_jobManager;
     TimeHandler* m_timeHandler;
 
-    // Physics
     std::weak_ptr<RigidBody> m_rigidBody;
-    //glm::dvec3 m_centerOfMass; // In local/body coordinates
 
     // Unique ID for deterministic sorting
     int m_uniqueId;

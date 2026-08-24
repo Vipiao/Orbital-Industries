@@ -198,8 +198,6 @@ bool RadialMenu::navigateToParent() {
     }
 
     updateRendering();
-    
-    //std::cout << "Navigated to parent node " << parentId << std::endl;
 
     return true;
 }

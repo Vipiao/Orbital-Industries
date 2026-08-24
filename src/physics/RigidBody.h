@@ -68,7 +68,6 @@ public:
 
     std::vector<std::unique_ptr<ColliderAttachment>> m_attachments; // Attached colliders
 
-    // Constructor
     RigidBody() = default;
 
     // ===== Core state. The fields live in the private section; every write runs

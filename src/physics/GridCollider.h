@@ -151,7 +151,6 @@ private:
     // Shape change tracking for cache invalidation
     uint64_t m_shapeChangeTimestamp = 0;
 
-    // Helper methods
     void updateSubColliderTransformsAndAABB(uint64_t currentTimestep);
 
     // Filter normal management

@@ -82,6 +82,5 @@ struct CollisionResult {
     }
 
 private:
-    // Helper function to calculate and store local contact points
     void calculateLocalContactPoints();
 };

@@ -154,9 +154,6 @@ DigibotPhysics::DigibotPhysics(PhysicsEngine* physics, JobManager* jobManager, T
     totalMass = 80.;
     inertiaTensor *= scalingFactor;
 
-    //m_centerOfMass = centerOfMass;
-    //m_centerOfMass = {0.5,0.5,4};
-
     // 3. Create RigidBody at origin
     m_rigidBody = m_physics->addRigidBody(
         glm::dvec3(0.0, 0.0, 0.0),

@@ -79,7 +79,6 @@ private:
     std::unordered_map<int, std::weak_ptr<Instance>> m_idToInstance;
     std::unordered_map<int, int> m_idToMeshIndex; // debug ID to SSBO mesh index
     
-    // Helper functions
     void loadSharedResources();
     int getNextDebugId();
     static int s_nextDebugId;

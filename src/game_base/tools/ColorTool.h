@@ -59,7 +59,6 @@ private:
     int m_valueTextureIndex{-1};
     int m_paintIconTextureIndex{-1};
     
-    // Helper methods
     void createMenuStructure(int64_t parentNodeId);
     void createHueSubmenus();
     void createSaturationValueSubmenus();

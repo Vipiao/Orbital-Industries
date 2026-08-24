@@ -1,4 +1,27 @@
 {
+    // Keep the IntelliSense browse database to the sources actually written here.
+    // The build tree carries a vendored third-party copy of its own, which is
+    // roughly seventy indexable files for every one under src/, and duplicate
+    // headers there are what a fuzzy symbol lookup lands on by mistake.
+    "C_Cpp.files.exclude": {
+        "**/build": true,
+        "**/bin": true,
+        "**/media": true,
+        "**/recordings": true
+    },
+    // Excluded from the file watcher too: none of it is edited by hand, and
+    // watching a rebuild write into it costs a notification per file.
+    "files.watcherExclude": {
+        "**/build/**": true,
+        "**/bin/**": true,
+        "**/recordings/**": true
+    },
+    // Search results, same reasoning. The explorer still shows all of it.
+    "search.exclude": {
+        "**/build": true,
+        "**/bin": true,
+        "**/recordings": true
+    },
     "cmake.debugConfig": {
         "program": "${command:cmake.launchTargetPath}",
         "cwd": "${workspaceFolder}/bin",

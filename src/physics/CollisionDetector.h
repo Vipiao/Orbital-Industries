@@ -101,7 +101,6 @@ private:
 
     std::unordered_map<int, std::vector<CollisionData>> m_byCollider; // keyed by Collider::m_id
 
-    // Helper functions
     void updateAllCollidersAndAABB();
     void updateAllEdgeValues();
     void sortAndDetectPotentialCollisions(

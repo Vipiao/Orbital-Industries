@@ -18,7 +18,6 @@ class Edge {
 public:
     Edge(Collider* collider, EdgeType type, EdgeAxis axis);
     
-    // Public member variables
     Collider* m_collider;
     EdgeType m_type;
     EdgeAxis m_axis;

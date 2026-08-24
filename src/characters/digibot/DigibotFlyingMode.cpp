@@ -17,14 +17,12 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
     // Lock force scaling parameter
     double lockForceScale{0.4};
 
-    // ========== Calculate View Orientation ==========
     glm::dvec3 bodyUpDirection{rigidBody->getOrientation() * glm::dvec3{0.0, 0.0, 1.0}};
 
     // Note: conjugate because lookAt gives the inverse of the orientation from vectors.
     glm::dquat viewOrientation{glm::conjugate(
         ArticulationUtils::quatLookAtYForward(inputs.m_viewDirection, bodyUpDirection))};
 
-    // ========== Calculate Movement Force ==========
     glm::dvec3 movementForce{0.0, 0.0, 0.0};
     if (inputs.m_movementDirection != glm::ivec3{0, 0, 0}) {
         glm::dvec3 direction{static_cast<double>(inputs.m_movementDirection.x),
@@ -39,7 +37,6 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
         }
     }
 
-    // ========== Handle Translation / Full Lock ==========
     glm::dvec3 lockForce{0.0, 0.0, 0.0};
     if (lockState == DigibotLockState::TRANSLATION_LOCK && lockTarget) {
         glm::dvec3 relativeVelocity{rigidBody->m_velocity - lockTarget->m_velocity};
@@ -91,7 +88,8 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
             relativeLinearVelocity);
     }
 
-    // ========== Combine and Clamp Forces ==========
+    // Movement and lock share one thrust budget, so a locked bot cannot also
+    // accelerate at full strength.
     double maxForce{m_thrustStrength * rigidBody->getMass()};
     glm::dvec3 totalForce{movementForce + lockForce};
     double totalForceMagnitude{glm::length(totalForce)};
@@ -102,7 +100,6 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
         wrench.m_force = totalForce;
     }
 
-    // ========== View Direction Rotation ==========
     glm::dvec3 currentForward{
         glm::normalize(rigidBody->getOrientation() * glm::dvec3{0.0, 1.0, 0.0})};
     glm::dvec3 targetForward{glm::normalize(inputs.m_viewDirection)};

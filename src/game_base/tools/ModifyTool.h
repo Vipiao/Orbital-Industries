@@ -83,7 +83,6 @@ private:
     // Icon texture
     int m_modifyIconTextureIndex{-1};
 
-    // Helper methods
     void createMenuStructure(int64_t parentNodeId);
     void updateMarkerPositions();
     static glm::dquat getArrowOrientation(const glm::ivec3& direction);

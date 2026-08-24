@@ -11,14 +11,17 @@ way that looks fine until it does not.
 
 Replay of `recordings/003_lattice_benchmark`, 8076 frames, GPU timings.
 
-| pass   | mean    | median  | p05     | p95     |
-|--------|---------|---------|---------|---------|
-| shadow | 1.67 ms | 1.65 ms | 0.38 ms | 2.70 ms |
-| light  | 0.51 ms | 0.50 ms | 0.23 ms | 0.78 ms |
-| frame  | 3.51 ms | 3.71 ms | 1.37 ms | 5.01 ms |
+Measured with per-cascade caster culling on and off, the two runs differing only in the
+margin constant so nothing else moves between them.
 
-**The shadow pass is ~48% of frame GPU time.** That is the number that makes Pin 1 the only
-one of these worth doing for speed.
+| pass   | unculled | culled  | change |
+|--------|----------|---------|--------|
+| shadow | 1.70 ms  | 0.31 ms | −82%   |
+| light  | 0.55 ms  | 0.53 ms | −3%    |
+| frame  | 3.57 ms  | 2.08 ms | −42%   |
+| wall   | 4.02 ms  | 2.49 ms | −38%   |
+
+The shadow pass was ~48% of frame GPU time and is now ~15%.
 
 ### How to measure
 
@@ -38,36 +41,57 @@ there.
 
 Run-to-run spread on identical binaries is about **0.2%**. Treat anything under ~0.5% as noise.
 
+To A/B a culling change without touching anything else, set `k_casterBoundsMargin` in
+`CdlodHandler.cpp` to a huge value: every patch then falls in tier 0, every cascade draws the
+whole selection, and the build reproduces the unculled behaviour exactly.
+
 ---
 
-## Pin 1 — Per-cascade caster culling
+## Pin 1 — Per-cascade caster culling — **DONE**
 
-`GraphicsEngine::renderShadowPass` draws the entire scene — every mesh, every instance, the
-full CDLOD patch selection — once per cascade, with nothing tested against the cascade being
-filled. Cascade 0 covers a 16 m x 16 m column and receives the whole planet.
+Implemented. `ShadowRenderer` exports one `Cylinder` per cascade in camera-relative world axes;
+`CdlodHandler` carries those into each body's frame, stamps every selected patch with the
+innermost volume it can cast into, and counting-sorts the selection so a cascade draws a prefix
+of what the camera draws whole. The tier travels down on `FrameRenderParams::casterTier`, whose
+default asks for everything, so the handlers that do not group their work needed no changes.
 
-Rejecting per cascade should collapse four near-full scene draws to roughly one, which against
-a 1.67 ms shadow pass is the largest win available anywhere in the frame.
+Typical selection: 2034 patches total, of which cascade 0 draws 11 and cascade 1 draws 103.
 
-**The condition that makes it correct:** cull against the cascade's *extruded* volume — its
-cross-section swept the full slab length along the light — never against the footprint that is
-visible. A caster stands up-light of what it shadows by as much as `m_casterReach`; testing
-what the camera can see would drop exactly the distant occluders the shared near plane exists
-to keep. Get this wrong and shadows vanish only at certain sun angles.
+Two properties worth not losing:
+
+- **Omission is correct without any nesting assumption.** A patch is skipped for cascade *c*
+  only when it is in none of volumes 0…*c*, and so in particular not in *c*. Nesting affects
+  only how much is drawn needlessly.
+- **The volume is a cylinder, not the ortho box, and that is exact rather than conservative.**
+  Under light this parallel a caster's perpendicular offset from the axis equals its shadow's,
+  so a caster outside the inscribed radius can only shadow points the lighting pass never
+  assigns to that cascade.
+
+Still uncalled: `MeshHandler` and `InstanceHandler` draw everything into every cascade. Meshes
+would need a bounds concept that may not exist yet; per-instance culling means rebuilding the
+instance buffer per cascade and is not localized. Neither is worth touching until measurement
+says they cost something.
 
 ## Pin 2 — Stable light basis and texel snapping
 
-`beginShadowPass` rerolls the light basis every frame off `Hash::pcgUnit3(frameNum)`, so the
-square rim of a cascade never sweeps the same texels twice. The round fade band hides *where*
-the seam falls, but the roll still moves every sample in the outer cascade by metres per frame,
-and it is what makes texel snapping impossible.
+`updateCascades` rerolls the light basis every frame off `Hash::pcgUnit3(frameNum)`, turning the
+texel lattice about the light axis so the staircase along a shadow edge lands somewhere new each
+frame rather than standing still.
 
-Texel snapping — quantizing each cascade's centre to whole shadow-map texels in light space —
-is the only exact fix for shadow crawl; dithering only spreads it. It needs a basis that holds
-still across frames, so the two are one change, not two.
+It does **not** affect what a cascade covers. The lighting pass takes each cascade out to the
+sphere inscribed in its square cross-section, and no roll of a square moves its inscribed
+circle, so the rim never enters the picture and the caster volumes are round for the same
+reason. This is also why the roll costs nothing in culling: the buckets are roll-invariant, and
+would stay valid even if the selection were ever cached across frames.
 
-Note that the cascades are now pushed along the view direction by `k_cascadePush`, so their
-centres already move when the camera turns. Snapping has to quantize the pushed centre.
+What the roll does cost is texel snapping — quantizing each cascade's centre to whole
+shadow-map texels in light space, which is the only exact fix for shadow crawl rather than a
+way of spreading it. Snapping needs a basis that holds still, so dropping the roll and adding
+snapping are one change, not two. The trade is a stable lattice against a moving one: crawl
+disappears, and whatever aliasing the roll was dithering stops being dithered.
+
+Note the cascades are pushed along the view direction by `k_cascadePush`, so their centres move
+when the camera turns. Snapping has to quantize the pushed centre.
 
 ## Pin 3 — `getLightSpaceMatricesForViewSpace` allocates per frame
 

@@ -69,7 +69,6 @@ public:
     // Navigation
     bool navigateToParent();
 
-    // Public rendering update
     void updateRendering();
     
     glm::dvec3 worldToLocal(const glm::dvec3& worldPos) const;

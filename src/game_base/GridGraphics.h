@@ -120,7 +120,6 @@ private:
     static constexpr double ORIENTATION_THRESHOLD_BASE = 0.0004;
     static constexpr uint64_t TIME_THRESHOLD = 256;
     
-    // Private methods
     void loadTextures();
     
     // Job-based graphics operations

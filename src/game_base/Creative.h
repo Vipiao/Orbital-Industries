@@ -50,7 +50,6 @@ private:
     double forceMultiplier = 1.0;
     double m_moveSpeed = 8.;
 
-    // Helper methods
     void applyDragForces();
     void processInputLogic();
 

@@ -116,7 +116,6 @@ private:
     int m_cockpitIconTextureIndex{-1};
     int m_reactionWheelIconTextureIndex{-1};
 
-    // Helper methods
     void createMenuStructure(int64_t parentNodeId);
     void addGridBlock(Grid* grid, int x, int y, int z);
 

@@ -310,7 +310,7 @@ void DigibotController::stepControl() {
         }
     }
 
-    // ========== Free movement ==========
+    // Free movement
     DigibotWrench freeWrench{};
     if (m_isJetpackEnabled) {
         freeWrench = m_flyingMode.update(rigidBody, inputs, m_lockState,

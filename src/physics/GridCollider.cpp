@@ -267,9 +267,6 @@ void GridCollider::addCell(const glm::ivec3& coord, std::unique_ptr<Collider> co
                     neighborhoodIt->second.m_neighbors.push_back(newCell);
                     
                     // No need to add neighbor's center to our list since it already did when it was created.
-                    //if (isNewNeighborhood && neighborhoodIt->second.m_hasCenter) {
-                    //    neighborhood.m_neighbors.push_back(neighborhoodIt->second.m_neighbors[0]);
-                    //}
                 } else {
                     // Create neighbor and add reference to us
                     m_neighborhoods.emplace(neighborCoord, CellNeighborhood()).first->second.m_neighbors.push_back(newCell);

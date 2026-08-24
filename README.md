@@ -47,6 +47,49 @@ and tell this project where the engine is.
    }
 ```
 
-   Set `ENGINE_DIR` to wherever you cloned the engine on your machine.
+   Set `ENGINE_DIR` to wherever you cloned the engine on your machine. Set
+   `UTILS_DIR` the same way if the shared utils repo is not at its default
+   sibling location.
 
 3. Configure and build:
+
+```sh
+   cmake --preset dev-release
+   cmake --build --preset dev-release
+```
+
+   The binary lands in `bin/` and must be run from there, since it resolves its
+   media paths relative to the working directory:
+
+```sh
+   cd bin && ./OrbitalIndustries
+```
+
+   It asks whether to start as server or client on stdin.
+
+## Editor setup
+
+Configuring is enough to get code navigation working: the build writes a
+`compile_commands.json` into the preset's build directory covering all three
+repos, game, engine and utils, so a language server can follow a symbol across
+them.
+
+Point [clangd](https://clangd.llvm.org/) at it. Because the engine and utils
+repos sit outside this one, clangd cannot find the database by searching upward
+from a file in them and has to be told where it is:
+
+```jsonc
+   "clangd.arguments": [
+       "--compile-commands-dir=/path/to/Orbital-Industries/build/dev-release",
+       "--background-index",
+       "--header-insertion=never"
+   ]
+```
+
+If the Microsoft C/C++ extension is installed as well, set
+`"C_Cpp.intelliSenseEngine": "disabled"` so only one language server parses each
+file. The extension is still worth keeping for its debugger, which is what
+`.vscode/launch.json` and the natvis visualizers are written against.
+
+Both of those settings hold wherever you open the engine and utils repos, so
+they belong in your own user settings rather than in this repo.

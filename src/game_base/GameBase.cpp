@@ -334,12 +334,12 @@ void GameBase::prepareFrame() {
     auto timeSinceLastPhysics = std::chrono::duration<double>(
         m_currentFrameStartTime - m_physicsEngine->getLastPhysicsStepTime()).count();
     
-    // Adjust time remainder based on scheduling error
+    // Adjust time remainder based on scheduling error. Left unclamped, so a frame
+    // that runs long extrapolates past the last physics step rather than freezing
+    // at it.
     double adjustedTimeSincePhysics = timeSinceLastPhysics + m_physicsTimeError;
-    //double timeRemainder = std::clamp(adjustedTimeSincePhysics / m_physicsTimeStep, 0.0, 1.0);
     double timeRemainder = adjustedTimeSincePhysics / m_physicsTimeStep;
 
-    // Set render parameters in graphics engine
     uint64_t currentTimeStep = m_physicsEngine->getCurrentPhysicsTimeStep();
     m_graphicsEngine->setRenderParameters(
         currentTimeStep,

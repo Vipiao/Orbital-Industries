@@ -158,12 +158,10 @@ void ModifyTool::framePreRender(bool doModify, bool doCancel) {
     // Update wrench animation angles
     double frameRate = m_gameBase->m_graphicsEngine->getFrameRate();
     double deltaTime = 1.0 / frameRate;
-    // Target angle lerps toward 0 at 2% per frame (small decay)
-    //m_targetAngle = m_targetAngle * 0.95;
+    // Both decay exponentially in real time rather than per frame, so the wrench
+    // settles the same way at any frame rate. The current angle chases the target
+    // several times faster than the target itself decays.
     m_targetAngle = m_targetAngle * glm::exp(-8 * deltaTime);
-    
-    // Current angle lerps toward target angle at 5% per frame (faster follow)
-    //m_currentAngle = m_currentAngle + (m_targetAngle - m_currentAngle) * 0.2;
     m_currentAngle = m_targetAngle + (m_currentAngle - m_targetAngle) *
         glm::exp(-36 * deltaTime);
     
@@ -311,13 +309,8 @@ void ModifyTool::createMenuStructure(int64_t parentNodeId) {
     m_modifyToolParentId = m_radialMenu->createNode(parentNodeId, m_modifyIconTextureIndex, activateCallback, deactivateCallback);
     
     // Add center node so you can navigate into the modify tool
-    // Use orange color scheme to indicate modify tool
-    //glm::dvec4 centerSelectColor = glm::dvec4(0.9, 0.5, 0.3, 1.0);   // Bright orange, opaque
-    //glm::dvec4 centerUnSelectColor = glm::dvec4(0.8, 0.4, 0.2, 1.0); // Orange, opaque
-    
     m_centerNodeId = m_radialMenu->createNode(
         m_modifyToolParentId, -1, activateCallback, deactivateCallback);
-    //    centerSelectColor, centerUnSelectColor);
     
     m_radialMenu->createNode(
         m_modifyToolParentId, m_modifyIconTextureIndex, activateCallback, deactivateCallback);
