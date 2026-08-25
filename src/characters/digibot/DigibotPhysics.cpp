@@ -314,7 +314,10 @@ void DigibotPhysics::updateCollisionBoxTransform(GraphicsEngine* graphics, uint6
         angVelMagnitude = 0.0;
     }
     
-    glm::dvec3 meshPosition = rigidBody->getPosition() + rigidBody->getOrientation() * m_colliderLocalPosition;
+    // The shader rotates about the centre of rotation and offsets from there, so the
+    // anchor it takes is the unrotated one: the pair places the collider's own origin
+    // at the body origin, and the box turns with the body rather than orbiting it.
+    glm::dvec3 meshPosition = rigidBody->getPosition() + m_colliderLocalPosition;
     graphics->updateMeshTransform(
         m_collisionBoxMeshId,
         meshPosition,

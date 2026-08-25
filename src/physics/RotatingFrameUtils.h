@@ -9,9 +9,6 @@ class RigidBody;
 // (grids). Leaf module: depends only on read access to RigidBody.
 namespace RotatingFrameUtils {
 
-// Velocity of the material point of `body` located at `worldPoint`: v + omega x r.
-glm::dvec3 velocityAtPoint(const RigidBody& body, const glm::dvec3& worldPoint);
-
 // Feed-forward force cancelling centrifugal and coriolis pseudo-forces for a mass
 // moving with `relativeVelocity` at offset `radius` from the rotation centre of a
 // frame rotating at `angularVelocity`.

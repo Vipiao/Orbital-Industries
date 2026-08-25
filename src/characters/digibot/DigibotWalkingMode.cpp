@@ -355,8 +355,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     // Velocity relative to the surface at the contact point, along the up direction
     double surfaceVelocityAlongNormal{0.0};
     if (targetRigidBody) {
-        glm::dvec3 surfaceVelocityAtContact{
-            RotatingFrameUtils::velocityAtPoint(*targetRigidBody, closestPoint)};
+        glm::dvec3 surfaceVelocityAtContact{targetRigidBody->velocityAtPoint(closestPoint)};
         surfaceVelocityAlongNormal = glm::dot(surfaceVelocityAtContact, targetUpDirection);
     }
     double relativeVelocityAlongNormal{
@@ -410,8 +409,7 @@ DigibotWrench DigibotWalkingMode::update(const std::shared_ptr<RigidBody>& rigid
     // Calculate surface velocity at body position
     glm::dvec3 surfaceVelocityAtBody{0.0, 0.0, 0.0};
     if (targetRigidBody) {
-        surfaceVelocityAtBody =
-            RotatingFrameUtils::velocityAtPoint(*targetRigidBody, rigidBody->getPosition());
+        surfaceVelocityAtBody = targetRigidBody->velocityAtPoint(rigidBody->getPosition());
     }
 
     // Calculate relative velocity in tangent plane (remove normal component)

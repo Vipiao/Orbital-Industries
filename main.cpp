@@ -154,8 +154,11 @@ static void buildTestWorld(GameBase* gameBase) {
 // network handlers each take their own Mode enum; each is selected by name below.
 // They must move together: a faithful replay needs all three fed from the same
 // run's recordings.
+//
+// RECORD is the resting position, so a crash or a bug met while playing is still
+// replayable afterwards: the capture is already on disk when it happens.
 enum class SessionMode { NONE, RECORD, PLAY };
-static constexpr SessionMode s_sessionMode{SessionMode::NONE};
+static constexpr SessionMode s_sessionMode{SessionMode::RECORD};
 
 // The session folders, holding the three streams a replay needs side by side.
 // Relative to the working directory the game runs from, as the media paths are.
@@ -165,7 +168,7 @@ static constexpr SessionMode s_sessionMode{SessionMode::NONE};
 // worth keeping, so no edit of the switch above can overwrite a session that
 // already is. Two roles recording at once want two scratch folders, every stream
 // but the network journal being per role.
-static const std::filesystem::path s_playbackDir{"../recordings/003_lattice_benchmark"};
+static const std::filesystem::path s_playbackDir{"../recordings/004_digibot_leg_offset"};
 static const std::filesystem::path s_recordDir{"../recordings/999_scratch"};
 
 int main() {

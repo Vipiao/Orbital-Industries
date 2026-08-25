@@ -425,13 +425,15 @@ std::vector<std::byte> GameNetworkServer::buildConnectionSnapshot(
     }
 
     // Reference frame: this connection's controlled character. All grid velocity is
-    // measured against it, so a cube resting on a fast platform reads as still.
+    // measured against it, so a cube resting on a fast platform reads as still. Taken
+    // at the centre of mass, the point the stored velocity belongs to, so both halves
+    // of the frame describe the same place.
     glm::dvec3 refPos{0.0, 0.0, 0.0};
     glm::dvec3 refVel{0.0, 0.0, 0.0};
     for (const auto& [characterId, owner] : m_characterOwners) {
         if (owner == connection) {
             if (std::shared_ptr<RigidBody> body{findCharacterBody(characterId).lock()}) {
-                refPos = body->getPosition();
+                refPos = body->getWorldCenterOfMass();
                 refVel = body->m_velocity;
             }
             break;

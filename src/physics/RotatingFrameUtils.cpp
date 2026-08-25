@@ -4,11 +4,6 @@
 
 namespace RotatingFrameUtils {
 
-glm::dvec3 velocityAtPoint(const RigidBody& body, const glm::dvec3& worldPoint) {
-    glm::dvec3 radius{worldPoint - body.getWorldCenterOfMass()};
-    return body.m_velocity + glm::cross(body.getAngularVelocityWorld(), radius);
-}
-
 glm::dvec3 centrifugalCoriolisCompensation(double mass,
                                            const glm::dvec3& angularVelocity,
                                            const glm::dvec3& radius,

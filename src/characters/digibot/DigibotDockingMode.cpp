@@ -62,8 +62,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateDocked(
 
     // Velocity relative to the grid material frame at the body position.
     glm::dvec3 relativeVelocity{
-        rigidBody->m_velocity -
-        RotatingFrameUtils::velocityAtPoint(*gridBody, rigidBody->getPosition())};
+        rigidBody->m_velocity - gridBody->velocityAtPoint(rigidBody->getPosition())};
     double axialVelocity{glm::dot(relativeVelocity, axis)};
     glm::dvec3 tangentialVelocity{relativeVelocity - axialVelocity * axis};
 
@@ -188,8 +187,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
     double profileAcceleration{m_seatMaxAcceleration *
                                glm::min(distance / m_seatRampDistance, 1.0)};
     glm::dvec3 seatRelativeVelocity{
-        rigidBody->m_velocity -
-        RotatingFrameUtils::velocityAtPoint(*gridBody, seat.m_position)};
+        rigidBody->m_velocity - gridBody->velocityAtPoint(seat.m_position)};
     glm::dvec3 targetVelocity{MotionServo::velocityToward(
         toSeat, profileAcceleration * (1.0 - margin))};
 
@@ -212,8 +210,7 @@ DigibotDockingMode::Result DigibotDockingMode::updateSeated(
     // Feed-forward for the rotating frame so the restraint only carries
     // disturbances, not the steady-state centripetal load.
     glm::dvec3 relativeVelocity{
-        rigidBody->m_velocity -
-        RotatingFrameUtils::velocityAtPoint(*gridBody, rigidBody->getPosition())};
+        rigidBody->m_velocity - gridBody->velocityAtPoint(rigidBody->getPosition())};
     glm::dvec3 compensation{RotatingFrameUtils::centrifugalCoriolisCompensation(
         rigidBody->getMass(), gridBody->getAngularVelocityWorld(),
         rigidBody->getPosition() - gridBody->getWorldCenterOfMass(), relativeVelocity)};

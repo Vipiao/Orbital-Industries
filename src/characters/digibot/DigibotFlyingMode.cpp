@@ -59,8 +59,7 @@ DigibotWrench DigibotFlyingMode::update(const std::shared_ptr<RigidBody>& rigidB
         }
     } else if (lockState == DigibotLockState::FULL_LOCK && lockTarget) {
         // Match the velocity of the material point of the grid at our position.
-        glm::dvec3 targetLinearVelocity{
-            RotatingFrameUtils::velocityAtPoint(*lockTarget, rigidBody->getPosition())};
+        glm::dvec3 targetLinearVelocity{lockTarget->velocityAtPoint(rigidBody->getPosition())};
         glm::dvec3 relativeLinearVelocity{rigidBody->m_velocity - targetLinearVelocity};
 
         glm::dvec3 correctionForce{-relativeLinearVelocity * m_translationLockStrength *

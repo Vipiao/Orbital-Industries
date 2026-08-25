@@ -150,11 +150,11 @@ DigibotPose DigibotAnimation::walkingPose(const DigibotAnimationContext& context
         surfaceGridPosition, upGridDirection);
 
     // --- Velocity relative to the surface, in grid space, tangent to the plane ---
+    // Against the surface's own motion at the point the digibot stands, so a spinning
+    // body reads as still underfoot.
     glm::dvec3 relativeWorldVelocity = context.m_digibotWorldVelocity;
     if (body) {
-        relativeWorldVelocity -= body->m_velocity
-            + glm::cross(body->getAngularVelocityWorld(),
-                         context.m_digibotWorldPos - body->getPosition());
+        relativeWorldVelocity -= body->velocityAtPoint(context.m_digibotWorldPos);
     }
     glm::dvec3 gridVelocity = body
         ? glm::conjugate(body->getOrientation()) * relativeWorldVelocity
