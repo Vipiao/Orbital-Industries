@@ -4,7 +4,7 @@
 // content is compared or transferred between simulations (world sync, save files).
 #pragma once
 
-#include "../serialization/ByteStream.h"
+#include "utils/ByteStream.h"
 
 #include <cstddef>
 #include <cstdint>

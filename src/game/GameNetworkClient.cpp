@@ -11,9 +11,9 @@
 #include "../physics/PhysicsEngine.h"
 #include "../physics/PhysicsUnits.h"
 #include "../physics/RigidBody.h"
-#include "../serialization/ByteStream.h"
 #include "debug/DebugGlobals.h"
 #include "debug/DebugRenderer.h"
+#include "utils/ByteStream.h"
 
 #include <cassert>
 #include <glm/glm.hpp>

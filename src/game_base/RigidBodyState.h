@@ -4,7 +4,7 @@
 // consumes it; layers above capture, ship or store body state through it.
 #pragma once
 
-#include "../serialization/ByteStream.h"
+#include "utils/ByteStream.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>

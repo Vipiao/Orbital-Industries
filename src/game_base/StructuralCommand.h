@@ -6,7 +6,7 @@
 
 #include "CellType.h"
 #include "GridSplitPiece.h"
-#include "../serialization/ByteStream.h"
+#include "utils/ByteStream.h"
 #include "utils/PolyhedronProcessor.h"
 
 #include <array>

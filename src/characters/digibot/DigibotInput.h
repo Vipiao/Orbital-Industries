@@ -6,7 +6,7 @@
 
 #include "DigibotModeTypes.h"
 
-#include "../../serialization/ByteStream.h"
+#include "utils/ByteStream.h"
 
 #include <cmath>
 #include <cstdint>

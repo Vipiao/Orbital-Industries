@@ -12,7 +12,7 @@
 #include "../game_base/RigidBodyState.h"
 #include "../physics/PhysicsUnits.h"
 #include "../physics/RigidBody.h"
-#include "../serialization/ByteStream.h"
+#include "utils/ByteStream.h"
 
 #include <algorithm>
 #include <cassert>

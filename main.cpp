@@ -13,6 +13,8 @@
 #include "utils/TimeHandler.h"
 #include "src/world/CdlodCubeFaces.h"
 #include "src/world/CubeSphereBounds.h"
+#include "src/world/PlanetBaseCache.h"
+#include "src/world/PlanetBaseDump.h"
 #include "src/world/PlanetSurface.h"
 #include "math/TileableNoiseMap.h"
 #include "debug/DebugRenderer.h"
@@ -24,6 +26,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <optional>
 
 int debug1 = 0;
 int debug2 = 0;
@@ -89,7 +92,7 @@ static void buildTestWorld(GameBase* gameBase) {
     // not exact in either width, and taking the same two whole numbers apart the
     // same way leaves both sides reading one map at one scale.
     const double planetTileSizeMetres{12742000.0 / 10000.0};
-    const double planetReliefMetres{400.0};     // the snippet's k_reliefMetres
+    const double planetReliefMetres{658.0};     // the snippet's k_reliefMetres
 
     // The noise both sides read, generated once. The map is dimensionless -- the
     // field spans exactly [0, 1] and its gradient is per unit of tile -- so it
@@ -102,8 +105,18 @@ static void buildTestWorld(GameBase* gameBase) {
     terrainConfig.m_gain = 0.45;
     terrainConfig.m_seed = 20260811;
 
+    // The layer under all of them, which the snippet reads by direction off a
+    // cube map rather than through the lattice. Nothing here is written twice:
+    // the snippet is handed the bake and the one constant that gives it metres.
+    //
+    // At an honest height this layer is a part in a thousand of the radius and a
+    // third of a degree of slope, so it cannot be seen in the silhouette or the
+    // shading at all. The snippet's colour bands are what it is read through.
+    const PlanetBaseLayerConfig planetBaseConfig{};
+
     const std::shared_ptr<PlanetSurface> planetSurface{std::make_shared<PlanetSurface>(
-        planetRadius, planetTileSizeMetres, planetReliefMetres, terrainConfig)};
+        planetRadius, planetTileSizeMetres, planetReliefMetres, terrainConfig,
+        planetBaseConfig)};
 
     const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
     const std::weak_ptr<CdlodSurface> planetSnippet{
@@ -120,13 +133,60 @@ static void buildTestWorld(GameBase* gameBase) {
     // aliased normals, and a working set too large for the texture cache. The
     // vertex stage takes level 0 regardless and is unaffected.
     mapSpec.m_generateMipmaps = true;
-    mapSpec.m_format = TextureSpec::Format::R16;
+    mapSpec.m_format = TextureFormat::R16;
     mapSpec.m_pixels = noiseBake.data();
     graphicsEngine->setCdlodSurfaceTexture(planetSnippet, "u_noiseMap", mapSpec);
 
-    mapSpec.m_format = TextureSpec::Format::RG16F;
+    mapSpec.m_format = TextureFormat::RG16F;
     mapSpec.m_pixels = gradientBake.data();
     graphicsEngine->setCdlodSurfaceTexture(planetSnippet, "u_gradientMap", mapSpec);
+
+    // The base layer's pair, kept beside the binary between runs: the bake costs
+    // seconds, and tuning the octaves above never touches the config that drives
+    // it. A file written for a different config, or cut short mid-write, reads as
+    // a miss and is baked over.
+    const std::filesystem::path baseCachePath{"planet_base.cache"};
+    const PlanetBaseMaps baseMaps{[&] {
+        std::optional<PlanetBaseMaps> cached{
+            PlanetBaseCache::load(baseCachePath, planetBaseConfig)};
+        if (cached) {
+            return std::move(*cached);
+        }
+        PlanetBaseMaps baked{planetSurface->baseField().bake()};
+        if (!PlanetBaseCache::save(baseCachePath, planetBaseConfig, baked)) {
+            std::cerr << "Could not write " << baseCachePath << "; the next run bakes again\n";
+        }
+        // The faces as images on the same occasion: a bake is the only time they
+        // change.
+        if (!PlanetBaseDump::writeElevationFaces(".", planetBaseConfig, baked)) {
+            std::cerr << "Could not write the base layer's face images\n";
+        }
+        return baked;
+    }()};
+
+    CubeTextureSpec baseSpec{};
+    // Read from orbit as well as from the ground, where a whole face of these
+    // maps falls inside a pixel.
+    baseSpec.m_generateMipmaps = true;
+
+    baseSpec.m_size = planetSurface->baseField().elevationResolution();
+    baseSpec.m_format = TextureFormat::R16;
+    for (int face{0}; face < PlanetBaseMaps::k_faceCount; ++face) {
+        baseSpec.m_faces[face] = baseMaps.m_elevation[face].data();
+    }
+    graphicsEngine->setCdlodSurfaceCubeTexture(planetSnippet, "u_baseElevationMap", baseSpec);
+
+    // Smaller than the elevation, the filter's own coarseness being what sizes
+    // that one and a slope having no such pressure.
+    baseSpec.m_size = planetSurface->baseField().slopeResolution();
+    baseSpec.m_format = TextureFormat::RGB16F;
+    for (int face{0}; face < PlanetBaseMaps::k_faceCount; ++face) {
+        baseSpec.m_faces[face] = baseMaps.m_slope[face].data();
+    }
+    graphicsEngine->setCdlodSurfaceCubeTexture(planetSnippet, "u_baseGradientMap", baseSpec);
+
+    graphicsEngine->setCdlodSurfaceUniform(planetSnippet, "u_baseReliefMetres",
+                                           static_cast<float>(planetSurface->baseField().relief()));
 
     graphicsEngine->createCdlodInstance(
         planetSsboIndex, CdlodConfig{},

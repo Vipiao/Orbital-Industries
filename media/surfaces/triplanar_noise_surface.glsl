@@ -67,6 +67,25 @@ const float k_radiusMetres = 6371000.0;
 uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
 uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 
+// The base layer: what the body is shaped like at its own size, under everything
+// the octaves lay on it. Read by direction rather than through the lattice,
+// because at this scale there is nothing to tile -- one pass of the field covers
+// the body once, so there is no repeat to hide and no seam to close.
+//
+// The one part of this file with no twin in PlanetSurface.cpp. That side
+// evaluates the field these were baked from rather than reading them back, and
+// the two part company only by what bilinear costs across a texel of a smooth
+// field. A drift rather than a step: there is no hash down here to turn one bit
+// of disagreement into a different answer.
+uniform samplerCube u_baseElevationMap;  // R16 unorm, spanning exactly [0, 1]
+uniform samplerCube u_baseGradientMap;   // RGB16F, slope per unit of direction
+
+// Metres between the base layer's floor and its ceiling. Handed over rather than
+// written here, unlike the constants below: the side that generated the maps
+// already holds this number, and a copy of it here would be a second place for
+// it to be wrong.
+uniform float u_baseReliefMetres;
+
 // Metres one tile of the map spans, as a ratio of two whole numbers a float
 // holds exactly. Below the body's width the tile repeats, which is what puts
 // detail on a planet the map could never cover in one pass.
@@ -87,32 +106,49 @@ const float k_tilesPerSpan = 10000.0;
 // exaggerated terrain, at the cost of a steeper surface: against the tile size
 // this sets the slope, and the slope is what the quadtree's ranges have to keep
 // up with.
-const float k_reliefMetres = 400.0;
+const float k_reliefMetres = 658.0;
 
 // Lattice points a cell is bounded by, and so lookups an octave costs.
 const int k_latticeCorners = 4;
 
 // The same map laid down at several scales and added up: frequency multiplier,
-// amplitude as a fraction of the relief, and a shift in tiles. Sixteen to a
-// step, and amplitude runs as the reciprocal of frequency, which leaves every
-// octave the same rise over run -- the terrain gains detail without gaining
-// slope, so the quadtree's ranges answer for all of them at once.
+// amplitude as a fraction of the relief, and a shift in tiles. Sixteen to a step
+// in frequency, four to a step in amplitude, so each layer is four times the rise
+// over run of the one above.
 //
-// The coarsest stretches the map over four of its own tiles at four times its
-// height: the tile is what the field was built at, not what the body wants to
-// wear it at.
+// The root of frequency rather than frequency itself: the reciprocal would give
+// every layer the same slope, where real ground has gentle big landforms and
+// steep small ones. Three steps reach thirty-one degrees, the angle loose ground
+// gives way at, past which roughening buys nothing.
 //
-// Frequencies and amplitudes are powers of two, exact in a float, so the wide
-// scale a lookup is taken at is exact as well. The shift is what keeps the
-// layers off one lattice: each repeats a whole number of times per coarser tile
-// and would otherwise land on it with the same phase, every repeat reinforcing
-// the last.
-const int k_octaveCount = 4;
+// Amplitude is not a slope. A tile does not rise by its own range across its own
+// width -- the map carries eight layers of its own, averaging nearly three times
+// that -- so rise over run is amplitude over tile times what the map does.
+// Measured, as averages:
+//
+//    49.8 km at 658 m        two degrees
+//    3.11 km at 165 m        eight and a half degrees
+//     194 m at 41.1 m        thirty-one degrees
+//
+// The map's worst texel runs three times its mean, putting the steepest ground
+// near sixty-six, and that is the figure the quadtree's ranges answer for. Steps
+// this close cost span at the fine end, leaving the finest feature hundreds of
+// metres; a fourth layer would buy it back.
+//
+// The coarsest picks up a sixty-fourth of the base layer's coarsest feature,
+// stretching a tile built at 1274.2 m over thirty-nine of its own.
+//
+// What has to land exactly is the cell count each frequency comes to, which
+// octaveCells rounds and PlanetSurface asserts is whole; the frequency itself
+// need not be a power of two, since everything else it scales is a smooth
+// coordinate rather than a lattice. The shift is what keeps the layers off one
+// lattice: each repeats a whole number of times per coarser tile and would
+// otherwise land on it with the same phase, every repeat reinforcing the last.
+const int k_octaveCount = 3;
 const vec4 k_octaves[k_octaveCount] = vec4[k_octaveCount](
-   vec4(0.25, 4.0, 0.0, 0.0),
-   vec4(4.0, 1.0 / 4.0, 0.37, 0.71),
-   vec4(64.0, 1.0 / 64.0, 0.61, 0.19),
-   vec4(1024.0, 1.0 / 1024.0, 0.13, 0.44));
+   vec4(0.0256, 1.0, 0.0, 0.0),
+   vec4(0.4096, 1.0 / 4.0, 0.37, 0.71),
+   vec4(6.5536, 1.0 / 16.0, 0.61, 0.19));
 
 // Tiles of an octave's own layer that one lattice cell spans, so the lattice
 // takes its size from the layer it carries and a frequency changed above carries
@@ -126,16 +162,18 @@ const float k_cellTiles = 2.0;
 // Octaves the drawn geometry carries. PlanetSurface.cpp must use this same
 // count: it is the surface the quadtree's bounds are measured on, and the
 // vertex and depth stages both reach it through here.
-const int k_positionOctaves = 2;
+const int k_positionOctaves = 3;
 
-// Octaves the shading carries. One past the geometry, and free to be: both read
-// the same octaves and each stops where its own sampling does, a pixel resolving
-// finer than a quad. The extra layer arrives as relief in the normal that the
-// vertices never carry, and since it tilts a normal without moving one, nothing
-// that measures the surface has to answer for it.
+// Octaves the shading carries, and free to run past the geometry: both read the
+// same octaves and each stops where its own sampling does, a pixel resolving
+// finer than a quad. A layer past the geometry would arrive as relief in the
+// normal that the vertices never carry, and since it tilts a normal without
+// moving one, nothing that measures the surface has to answer for it.
 //
-// It costs four lookups wherever it is still above the map's top, which the
-// gradient path skips it below.
+// Level with the geometry here, the table holding nothing further to reach for.
+//
+// It costs four lookups per layer wherever one is still above the map's top,
+// which the gradient path skips it below.
 const int k_shadingOctaves = 3;
 
 // One lattice point's plane, as the point being shaded stands in it.
@@ -407,6 +445,44 @@ float mapTopLevel() {
    return log2(float(textureSize(u_noiseMap, 0).x));
 }
 
+// The level at which one texel of a base map covers the spacing given. A cube
+// face spans a quarter turn of the body, so its texels are that arc cut into as
+// many pieces as the map has a side.
+//
+// The side is passed rather than read from one of the two maps, because they are
+// not the same size and a level means a different thing on each: level zero of
+// the smaller map is already as coarse as level one of the larger.
+float baseMipLevel(float sampleSpacing, float mapSide) {
+   const float k_quarterTurn = 1.5707963267948966;
+   float texelSpan = k_quarterTurn * k_radiusMetres / mapSide;
+
+   return max(0.0, log2(sampleSpacing / texelSpan));
+}
+
+// The base layer's elevation and its gradient in the body's frame.
+//
+// The direction is narrow, and safely so where nothing else here is: it is
+// bounded by one however wide the body, so a float resolves it to a millionth of
+// one of this map's texels. What forces the wide arithmetic elsewhere is that a
+// position on this body is millions of metres from the origin, and a direction
+// never is.
+//
+// The map holds the slope per unit of direction, and a metre across the surface
+// turns the direction by one over the radius. That ratio is what gives the
+// gradient the metres per metre the octaves come back in, from the same one
+// constant that gives the elevation its own metres.
+float baseElevation(vec3 direction, float sampleSpacing) {
+   float side = float(textureSize(u_baseElevationMap, 0).x);
+   return textureLod(u_baseElevationMap, direction, baseMipLevel(sampleSpacing, side)).r
+      * u_baseReliefMetres;
+}
+
+vec3 baseGradient(vec3 direction, float sampleSpacing) {
+   float side = float(textureSize(u_baseGradientMap, 0).x);
+   return textureLod(u_baseGradientMap, direction, baseMipLevel(sampleSpacing, side)).rgb
+      * (u_baseReliefMetres / k_radiusMetres);
+}
+
 // Gradient of one plane's elevation, in metres per metre, expressed in that
 // plane's own two axes.
 //
@@ -446,7 +522,10 @@ float elevationAt(Df3 crudePoint, int octaveCount, float sampleSpacing) {
 
    LatticeFrame frame = latticeFrameOf(crudePoint);
 
-   float elevation = 0.0;
+   // The base layer is not one of the octaves and is never left out: it is what
+   // the body is shaped like, and the octaves are what it wears.
+   float elevation = baseElevation(normalize(df3ToVec(crudePoint)), sampleSpacing);
+
    for (int octave = 0; octave < octaveCount; ++octave) {
       LatticePlane planes[k_latticeCorners];
       latticePlanes(frame, octave, planes);
@@ -481,7 +560,8 @@ vec3 gradientAt(Df3 crudePoint, int octaveCount, float sampleSpacing) {
    float topLevel = mapTopLevel();
    LatticeFrame frame = latticeFrameOf(crudePoint);
 
-   vec3 gradient = vec3(0.0);
+   vec3 gradient = baseGradient(normalize(df3ToVec(crudePoint)), sampleSpacing);
+
    for (int octave = 0; octave < octaveCount; ++octave) {
       float mipLevel = octaveMipLevel(sampleSpacing, k_octaves[octave].x);
 
@@ -532,16 +612,33 @@ Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
    return df3Scale(df3Normalize(crudePoint), reach);
 }
 
-// The unit normal of that surface. Only the tangential part of the gradient tilts
-// it; the radial part moves the point without turning it. The tangent stretch as
-// the surface rises is left out -- it scales the tilt by 1 / (1 + height/radius),
-// a part in a hundred thousand against a planet.
+// Metres of height between one colour band and the next. A contour interval:
+// the surface is banded by how high it stands, so relief too gentle to see in
+// the shading still reads as a pattern of stripes.
+//
+// A stand-in for a material, and the whole of what this surface has to say about
+// its own colour for now.
+const float k_colourBandMetres = 500.0;
+
+// The unit normal of that surface, and the colour it is drawn in. Only the
+// tangential part of the gradient tilts the normal; the radial part moves the
+// point without turning it. The tangent stretch as the surface rises is left out
+// -- it scales the tilt by 1 / (1 + height/radius), a part in a hundred thousand
+// against a planet.
 //
 // Reads the octaves the geometry carries, so this is the gradient of the surface
 // drawn rather than of a finer one. A pixel still resolves more of them than a
 // quad does: both stop where their own sampling stops, and the fragment stage
 // samples the finer of the two.
-vec3 cdlodSurfaceNormal(Df3 crudePoint, vec3 crudeDerivX, vec3 crudeDerivY) {
+//
+// The colour costs an elevation the normal itself has no use for, the gradient
+// path never having needed a height. Read here rather than carried down from the
+// stage that placed the vertex, because a height is a thing this surface knows
+// about and the renderer between them does not: handing it over would put the
+// word "elevation" in an interface that is meant to hold whatever a surface
+// happens to be.
+vec3 cdlodSurfaceNormal(Df3 crudePoint, vec3 crudeDerivX, vec3 crudeDerivY,
+                        out vec3 surfaceColour) {
    vec3 crude = df3ToVec(crudePoint);
    vec3 sphereNormal = normalize(crude);
 
@@ -560,6 +657,10 @@ vec3 cdlodSurfaceNormal(Df3 crudePoint, vec3 crudeDerivX, vec3 crudeDerivY) {
    float sampleSpacing = max(length(metreDerivX), length(metreDerivY));
 
    vec3 gradient = gradientAt(crudePoint, k_shadingOctaves, sampleSpacing);
+
+   const float k_turn = 6.283185307179586;
+   float elevation = elevationAt(crudePoint, k_shadingOctaves, sampleSpacing);
+   surfaceColour = vec3(0.5 + 0.5 * sin(elevation * (k_turn / k_colourBandMetres)));
 
    return normalize(sphereNormal - (gradient - sphereNormal * dot(sphereNormal, gradient)));
 }

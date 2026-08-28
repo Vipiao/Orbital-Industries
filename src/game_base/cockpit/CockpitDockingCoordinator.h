@@ -2,7 +2,7 @@
 #pragma once
 
 #include "../../characters/digibot/DigibotController.h"
-#include "../../serialization/ByteStream.h"
+#include "utils/ByteStream.h"
 
 #include <cstdint>
 #include <functional>

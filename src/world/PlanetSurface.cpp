@@ -5,14 +5,31 @@
 namespace {
 
 // The snippet's k_octaves: frequency multiplier, amplitude as a fraction of the
-// relief, and a shift in tiles. The same map added up at several scales, sixteen
-// to a step, with amplitude running as the reciprocal of frequency so every
-// octave carries the same rise over run.
-constexpr int k_octaveCount{4};
+// relief, and a shift in tiles. Sixteen to a step in frequency, four to a step
+// in amplitude, so each layer is four times the rise over run of the one above.
+//
+// The root of frequency rather than frequency itself: the reciprocal would give
+// every layer the same slope, where real ground has gentle big landforms and
+// steep small ones. Three steps reach thirty-one degrees, the angle loose ground
+// gives way at, past which roughening buys nothing.
+//
+// Amplitude is not a slope. A tile does not rise by its own range across its own
+// width -- the map carries eight layers of its own, averaging nearly three times
+// that -- so rise over run is amplitude over tile times what the map does.
+// Measured, as averages:
+//
+//    49.8 km at 658 m        two degrees
+//    3.11 km at 165 m        eight and a half degrees
+//     194 m at 41.1 m        thirty-one degrees
+//
+// The map's worst texel runs three times its mean, putting the steepest ground
+// near sixty-six. Steps this close cost span at the fine end, leaving the finest
+// feature hundreds of metres; a fourth layer would buy it back, and the cell
+// counts -- 64, 1024, 16384, stepping by sixteen as well -- leave room for one.
+constexpr int k_octaveCount{3};
 const glm::dvec4 k_octaves[k_octaveCount]{
-    glm::dvec4{0.25, 4.0, 0.0, 0.0}, glm::dvec4{4.0, 1.0 / 4.0, 0.37, 0.71},
-    glm::dvec4{64.0, 1.0 / 64.0, 0.61, 0.19},
-    glm::dvec4{1024.0, 1.0 / 1024.0, 0.13, 0.44}};
+    glm::dvec4{0.0256, 1.0, 0.0, 0.0}, glm::dvec4{0.4096, 1.0 / 4.0, 0.37, 0.71},
+    glm::dvec4{6.5536, 1.0 / 16.0, 0.61, 0.19}};
 
 // Tiles of an octave's own layer that one lattice cell spans, so the lattice
 // takes its size from the layer it carries. The snippet's k_cellTiles.
@@ -46,7 +63,7 @@ std::uint32_t latticeHash(const glm::ivec3& point) {
 // Octaves the geometry carries and octaves the shading carries. The snippet's
 // k_positionOctaves and k_shadingOctaves, and the first of the two is the one
 // that must agree: it is the surface the quadtree measures its bounds on.
-constexpr int k_positionOctaves{2};
+constexpr int k_positionOctaves{3};
 constexpr int k_shadingOctaves{3};
 
 static_assert(k_positionOctaves > 0 && k_positionOctaves <= k_octaveCount,
@@ -63,9 +80,10 @@ constexpr double k_exactWhole{16777216.0};   // 2^24
 
 PlanetSurface::PlanetSurface(double radiusMetres, double tileSizeMetres,
                              double reliefMetres,
-                             const TileableNoiseMapConfig& noiseConfig)
+                             const TileableNoiseMapConfig& noiseConfig,
+                             const PlanetBaseLayerConfig& baseConfig)
     : m_radius{radiusMetres}, m_tileSize{tileSizeMetres}, m_relief{reliefMetres},
-      m_noise{noiseConfig} {
+      m_noise{noiseConfig}, m_baseField{baseConfig} {
     assert(m_radius > 0.0 && "A body with no radius projects every crude point to a point");
     assert(m_tileSize > 0.0 && "A tile of no width repeats infinitely often across the body");
     assert(m_relief >= 0.0 && "Negative relief would sink the terrain into the sphere");
@@ -324,7 +342,10 @@ double PlanetSurface::elevationAt(const glm::dvec3& crudePoint, int octaveCount)
     // they are found on is the same for all of them, and is found once.
     const LatticeFrame frame{latticeFrameOf(crudePoint)};
 
-    double elevation{0.0};
+    glm::dvec3 unusedSlope{0.0};
+    double elevation{m_baseField.sample(glm::normalize(crudePoint), unusedSlope) *
+                     m_baseField.relief()};
+
     for (int octave{0}; octave < octaveCount; ++octave) {
         const std::array<LatticePlane, k_latticeCorners> planes{
             latticePlanes(frame, octave)};
@@ -348,8 +369,15 @@ double PlanetSurface::elevationAt(const glm::dvec3& crudePoint, int octaveCount)
 glm::dvec3 PlanetSurface::gradientAt(const glm::dvec3& crudePoint,
                                      int octaveCount) const {
     const LatticeFrame frame{latticeFrameOf(crudePoint)};
+    const glm::dvec3 direction{glm::normalize(crudePoint)};
 
+    // The base layer's slope is per unit of direction, and a metre across the
+    // surface turns the direction by one over the radius. That is what puts it
+    // in the metres per metre the octaves come back in.
     glm::dvec3 gradient{0.0};
+    m_baseField.sample(direction, gradient);
+    gradient *= m_baseField.relief() / m_radius;
+
     for (int octave{0}; octave < octaveCount; ++octave) {
         const std::array<LatticePlane, k_latticeCorners> planes{
             latticePlanes(frame, octave)};
@@ -378,14 +406,24 @@ double PlanetSurface::maxRadius() const {
         amplitude += k_octaves[octave].y;
     }
 
-    return m_radius + m_relief * amplitude * k_blendCeiling;
+    // The base layer's own ceiling needs no such allowance: it is one map read
+    // once, not a blend of four, so it reaches its relief and no further.
+    return m_radius + m_baseField.relief() + m_relief * amplitude * k_blendCeiling;
 }
 
 glm::dvec3 PlanetSurface::surfacePoint(const glm::dvec3& crudePoint) const {
     // The sphere and the terrain riding on it share one outward direction, so the
     // radius and the height are added before it is scaled by them.
-    return glm::normalize(crudePoint) *
-           (m_radius + elevationAt(crudePoint, k_positionOctaves));
+    const glm::dvec3 point{glm::normalize(crudePoint) *
+                           (m_radius + elevationAt(crudePoint, k_positionOctaves))};
+
+    // The ceiling the quadtree builds its bounds from. Ground above it is culled
+    // with terrain still in it, which arrives as holes at particular angles
+    // rather than as anything resembling an error in the arithmetic.
+    assert(glm::length(point) <= maxRadius() &&
+           "The surface has risen above the radius the bounds are built from");
+
+    return point;
 }
 
 glm::dvec3 PlanetSurface::surfaceNormal(const glm::dvec3& crudePoint) const {
@@ -394,6 +432,15 @@ glm::dvec3 PlanetSurface::surfaceNormal(const glm::dvec3& crudePoint) const {
 
     // Only the tangential part of the gradient tilts the normal; the radial part
     // moves the point without turning it.
-    return glm::normalize(sphereNormal -
-                          (gradient - sphereNormal * glm::dot(sphereNormal, gradient)));
+    const glm::dvec3 normal{glm::normalize(
+        sphereNormal - (gradient - sphereNormal * glm::dot(sphereNormal, gradient)))};
+
+    // A cancelled subtraction leaves normalize dividing by nothing, and a normal
+    // that is not a number reaches the g-buffer before anything can name where it
+    // came from. A length that is not a number fails this as surely as a wrong
+    // one does.
+    assert(glm::abs(glm::length(normal) - 1.0) < 1e-9 &&
+           "The surface normal must come back of unit length");
+
+    return normal;
 }

@@ -92,7 +92,12 @@ endif()
 # Game sources. The recursive glob is scoped to src/ so stray copies of the
 # tree (e.g. git worktrees under .claude/) never leak into the build;
 # GLOB_RECURSE on a root-level file pattern would match it in every subtree.
-file(GLOB_RECURSE SRC_FILES
+#
+# CONFIGURE_DEPENDS re-checks the glob at build time, so a new source file
+# reaches every build directory and not just the one last reconfigured. Without
+# it a second preset keeps the list it last saw and fails at link, naming the
+# symbol rather than the missing file.
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
 )
 list(APPEND SRC_FILES "${CMAKE_SOURCE_DIR}/main.cpp")

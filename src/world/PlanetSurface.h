@@ -6,6 +6,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include "math/TileableNoiseMap.h"
+#include "PlanetBaseField.h"
 
 /**
  * @brief The body's shape in C++: a crude point in, the surface out.
@@ -35,6 +36,12 @@
  * Owns the noise and bakes the maps the snippet samples from that same field, so
  * the two are reading one generation rather than two.
  *
+ * The base layer is the one part with no twin in the snippet at all, and needs
+ * none: this side evaluates the field, the snippet reads the bake of it. They
+ * part company only by what bilinear costs across a texel of a smooth field,
+ * which is a drift rather than a step -- there is no hash down there to make one
+ * bit of disagreement a different answer.
+ *
  * Knows nothing about the quadtree. What subdivides the crude solid, and what
  * needs to know where its squares land, is somebody else's concern.
  */
@@ -44,7 +51,8 @@ public:
     // how wide one repeat of the map is laid down, and reliefMetres the floor to
     // ceiling height of the terrain it carries.
     PlanetSurface(double radiusMetres, double tileSizeMetres, double reliefMetres,
-                  const TileableNoiseMapConfig& noiseConfig);
+                  const TileableNoiseMapConfig& noiseConfig,
+                  const PlanetBaseLayerConfig& baseConfig);
 
     // Where a crude point is drawn. Mirrors cdlodSurfacePoint.
     glm::dvec3 surfacePoint(const glm::dvec3& crudePoint) const;
@@ -65,6 +73,10 @@ public:
     std::vector<uint16_t> bakeElevation() const { return m_noise.bake(); }
     std::vector<float> bakeGradient() const { return m_noise.bakeGradient(); }
     int mapResolution() const { return m_noise.config().m_resolution; }
+
+    // The layer under the octaves, exported rather than wrapped: baking it and
+    // reading it back are somebody else's business, and this only reads it.
+    const PlanetBaseField& baseField() const { return m_baseField; }
 
 private:
     // Lattice points a cell is bounded by, and so lookups an octave costs.
@@ -91,8 +103,11 @@ private:
         double m_metresPerCell{0.0};   // at that same octave
     };
 
-    // The map summed over the first octaveCount layers of the table: zero is the
-    // bare sphere, and each further layer adds the same field at a finer scale.
+    // The base layer, plus the map summed over the first octaveCount layers of
+    // the table: zero is the base layer alone, and each further layer adds the
+    // same field at a finer scale. The base layer is not one of them and is
+    // never left out -- it is what the body is shaped like, and the octaves are
+    // what it wears.
     double elevationAt(const glm::dvec3& crudePoint, int octaveCount) const;
     glm::dvec3 gradientAt(const glm::dvec3& crudePoint, int octaveCount) const;
 
@@ -128,4 +143,5 @@ private:
     // blend leans on because its weights sum to more than one.
     double m_fieldMean{0.0};
     TileableNoiseMap m_noise;
+    PlanetBaseField m_baseField;
 };

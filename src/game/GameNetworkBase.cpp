@@ -8,7 +8,7 @@
 #include "../game_base/Grid.h"
 #include "../game_base/GridSubsystem.h"
 #include "../game_base/Mode.h"
-#include "../serialization/ByteStream.h"
+#include "utils/ByteStream.h"
 
 #include <algorithm>
 #include <cassert>
