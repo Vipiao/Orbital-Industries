@@ -183,7 +183,7 @@ void GridGraphics::updateCellGraphics(const glm::ivec3& coord, const PolyhedronP
         cell.triangleIds = m_graphics->appendTrianglesToMesh(
             m_ssboIndex, &transformedMeshData.positions, &transformedMeshData.normals,
             &transformedMeshData.tangents, &transformedMeshData.uvs,
-            nullptr, &colors, &textureUnits);
+            &colors, &textureUnits);
     }
 }
 

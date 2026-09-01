@@ -291,7 +291,7 @@ void DigibotPhysics::createCollisionBoxMesh(GraphicsEngine* graphics) {
         // Append this cell's mesh
         graphics->appendTrianglesToMesh(
             m_collisionBoxMeshId, &meshData.positions, &meshData.normals, 
-            &meshData.tangents, &meshData.uvs, nullptr, &colors);
+            &meshData.tangents, &meshData.uvs, &colors);
     }
 
     // Set initial transform
