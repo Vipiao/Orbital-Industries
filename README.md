@@ -40,7 +40,7 @@ and tell this project where the engine is.
          "name": "dev",
          "binaryDir": "${sourceDir}/build",
          "cacheVariables": {
-           "ENGINE_DIR": "/home/markus/repos/02_graphics_engine/graphics_engine"
+           "ENGINE_DIR": "/path/to/graphics_engine"
          }
        }
      ]
