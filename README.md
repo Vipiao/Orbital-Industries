@@ -1,5 +1,24 @@
 # OrbitalIndustries
 
+**Video: [youtu.be/uqL_dwq1_-c](https://youtu.be/uqL_dwq1_-c)**
+
+Space game kind of like Minecraft in space. Build, crash, fly, paint. With a
+real world sized planet (6000km radius).
+
+Concave collision detection is hard. The solution? Simple, split it into convex
+shapes in a grid.
+
+The 3d engine simulates tumbling. The problem with tumbling is that it is
+chaotic. It cannot be interpolated into the future analytically so I simulate it in
+64hz. Fast rotation leads to larger errors that can cause phantom forces. To fix
+this, I normalize the angular momentum vector after each iteration to the
+original size.
+
+Ray volumes are a graphical element mixing in ray marching or any glsl injected
+logic into a rasterized environment.
+
+The multiplayer is LAN, but with simulated lag/latency.
+
 A game built on a separate graphics engine repo. The engine lives in its own
 repository and is pulled in at build time via a local path, so you clone both
 and tell this project where the engine is.
@@ -29,7 +48,7 @@ and tell this project where the engine is.
 1. Clone this repo and the graphics engine repo.
 
 2. Create a `CMakeUserPresets.json` next to this README, pointing `ENGINE_DIR`
-   at your local engine clone. This file is gitignored — it's personal to your
+   at your local engine clone. This file is gitignored. It's personal to your
    machine. Example:
 
 ```json
