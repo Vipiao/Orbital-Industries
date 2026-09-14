@@ -6,9 +6,12 @@
 
 namespace {
 
+// Throws once stdin is closed, since no answer can arrive and re-asking would loop forever.
 std::string readLine() {
     std::string line{};
-    std::getline(std::cin, line);
+    if (!std::getline(std::cin, line)) {
+        throw std::runtime_error("stdin closed before the startup prompt was answered");
+    }
     return line;
 }
 

@@ -6,6 +6,7 @@
 namespace startupPrompt {
 
 // Runs before any engine/window init; re-asks until the input parses.
+// Throws std::runtime_error if stdin closes before a complete answer is read.
 NetworkStartupConfig prompt();
 
 }  // namespace startupPrompt
