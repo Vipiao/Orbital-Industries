@@ -120,7 +120,7 @@ static void buildTestWorld(GameBase* gameBase) {
 
     const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
     const std::weak_ptr<CdlodSurface> planetSnippet{
-        graphicsEngine->createCdlodSurface("../media/surfaces/triplanar_noise_surface.glsl")};
+        graphicsEngine->createCdlodSurface("../media/surfaces/lattice_surface.glsl")};
 
     const std::vector<uint16_t> noiseBake{planetSurface->bakeElevation()};
     const std::vector<float> gradientBake{planetSurface->bakeGradient()};

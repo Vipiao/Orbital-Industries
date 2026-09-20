@@ -2,15 +2,12 @@
 //
 // What the terrain is: how many layers it has, how tall each stands, and how
 // they add up. Nothing about where a reading came from -- the caller takes the
-// lookups and hands them over dimensionless, and this gives them size.
+// lookups and hands them over dimensionless, and this gives them size. Only the
+// frequency column is exported, because the caller reads the map at its own
+// scale.
 //
 // The twin of src/world/TerrainDisplacement.h. Change one side alone and the
 // surface moves out from under the bounds the quadtree measures by.
-//
-// A level arrives in the map's own units: unit height, and unit height per
-// metre where it is a gradient. Only the frequency column is exported, because
-// the caller reads the map at its own scale; everything that turns a reading
-// into metres happens here.
 //
 // Height and gradient come back together, being one surface measured two ways.
 // Each layer takes the same factor either way, so the gradient returned is the
@@ -29,19 +26,13 @@
 // Amplitude is not a slope. A tile does not rise by its own range across its own
 // width -- the map carries eight layers of its own, averaging nearly three times
 // that -- so rise over run is amplitude over tile times what the map does.
-// Measured, as averages:
+// Measured, as averages: 49.8 km at 658 m is two degrees, 3.11 km at 165 m eight
+// and a half, 194 m at 41.1 m thirty-one. The map's worst texel runs three times
+// its mean, putting the steepest ground near sixty-six, and that is the figure
+// the quadtree's ranges answer for.
 //
-//    49.8 km at 658 m        two degrees
-//    3.11 km at 165 m        eight and a half degrees
-//     194 m at 41.1 m        thirty-one degrees
-//
-// The map's worst texel runs three times its mean, putting the steepest ground
-// near sixty-six, and that is the figure the quadtree's ranges answer for. Steps
-// this close cost span at the fine end, leaving the finest feature hundreds of
-// metres; a fourth layer would buy it back.
-//
-// The coarsest picks up a sixty-fourth of the base layer's coarsest feature,
-// stretching a tile built at 1274.2 m over thirty-nine of its own.
+// Steps this close cost span at the fine end, leaving the finest feature hundreds
+// of metres; a fourth layer would buy it back.
 //
 // The frequency need not be a power of two: what has to land exactly is the cell
 // count the caller's lattice comes to, which it rounds and asserts is whole. The
@@ -55,20 +46,15 @@ const vec4 k_octaves[k_octaveCount] = vec4[k_octaveCount](
    vec4(6.5536, 1.0 / 16.0, 0.61, 0.19));
 
 // Metres between the map's floor and its ceiling. The map is unsigned, so the
-// terrain rises from the sphere rather than straddling it, and this is the full
-// depth of the relief.
+// terrain rises from the sphere rather than straddling it.
 //
-// Tiny against a planet's radius, so the body reads as a sphere and the relief
-// shows in the shading rather than the silhouette. The knob to raise for
-// exaggerated terrain, at the cost of a steeper surface: against the tile size
-// this sets the slope, and the slope is what the quadtree's ranges have to keep
-// up with.
+// The knob to raise for exaggerated terrain, at the cost of a steeper surface:
+// against the tile size this sets the slope, and the slope is what the quadtree's
+// ranges have to keep up with.
 const float k_reliefMetres = 658.0;
 
-// Metres between the base layer's floor and its ceiling. Handed over rather than
-// written here, unlike the constants above: the side that generated the base
-// maps already holds this number, and a copy of it here would be a second place
-// for it to be wrong.
+// The same for the base layer, handed over rather than written here: the side
+// that generated the base maps already holds this number.
 uniform float u_baseReliefMetres;
 
 // What the caller read, per layer, before anything gave it a size.
@@ -102,8 +88,8 @@ vec2 octaveShift(int octave) {
 }
 
 // The levels summed over the first octaveCount layers of the table, each at its
-// own amplitude. Fewer layers is a coarser surface and not a different one:
-// every layer is the same sum with the fine end left off.
+// own amplitude. Fewer layers is a coarser surface and not a different one: the
+// same sum with the fine end left off.
 TerrainDisplacement terrainDisplacement(TerrainLevels levels, int octaveCount) {
    TerrainDisplacement displacement;
    displacement.height = u_baseReliefMetres * levels.baseHeight;

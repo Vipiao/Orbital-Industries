@@ -1,4 +1,4 @@
-// triplanar_noise_surface.glsl
+// lattice_surface.glsl
 //
 // Where the terrain is read from: the lattice the map is sampled through, and
 // the level each lookup is taken at. What the readings then amount to is

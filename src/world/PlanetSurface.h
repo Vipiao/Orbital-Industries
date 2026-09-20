@@ -16,7 +16,7 @@
  * the readings it comes to. What those then amount to is TerrainDisplacement's,
  * which this hands them to unscaled.
  *
- * The twin of media/surfaces/triplanar_noise_surface.glsl, written apart only
+ * The twin of media/surfaces/lattice_surface.glsl, written apart only
  * because the two run in different languages, and it must be kept in step with
  * it. Every constant here appears in the snippet as well -- the three the
  * constructor takes and the lattice's cell counts -- and so does every function.
