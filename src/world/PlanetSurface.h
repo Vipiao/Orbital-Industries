@@ -7,16 +7,21 @@
 #include <glm/glm.hpp>
 #include "math/TileableNoiseMap.h"
 #include "PlanetBaseField.h"
+#include "TerrainDisplacement.h"
 
 /**
  * @brief The body's shape in C++: a crude point in, the surface out.
  *
+ * Where the terrain is read from: the lattice the map is sampled through, and
+ * the readings it comes to. What those then amount to is TerrainDisplacement's,
+ * which this hands them to unscaled.
+ *
  * The twin of media/surfaces/triplanar_noise_surface.glsl, written apart only
  * because the two run in different languages, and it must be kept in step with
  * it. Every constant here appears in the snippet as well -- the three the
- * constructor takes, the octave table, and the lattice's cell counts -- and so
- * does every function. Change one side alone and the bounds stop describing the
- * surface being drawn, which is what closes the seams between patches.
+ * constructor takes and the lattice's cell counts -- and so does every function.
+ * Change one side alone and the bounds stop describing the surface being drawn,
+ * which is what closes the seams between patches.
  *
  * The shading octaves are the exception, and need not agree with anything: they
  * tilt a normal without moving a vertex, and nothing measures a normal.
@@ -103,13 +108,21 @@ private:
         double m_metresPerCell{0.0};   // at that same octave
     };
 
-    // The base layer, plus the map summed over the first octaveCount layers of
-    // the table: zero is the base layer alone, and each further layer adds the
-    // same field at a finer scale. The base layer is not one of them and is
-    // never left out -- it is what the body is shaped like, and the octaves are
-    // what it wears.
-    double elevationAt(const glm::dvec3& crudePoint, int octaveCount) const;
-    glm::dvec3 gradientAt(const glm::dvec3& crudePoint, int octaveCount) const;
+    // Every octave's four planes read into one level apiece, plus the base
+    // layer's own, all of it in the map's own unit height. Mirrors
+    // gatherHeightLevels and gatherLevels: the first reads height alone, which
+    // is what placing a point needs, and the second reads height and slope off
+    // one lattice, where asking for them apart would build every plane twice.
+    TerrainDisplacement::Levels gatherHeightLevels(const glm::dvec3& crudePoint,
+                                                   int octaveCount) const;
+    TerrainDisplacement::Levels gatherLevels(const glm::dvec3& crudePoint,
+                                             int octaveCount) const;
+
+    // One octave's four planes blended into one reading, and into one slope in
+    // the body's frame. Mirrors blendHeight and blendSlope.
+    double blendHeight(const std::array<LatticePlane, k_latticeCorners>& planes) const;
+    glm::dvec3 blendSlope(const std::array<LatticePlane, k_latticeCorners>& planes,
+                          double tilesPerMetre) const;
 
     // Cells across one half of a cube face, for the layer named. Mirrors
     // octaveCells; cellsExactly is what it rounds, kept apart so the constructor
@@ -127,8 +140,9 @@ private:
     std::array<LatticePlane, k_latticeCorners> latticePlanes(
         const LatticeFrame& frame, int octave) const;
 
-    // One plane, at full amplitude: the caller scales, having one weighted sum
-    // per octave to do it to rather than four.
+    // One plane's reading, in the map's own unit height, and its slope in unit
+    // height per metre. What they come to in metres is TerrainDisplacement's,
+    // which has one weighted sum per octave to scale rather than four.
     double sampleElevation(const glm::dvec2& tileCoord) const;
     glm::dvec2 sampleSlope(const glm::dvec2& tileCoord, double tilesPerMetre) const;
 
@@ -138,10 +152,10 @@ private:
 
     double m_radius{1.0};
     double m_tileSize{1.0};
-    double m_relief{0.0};
-    // In metres, as the snippet's fieldMean is: the map's own mean, which the
-    // blend leans on because its weights sum to more than one.
+    // In unit height, as the snippet's fieldMean is: the map's own mean, which
+    // the blend leans on because its weights sum to more than one.
     double m_fieldMean{0.0};
     TileableNoiseMap m_noise;
     PlanetBaseField m_baseField;
+    TerrainDisplacement m_displacement;
 };

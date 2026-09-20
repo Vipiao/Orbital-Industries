@@ -4,33 +4,6 @@
 
 namespace {
 
-// The snippet's k_octaves: frequency multiplier, amplitude as a fraction of the
-// relief, and a shift in tiles. Sixteen to a step in frequency, four to a step
-// in amplitude, so each layer is four times the rise over run of the one above.
-//
-// The root of frequency rather than frequency itself: the reciprocal would give
-// every layer the same slope, where real ground has gentle big landforms and
-// steep small ones. Three steps reach thirty-one degrees, the angle loose ground
-// gives way at, past which roughening buys nothing.
-//
-// Amplitude is not a slope. A tile does not rise by its own range across its own
-// width -- the map carries eight layers of its own, averaging nearly three times
-// that -- so rise over run is amplitude over tile times what the map does.
-// Measured, as averages:
-//
-//    49.8 km at 658 m        two degrees
-//    3.11 km at 165 m        eight and a half degrees
-//     194 m at 41.1 m        thirty-one degrees
-//
-// The map's worst texel runs three times its mean, putting the steepest ground
-// near sixty-six. Steps this close cost span at the fine end, leaving the finest
-// feature hundreds of metres; a fourth layer would buy it back, and the cell
-// counts -- 64, 1024, 16384, stepping by sixteen as well -- leave room for one.
-constexpr int k_octaveCount{3};
-const glm::dvec4 k_octaves[k_octaveCount]{
-    glm::dvec4{0.0256, 1.0, 0.0, 0.0}, glm::dvec4{0.4096, 1.0 / 4.0, 0.37, 0.71},
-    glm::dvec4{6.5536, 1.0 / 16.0, 0.61, 0.19}};
-
 // Tiles of an octave's own layer that one lattice cell spans, so the lattice
 // takes its size from the layer it carries. The snippet's k_cellTiles.
 constexpr double k_cellTiles{2.0};
@@ -66,9 +39,11 @@ std::uint32_t latticeHash(const glm::ivec3& point) {
 constexpr int k_positionOctaves{3};
 constexpr int k_shadingOctaves{3};
 
-static_assert(k_positionOctaves > 0 && k_positionOctaves <= k_octaveCount,
+static_assert(k_positionOctaves > 0 &&
+                  k_positionOctaves <= TerrainDisplacement::k_octaveCount,
               "The geometry cannot carry octaves the table does not hold");
-static_assert(k_shadingOctaves > 0 && k_shadingOctaves <= k_octaveCount,
+static_assert(k_shadingOctaves > 0 &&
+                  k_shadingOctaves <= TerrainDisplacement::k_octaveCount,
               "The shading cannot carry octaves the table does not hold");
 
 // Most a lattice coordinate may reach before a float stops naming whole numbers.
@@ -82,16 +57,16 @@ PlanetSurface::PlanetSurface(double radiusMetres, double tileSizeMetres,
                              double reliefMetres,
                              const TileableNoiseMapConfig& noiseConfig,
                              const PlanetBaseLayerConfig& baseConfig)
-    : m_radius{radiusMetres}, m_tileSize{tileSizeMetres}, m_relief{reliefMetres},
-      m_noise{noiseConfig}, m_baseField{baseConfig} {
+    : m_radius{radiusMetres}, m_tileSize{tileSizeMetres}, m_noise{noiseConfig},
+      m_baseField{baseConfig},
+      m_displacement{reliefMetres, baseConfig.m_reliefMetres} {
     assert(m_radius > 0.0 && "A body with no radius projects every crude point to a point");
     assert(m_tileSize > 0.0 && "A tile of no width repeats infinitely often across the body");
-    assert(m_relief >= 0.0 && "Negative relief would sink the terrain into the sphere");
 
     // The snippet reaches this same count through a float. Both land on the
     // whole number itself only while the constants leave one to land on; between
     // two, the two widths are free to round apart and take the lattice with them.
-    for (int octave{0}; octave < k_octaveCount; ++octave) {
+    for (int octave{0}; octave < TerrainDisplacement::k_octaveCount; ++octave) {
         const double cells{cellsExactly(octave)};
         assert(glm::abs(cells - glm::round(cells)) < 1e-6 &&
                "The radius, tile size and cell span must leave a whole cell count");
@@ -130,9 +105,9 @@ PlanetSurface::PlanetSurface(double radiusMetres, double tileSizeMetres,
             total += m_noise.sample(x, y);
         }
     }
-    m_fieldMean = total / (static_cast<double>(resolution) * resolution) * m_relief;
-    assert(m_fieldMean >= 0.0 && m_fieldMean <= m_relief &&
-           "The map spans [0, 1], so its mean lies inside the relief it scales to");
+    m_fieldMean = total / (static_cast<double>(resolution) * resolution);
+    assert(m_fieldMean >= 0.0 && m_fieldMean <= 1.0 &&
+           "The map spans [0, 1], and so does the mean of it");
 }
 
 int PlanetSurface::octaveCells(int octave) const {
@@ -140,7 +115,7 @@ int PlanetSurface::octaveCells(int octave) const {
 }
 
 double PlanetSurface::cellsExactly(int octave) const {
-    return m_radius * k_octaves[octave].x / (k_cellTiles * m_tileSize);
+    return m_radius * m_displacement.octaveFrequency(octave) / (k_cellTiles * m_tileSize);
 }
 
 glm::dvec3 PlanetSurface::spherePointOf(const glm::dvec3& crudePoint) const {
@@ -180,7 +155,8 @@ PlanetSurface::LatticeFrame PlanetSurface::latticeFrameOf(
 
 std::array<PlanetSurface::LatticePlane, PlanetSurface::k_latticeCorners>
 PlanetSurface::latticePlanes(const LatticeFrame& frame, int octave) const {
-    assert(octave >= 0 && octave < k_octaveCount && "No such octave in the table");
+    assert(octave >= 0 && octave < TerrainDisplacement::k_octaveCount &&
+           "No such octave in the table");
     const int cells{octaveCells(octave)};
 
     // Every octave's cell count is the coarsest one's times a power of two, which
@@ -211,13 +187,13 @@ PlanetSurface::latticePlanes(const LatticeFrame& frame, int octave) const {
     // Four weights summing to one keep only the sum of their squares' worth of
     // the field's variance, what they mix being four unrelated pieces of it.
     // Dividing by the root of that sum instead holds the contrast flat, at the
-    // price of weights that no longer sum to one -- which elevationAt answers
-    // for and gradientAt need not.
+    // price of weights that no longer sum to one -- which blendHeight answers
+    // for and blendSlope need not.
     const double restore{
         1.0 / glm::sqrt(glm::dot(alongU, alongU) * glm::dot(alongV, alongV))};
 
-    const double tilesPerMetre{k_octaves[octave].x / m_tileSize};
-    const glm::dvec2 shift{k_octaves[octave].z, k_octaves[octave].w};
+    const double tilesPerMetre{m_displacement.octaveFrequency(octave) / m_tileSize};
+    const glm::dvec2 shift{m_displacement.octaveShift(octave)};
 
     std::array<LatticePlane, k_latticeCorners> planes{};
     for (int corner{0}; corner < k_latticeCorners; ++corner) {
@@ -313,9 +289,9 @@ double PlanetSurface::sampleElevation(const glm::dvec2& tileCoord) const {
     const double upper{
         glm::mix(m_noise.sample(x, y + 1), m_noise.sample(x + 1, y + 1), fraction.x)};
 
-    // Full amplitude: the caller scales, having one weighted sum per octave to do
-    // it to rather than four.
-    return glm::mix(lower, upper, fraction.y) * m_relief;
+    // The map's own unit height: TerrainDisplacement scales, having one weighted
+    // sum per octave to do it to rather than four.
+    return glm::mix(lower, upper, fraction.y);
 }
 
 glm::dvec2 PlanetSurface::sampleSlope(const glm::dvec2& tileCoord,
@@ -331,91 +307,106 @@ glm::dvec2 PlanetSurface::sampleSlope(const glm::dvec2& tileCoord,
     const glm::dvec2 upper{
         glm::mix(m_noise.gradient(x, y + 1), m_noise.gradient(x + 1, y + 1), fraction.x)};
 
-    // The map holds the gradient per unit of tile, so the same two constants that
-    // give the elevation its metres give this its own: rise over run.
-    return glm::mix(lower, upper, fraction.y) * (m_relief * tilesPerMetre);
+    // The map holds the gradient per unit of tile, and the tiles to the metre are
+    // what carry it onto the ground. Unit height as sampleElevation's is, so the
+    // two take the same scaling and the one stays the derivative of the other.
+    return glm::mix(lower, upper, fraction.y) * tilesPerMetre;
 }
 
-double PlanetSurface::elevationAt(const glm::dvec3& crudePoint, int octaveCount) const {
+double PlanetSurface::blendHeight(
+    const std::array<LatticePlane, k_latticeCorners>& planes) const {
+    // The blend's weights sum to more than one, so a layer overshoots by whatever
+    // it stands above the map's mean, and the mean is what that overshoot is
+    // taken back off against.
+    double level{0.0};
+    double covered{0.0};
+    for (const LatticePlane& plane : planes) {
+        level += plane.m_weight * sampleElevation(plane.m_tileCoord);
+        covered += plane.m_weight;
+    }
+
+    return level + m_fieldMean * (1.0 - covered);
+}
+
+glm::dvec3 PlanetSurface::blendSlope(
+    const std::array<LatticePlane, k_latticeCorners>& planes,
+    double tilesPerMetre) const {
+    // Each plane returns a slope in its own two axes, which those axes carry back
+    // into the body's frame. No mean to answer for, the mean slope of a field
+    // that wraps being zero.
+    glm::dvec3 level{0.0};
+    for (const LatticePlane& plane : planes) {
+        const glm::dvec2 slope{sampleSlope(plane.m_tileCoord, tilesPerMetre)};
+        level += plane.m_weight *
+                 (slope.x * plane.m_tangent + slope.y * plane.m_bitangent);
+    }
+
+    return level;
+}
+
+TerrainDisplacement::Levels PlanetSurface::gatherHeightLevels(
+    const glm::dvec3& crudePoint, int octaveCount) const {
     // The lattice is taken per octave, each layer wanting cells sized to its own
     // tile, so the four planes are found again for every one of them. The face
     // they are found on is the same for all of them, and is found once.
     const LatticeFrame frame{latticeFrameOf(crudePoint)};
 
+    TerrainDisplacement::Levels levels{};
     glm::dvec3 unusedSlope{0.0};
-    double elevation{m_baseField.sample(glm::normalize(crudePoint), unusedSlope) *
-                     m_baseField.relief()};
+    levels.m_baseHeight = m_baseField.sample(glm::normalize(crudePoint), unusedSlope);
 
     for (int octave{0}; octave < octaveCount; ++octave) {
-        const std::array<LatticePlane, k_latticeCorners> planes{
-            latticePlanes(frame, octave)};
-
-        // The blend's weights sum to more than one, so each layer overshoots by
-        // whatever it stands above the map's mean, and that is what the mean is
-        // taken back off against.
-        double layer{0.0};
-        double covered{0.0};
-        for (const LatticePlane& plane : planes) {
-            layer += plane.m_weight * sampleElevation(plane.m_tileCoord);
-            covered += plane.m_weight;
-        }
-
-        elevation += k_octaves[octave].y * (layer + m_fieldMean * (1.0 - covered));
+        levels.m_height[octave] = blendHeight(latticePlanes(frame, octave));
     }
 
-    return elevation;
+    return levels;
 }
 
-glm::dvec3 PlanetSurface::gradientAt(const glm::dvec3& crudePoint,
-                                     int octaveCount) const {
+TerrainDisplacement::Levels PlanetSurface::gatherLevels(const glm::dvec3& crudePoint,
+                                                        int octaveCount) const {
     const LatticeFrame frame{latticeFrameOf(crudePoint)};
     const glm::dvec3 direction{glm::normalize(crudePoint)};
 
     // The base layer's slope is per unit of direction, and a metre across the
-    // surface turns the direction by one over the radius. That is what puts it
-    // in the metres per metre the octaves come back in.
-    glm::dvec3 gradient{0.0};
-    m_baseField.sample(direction, gradient);
-    gradient *= m_baseField.relief() / m_radius;
+    // surface turns the direction by one over the radius. That is what puts it in
+    // the per metre the octaves' own come back in.
+    TerrainDisplacement::Levels levels{};
+    levels.m_baseHeight = m_baseField.sample(direction, levels.m_baseGradient);
+    levels.m_baseGradient /= m_radius;
 
     for (int octave{0}; octave < octaveCount; ++octave) {
         const std::array<LatticePlane, k_latticeCorners> planes{
             latticePlanes(frame, octave)};
-        const double tilesPerMetre{k_octaves[octave].x / m_tileSize};
+        const double tilesPerMetre{m_displacement.octaveFrequency(octave) / m_tileSize};
 
-        // Each plane returns a slope in its own two axes, which those axes carry
-        // back into the body's frame.
-        glm::dvec3 layer{0.0};
-        for (const LatticePlane& plane : planes) {
-            const glm::dvec2 slope{sampleSlope(plane.m_tileCoord, tilesPerMetre)};
-            layer += plane.m_weight *
-                     (slope.x * plane.m_tangent + slope.y * plane.m_bitangent);
-        }
-
-        gradient += k_octaves[octave].y * layer;
+        levels.m_height[octave] = blendHeight(planes);
+        levels.m_gradient[octave] = blendSlope(planes, tilesPerMetre);
     }
 
-    return gradient;
+    return levels;
 }
 
 double PlanetSurface::maxRadius() const {
     // Only what the geometry carries: the shading octaves tilt a normal without
     // moving a vertex, so nothing they add is inside anything.
-    double amplitude{0.0};
-    for (int octave{0}; octave < k_positionOctaves; ++octave) {
-        amplitude += k_octaves[octave].y;
-    }
-
-    // The base layer's own ceiling needs no such allowance: it is one map read
-    // once, not a blend of four, so it reaches its relief and no further.
-    return m_radius + m_baseField.relief() + m_relief * amplitude * k_blendCeiling;
+    //
+    // The base layer's own ceiling needs no allowance for the blend: it is one
+    // map read once, not a blend of four, so it reaches its relief and no
+    // further.
+    return m_radius + m_displacement.baseCeiling() +
+           m_displacement.octaveCeiling(k_positionOctaves) * k_blendCeiling;
 }
 
 glm::dvec3 PlanetSurface::surfacePoint(const glm::dvec3& crudePoint) const {
+    const double height{
+        m_displacement
+            .displacement(gatherHeightLevels(crudePoint, k_positionOctaves),
+                          k_positionOctaves)
+            .m_height};
+
     // The sphere and the terrain riding on it share one outward direction, so the
     // radius and the height are added before it is scaled by them.
-    const glm::dvec3 point{glm::normalize(crudePoint) *
-                           (m_radius + elevationAt(crudePoint, k_positionOctaves))};
+    const glm::dvec3 point{glm::normalize(crudePoint) * (m_radius + height)};
 
     // The ceiling the quadtree builds its bounds from. Ground above it is culled
     // with terrain still in it, which arrives as holes at particular angles
@@ -428,7 +419,10 @@ glm::dvec3 PlanetSurface::surfacePoint(const glm::dvec3& crudePoint) const {
 
 glm::dvec3 PlanetSurface::surfaceNormal(const glm::dvec3& crudePoint) const {
     const glm::dvec3 sphereNormal{glm::normalize(crudePoint)};
-    const glm::dvec3 gradient{gradientAt(crudePoint, k_shadingOctaves)};
+    const glm::dvec3 gradient{
+        m_displacement
+            .displacement(gatherLevels(crudePoint, k_shadingOctaves), k_shadingOctaves)
+            .m_gradient};
 
     // Only the tangential part of the gradient tilts the normal; the radial part
     // moves the point without turning it.
