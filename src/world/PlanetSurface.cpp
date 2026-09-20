@@ -4,15 +4,11 @@
 
 namespace {
 
-// Tiles of an octave's own layer that one lattice cell spans, so the lattice
-// takes its size from the layer it carries. The snippet's k_cellTiles.
-constexpr double k_cellTiles{2.0};
-
 // Most a layer can reach above its own amplitude once the blend has divided by
 // the root of its weights' squares. That root is smallest at a cell's centre,
-// where all four weights stand equal and it comes to a half. Only maxRadius
-// needs it, and only to leave room above the terrain; it is a ceiling, not a
-// scale, and nothing the surface is drawn from reads it.
+// where all four weights stand equal and it comes to a half. maxRadius leaves
+// room by it and latticePlanes asserts the blend stays under it; it is a
+// ceiling, not a scale, and nothing the surface is drawn from reads it.
 constexpr double k_blendCeiling{2.0};
 
 // A lattice point's own random numbers, drawn from its place on the cube. The
@@ -33,18 +29,20 @@ std::uint32_t latticeHash(const glm::ivec3& point) {
     return h;
 }
 
-// Octaves the geometry carries and octaves the shading carries. The snippet's
-// k_positionOctaves and k_shadingOctaves, and the first of the two is the one
-// that must agree: it is the surface the quadtree measures its bounds on.
-constexpr int k_positionOctaves{3};
+// Octaves the normal read here carries. Its own, needing to agree with nothing:
+// the snippet's shading octaves tilt a normal without moving a vertex, and
+// nothing measures a normal.
 constexpr int k_shadingOctaves{3};
 
-static_assert(k_positionOctaves > 0 &&
-                  k_positionOctaves <= TerrainDisplacement::k_octaveCount,
-              "The geometry cannot carry octaves the table does not hold");
 static_assert(k_shadingOctaves > 0 &&
                   k_shadingOctaves <= TerrainDisplacement::k_octaveCount,
               "The shading cannot carry octaves the table does not hold");
+
+// Whether a figure survives the narrowing to float the surface is drawn in, so
+// both sides read one number rather than two that differ in the last place.
+bool exactInFloat(double value) {
+    return static_cast<double>(static_cast<float>(value)) == value;
+}
 
 // Most a lattice coordinate may reach before a float stops naming whole numbers.
 // The snippet holds cell counts in a float and builds lattice points out of
@@ -53,15 +51,23 @@ constexpr double k_exactWhole{16777216.0};   // 2^24
 
 }  // namespace
 
-PlanetSurface::PlanetSurface(double radiusMetres, double tileSizeMetres,
-                             double reliefMetres,
+PlanetSurface::PlanetSurface(double radiusMetres, double tileSpanMetres,
+                             double tilesPerSpan, double reliefMetres,
                              const TileableNoiseMapConfig& noiseConfig,
                              const PlanetBaseLayerConfig& baseConfig)
-    : m_radius{radiusMetres}, m_tileSize{tileSizeMetres}, m_noise{noiseConfig},
+    : m_radius{radiusMetres}, m_tileSpan{tileSpanMetres}, m_tilesPerSpan{tilesPerSpan},
+      m_tileSize{tileSpanMetres / tilesPerSpan}, m_noise{noiseConfig},
       m_baseField{baseConfig},
       m_displacement{reliefMetres, baseConfig.m_reliefMetres} {
     assert(m_radius > 0.0 && "A body with no radius projects every crude point to a point");
-    assert(m_tileSize > 0.0 && "A tile of no width repeats infinitely often across the body");
+    assert(m_tileSpan > 0.0 && m_tilesPerSpan > 0.0 &&
+           "A tile of no width repeats infinitely often across the body");
+
+    // The surface is drawn from these narrowed to float. Each has to survive
+    // that to the last bit, or the drawn lattice is not the measured one.
+    assert(exactInFloat(m_radius) && exactInFloat(m_tileSpan) &&
+           exactInFloat(m_tilesPerSpan) &&
+           "The radius and the tile's two whole numbers must be exact in a float");
 
     // The snippet reaches this same count through a float. Both land on the
     // whole number itself only while the constants leave one to land on; between
@@ -191,11 +197,19 @@ PlanetSurface::latticePlanes(const LatticeFrame& frame, int octave) const {
     // for and blendSlope need not.
     const double restore{
         1.0 / glm::sqrt(glm::dot(alongU, alongU) * glm::dot(alongV, alongV))};
+    // What maxRadius leaves room for. Terrain past it stands outside the bounds
+    // the quadtree culls by, which arrives as holes rather than as anything
+    // resembling an error.
+    assert(restore >= 1.0 && restore <= k_blendCeiling &&
+           "A blend reaching past the ceiling would put terrain outside the bounds");
 
     const double tilesPerMetre{m_displacement.octaveFrequency(octave) / m_tileSize};
     const glm::dvec2 shift{m_displacement.octaveShift(octave)};
 
     std::array<LatticePlane, k_latticeCorners> planes{};
+    // The corner index is taken apart as two bits, one step per axis, which is
+    // what ties the loop below to a cell having four of them.
+    static_assert(k_latticeCorners == 4, "A corner index carries one bit per axis");
     for (int corner{0}; corner < k_latticeCorners; ++corner) {
         const int stepU{corner & 1};
         const int stepV{corner >> 1};

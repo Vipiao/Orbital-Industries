@@ -10,9 +10,12 @@
 //
 // The GPU half of the body's shape. src/world/PlanetSurface.cpp is the other
 // half and must be kept in step: the same crude point, the same position and
-// normal. Every constant and every function below has a twin there. Change one
-// side alone and the surface moves out from under the bounds the quadtree
-// measures by, which is what closes the seams between patches.
+// normal. Every function below has a twin there, and a change to one alone moves
+// the surface out from under the bounds the quadtree measures by, which is what
+// closes the seams between patches.
+//
+// The figures do not: they are declared ahead of this file, from that same
+// PlanetSurface. They are listed where they would otherwise stand, below.
 //
 // Four planar projections, one anchored to each of the lattice points the point
 // being shaded stands between, blended by how near it stands to each. The
@@ -47,10 +50,9 @@
 // two patches meeting at different levels would displace their shared edge to
 // different places and reopen the seam that morphing exists to close.
 //
-// What this buys is the same on both paths: detail finer than a sample arrives
-// as its average instead of as whichever point of it the sample landed on, so
-// neither normals nor vertices sparkle, and the lookups stay inside the texture
-// cache instead of striding a map that no longer fits it.
+// Both paths buy the same thing: detail finer than a sample arrives as its
+// average rather than as whichever point of it the sample landed on, so neither
+// normals nor vertices sparkle, and the lookups stay inside the texture cache.
 //
 // Both paths take the point in a wide float, and both reduce it to its cell
 // before narrowing. A point on this body is millions of metres from the origin,
@@ -65,9 +67,21 @@
 // into a stage that has included it, so there is nothing to include here.
 #include "terrain_displacement.glsl"
 
-// Metres from the body's centre to the sphere the cube projects onto. Exact in a
-// float, so it needs nothing in a low part.
-const float k_radiusMetres = 6371000.0;
+// In scope already, written ahead of this file by planetSurfaceGlsl in
+// src/world/PlanetSurfaceGlsl.cpp, off the PlanetSurface the quadtree's bounds
+// are measured on. Change any of them there, in C++, and both sides move
+// together; there is nothing to edit here.
+//
+//    float k_radiusMetres      the sphere the cube projects onto
+//    float k_tileSpanMetres    one repeat of the map, as the two whole numbers
+//    float k_tilesPerSpan        its width is the ratio of, that width being no
+//                                float and a plane coordinate standing thousands
+//                                of tiles out
+//    int   k_latticeCorners    lattice points a cell is bounded by
+//    float k_cellTiles         tiles of an octave's own layer one cell spans
+//    int   k_positionOctaves   octaves the drawn geometry carries
+//
+// terrain_displacement.glsl lists the rest, being what reads them.
 
 uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
 uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
@@ -84,34 +98,6 @@ uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 // of disagreement into a different answer.
 uniform samplerCube u_baseElevationMap;  // R16 unorm, spanning exactly [0, 1]
 uniform samplerCube u_baseGradientMap;   // RGB16F, slope per unit of direction
-
-// Metres one tile of the map spans, as a ratio of two whole numbers a float
-// holds exactly. Below the body's width the tile repeats, which is what puts
-// detail on a planet the map could never cover in one pass.
-//
-// Written as the ratio rather than as 1274.2 because that value is not a float,
-// and the lookups need it to more than a float's worth: a plane coordinate is
-// thousands of tiles from the origin, so a part in ten million of the tile size
-// is a thousandth of a tile of drift by the time it gets there.
-const float k_tileSpanMetres = 12742000.0;
-const float k_tilesPerSpan = 10000.0;
-
-// Lattice points a cell is bounded by, and so lookups an octave costs.
-const int k_latticeCorners = 4;
-
-// Tiles of an octave's own layer that one lattice cell spans, so the lattice
-// takes its size from the layer it carries and a frequency changed in the table
-// carries the lattice with it.
-//
-// Few enough that the map never repeats visibly within one cell, many enough
-// that the cells do not become the pattern themselves. Cutting finer costs a
-// normal: the term this blend drops runs as the reciprocal of a cell.
-const float k_cellTiles = 2.0;
-
-// Octaves the drawn geometry carries. PlanetSurface.cpp must use this same
-// count: it is the surface the quadtree's bounds are measured on, and the
-// vertex and depth stages both reach it through here.
-const int k_positionOctaves = 3;
 
 // Octaves the shading carries, and free to run past the geometry: both read the
 // same octaves and each stops where its own sampling does, a pixel resolving

@@ -8,10 +8,11 @@
  * @brief What the terrain is: how many layers it has, how tall each stands, and
  * how they add up.
  *
- * The twin of media/surfaces/terrain_displacement.glsl, written apart only
- * because the two run in different languages, and it must be kept in step with
- * it. Change one side alone and the surface moves out from under the bounds the
- * quadtree measures by.
+ * Where the numbers live. media/surfaces/terrain_displacement.glsl runs the same
+ * arithmetic on the GPU but holds none of the figures: planetSurfaceGlsl spells
+ * these out for it to read, so the table is here once rather than on both sides
+ * waiting to be edited apart. The two still have to agree about what to do with
+ * them, and a change to the sum belongs in both.
  *
  * Nothing here knows where a reading came from. The caller takes the lookups and
  * hands them over dimensionless; this gives them size. Only the frequency column
@@ -21,9 +22,6 @@
  * Height and gradient come back together, being one surface measured two ways.
  * Each layer takes the same factor either way, so the gradient returned is the
  * derivative of the height returned rather than a second opinion about it.
- *
- * The relief is a constant on the snippet's side and a constructor argument here,
- * that side having no one to be handed it by.
  */
 class TerrainDisplacement {
 public:

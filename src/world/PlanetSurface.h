@@ -16,12 +16,11 @@
  * the readings it comes to. What those then amount to is TerrainDisplacement's,
  * which this hands them to unscaled.
  *
- * The twin of media/surfaces/lattice_surface.glsl, written apart only
- * because the two run in different languages, and it must be kept in step with
- * it. Every constant here appears in the snippet as well -- the three the
- * constructor takes and the lattice's cell counts -- and so does every function.
- * Change one side alone and the bounds stop describing the surface being drawn,
- * which is what closes the seams between patches.
+ * The twin of media/surfaces/lattice_surface.glsl, written apart only because
+ * the two run in different languages. Every function here has one there, and a
+ * change to one alone leaves the bounds no longer describing the surface being
+ * drawn, which is what closes the seams between patches. The figures are not
+ * written twice: planetSurfaceGlsl hands the snippet the ones held here.
  *
  * The shading octaves are the exception, and need not agree with anything: they
  * tilt a normal without moving a vertex, and nothing measures a normal.
@@ -52,16 +51,20 @@
  */
 class PlanetSurface {
 public:
-    // radiusMetres is the sphere the crude solid projects onto, tileSizeMetres
-    // how wide one repeat of the map is laid down, and reliefMetres the floor to
-    // ceiling height of the terrain it carries.
-    PlanetSurface(double radiusMetres, double tileSizeMetres, double reliefMetres,
-                  const TileableNoiseMapConfig& noiseConfig,
+    // radiusMetres is the sphere the crude solid projects onto, and reliefMetres
+    // the floor to ceiling height of the terrain it carries.
+    //
+    // One repeat of the map is tileSpanMetres wide over tilesPerSpan of them,
+    // taken as two whole numbers rather than the width they come to. That width
+    // is not exact in a float, and a plane coordinate stands thousands of tiles
+    // out, where a part in ten million of it is a thousandth of a tile of drift.
+    PlanetSurface(double radiusMetres, double tileSpanMetres, double tilesPerSpan,
+                  double reliefMetres, const TileableNoiseMapConfig& noiseConfig,
                   const PlanetBaseLayerConfig& baseConfig);
 
     // Where a crude point is drawn. Mirrors cdlodSurfacePoint.
     glm::dvec3 surfacePoint(const glm::dvec3& crudePoint) const;
-    // The unit normal there. Mirrors cdlodSurfaceNormal.
+    // The unit normal there. Mirrors the normal cdlodSurfaceShading returns.
     glm::dvec3 surfaceNormal(const glm::dvec3& crudePoint) const;
     // The same point before any terrain, which costs no lookup: the projection
     // the snippet's position path folds into cdlodSurfacePoint.
@@ -70,6 +73,10 @@ public:
     // The sphere the crude solid projects onto, before any terrain: the size of
     // the solid a caller builds to subdivide.
     double radius() const { return m_radius; }
+    // The tile, as the two whole numbers its width is the ratio of, so a caller
+    // that has to divide by it can divide the same way this does.
+    double tileSpanMetres() const { return m_tileSpan; }
+    double tilesPerSpan() const { return m_tilesPerSpan; }
     // The highest the surface can reach from the body's centre, since the map is
     // unsigned and the terrain rises off the sphere rather than straddling it.
     double maxRadius() const;
@@ -83,10 +90,30 @@ public:
     // reading it back are somebody else's business, and this only reads it.
     const PlanetBaseField& baseField() const { return m_baseField; }
 
-private:
+    // How tall the layers stand and how often each is laid down, exported rather
+    // than wrapped: this reads the maps, and what a reading is worth is the
+    // displacement's to say.
+    const TerrainDisplacement& displacement() const { return m_displacement; }
+
     // Lattice points a cell is bounded by, and so lookups an octave costs.
     static constexpr int k_latticeCorners{4};
 
+    // Tiles of an octave's own layer that one lattice cell spans, so the lattice
+    // takes its size from the layer it carries and a frequency changed in the
+    // table carries the lattice with it. Few enough that the map never repeats
+    // visibly within one cell, many enough that the cells do not become the
+    // pattern themselves. Cutting finer costs a normal: the term the blend drops
+    // runs as the reciprocal of a cell.
+    static constexpr double k_cellTiles{2.0};
+
+    // Octaves the drawn geometry carries, and so the surface the bounds are
+    // measured on.
+    static constexpr int k_positionOctaves{3};
+    static_assert(k_positionOctaves > 0 &&
+                      k_positionOctaves <= TerrainDisplacement::k_octaveCount,
+                  "The geometry cannot carry octaves the table does not hold");
+
+private:
     // One lattice point's plane, as the point being shaded stands in it. The
     // snippet's LatticePlane.
     struct LatticePlane {
@@ -151,6 +178,9 @@ private:
     glm::dvec2 texelCoord(const glm::dvec2& tileCoord) const;
 
     double m_radius{1.0};
+    double m_tileSpan{1.0};
+    double m_tilesPerSpan{1.0};
+    // What those two come to, which is what everything here divides by.
     double m_tileSize{1.0};
     // In unit height, as the snippet's fieldMean is: the map's own mean, which
     // the blend leans on because its weights sum to more than one.

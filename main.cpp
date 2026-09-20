@@ -16,10 +16,12 @@
 #include "src/world/PlanetBaseCache.h"
 #include "src/world/PlanetBaseDump.h"
 #include "src/world/PlanetSurface.h"
+#include "src/world/PlanetSurfaceGlsl.h"
 #include "math/TileableNoiseMap.h"
 #include "debug/DebugRenderer.h"
 #include "debug/DebugGlobals.h"
 #include "graphics/GraphicsEngine.h"
+#include "graphics/ShaderProgram.h"
 #include "graphics/SSBOManager.h"
 #include <glm/glm.hpp>
 #include <cassert>
@@ -82,17 +84,18 @@ static void buildTestWorld(GameBase* gameBase) {
     // Triangles per selected patch, shared by every CDLOD body.
     graphicsEngine->setCdlodPatchQuads(24);
 
-    // The body's shape is written twice, here and in the snippet, and the two
-    // must agree: this side is what the bounds measure and what the physics will
-    // eventually collide against, the snippet is what the vertex stages draw. The
-    // renderer knows none of these numbers, and nothing below reads them again --
-    // the planet is asked instead.
-    const double planetRadius{6371000.0};       // the snippet's k_radiusMetres
-    // The ratio the snippet is written as, not the number it comes to: 1274.2 is
-    // not exact in either width, and taking the same two whole numbers apart the
-    // same way leaves both sides reading one map at one scale.
-    const double planetTileSizeMetres{12742000.0 / 10000.0};
-    const double planetReliefMetres{658.0};     // the snippet's k_reliefMetres
+    // The body's shape, written once: the planet is what the bounds measure and
+    // what the physics will eventually collide against, and the shader that draws
+    // it is handed these same figures. The renderer knows none of them, and
+    // nothing below reads them again -- the planet is asked instead.
+    //
+    // The tile goes in as the two whole numbers rather than the 1274.2 they come
+    // to, which is not exact in either width; both sides then take them apart the
+    // same way and read one map at one scale.
+    const double planetRadius{6371000.0};
+    const double planetTileSpanMetres{12742000.0};
+    const double planetTilesPerSpan{10000.0};
+    const double planetReliefMetres{658.0};
 
     // The noise both sides read, generated once. The map is dimensionless -- the
     // field spans exactly [0, 1] and its gradient is per unit of tile -- so it
@@ -115,12 +118,24 @@ static void buildTestWorld(GameBase* gameBase) {
     const PlanetBaseLayerConfig planetBaseConfig{};
 
     const std::shared_ptr<PlanetSurface> planetSurface{std::make_shared<PlanetSurface>(
-        planetRadius, planetTileSizeMetres, planetReliefMetres, terrainConfig,
-        planetBaseConfig)};
+        planetRadius, planetTileSpanMetres, planetTilesPerSpan, planetReliefMetres,
+        terrainConfig, planetBaseConfig)};
 
     const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
-    const std::weak_ptr<CdlodSurface> planetSnippet{
-        graphicsEngine->createCdlodSurface("../media/surfaces/lattice_surface.glsl")};
+
+    // The body's figures go in front of the shader that reads them, so they are
+    // written once in C++ and compiled rather than sent per frame. The snippet
+    // says what to do with them and holds none of them itself.
+    //
+    // The snippet is read each time this is asked, so a shader reload picks it up
+    // as edited. The figures are taken once: they are fixed at startup, and a
+    // reload is for the GLSL rather than for the shape of the body.
+    const std::weak_ptr<CdlodSurface> planetSnippet{graphicsEngine->createCdlodSurface(
+        [shape = planetSurfaceGlsl(*planetSurface)] {
+            return shape
+                 + ShaderProgram::loadTextFileFromPath(
+                       "../media/surfaces/lattice_surface.glsl");
+        })};
 
     const std::vector<uint16_t> noiseBake{planetSurface->bakeElevation()};
     const std::vector<float> gradientBake{planetSurface->bakeGradient()};
@@ -184,9 +199,6 @@ static void buildTestWorld(GameBase* gameBase) {
         baseSpec.m_faces[face] = baseMaps.m_slope[face].data();
     }
     graphicsEngine->setCdlodSurfaceCubeTexture(planetSnippet, "u_baseGradientMap", baseSpec);
-
-    graphicsEngine->setCdlodSurfaceUniform(planetSnippet, "u_baseReliefMetres",
-                                           static_cast<float>(planetSurface->baseField().relief()));
 
     graphicsEngine->createCdlodInstance(
         planetSsboIndex, CdlodConfig{},
