@@ -36,7 +36,7 @@ glm::dvec2 TerrainDisplacement::octaveShift(int octave) const {
 
 double TerrainDisplacement::levelRelief(int level) const {
     assert(level >= 0 && level < k_levelCount && "No such level in the table");
-    const double relief{level == k_baseLevel ? m_baseRelief : m_relief};
+    const double relief{level == k_octaveCount ? m_baseRelief : m_relief};
     return relief * k_levels[level].y;
 }
 

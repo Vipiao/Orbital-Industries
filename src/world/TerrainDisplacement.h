@@ -34,9 +34,9 @@ public:
     // The base layer is the last row of the table and the one the octaves ride
     // on: what the body is shaped like, where they are what it wears. It is read
     // by direction rather than through a lattice, so it lays down no tiles and
-    // takes no shift. Last so that an octave keeps the index it is read at; in
-    // every other way it is a layer like the rest and is summed like the rest.
-    static constexpr int k_baseLevel{k_octaveCount};
+    // takes no shift. Last, at k_octaveCount, so that an octave keeps the index
+    // it is read at; in every other way it is a layer like the rest and is
+    // summed like the rest.
     static constexpr int k_levelCount{k_octaveCount + 1};
 
     // What the caller read, per layer, before anything gave it a size. The

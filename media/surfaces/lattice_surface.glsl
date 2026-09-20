@@ -522,7 +522,7 @@ TerrainLevels emptyLevels() {
 TerrainLevels gatherHeightLevels(Df3 crudePoint, int octaveCount,
                                  float sampleSpacing) {
    TerrainLevels levels = emptyLevels();
-   levels.height[k_baseLevel] =
+   levels.height[k_octaveCount] =
       baseElevation(normalize(df3ToVec(crudePoint)), sampleSpacing);
 
    float fieldMean = textureLod(u_noiseMap, vec2(0.5), mapTopLevel()).r;
@@ -546,8 +546,8 @@ TerrainLevels gatherLevels(Df3 crudePoint, int octaveCount, float sampleSpacing)
    TerrainLevels levels = emptyLevels();
 
    vec3 direction = normalize(df3ToVec(crudePoint));
-   levels.height[k_baseLevel] = baseElevation(direction, sampleSpacing);
-   levels.gradient[k_baseLevel] = baseGradient(direction, sampleSpacing);
+   levels.height[k_octaveCount] = baseElevation(direction, sampleSpacing);
+   levels.gradient[k_octaveCount] = baseGradient(direction, sampleSpacing);
 
    float topLevel = mapTopLevel();
    float fieldMean = textureLod(u_noiseMap, vec2(0.5), topLevel).r;

@@ -353,7 +353,7 @@ TerrainDisplacement::Levels PlanetSurface::gatherHeightLevels(
 
     TerrainDisplacement::Levels levels{};
     glm::dvec3 unusedSlope{0.0};
-    levels.m_height[TerrainDisplacement::k_baseLevel] =
+    levels.m_height[TerrainDisplacement::k_octaveCount] =
         m_baseField.sample(glm::normalize(crudePoint), unusedSlope);
 
     for (int octave{0}; octave < octaveCount; ++octave) {
@@ -372,9 +372,9 @@ TerrainDisplacement::Levels PlanetSurface::gatherLevels(const glm::dvec3& crudeP
     // surface turns the direction by one over the radius. That is what puts it in
     // the per metre the octaves' own come back in.
     TerrainDisplacement::Levels levels{};
-    levels.m_height[TerrainDisplacement::k_baseLevel] =
-        m_baseField.sample(direction, levels.m_gradient[TerrainDisplacement::k_baseLevel]);
-    levels.m_gradient[TerrainDisplacement::k_baseLevel] /= m_radius;
+    levels.m_height[TerrainDisplacement::k_octaveCount] =
+        m_baseField.sample(direction, levels.m_gradient[TerrainDisplacement::k_octaveCount]);
+    levels.m_gradient[TerrainDisplacement::k_octaveCount] /= m_radius;
 
     for (int octave{0}; octave < octaveCount; ++octave) {
         const std::array<LatticePlane, k_latticeCorners> planes{
@@ -394,7 +394,7 @@ double PlanetSurface::maxRadius() const {
     //
     // The base level needs no allowance for the blend: it is one map read once,
     // not a blend of four, so it reaches its relief and no further.
-    double ceiling{m_displacement.levelRelief(TerrainDisplacement::k_baseLevel)};
+    double ceiling{m_displacement.levelRelief(TerrainDisplacement::k_octaveCount)};
     for (int octave{0}; octave < k_positionOctaves; ++octave) {
         ceiling += m_displacement.levelRelief(octave) * k_blendCeiling;
     }

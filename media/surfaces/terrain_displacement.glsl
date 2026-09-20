@@ -42,10 +42,10 @@
 // The base layer is the last row and the one the octaves ride on: what the body
 // is shaped like, where they are what it wears. It is read by direction rather
 // than through a lattice, so it lays down no tiles and takes no shift, and its
-// amplitude is the whole of a relief of its own. Last so that an octave keeps
-// the index it is read at; in every other way it is a layer like the rest.
+// amplitude is the whole of a relief of its own. Last, at k_octaveCount, so that
+// an octave keeps the index it is read at; in every other way it is a layer like
+// the rest.
 const int k_octaveCount = 3;
-const int k_baseLevel = k_octaveCount;
 const int k_levelCount = k_octaveCount + 1;
 
 const vec4 k_levels[k_levelCount] = vec4[k_levelCount](
@@ -70,7 +70,7 @@ uniform float u_baseReliefMetres;
 // worth at full height. The octaves share out one relief between them; the base
 // layer has its own, and takes all of it.
 float levelReliefMetres(int level) {
-   float relief = level == k_baseLevel ? u_baseReliefMetres : k_reliefMetres;
+   float relief = level == k_octaveCount ? u_baseReliefMetres : k_reliefMetres;
    return relief * k_levels[level].y;
 }
 
