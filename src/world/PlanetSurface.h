@@ -108,8 +108,8 @@ private:
         double m_metresPerCell{0.0};   // at that same octave
     };
 
-    // Every octave's four planes read into one level apiece, plus the base
-    // layer's own, all of it in the map's own unit height. Mirrors
+    // Every octave's four planes read into one level apiece, and the base level
+    // read by direction, all of it in the map's own unit height. Mirrors
     // gatherHeightLevels and gatherLevels: the first reads height alone, which
     // is what placing a point needs, and the second reads height and slope off
     // one lattice, where asking for them apart would build every plane twice.

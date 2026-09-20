@@ -489,16 +489,13 @@ vec3 blendSlope(LatticePlane planes[k_latticeCorners], float mipLevel,
 }
 
 // Nothing read yet. A layer the caller does not reach is left at zero rather
-// than undefined, so summing over more of them than were gathered is short of
-// detail rather than wrong.
+// than undefined, which is what lets the sum run the whole table however few
+// were gathered: a layer left out is short of detail rather than wrong.
 TerrainLevels emptyLevels() {
    TerrainLevels levels;
-   levels.baseHeight = 0.0;
-   levels.baseGradient = vec3(0.0);
-
-   for (int octave = 0; octave < k_octaveCount; ++octave) {
-      levels.height[octave] = 0.0;
-      levels.gradient[octave] = vec3(0.0);
+   for (int level = 0; level < k_levelCount; ++level) {
+      levels.height[level] = 0.0;
+      levels.gradient[level] = vec3(0.0);
    }
 
    return levels;
@@ -519,12 +516,14 @@ TerrainLevels emptyLevels() {
 // lookup covers the whole tile -- one lookup outside the octaves, on a texel
 // every pixel shares.
 //
-// The base layer is not one of the octaves and is never left out: it is what the
-// body is shaped like, and the octaves are what it wears.
+// The base level is read by direction rather than through a lattice, and is
+// never left out: it is what the body is shaped like, and the octaves are what
+// it wears.
 TerrainLevels gatherHeightLevels(Df3 crudePoint, int octaveCount,
                                  float sampleSpacing) {
    TerrainLevels levels = emptyLevels();
-   levels.baseHeight = baseElevation(normalize(df3ToVec(crudePoint)), sampleSpacing);
+   levels.height[k_baseLevel] =
+      baseElevation(normalize(df3ToVec(crudePoint)), sampleSpacing);
 
    float fieldMean = textureLod(u_noiseMap, vec2(0.5), mapTopLevel()).r;
    LatticeFrame frame = latticeFrameOf(crudePoint);
@@ -547,8 +546,8 @@ TerrainLevels gatherLevels(Df3 crudePoint, int octaveCount, float sampleSpacing)
    TerrainLevels levels = emptyLevels();
 
    vec3 direction = normalize(df3ToVec(crudePoint));
-   levels.baseHeight = baseElevation(direction, sampleSpacing);
-   levels.baseGradient = baseGradient(direction, sampleSpacing);
+   levels.height[k_baseLevel] = baseElevation(direction, sampleSpacing);
+   levels.gradient[k_baseLevel] = baseGradient(direction, sampleSpacing);
 
    float topLevel = mapTopLevel();
    float fieldMean = textureLod(u_noiseMap, vec2(0.5), topLevel).r;
@@ -590,8 +589,7 @@ TerrainLevels gatherLevels(Df3 crudePoint, int octaveCount, float sampleSpacing)
 // it, and the shading stage runs far more often than this one.
 Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
    TerrainDisplacement displacement = terrainDisplacement(
-      gatherHeightLevels(crudePoint, k_positionOctaves, sampleSpacing),
-      k_positionOctaves);
+      gatherHeightLevels(crudePoint, k_positionOctaves, sampleSpacing));
 
    Df reach =
       dfAdd(dfFromFloat(k_radiusMetres), dfFromFloat(displacement.height));
@@ -655,8 +653,8 @@ CdlodSurfaceShading cdlodSurfaceShading(Df3 crudePoint, vec3 crudeDerivX,
    // rather than its width, which is the side that would alias.
    float sampleSpacing = max(length(metreDerivX), length(metreDerivY));
 
-   TerrainDisplacement displacement = terrainDisplacement(
-      gatherLevels(crudePoint, k_shadingOctaves, sampleSpacing), k_shadingOctaves);
+   TerrainDisplacement displacement =
+      terrainDisplacement(gatherLevels(crudePoint, k_shadingOctaves, sampleSpacing));
    vec3 acrossSphere = displacement.gradient
       - sphereNormal * dot(sphereNormal, displacement.gradient);
 

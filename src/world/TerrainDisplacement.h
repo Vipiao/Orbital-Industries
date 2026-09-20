@@ -27,21 +27,24 @@
  */
 class TerrainDisplacement {
 public:
-    // Layers the table holds. The snippet's k_octaveCount, and public so a caller
-    // can check at compile time that the octaves it asks for are there.
+    // Octaves the table holds. The snippet's k_octaveCount, and public so a
+    // caller can check at compile time that the octaves it asks for are there.
     static constexpr int k_octaveCount{3};
 
+    // The base layer is the last row of the table and the one the octaves ride
+    // on: what the body is shaped like, where they are what it wears. It is read
+    // by direction rather than through a lattice, so it lays down no tiles and
+    // takes no shift. Last so that an octave keeps the index it is read at; in
+    // every other way it is a layer like the rest and is summed like the rest.
+    static constexpr int k_baseLevel{k_octaveCount};
+    static constexpr int k_levelCount{k_octaveCount + 1};
+
     // What the caller read, per layer, before anything gave it a size. The
-    // snippet's TerrainLevels.
-    //
-    // The base layer is not one of the octaves and is never left out: it is what
-    // the body is shaped like, and the octaves are what it wears. It is read by
-    // direction rather than through a lattice, so it has no frequency here.
+    // snippet's TerrainLevels. A layer the caller did not reach is left at zero,
+    // which is what lets the sum run the whole table however few were gathered.
     struct Levels {
-        double m_baseHeight{0.0};                            // unit height
-        glm::dvec3 m_baseGradient{0.0};                      // unit height per metre
-        std::array<double, k_octaveCount> m_height{};        // unit height
-        std::array<glm::dvec3, k_octaveCount> m_gradient{};  // unit height per metre
+        std::array<double, k_levelCount> m_height{};        // unit height
+        std::array<glm::dvec3, k_levelCount> m_gradient{};  // unit height per metre
     };
 
     // Where the surface stands above the sphere, and how it leans there. The
@@ -55,10 +58,14 @@ public:
     // carry, baseReliefMetres the same for the layer beneath them.
     TerrainDisplacement(double reliefMetres, double baseReliefMetres);
 
-    // The levels summed over the first octaveCount layers of the table, each at
-    // its own amplitude. Fewer layers is a coarser surface and not a different
-    // one: every layer is the same sum with the fine end left off.
-    Displacement displacement(const Levels& levels, int octaveCount) const;
+    // Every layer at its own relief, summed. Fewer layers gathered is a coarser
+    // surface and not a different one: the same sum with the fine end at zero.
+    Displacement displacement(const Levels& levels) const;
+
+    // What a layer's whole range comes to in metres, which is what its reading is
+    // worth at full height. The map is unsigned, so it is also the highest that
+    // layer can reach, and a caller building bounds reads it for that.
+    double levelRelief(int level) const;
 
     // How much oftener than the field it was built at a layer's map is laid down.
     // The caller sizes its lattice and picks its mip levels off this.
@@ -67,15 +74,6 @@ public:
     // Tiles the layer's coordinate is carried by before it is read, which is what
     // leaves the layers off one another's phase.
     glm::dvec2 octaveShift(int octave) const;
-
-    // Metres the octaves can reach above the sphere between them, before the
-    // caller's own blend is allowed for. A ceiling, not a scale: only the bounds
-    // read it, and only to leave room above the terrain.
-    double octaveCeiling(int octaveCount) const;
-
-    // The same for the layer beneath them, which needs no allowance: it is one
-    // map read once rather than a blend, so it reaches its relief and no further.
-    double baseCeiling() const { return m_baseRelief; }
 
 private:
     double m_relief{0.0};

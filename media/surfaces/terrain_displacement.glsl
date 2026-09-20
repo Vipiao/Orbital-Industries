@@ -39,11 +39,20 @@
 // shift is what keeps the layers off one lattice: each repeats a whole number of
 // times per coarser tile and would otherwise land on it with the same phase,
 // every repeat reinforcing the last.
+// The base layer is the last row and the one the octaves ride on: what the body
+// is shaped like, where they are what it wears. It is read by direction rather
+// than through a lattice, so it lays down no tiles and takes no shift, and its
+// amplitude is the whole of a relief of its own. Last so that an octave keeps
+// the index it is read at; in every other way it is a layer like the rest.
 const int k_octaveCount = 3;
-const vec4 k_octaves[k_octaveCount] = vec4[k_octaveCount](
+const int k_baseLevel = k_octaveCount;
+const int k_levelCount = k_octaveCount + 1;
+
+const vec4 k_levels[k_levelCount] = vec4[k_levelCount](
    vec4(0.0256, 1.0, 0.0, 0.0),
    vec4(0.4096, 1.0 / 4.0, 0.37, 0.71),
-   vec4(6.5536, 1.0 / 16.0, 0.61, 0.19));
+   vec4(6.5536, 1.0 / 16.0, 0.61, 0.19),
+   vec4(0.0, 1.0, 0.0, 0.0));
 
 // Metres between the map's floor and its ceiling. The map is unsigned, so the
 // terrain rises from the sphere rather than straddling it.
@@ -57,16 +66,20 @@ const float k_reliefMetres = 658.0;
 // that generated the base maps already holds this number.
 uniform float u_baseReliefMetres;
 
-// What the caller read, per layer, before anything gave it a size.
-//
-// The base layer is not one of the octaves and is never left out: it is what the
-// body is shaped like, and the octaves are what it wears. It is read by
-// direction rather than through a lattice, so it has no frequency here.
+// What a layer's whole range comes to in metres, which is what its reading is
+// worth at full height. The octaves share out one relief between them; the base
+// layer has its own, and takes all of it.
+float levelReliefMetres(int level) {
+   float relief = level == k_baseLevel ? u_baseReliefMetres : k_reliefMetres;
+   return relief * k_levels[level].y;
+}
+
+// What the caller read, per layer, before anything gave it a size. A layer the
+// caller did not reach is left at zero, which is what lets the sum below run the
+// whole table however few were gathered.
 struct TerrainLevels {
-   float baseHeight;                 // unit height
-   vec3 baseGradient;                // unit height per metre, in the body's frame
-   float height[k_octaveCount];      // unit height
-   vec3 gradient[k_octaveCount];     // unit height per metre, in the body's frame
+   float height[k_levelCount];    // unit height
+   vec3 gradient[k_levelCount];   // unit height per metre, in the body's frame
 };
 
 // Where the surface stands above the sphere, and how it leans there.
@@ -75,30 +88,30 @@ struct TerrainDisplacement {
    vec3 gradient;   // metres per metre, in the body's frame
 };
 
-// How much oftener than the field it was built at a layer's map is laid down.
-// The caller sizes its lattice and picks its mip levels off this.
+// How much oftener than the field it was built at an octave's map is laid down.
+// The caller sizes its lattice and picks its mip levels off this. Asked of the
+// base layer it answers zero, that layer laying nothing down through a lattice.
 float octaveFrequency(int octave) {
-   return k_octaves[octave].x;
+   return k_levels[octave].x;
 }
 
-// Tiles the layer's coordinate is carried by before it is read, which is what
-// leaves the layers off one another's phase.
+// Tiles the octave's coordinate is carried by before it is read, which is what
+// leaves the octaves off one another's phase.
 vec2 octaveShift(int octave) {
-   return k_octaves[octave].zw;
+   return k_levels[octave].zw;
 }
 
-// The levels summed over the first octaveCount layers of the table, each at its
-// own amplitude. Fewer layers is a coarser surface and not a different one: the
-// same sum with the fine end left off.
-TerrainDisplacement terrainDisplacement(TerrainLevels levels, int octaveCount) {
+// Every layer at its own relief, summed. Fewer layers gathered is a coarser
+// surface and not a different one: the same sum with the fine end at zero.
+TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
    TerrainDisplacement displacement;
-   displacement.height = u_baseReliefMetres * levels.baseHeight;
-   displacement.gradient = u_baseReliefMetres * levels.baseGradient;
+   displacement.height = 0.0;
+   displacement.gradient = vec3(0.0);
 
-   for (int octave = 0; octave < octaveCount; ++octave) {
-      float amplitude = k_reliefMetres * k_octaves[octave].y;
-      displacement.height += amplitude * levels.height[octave];
-      displacement.gradient += amplitude * levels.gradient[octave];
+   for (int level = 0; level < k_levelCount; ++level) {
+      float relief = levelReliefMetres(level);
+      displacement.height += relief * levels.height[level];
+      displacement.gradient += relief * levels.gradient[level];
    }
 
    return displacement;

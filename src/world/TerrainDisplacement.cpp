@@ -4,16 +4,17 @@
 
 namespace {
 
-// The snippet's k_octaves: frequency multiplier, amplitude as a fraction of the
-// relief, and a shift in tiles, layer by layer. What each column is for, and how
-// these numbers were arrived at, is written out once in the snippet's copy; the
-// two tables have to read the same or the surface stops matching its bounds.
+// The snippet's k_levels: frequency multiplier, amplitude as a fraction of the
+// relief, and a shift in tiles, layer by layer, with the base layer last. What
+// each column is for, and how these numbers were arrived at, is written out once
+// in the snippet's copy; the two tables have to read the same or the surface
+// stops matching its bounds.
 //
-// The cell counts they come to -- 64, 1024, 16384, stepping by sixteen as the
-// frequencies do -- leave room for a fourth layer.
-const glm::dvec4 k_octaves[TerrainDisplacement::k_octaveCount]{
+// The cell counts the octaves come to -- 64, 1024, 16384, stepping by sixteen as
+// the frequencies do -- leave room for a fourth.
+const glm::dvec4 k_levels[TerrainDisplacement::k_levelCount]{
     glm::dvec4{0.0256, 1.0, 0.0, 0.0}, glm::dvec4{0.4096, 1.0 / 4.0, 0.37, 0.71},
-    glm::dvec4{6.5536, 1.0 / 16.0, 0.61, 0.19}};
+    glm::dvec4{6.5536, 1.0 / 16.0, 0.61, 0.19}, glm::dvec4{0.0, 1.0, 0.0, 0.0}};
 
 }  // namespace
 
@@ -25,40 +26,28 @@ TerrainDisplacement::TerrainDisplacement(double reliefMetres, double baseReliefM
 
 double TerrainDisplacement::octaveFrequency(int octave) const {
     assert(octave >= 0 && octave < k_octaveCount && "No such octave in the table");
-    return k_octaves[octave].x;
+    return k_levels[octave].x;
 }
 
 glm::dvec2 TerrainDisplacement::octaveShift(int octave) const {
     assert(octave >= 0 && octave < k_octaveCount && "No such octave in the table");
-    return glm::dvec2{k_octaves[octave].z, k_octaves[octave].w};
+    return glm::dvec2{k_levels[octave].z, k_levels[octave].w};
 }
 
-TerrainDisplacement::Displacement TerrainDisplacement::displacement(const Levels& levels,
-                                                                    int octaveCount) const {
-    assert(octaveCount >= 0 && octaveCount <= k_octaveCount &&
-           "The surface cannot carry octaves the table does not hold");
+double TerrainDisplacement::levelRelief(int level) const {
+    assert(level >= 0 && level < k_levelCount && "No such level in the table");
+    const double relief{level == k_baseLevel ? m_baseRelief : m_relief};
+    return relief * k_levels[level].y;
+}
 
+TerrainDisplacement::Displacement TerrainDisplacement::displacement(
+    const Levels& levels) const {
     Displacement displacement{};
-    displacement.m_height = m_baseRelief * levels.m_baseHeight;
-    displacement.m_gradient = m_baseRelief * levels.m_baseGradient;
-
-    for (int octave{0}; octave < octaveCount; ++octave) {
-        const double amplitude{m_relief * k_octaves[octave].y};
-        displacement.m_height += amplitude * levels.m_height[octave];
-        displacement.m_gradient += amplitude * levels.m_gradient[octave];
+    for (int level{0}; level < k_levelCount; ++level) {
+        const double relief{levelRelief(level)};
+        displacement.m_height += relief * levels.m_height[level];
+        displacement.m_gradient += relief * levels.m_gradient[level];
     }
 
     return displacement;
-}
-
-double TerrainDisplacement::octaveCeiling(int octaveCount) const {
-    assert(octaveCount >= 0 && octaveCount <= k_octaveCount &&
-           "The surface cannot carry octaves the table does not hold");
-
-    double amplitude{0.0};
-    for (int octave{0}; octave < octaveCount; ++octave) {
-        amplitude += k_octaves[octave].y;
-    }
-
-    return m_relief * amplitude;
 }

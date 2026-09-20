@@ -353,7 +353,8 @@ TerrainDisplacement::Levels PlanetSurface::gatherHeightLevels(
 
     TerrainDisplacement::Levels levels{};
     glm::dvec3 unusedSlope{0.0};
-    levels.m_baseHeight = m_baseField.sample(glm::normalize(crudePoint), unusedSlope);
+    levels.m_height[TerrainDisplacement::k_baseLevel] =
+        m_baseField.sample(glm::normalize(crudePoint), unusedSlope);
 
     for (int octave{0}; octave < octaveCount; ++octave) {
         levels.m_height[octave] = blendHeight(latticePlanes(frame, octave));
@@ -371,8 +372,9 @@ TerrainDisplacement::Levels PlanetSurface::gatherLevels(const glm::dvec3& crudeP
     // surface turns the direction by one over the radius. That is what puts it in
     // the per metre the octaves' own come back in.
     TerrainDisplacement::Levels levels{};
-    levels.m_baseHeight = m_baseField.sample(direction, levels.m_baseGradient);
-    levels.m_baseGradient /= m_radius;
+    levels.m_height[TerrainDisplacement::k_baseLevel] =
+        m_baseField.sample(direction, levels.m_gradient[TerrainDisplacement::k_baseLevel]);
+    levels.m_gradient[TerrainDisplacement::k_baseLevel] /= m_radius;
 
     for (int octave{0}; octave < octaveCount; ++octave) {
         const std::array<LatticePlane, k_latticeCorners> planes{
@@ -390,18 +392,19 @@ double PlanetSurface::maxRadius() const {
     // Only what the geometry carries: the shading octaves tilt a normal without
     // moving a vertex, so nothing they add is inside anything.
     //
-    // The base layer's own ceiling needs no allowance for the blend: it is one
-    // map read once, not a blend of four, so it reaches its relief and no
-    // further.
-    return m_radius + m_displacement.baseCeiling() +
-           m_displacement.octaveCeiling(k_positionOctaves) * k_blendCeiling;
+    // The base level needs no allowance for the blend: it is one map read once,
+    // not a blend of four, so it reaches its relief and no further.
+    double ceiling{m_displacement.levelRelief(TerrainDisplacement::k_baseLevel)};
+    for (int octave{0}; octave < k_positionOctaves; ++octave) {
+        ceiling += m_displacement.levelRelief(octave) * k_blendCeiling;
+    }
+
+    return m_radius + ceiling;
 }
 
 glm::dvec3 PlanetSurface::surfacePoint(const glm::dvec3& crudePoint) const {
     const double height{
-        m_displacement
-            .displacement(gatherHeightLevels(crudePoint, k_positionOctaves),
-                          k_positionOctaves)
+        m_displacement.displacement(gatherHeightLevels(crudePoint, k_positionOctaves))
             .m_height};
 
     // The sphere and the terrain riding on it share one outward direction, so the
@@ -420,8 +423,7 @@ glm::dvec3 PlanetSurface::surfacePoint(const glm::dvec3& crudePoint) const {
 glm::dvec3 PlanetSurface::surfaceNormal(const glm::dvec3& crudePoint) const {
     const glm::dvec3 sphereNormal{glm::normalize(crudePoint)};
     const glm::dvec3 gradient{
-        m_displacement
-            .displacement(gatherLevels(crudePoint, k_shadingOctaves), k_shadingOctaves)
+        m_displacement.displacement(gatherLevels(crudePoint, k_shadingOctaves))
             .m_gradient};
 
     // Only the tangential part of the gradient tilts the normal; the radial part
