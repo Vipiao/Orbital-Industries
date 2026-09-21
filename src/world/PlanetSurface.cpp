@@ -211,7 +211,6 @@ PlanetSurface::latticePlanes(const LatticeFrame& frame, int octave) const {
            "A blend reaching past the ceiling would put terrain outside the bounds");
 
     const double tilesPerMetre{octaveTilesPerMetre(octave)};
-    const glm::dvec2 shift{m_displacement.octaveShift(octave)};
 
     std::array<LatticePlane, k_latticeCorners> planes{};
     // The corner index is taken apart as two bits, one step per axis, which is
@@ -253,10 +252,10 @@ PlanetSurface::latticePlanes(const LatticeFrame& frame, int octave) const {
         const glm::dvec2 turnShift{static_cast<double>((hash >> 16) & 0xFFu) / 256.0,
                                    static_cast<double>((hash >> 24) & 0xFFu) / 256.0};
 
-        // Turned about the lattice point, which together with the shift is what
-        // leaves each cell reading the map somewhere else and along some other
-        // direction. The axes carry the turn rather than the coordinate, so the
-        // gradient comes back in the frame it was taken in.
+        // Turned and slid about the lattice point, so each cell reads the map
+        // somewhere else and along some other direction. The axes carry the turn
+        // rather than the coordinate, so the gradient comes back in the frame it
+        // was taken in.
         const glm::dvec3 tangent{turn.x * basisU - turn.y * basisV};
         const glm::dvec3 bitangent{turn.y * basisU + turn.x * basisV};
         // The plane carries a slope back into the body's frame through these, so
@@ -276,7 +275,7 @@ PlanetSurface::latticePlanes(const LatticeFrame& frame, int octave) const {
         planes[corner].m_tileCoord =
             glm::dvec2{glm::dot(offset, tangent), glm::dot(offset, bitangent)} *
                 tilesPerMetre +
-            shift + turnShift;
+            turnShift;
         planes[corner].m_tangent = tangent;
         planes[corner].m_bitangent = bitangent;
         planes[corner].m_weight = alongU[stepU] * alongV[stepV] * restore;

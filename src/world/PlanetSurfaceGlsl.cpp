@@ -66,15 +66,13 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface) {
     }
 
     glsl << ");\n\n"
-         << "// How an octave's map is laid down: how much oftener than the field it\n"
-         << "// was built at, and the tiles its coordinate is carried by first.\n"
-         << "const vec3 k_octaveTiling[k_octaveCount] = vec3[k_octaveCount](";
+         << "// How much oftener than the field it was built at an octave's map is laid\n"
+         << "// down.\n"
+         << "const float k_octaveFrequency[k_octaveCount] = float[k_octaveCount](";
 
     for (int octave{0}; octave < octaveCount; ++octave) {
-        const glm::dvec2 shift{displacement.octaveShift(octave)};
-        glsl << (octave == 0 ? "\n   vec3(" : ",\n   vec3(")
-             << glslFloat(displacement.octaveFrequency(octave)) << ", "
-             << glslFloat(shift.x) << ", " << glslFloat(shift.y) << ")";
+        glsl << (octave == 0 ? "\n   " : ",\n   ")
+             << glslFloat(displacement.octaveFrequency(octave));
     }
     glsl << ");\n";
 

@@ -276,7 +276,6 @@ void latticePlanes(LatticeFrame frame, int octave,
    float restore = inversesqrt(dot(alongU, alongU) * dot(alongV, alongV));
 
    float tilesPerMetre = octaveTilesPerMetre(octave);
-   vec2 shift = octaveShift(octave);
 
    for (int corner = 0; corner < k_latticeCorners; ++corner) {
       int stepU = corner & 1;
@@ -314,11 +313,11 @@ void latticePlanes(LatticeFrame frame, int octave,
       vec2 turnShift = vec2(float((hash >> 16) & 0xFFu),
                             float((hash >> 24) & 0xFFu)) * (1.0 / 256.0);
 
-      // Turned about the lattice point, which together with the shift is what
-      // leaves each cell reading the map somewhere else and along some other
-      // direction: the repeat is still there, and no longer runs far enough in
-      // one piece to be read as one. The axes carry the turn rather than the
-      // coordinate, so the gradient comes back in the frame it was taken in.
+      // Turned and slid about the lattice point, so each cell reads the map
+      // somewhere else and along some other direction: the repeat is still there
+      // and no longer runs far enough in one piece to be read as one. The axes
+      // carry the turn rather than the coordinate, so the gradient comes back in
+      // the frame it was taken in.
       vec3 tangent = turn.x * basisU - turn.y * basisV;
       vec3 bitangent = turn.y * basisU + turn.x * basisV;
 
@@ -331,7 +330,7 @@ void latticePlanes(LatticeFrame frame, int octave,
 
       planes[corner].tileCoord =
          vec2(dot(offset, tangent), dot(offset, bitangent)) * tilesPerMetre
-         + shift + turnShift;
+         + turnShift;
       planes[corner].tangent = tangent;
       planes[corner].bitangent = bitangent;
       planes[corner].weight = alongU[stepU] * alongV[stepV] * restore;

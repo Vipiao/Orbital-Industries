@@ -28,9 +28,8 @@
 //    int   k_levelCount    those, plus the base layer, which is not
 //    float k_levelReliefMetres[k_levelCount]  metres each layer stands, floor
 //                                             to ceiling
-//    vec3  k_octaveTiling[k_octaveCount]      how much oftener than the field an
-//                                             octave's map is laid down, then the
-//                                             tiles its coordinate is carried by
+//    float k_octaveFrequency[k_octaveCount]   how much oftener than the field an
+//                                             octave's map is laid down
 
 // What the caller read, per layer, before anything gave it a size. A layer the
 // caller did not reach is left at zero, which is what lets the sum below run the
@@ -52,23 +51,12 @@ struct TerrainMaterial {
    float roughness;
 };
 
-// The two columns the lattice reads, exported rather than used here: nothing
-// below calls either. They are the caller's to sample by and this table's to own,
-// because a frequency is half of a slope -- it is the amplitude beside it that
-// says how far the layer rises, and the frequency that says across what -- and the
-// ladder asserts the two step together. An amplitude on its own means nothing:
-// 658 metres is gentle across fifty kilometres and a cliff across two hundred.
-
-// How much oftener than the field it was built at an octave's map is laid down.
-// The caller sizes its lattice and picks its mip levels off this.
+// The column the lattice reads, exported rather than used here. A frequency is
+// half of a slope -- the amplitude beside it says how far a layer rises, this
+// says across what -- so the two sit in one table, and the ladder asserts they
+// step together.
 float octaveFrequency(int octave) {
-   return k_octaveTiling[octave].x;
-}
-
-// Tiles the octave's coordinate is carried by before it is read, which is what
-// leaves the octaves off one another's phase.
-vec2 octaveShift(int octave) {
-   return k_octaveTiling[octave].yz;
+   return k_octaveFrequency[octave];
 }
 
 // Every layer at its own relief, summed. Fewer layers gathered is a coarser
