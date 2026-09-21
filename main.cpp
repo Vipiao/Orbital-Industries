@@ -37,6 +37,30 @@ int debug2 = 0;
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 IHashable* DebugGlobals::g_gameBase = nullptr;
 
+// The maps a config was baked at, read back when the cache holds that same config
+// and baked afresh when it does not. A fresh bake is written back, and the faces
+// written out as images alongside it, a bake being the only occasion they change.
+// Neither write is worth failing over: the cost of both is that the next run bakes
+// again.
+static PlanetBaseMaps loadOrBakeBaseMaps(const std::filesystem::path& cachePath,
+                                         const PlanetBaseLayerConfig& config,
+                                         const PlanetBaseField& field) {
+    std::optional<PlanetBaseMaps> cached{PlanetBaseCache::load(cachePath, config)};
+    if (cached) {
+        return std::move(*cached);
+    }
+
+    PlanetBaseMaps baked{field.bake()};
+    if (!PlanetBaseCache::save(cachePath, config, baked)) {
+        std::cerr << "Could not write " << cachePath << "; the next run bakes again\n";
+    }
+    if (!PlanetBaseDump::writeElevationFaces(".", config, baked)) {
+        std::cerr << "Could not write the base layer's face images\n";
+    }
+
+    return baked;
+}
+
 // Test fixture: the hardcoded demo world. This is content, not game machinery, so
 // it lives with the entry point. Server and client build the identical world in
 // the same order, so every object id matches deterministically and the network
@@ -160,24 +184,8 @@ static void buildTestWorld(GameBase* gameBase) {
     // seconds, and tuning the octaves above never touches the config that drives
     // it. A file written for a different config, or cut short mid-write, reads as
     // a miss and is baked over.
-    const std::filesystem::path baseCachePath{"planet_base.cache"};
-    const PlanetBaseMaps baseMaps{[&] {
-        std::optional<PlanetBaseMaps> cached{
-            PlanetBaseCache::load(baseCachePath, planetBaseConfig)};
-        if (cached) {
-            return std::move(*cached);
-        }
-        PlanetBaseMaps baked{planetSurface->baseField().bake()};
-        if (!PlanetBaseCache::save(baseCachePath, planetBaseConfig, baked)) {
-            std::cerr << "Could not write " << baseCachePath << "; the next run bakes again\n";
-        }
-        // The faces as images on the same occasion: a bake is the only time they
-        // change.
-        if (!PlanetBaseDump::writeElevationFaces(".", planetBaseConfig, baked)) {
-            std::cerr << "Could not write the base layer's face images\n";
-        }
-        return baked;
-    }()};
+    const PlanetBaseMaps baseMaps{loadOrBakeBaseMaps(
+        "planet_base.cache", planetBaseConfig, planetSurface->baseField())};
 
     CubeTextureSpec baseSpec{};
     // Read from orbit as well as from the ground, where a whole face of these
