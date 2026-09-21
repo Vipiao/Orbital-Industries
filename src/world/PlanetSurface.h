@@ -135,21 +135,10 @@ private:
         double m_metresPerCell{0.0};   // at that same octave
     };
 
-    // Every octave's four planes read into one level apiece, and the base level
-    // read by direction, all of it in the map's own unit height. Mirrors
-    // gatherHeightLevels and gatherLevels: the first reads height alone, which
-    // is what placing a point needs, and the second reads height and slope off
-    // one lattice, where asking for them apart would build every plane twice.
-    TerrainDisplacement::Levels gatherHeightLevels(const glm::dvec3& crudePoint,
-                                                   int octaveCount) const;
-    TerrainDisplacement::Levels gatherLevels(const glm::dvec3& crudePoint,
-                                             int octaveCount) const;
-
-    // One octave's four planes blended into one reading, and into one slope in
-    // the body's frame. Mirrors blendHeight and blendSlope.
-    double blendHeight(const std::array<LatticePlane, k_latticeCorners>& planes) const;
-    glm::dvec3 blendSlope(const std::array<LatticePlane, k_latticeCorners>& planes,
-                          double tilesPerMetre) const;
+    // Tiles of an octave's own layer to the metre, its map being laid down that
+    // much more often than the field it was built at. Mirrors
+    // octaveTilesPerMetre.
+    double octaveTilesPerMetre(int octave) const;
 
     // Cells across one half of a cube face, for the layer named. Mirrors
     // octaveCells; cellsExactly is what it rounds, kept apart so the constructor
@@ -167,21 +156,35 @@ private:
     std::array<LatticePlane, k_latticeCorners> latticePlanes(
         const LatticeFrame& frame, int octave) const;
 
+    // Bilinear over the wrapped field, at the texel centres GL samples between,
+    // so a lookup here lands where the snippet's lookup does.
+    glm::dvec2 texelCoord(const glm::dvec2& tileCoord) const;
+
     // One plane's reading, in the map's own unit height, and its slope in unit
     // height per metre. What they come to in metres is TerrainDisplacement's,
     // which has one weighted sum per octave to scale rather than four.
     double sampleElevation(const glm::dvec2& tileCoord) const;
     glm::dvec2 sampleSlope(const glm::dvec2& tileCoord, double tilesPerMetre) const;
 
-    // Bilinear over the wrapped field, at the texel centres GL samples between,
-    // so a lookup here lands where the snippet's lookup does.
-    glm::dvec2 texelCoord(const glm::dvec2& tileCoord) const;
+    // One octave's four planes blended into one reading, and into one slope in
+    // the body's frame. Mirrors blendHeight and blendSlope.
+    double blendHeight(const std::array<LatticePlane, k_latticeCorners>& planes) const;
+    glm::dvec3 blendSlope(const std::array<LatticePlane, k_latticeCorners>& planes,
+                          double tilesPerMetre) const;
+
+    // Every octave's four planes read into one level apiece, and the base level
+    // read by direction, all of it in the map's own unit height. Mirrors
+    // gatherHeightLevels and gatherLevels: the first reads height alone, which
+    // is what placing a point needs, and the second reads height and slope off
+    // one lattice, where asking for them apart would build every plane twice.
+    TerrainDisplacement::Levels gatherHeightLevels(const glm::dvec3& crudePoint,
+                                                   int octaveCount) const;
+    TerrainDisplacement::Levels gatherLevels(const glm::dvec3& crudePoint,
+                                             int octaveCount) const;
 
     double m_radius{1.0};
     double m_tileSpan{1.0};
     double m_tilesPerSpan{1.0};
-    // What those two come to, which is what everything here divides by.
-    double m_tileSize{1.0};
     // In unit height, as the snippet's fieldMean is: the map's own mean, which
     // the blend leans on because its weights sum to more than one.
     double m_fieldMean{0.0};

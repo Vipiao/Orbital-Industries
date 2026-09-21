@@ -279,13 +279,13 @@ void latticePlanes(LatticeFrame frame, int octave,
    vec2 shift = octaveShift(octave);
 
    for (int corner = 0; corner < k_latticeCorners; ++corner) {
-      float stepU = float(corner & 1);
-      float stepV = float(corner >> 1);
+      int stepU = corner & 1;
+      int stepV = corner >> 1;
 
       ivec3 point;
       point[frame.major] = int(frame.faceSign) * cells;
-      point[frame.uAxis] = cellU + (corner & 1);
-      point[frame.vAxis] = cellV + (corner >> 1);
+      point[frame.uAxis] = cellU + stepU;
+      point[frame.vAxis] = cellV + stepV;
 
       vec3 direction = normalize(vec3(point));
 
@@ -326,15 +326,15 @@ void latticePlanes(LatticeFrame frame, int octave,
       // cell is cut on. What of it stands off the body falls out in the two dot
       // products below, the plane's axes having no reach that way.
       vec3 offset = vec3(0.0);
-      offset[frame.uAxis] = (fracU - stepU) * metresPerCell;
-      offset[frame.vAxis] = (fracV - stepV) * metresPerCell;
+      offset[frame.uAxis] = (fracU - float(stepU)) * metresPerCell;
+      offset[frame.vAxis] = (fracV - float(stepV)) * metresPerCell;
 
       planes[corner].tileCoord =
          vec2(dot(offset, tangent), dot(offset, bitangent)) * tilesPerMetre
          + shift + turnShift;
       planes[corner].tangent = tangent;
       planes[corner].bitangent = bitangent;
-      planes[corner].weight = alongU[corner & 1] * alongV[corner >> 1] * restore;
+      planes[corner].weight = alongU[stepU] * alongV[stepV] * restore;
    }
 }
 
