@@ -8,11 +8,11 @@
  * @brief What the terrain is: how many layers it has, how tall each stands, and
  * how they add up.
  *
- * Where the numbers live. media/surfaces/terrain_displacement.glsl runs the same
- * arithmetic on the GPU but holds none of the figures: planetSurfaceGlsl spells
- * these out for it to read, so the table is here once rather than on both sides
- * waiting to be edited apart. The two still have to agree about what to do with
- * them, and a change to the sum belongs in both.
+ * Where the numbers live. terrain_displacement.glsl runs the same arithmetic on
+ * the GPU but holds none of the figures: planetSurfaceGlsl spells these out for
+ * it to read, so the table is here once rather than on both sides waiting to be
+ * edited apart. The two still have to agree about what to do with them, and a
+ * change to the sum belongs in both.
  *
  * Nothing here knows where a reading came from. The caller takes the lookups and
  * hands them over dimensionless; this gives them size. Only the frequency column

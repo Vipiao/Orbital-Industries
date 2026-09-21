@@ -134,7 +134,7 @@ static void buildTestWorld(GameBase* gameBase) {
         [shape = planetSurfaceGlsl(*planetSurface)] {
             return shape
                  + ShaderProgram::loadTextFileFromPath(
-                       "../media/surfaces/lattice_surface.glsl");
+                       "../src/world/lattice_surface.glsl");
         })};
 
     const std::vector<uint16_t> noiseBake{planetSurface->bakeElevation()};

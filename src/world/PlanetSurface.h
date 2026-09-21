@@ -16,11 +16,11 @@
  * the readings it comes to. What those then amount to is TerrainDisplacement's,
  * which this hands them to unscaled.
  *
- * The twin of media/surfaces/lattice_surface.glsl, written apart only because
- * the two run in different languages. Every function here has one there, and a
- * change to one alone leaves the bounds no longer describing the surface being
- * drawn, which is what closes the seams between patches. The figures are not
- * written twice: planetSurfaceGlsl hands the snippet the ones held here.
+ * The twin of lattice_surface.glsl, written apart only because the two run in
+ * different languages. Every function here has one there, and a change to one
+ * alone leaves the bounds no longer describing the surface being drawn, which is
+ * what closes the seams between patches. The figures are not written twice:
+ * planetSurfaceGlsl hands the snippet the ones held here.
  *
  * The shading octaves are the exception, and need not agree with anything: they
  * tilt a normal without moving a vertex, and nothing measures a normal.
