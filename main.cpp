@@ -120,6 +120,11 @@ static void buildTestWorld(GameBase* gameBase) {
     const double planetTileSpanMetres{12742000.0};
     const double planetTilesPerSpan{10000.0};
     const double planetReliefMetres{658.0};
+    // The layer beneath the octaves. Nothing like their rise over run, and
+    // deliberately: it is hundreds of times wider than octave zero and only tens
+    // of times taller, so it is far the gentlest slope on the body and the
+    // quadtree's ranges, which answer for the steepest, never see it.
+    const double planetBaseReliefMetres{10000.0};
 
     // The noise both sides read, generated once. The map is dimensionless -- the
     // field spans exactly [0, 1] and its gradient is per unit of tile -- so it
@@ -143,7 +148,7 @@ static void buildTestWorld(GameBase* gameBase) {
 
     const std::shared_ptr<PlanetSurface> planetSurface{std::make_shared<PlanetSurface>(
         planetRadius, planetTileSpanMetres, planetTilesPerSpan, planetReliefMetres,
-        terrainConfig, planetBaseConfig)};
+        planetBaseReliefMetres, terrainConfig, planetBaseConfig)};
 
     const int planetSsboIndex{graphicsEngine->m_ssboManager->allocateIndex()};
 

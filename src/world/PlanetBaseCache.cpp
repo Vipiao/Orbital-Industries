@@ -9,15 +9,15 @@ namespace {
 // Tells this cache from anything else that landed on the name; the version
 // retires a layout change, so an older file reads as a miss and not as texels.
 constexpr std::uint32_t k_magic{0x504C4243};   // 'PLBC'
-constexpr std::uint32_t k_version{1};
+constexpr std::uint32_t k_version{2};
 
 // Field by field rather than a memcmp, whose padding carries whatever the stack
 // held.
 bool sameConfig(const PlanetBaseLayerConfig& a, const PlanetBaseLayerConfig& b) {
     return a.m_elevationResolution == b.m_elevationResolution &&
-           a.m_slopeResolution == b.m_slopeResolution && a.m_reliefMetres == b.m_reliefMetres &&
-           a.m_octaveCount == b.m_octaveCount && a.m_baseFrequency == b.m_baseFrequency &&
-           a.m_gain == b.m_gain && a.m_seed == b.m_seed;
+           a.m_slopeResolution == b.m_slopeResolution && a.m_octaveCount == b.m_octaveCount &&
+           a.m_baseFrequency == b.m_baseFrequency && a.m_gain == b.m_gain &&
+           a.m_seed == b.m_seed;
 }
 
 // Texels one face holds. The config fixes these, so the payload carries no

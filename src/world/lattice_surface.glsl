@@ -583,27 +583,6 @@ Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
    return df3Scale(df3Normalize(crudePoint), reach);
 }
 
-// Metres of height between one colour band and the next. A contour interval:
-// the surface is banded by how high it stands, so relief too gentle to see in
-// the shading still reads as a pattern of stripes.
-//
-// A stand-in for a material, and the whole of what this surface has to say about
-// its own colour for now.
-const float k_colourBandMetres = 500.0;
-
-// Roughness by slope: flats hold the fine material that settles out of
-// everything standing above them and scatter in every direction, while ground
-// steep enough to shed it is left as the rock beneath, which carries a
-// highlight.
-//
-// The ramp is placed off the ladder's own measurements -- mean rise over run is
-// 0.60 and the steepest ground reaches 2.27 -- so it spans the middle of the
-// range and keeps the far end for ground that is truly bare.
-const float k_flatRoughness = 0.85;
-const float k_steepRoughness = 0.45;
-const float k_roughnessSlopeFrom = 0.25;
-const float k_roughnessSlopeTo = 1.20;
-
 // How the surface faces, what colour it is drawn in, and how tight a highlight
 // it carries. Only the tangential part of the gradient tilts the normal; the
 // radial part moves the point without turning it. The tangent stretch as the
@@ -644,17 +623,14 @@ CdlodSurfaceShading cdlodSurfaceShading(Df3 crudePoint, vec3 crudeDerivX,
    vec3 acrossSphere = displacement.gradient
       - sphereNormal * dot(sphereNormal, displacement.gradient);
 
+   // Rise over run, which the tangential gradient already is.
+   TerrainMaterial material =
+      terrainMaterial(displacement.height, length(acrossSphere));
+
    CdlodSurfaceShading shading;
    shading.normal = normalize(sphereNormal - acrossSphere);
-
-   const float k_turn = 6.283185307179586;
-   shading.colour =
-      vec3(0.5 + 0.5 * sin(displacement.height * (k_turn / k_colourBandMetres)));
-
-   // Rise over run, which the tangential gradient already is.
-   shading.roughness =
-      mix(k_flatRoughness, k_steepRoughness,
-          smoothstep(k_roughnessSlopeFrom, k_roughnessSlopeTo, length(acrossSphere)));
+   shading.colour = material.colour;
+   shading.roughness = material.roughness;
 
    return shading;
 }

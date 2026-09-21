@@ -51,15 +51,19 @@
  */
 class PlanetSurface {
 public:
-    // radiusMetres is the sphere the crude solid projects onto, and reliefMetres
-    // the floor to ceiling height of the terrain it carries.
+    // radiusMetres is the sphere the crude solid projects onto, reliefMetres the
+    // floor to ceiling height of the terrain the octaves carry, and
+    // baseReliefMetres the same for the layer beneath them. The base field is
+    // dimensionless, so its height is named here rather than in the config that
+    // generates it.
     //
     // One repeat of the map is tileSpanMetres wide over tilesPerSpan of them,
     // taken as two whole numbers rather than the width they come to. That width
     // is not exact in a float, and a plane coordinate stands thousands of tiles
     // out, where a part in ten million of it is a thousandth of a tile of drift.
     PlanetSurface(double radiusMetres, double tileSpanMetres, double tilesPerSpan,
-                  double reliefMetres, const TileableNoiseMapConfig& noiseConfig,
+                  double reliefMetres, double baseReliefMetres,
+                  const TileableNoiseMapConfig& noiseConfig,
                   const PlanetBaseLayerConfig& baseConfig);
 
     // Where a crude point is drawn. Mirrors cdlodSurfacePoint.

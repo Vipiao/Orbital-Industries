@@ -53,11 +53,12 @@ constexpr double k_exactWhole{16777216.0};   // 2^24
 
 PlanetSurface::PlanetSurface(double radiusMetres, double tileSpanMetres,
                              double tilesPerSpan, double reliefMetres,
+                             double baseReliefMetres,
                              const TileableNoiseMapConfig& noiseConfig,
                              const PlanetBaseLayerConfig& baseConfig)
     : m_radius{radiusMetres}, m_tileSpan{tileSpanMetres}, m_tilesPerSpan{tilesPerSpan},
       m_noise{noiseConfig}, m_baseField{baseConfig},
-      m_displacement{reliefMetres, baseConfig.m_reliefMetres} {
+      m_displacement{reliefMetres, baseReliefMetres} {
     assert(m_radius > 0.0 && "A body with no radius projects every crude point to a point");
     assert(m_tileSpan > 0.0 && m_tilesPerSpan > 0.0 &&
            "A tile of no width repeats infinitely often across the body");

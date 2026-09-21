@@ -25,14 +25,6 @@ struct PlanetBaseLayerConfig {
     // three channels of float would otherwise cost.
     int m_elevationResolution{2048};
     int m_slopeResolution{1024};
-    // Metres between the layer's floor and its ceiling, as the relief is for the
-    // map: the field is unsigned, so this rises off the sphere.
-    //
-    // Nothing like the octaves' rise over run, and deliberately: this layer is
-    // hundreds of times wider than octave zero and only tens of times taller, so
-    // it is far the gentlest slope on the body and the quadtree's ranges, which
-    // answer for the steepest, never see it.
-    double m_reliefMetres{10000.0};
     int m_octaveCount{5};
     // Noise cells across one unit of direction at octave zero. A cell is the
     // radius over this, so two puts the coarsest features a few thousand
@@ -100,9 +92,6 @@ public:
 
     int elevationResolution() const { return m_config.m_elevationResolution; }
     int slopeResolution() const { return m_config.m_slopeResolution; }
-    // What the maps are dimensionless against, and so what a reader needs
-    // alongside them to give either one metres.
-    double relief() const { return m_config.m_reliefMetres; }
 
 private:
     // One face of each map, written in place. Split out because the faces are

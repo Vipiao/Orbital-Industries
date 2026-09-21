@@ -1,9 +1,14 @@
 // terrain_displacement.glsl
 //
-// How the layers add up. Nothing about where a reading came from -- the caller
-// takes the lookups and hands them over dimensionless, and this gives them size.
-// Only the tiling is exported, because the caller reads the map at its own
-// scale.
+// What the terrain is: how the layers add up into a height and a gradient, and
+// what the ground is made of where they land. Nothing about where a reading came
+// from -- the caller takes the lookups and hands them over dimensionless, and
+// this gives them size. Only the tiling is exported, because the caller reads the
+// map at its own scale.
+//
+// Nothing here knows the body is a sphere. A height, a rise over run and a colour
+// are the same things on any shape, and wrapping the flat map onto this one is
+// lattice_surface.glsl's.
 //
 // How tall each layer stands is not written here; that is
 // src/world/TerrainDisplacement's, held once rather than on both sides waiting
@@ -41,6 +46,19 @@ struct TerrainDisplacement {
    vec3 gradient;   // metres per metre, in the body's frame
 };
 
+// What the ground is made of where it was measured.
+struct TerrainMaterial {
+   vec3 colour;
+   float roughness;
+};
+
+// The two columns the lattice reads, exported rather than used here: nothing
+// below calls either. They are the caller's to sample by and this table's to own,
+// because a frequency is half of a slope -- it is the amplitude beside it that
+// says how far the layer rises, and the frequency that says across what -- and the
+// ladder asserts the two step together. An amplitude on its own means nothing:
+// 658 metres is gentle across fifty kilometres and a cliff across two hundred.
+
 // How much oftener than the field it was built at an octave's map is laid down.
 // The caller sizes its lattice and picks its mip levels off this.
 float octaveFrequency(int octave) {
@@ -67,4 +85,42 @@ TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
    }
 
    return displacement;
+}
+
+// Metres of height between one colour band and the next. A contour interval: the
+// surface is banded by how high it stands, so relief too gentle to see in the
+// shading still reads as a pattern of stripes.
+//
+// A stand-in for a material, and the whole of what this surface has to say about
+// its own colour for now.
+const float k_colourBandMetres = 500.0;
+
+// Roughness by slope: flats hold the fine material that settles out of everything
+// standing above them and scatter in every direction, while ground steep enough to
+// shed it is left as the rock beneath, which carries a highlight.
+//
+// The ramp is placed off the ladder's own measurements -- mean rise over run is
+// 0.60 and the steepest ground reaches 2.27 -- so it spans the middle of the range
+// and keeps the far end for ground that is truly bare.
+const float k_flatRoughness = 0.85;
+const float k_steepRoughness = 0.45;
+const float k_roughnessSlopeFrom = 0.25;
+const float k_roughnessSlopeTo = 1.20;
+
+// What the ground is made of, from how high it stands and how steeply it leans.
+//
+// Slope is rise over run across the surface, which is what the caller is left
+// holding once the part of the gradient that only moves the point has come off.
+// Neither of these knows the body is a sphere, and neither needs to.
+TerrainMaterial terrainMaterial(float heightMetres, float slope) {
+   const float k_turn = 6.283185307179586;
+
+   TerrainMaterial material;
+   material.colour =
+      vec3(0.5 + 0.5 * sin(heightMetres * (k_turn / k_colourBandMetres)));
+   material.roughness =
+      mix(k_flatRoughness, k_steepRoughness,
+          smoothstep(k_roughnessSlopeFrom, k_roughnessSlopeTo, slope));
+
+   return material;
 }

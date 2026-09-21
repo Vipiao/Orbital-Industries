@@ -37,8 +37,6 @@ PlanetBaseField::PlanetBaseField(const PlanetBaseLayerConfig& config) : m_config
     }
     assert(m_config.m_octaveCount > 0 && "A base layer with no octaves is a bare sphere");
     assert(m_config.m_baseFrequency > 0 && "A field with no cells has nothing to interpolate");
-    assert(m_config.m_reliefMetres >= 0.0 &&
-           "Negative relief would sink the base layer into the sphere");
 
     // The face a direction lands on, and which way up it lies there, are the
     // sampler's to decide; this side only writes the map. A stray sign in the
