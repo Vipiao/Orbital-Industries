@@ -1,7 +1,7 @@
 // lattice_surface.glsl
 //
 // Where the terrain is read from: the lattice the map is sampled through, and
-// the level each lookup is taken at. What the readings then amount to is
+// the mip each lookup is taken at. What the readings then amount to is
 // terrain_displacement.glsl's, which this hands them to unscaled.
 //
 // Terrain read out of a baked, tileable noise map instead of evaluated in
@@ -34,15 +34,15 @@
 // off the crude point itself, and only the position path pays the wide square
 // root that projects one onto the sphere.
 //
-// Every lookup is taken at the level its sampling resolves, and the two stages
-// arrive at that level differently because their samples are differently shaped.
-// The fragment stage has screen derivatives and asks for the level its pixel
+// Every lookup is taken at the mip its sampling resolves, and the two stages
+// arrive at that mip differently because their samples are differently shaped.
+// The fragment stage has screen derivatives and asks for the mip its pixel
 // covers. The vertex stage has none, and is handed the metres between
 // neighbouring vertices instead. A spacing rather than a distance: what a sample
 // resolves is how far it stands from the next one, and the two part company
 // wherever the terrain lifts the camera off the sphere -- a camera an arm's
 // length above ground that stands four hundred metres up is four hundred metres
-// from the sphere below it, and would read the ground through a level chosen for
+// from the sphere below it, and would read the ground through a mip chosen for
 // a patch that size.
 //
 // Neither depends on which patch asked, which is what geometry requires: the
@@ -57,7 +57,7 @@
 // Both paths take the point in a wide float, and both reduce it to its cell
 // before narrowing. A point on this body is millions of metres from the origin,
 // where a float's spacing is half a metre -- two hundred texels of the finest
-// octave's map -- so a lookup taken from a narrow coordinate reads that lattice
+// layer's map -- so a lookup taken from a narrow coordinate reads that lattice
 // rather than the terrain. What stays narrow is everything downstream of the
 // split: weights, slopes and the normal are directions and heights, not
 // positions. The twin is double throughout, being under no such pressure.
@@ -78,8 +78,8 @@
 //                                float and a plane coordinate standing thousands
 //                                of tiles out
 //    int   k_latticeCorners    lattice points a cell is bounded by
-//    float k_cellTiles         tiles of an octave's own layer one cell spans
-//    int   k_positionOctaves   octaves the drawn geometry carries
+//    float k_cellTiles         tiles of a level's own layer one cell spans
+//    int   k_positionLevels    levels the drawn geometry carries
 //
 // terrain_displacement.glsl lists the rest, being what reads them.
 
@@ -87,7 +87,7 @@ uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1
 uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 
 // The base layer: what the body is shaped like at its own size, under everything
-// the octaves lay on it. Read by direction rather than through the lattice,
+// the lattice layers lay on it. Read by direction rather than through the lattice,
 // because at this scale there is nothing to tile -- one pass of the field covers
 // the body once, so there is no repeat to hide and no seam to close.
 //
@@ -99,8 +99,8 @@ uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 uniform samplerCube u_baseElevationMap;  // R16 unorm, spanning exactly [0, 1]
 uniform samplerCube u_baseGradientMap;   // RGB16F, slope per unit of direction
 
-// Octaves the shading carries, and free to run past the geometry: both read the
-// same octaves and each stops where its own sampling does, a pixel resolving
+// Levels the shading carries, and free to run past the geometry: both read the
+// same table and each stops where its own sampling does, a pixel resolving
 // finer than a quad. A layer past the geometry would arrive as relief in the
 // normal that the vertices never carry, and since it tilts a normal without
 // moving one, nothing that measures the surface has to answer for it.
@@ -109,7 +109,7 @@ uniform samplerCube u_baseGradientMap;   // RGB16F, slope per unit of direction
 //
 // It costs four lookups per layer wherever one is still above the map's top,
 // which the gradient path skips it below.
-const int k_shadingOctaves = 3;
+const int k_shadingLevels = 4;
 
 // One lattice point's plane, as the point being shaded stands in it.
 struct LatticePlane {
@@ -119,22 +119,22 @@ struct LatticePlane {
    float weight;     // how much of the blend this plane carries
 };
 
-// Tiles of an octave's own layer to the metre. Its map is laid down that much
+// Tiles of a level's own layer to the metre. Its map is laid down that much
 // more often than the field it was built at.
-float octaveTilesPerMetre(int octave) {
-   return k_tilesPerSpan * octaveFrequency(octave) / k_tileSpanMetres;
+float levelTilesPerMetre(int level) {
+   return k_tilesPerSpan * levelFrequency(level) / k_tileSpanMetres;
 }
 
-// Cells across one half of a cube face for the layer named: that octave's tiles
+// Cells across one half of a cube face for the layer named: that level's tiles
 // across the half face, in groups of k_cellTiles.
 //
 // Grouped so the arithmetic stays exact -- the radius over the span is a half,
 // the rest whole numbers and powers of two -- so this float and the twin's
 // double land on the same whole number. PlanetSurface asserts they do; constants
 // leaving it between two would let the two sides round apart.
-int octaveCells(int octave) {
+int levelCells(int level) {
    float tilesPerHalfFace =
-      k_tilesPerSpan * (k_radiusMetres / k_tileSpanMetres) * octaveFrequency(octave);
+      k_tilesPerSpan * (k_radiusMetres / k_tileSpanMetres) * levelFrequency(level);
 
    return int(tilesPerHalfFace / k_cellTiles + 0.5);
 }
@@ -146,8 +146,8 @@ int octaveCells(int octave) {
 // its point sits and may differ in the last place harmlessly, but neighbouring
 // points draw unrelated numbers, so one bit apart is a different plane.
 //
-// No octave in the mix, and none needed: a point's largest coordinate is its own
-// octave's cell count, so no two layers ever name the same point.
+// No level in the mix, and none needed: a point's largest coordinate is its own
+// level's cell count, so no two layers ever name the same point.
 uint latticeHash(ivec3 point) {
    uint h = uint(point.x) * 0x9E3779B1u;
    h = (h ^ uint(point.y)) * 0x85EBCA6Bu;
@@ -164,7 +164,7 @@ uint latticeHash(ivec3 point) {
 
 // A lattice coordinate split into the cell it falls in and how far across that
 // cell it stands, the whole part taken off while the value is still wide. A
-// cell at the finest octave is a few metres and the body is millions of them,
+// cell at the finest level is a few metres and the body is millions of them,
 // so a coordinate narrowed before the split holds nothing but whole cells.
 //
 // The same decomposition dfFractToFloat makes, keeping the whole part rather
@@ -179,7 +179,7 @@ float latticeSplit(Df coordinate, out int cell) {
 }
 
 // The cube face a point stands on, and where across it, found once and read by
-// every octave.
+// every level.
 //
 // A point's face comes from its largest component, by magnitude rather than
 // signed value, so a point on a face boundary answers the same from either side.
@@ -188,9 +188,9 @@ struct LatticeFrame {
    int uAxis;             // and the two cut across it
    int vAxis;
    Df coordU;             // where the point falls across the face, in cells of
-   Df coordV;             // the coarsest octave, which the rest scale from
+   Df coordV;             // the coarsest level, which the rest scale from
    float faceSign;        // which of the pair of faces it is
-   float metresPerCell;   // at that same octave
+   float metresPerCell;   // at that same level
 };
 
 // The frame the point stands in, taken off the crude point rather than off its
@@ -210,10 +210,10 @@ LatticeFrame latticeFrameOf(Df3 crudePoint) {
    frame.faceSign = crudePoint.hi[frame.major] < 0.0 ? -1.0 : 1.0;
 
    // How far out the face stands, and the one wide division the lattice costs
-   // however many octaves go on to read it.
+   // however many levels go on to read it.
    Df faceSpan = Df(frame.faceSign * crudePoint.hi[frame.major],
                     frame.faceSign * crudePoint.lo[frame.major]);
-   float cells = float(octaveCells(0));
+   float cells = float(levelCells(k_firstLatticeLevel));
    Df cellScale = dfDiv(dfFromFloat(cells), faceSpan);
 
    frame.coordU =
@@ -237,14 +237,14 @@ LatticeFrame latticeFrameOf(Df3 crudePoint) {
 // is what the seamlessness rests on: face normals differ by a right angle across
 // an edge, lattice point directions not at all.
 //
-// Every octave's cell count is the coarsest one's times a power of two, so a
+// Every level's cell count is the coarsest one's times a power of two, so a
 // layer reaches its own lattice by shifting the frame's exponents. Exact, and
-// free of wide arithmetic, which leaves the lattice no dearer at four octaves
+// free of wide arithmetic, which leaves the lattice no dearer at four levels
 // than at one. PlanetSurface asserts the counts step that way.
-void latticePlanes(LatticeFrame frame, int octave,
+void latticePlanes(LatticeFrame frame, int level,
                    out LatticePlane planes[k_latticeCorners]) {
-   int cells = octaveCells(octave);
-   float cellRatio = float(cells) / float(octaveCells(0));
+   int cells = levelCells(level);
+   float cellRatio = float(cells) / float(levelCells(k_firstLatticeLevel));
 
    int cellU;
    int cellV;
@@ -275,7 +275,7 @@ void latticePlanes(LatticeFrame frame, int octave,
    // blendHeight does, and answers for it.
    float restore = inversesqrt(dot(alongU, alongU) * dot(alongV, alongV));
 
-   float tilesPerMetre = octaveTilesPerMetre(octave);
+   float tilesPerMetre = levelTilesPerMetre(level);
 
    for (int corner = 0; corner < k_latticeCorners; ++corner) {
       int stepU = corner & 1;
@@ -302,7 +302,7 @@ void latticePlanes(LatticeFrame frame, int octave,
 
       // A byte apiece. The turn arrives as a pair's direction rather than as an
       // angle, which is one root where a sine and a cosine stood -- the same
-      // thing to the terrain, and this runs four times per octave.
+      // thing to the terrain, and this runs four times per level.
       //
       // Odd numerators over an even scale, so neither half lands on the middle
       // and the pair is never the zero that points nowhere.
@@ -338,56 +338,56 @@ void latticePlanes(LatticeFrame frame, int octave,
 }
 
 // One plane's reading, in the map's own unit height. What it comes to in metres
-// is terrainDisplacement's, which has one weighted sum per octave to scale
+// is terrainDisplacement's, which has one weighted sum per level to scale
 // rather than four.
 //
 // The coordinate arrives a few tiles from its plane's own lattice point and is
 // left that way, the sampler's wrap taking it home. Two patches meeting at a
 // level boundary reach the same lattice point and read the same texel.
 //
-// The level is given rather than derived: this is read from stages that have no
+// The mip is given rather than derived: this is read from stages that have no
 // derivatives, and the caller knows how far apart its samples stand.
-float sampleElevation(vec2 tileCoord, float mipLevel) {
-   return textureLod(u_noiseMap, tileCoord, mipLevel).r;
+float sampleElevation(vec2 tileCoord, float mip) {
+   return textureLod(u_noiseMap, tileCoord, mip).r;
 }
 
-// Levels sharper than the spacing each lookup is taken. At zero a texel matches
+// Mips sharper than the spacing each lookup is taken. At zero a texel matches
 // the spacing, already a level short of suppressing every wavelength the samples
 // cannot carry; raising it buys detail back, and what it buys moves as the
 // samples do.
 const float k_detailSharpening = 0.0;
 
-// The level at which one texel of an octave's map covers the spacing given. An
-// octave lays the map down octaveFrequency times as often, so its texel is that
-// much smaller on the ground.
+// The mip at which one texel of a layer's map covers the spacing given. A layer
+// lays the map down levelFrequency times as often, so its texel is that much
+// smaller on the ground.
 //
-// Not clamped above: the sampler stops at its own 1x1 top, where an octave
-// returns the map's mean. So an octave retires by fading into its own average as
-// the samples spread past it, with nothing left to step when it does.
+// Not clamped above: the sampler stops at its own 1x1 top, where a layer returns
+// the map's mean. So a layer retires by fading into its own average as the
+// samples spread past it, with nothing left to step when it does.
 //
 // Sized off the elevation map for both, the two being baked from one field at
 // one resolution.
-float octaveMipLevel(float sampleSpacing, float frequency) {
+float levelMip(float sampleSpacing, float frequency) {
    float texelSpan = k_tileSpanMetres
       / (k_tilesPerSpan * frequency * float(textureSize(u_noiseMap, 0).x));
 
    return max(0.0, log2(sampleSpacing / texelSpan) - k_detailSharpening);
 }
 
-// The level at which a lookup covers the whole tile, so that what comes back is
+// The mip at which a lookup covers the whole tile, so that what comes back is
 // the field's mean however the coordinate moves.
-float mapTopLevel() {
+float mapTopMip() {
    return log2(float(textureSize(u_noiseMap, 0).x));
 }
 
-// The level at which one texel of a base map covers the spacing given. A cube
+// The mip at which one texel of a base map covers the spacing given. A cube
 // face spans a quarter turn of the body, so its texels are that arc cut into as
 // many pieces as the map has a side.
 //
 // The side is passed rather than read from one of the two maps, because they are
-// not the same size and a level means a different thing on each: level zero of
-// the smaller map is already as coarse as level one of the larger.
-float baseMipLevel(float sampleSpacing, float mapSide) {
+// not the same size and a mip means a different thing on each: mip zero of
+// the smaller map is already as coarse as mip one of the larger.
+float baseMip(float sampleSpacing, float mapSide) {
    const float k_quarterTurn = 1.5707963267948966;
    float texelSpan = k_quarterTurn * k_radiusMetres / mapSide;
 
@@ -395,7 +395,7 @@ float baseMipLevel(float sampleSpacing, float mapSide) {
 }
 
 // The base layer's reading and its slope in the body's frame, both in the map's
-// own unit height as the octaves' are.
+// own unit height as the lattice layers' are.
 //
 // The direction is narrow, and safely so where nothing else here is: it is
 // bounded by one however wide the body, so a float resolves it to a millionth of
@@ -405,16 +405,16 @@ float baseMipLevel(float sampleSpacing, float mapSide) {
 //
 // The map holds the slope per unit of direction, and a metre across the surface
 // turns the direction by one over the radius. That ratio is what puts the slope
-// in the per metre the octaves' own come back in, so the two need the same one
+// in the per metre the lattice layers' own come back in, so the two need the same one
 // scaling afterwards and cannot be given different ones.
 float baseElevation(vec3 direction, float sampleSpacing) {
    float side = float(textureSize(u_baseElevationMap, 0).x);
-   return textureLod(u_baseElevationMap, direction, baseMipLevel(sampleSpacing, side)).r;
+   return textureLod(u_baseElevationMap, direction, baseMip(sampleSpacing, side)).r;
 }
 
 vec3 baseGradient(vec3 direction, float sampleSpacing) {
    float side = float(textureSize(u_baseGradientMap, 0).x);
-   return textureLod(u_baseGradientMap, direction, baseMipLevel(sampleSpacing, side)).rgb
+   return textureLod(u_baseGradientMap, direction, baseMip(sampleSpacing, side)).rgb
       * (1.0 / k_radiusMetres);
 }
 
@@ -424,31 +424,31 @@ vec3 baseGradient(vec3 direction, float sampleSpacing) {
 // ground. Unit height as sampleElevation's is, so the two take the same scaling
 // and the one stays the derivative of the other.
 //
-// The level is given rather than derived, as sampleElevation's is. Each plane's
+// The mip is given rather than derived, as sampleElevation's is. Each plane's
 // coordinate jumps to the next lattice point at every cell boundary, so
 // differencing one across a pixel quad would read that jump as an infinite slope
-// and pick the coarsest level along a line through every cell.
-vec2 sampleSlope(vec2 tileCoord, float tilesPerMetre, float mipLevel) {
-   vec2 perTile = textureLod(u_gradientMap, tileCoord, mipLevel).rg;
+// and pick the coarsest mip along a line through every cell.
+vec2 sampleSlope(vec2 tileCoord, float tilesPerMetre, float mip) {
+   vec2 perTile = textureLod(u_gradientMap, tileCoord, mip).rg;
    return perTile * tilesPerMetre;
 }
 
-// One octave's four planes blended into one reading.
+// One level's four planes blended into one reading.
 //
 // The blend's weights sum to more than one, so a layer overshoots by whatever it
 // stands above the map's mean, and the mean is what that overshoot is taken back
 // off against.
-float blendHeight(LatticePlane planes[k_latticeCorners], float mipLevel,
+float blendHeight(LatticePlane planes[k_latticeCorners], float mip,
                   float fieldMean) {
-   float level = 0.0;
+   float reading = 0.0;
    float covered = 0.0;
    for (int corner = 0; corner < k_latticeCorners; ++corner) {
-      level += planes[corner].weight
-         * sampleElevation(planes[corner].tileCoord, mipLevel);
+      reading += planes[corner].weight
+         * sampleElevation(planes[corner].tileCoord, mip);
       covered += planes[corner].weight;
    }
 
-   return level + fieldMean * (1.0 - covered);
+   return reading + fieldMean * (1.0 - covered);
 }
 
 // The same four, blended into one slope in the body's frame.
@@ -461,16 +461,16 @@ float blendHeight(LatticePlane planes[k_latticeCorners], float mipLevel,
 // proportional to the difference between the planes' readings, which the blend
 // already softens. No mean to answer for either, the mean slope of a field that
 // wraps being zero.
-vec3 blendSlope(LatticePlane planes[k_latticeCorners], float mipLevel,
+vec3 blendSlope(LatticePlane planes[k_latticeCorners], float mip,
                 float tilesPerMetre) {
-   vec3 level = vec3(0.0);
+   vec3 reading = vec3(0.0);
    for (int corner = 0; corner < k_latticeCorners; ++corner) {
-      vec2 slope = sampleSlope(planes[corner].tileCoord, tilesPerMetre, mipLevel);
-      level += planes[corner].weight
+      vec2 slope = sampleSlope(planes[corner].tileCoord, tilesPerMetre, mip);
+      reading += planes[corner].weight
          * (slope.x * planes[corner].tangent + slope.y * planes[corner].bitangent);
    }
 
-   return level;
+   return reading;
 }
 
 // Nothing read yet. A layer the caller does not reach is left at zero rather
@@ -486,39 +486,39 @@ TerrainLevels emptyLevels() {
    return levels;
 }
 
-// The lattice is taken per octave, each layer wanting cells sized to its own
+// The lattice is taken per level, each layer wanting cells sized to its own
 // tile, so the four planes are found again for every one of them. The face they
 // stand on is the same for all of them and is found once.
 //
 // sampleSpacing is how far apart the samples reading this stand on the ground.
-// Every octave is read at the level that spacing resolves, so a layer finer than
+// Every layer is read at the mip that spacing resolves, so a layer finer than
 // the samples arrives as its own average rather than as whichever point of it
 // each sample landed on. What that removes was never terrain: it was the noise a
 // lattice makes.
 //
 // Height alone: what the vertex stages ask for, which place a point without
 // shading it. The map's mean comes off the top of its mip chain, where one
-// lookup covers the whole tile -- one lookup outside the octaves, on a texel
+// lookup covers the whole tile -- one lookup outside the layers, on a texel
 // every pixel shares.
 //
 // The base level is read by direction rather than through a lattice, and is
-// never left out: it is what the body is shaped like, and the octaves are what
+// never left out: it is what the body is shaped like, and the rest are what
 // it wears.
-TerrainLevels gatherHeightLevels(Df3 crudePoint, int octaveCount,
+TerrainLevels gatherHeightLevels(Df3 crudePoint, int levelCount,
                                  float sampleSpacing) {
    TerrainLevels levels = emptyLevels();
-   levels.height[k_octaveCount] =
+   levels.height[k_baseLevel] =
       baseElevation(normalize(df3ToVec(crudePoint)), sampleSpacing);
 
-   float fieldMean = textureLod(u_noiseMap, vec2(0.5), mapTopLevel()).r;
+   float fieldMean = textureLod(u_noiseMap, vec2(0.5), mapTopMip()).r;
    LatticeFrame frame = latticeFrameOf(crudePoint);
 
-   for (int octave = 0; octave < octaveCount; ++octave) {
+   for (int level = k_firstLatticeLevel; level < levelCount; ++level) {
       LatticePlane planes[k_latticeCorners];
-      latticePlanes(frame, octave, planes);
+      latticePlanes(frame, level, planes);
 
-      levels.height[octave] = blendHeight(
-         planes, octaveMipLevel(sampleSpacing, octaveFrequency(octave)), fieldMean);
+      levels.height[level] = blendHeight(
+         planes, levelMip(sampleSpacing, levelFrequency(level)), fieldMean);
    }
 
    return levels;
@@ -527,31 +527,31 @@ TerrainLevels gatherHeightLevels(Df3 crudePoint, int octaveCount,
 // Height and slope together: what the fragment stage asks for, which shades a
 // point and reads its height for the colour bands. One lattice serves both,
 // where asking for them apart would build every plane twice.
-TerrainLevels gatherLevels(Df3 crudePoint, int octaveCount, float sampleSpacing) {
+TerrainLevels gatherLevels(Df3 crudePoint, int levelCount, float sampleSpacing) {
    TerrainLevels levels = emptyLevels();
 
    vec3 direction = normalize(df3ToVec(crudePoint));
-   levels.height[k_octaveCount] = baseElevation(direction, sampleSpacing);
-   levels.gradient[k_octaveCount] = baseGradient(direction, sampleSpacing);
+   levels.height[k_baseLevel] = baseElevation(direction, sampleSpacing);
+   levels.gradient[k_baseLevel] = baseGradient(direction, sampleSpacing);
 
-   float topLevel = mapTopLevel();
-   float fieldMean = textureLod(u_noiseMap, vec2(0.5), topLevel).r;
+   float topMip = mapTopMip();
+   float fieldMean = textureLod(u_noiseMap, vec2(0.5), topMip).r;
    LatticeFrame frame = latticeFrameOf(crudePoint);
 
-   for (int octave = 0; octave < octaveCount; ++octave) {
+   for (int level = k_firstLatticeLevel; level < levelCount; ++level) {
       LatticePlane planes[k_latticeCorners];
-      latticePlanes(frame, octave, planes);
-      float mipLevel = octaveMipLevel(sampleSpacing, octaveFrequency(octave));
+      latticePlanes(frame, level, planes);
+      float mip = levelMip(sampleSpacing, levelFrequency(level));
 
-      levels.height[octave] = blendHeight(planes, mipLevel, fieldMean);
+      levels.height[level] = blendHeight(planes, mip, fieldMean);
 
       // Past the top the map returns the tile's mean, whose slope is zero: the
-      // octave has nothing left to tilt a normal with, so its four slope lookups
+      // layer has nothing left to tilt a normal with, so its four slope lookups
       // are skipped rather than summed to nothing. The height has no such exit, a
       // mean height being a real offset.
-      if (mipLevel < topLevel) {
-         levels.gradient[octave] =
-            blendSlope(planes, mipLevel, octaveTilesPerMetre(octave));
+      if (mip < topMip) {
+         levels.gradient[level] =
+            blendSlope(planes, mip, levelTilesPerMetre(level));
       }
    }
 
@@ -574,7 +574,7 @@ TerrainLevels gatherLevels(Df3 crudePoint, int octaveCount, float sampleSpacing)
 // it, and the shading stage runs far more often than this one.
 Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
    TerrainDisplacement displacement = terrainDisplacement(
-      gatherHeightLevels(crudePoint, k_positionOctaves, sampleSpacing));
+      gatherHeightLevels(crudePoint, k_positionLevels, sampleSpacing));
 
    Df reach =
       dfAdd(dfFromFloat(k_radiusMetres), dfFromFloat(displacement.height));
@@ -588,7 +588,7 @@ Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
 // surface rises is left out -- it scales the tilt by 1 / (1 + height/radius), a
 // part in a hundred thousand against a planet.
 //
-// Reads the octaves the geometry carries, so this is the gradient of the surface
+// Reads the levels the geometry carries, so this is the gradient of the surface
 // drawn rather than of a finer one. A pixel still resolves more of them than a
 // quad does: both stop where their own sampling stops, and the fragment stage
 // samples the finer of the two.
@@ -618,7 +618,7 @@ CdlodSurfaceShading cdlodSurfaceShading(Df3 crudePoint, vec3 crudeDerivX,
    float sampleSpacing = max(length(metreDerivX), length(metreDerivY));
 
    TerrainDisplacement displacement =
-      terrainDisplacement(gatherLevels(crudePoint, k_shadingOctaves, sampleSpacing));
+      terrainDisplacement(gatherLevels(crudePoint, k_shadingLevels, sampleSpacing));
    vec3 acrossSphere = displacement.gradient
       - sphereNormal * dot(sphereNormal, displacement.gradient);
 

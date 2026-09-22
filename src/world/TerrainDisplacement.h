@@ -20,21 +20,50 @@
  * turns a reading into metres happens here.
  *
  * Height and gradient come back together, being one surface measured two ways.
- * Each layer takes the same factor either way, so the gradient returned is the
- * derivative of the height returned rather than a second opinion about it.
+ * The gradient returned is the derivative of the height returned rather than a
+ * second opinion about it: every synthesis differentiates its own arithmetic, so
+ * one that bends a reading bends the slope with it.
  */
 class TerrainDisplacement {
 public:
-    // Octaves the table holds. The snippet's k_octaveCount, and public so a
-    // caller can check at compile time that the octaves it asks for are there.
-    static constexpr int k_octaveCount{3};
+    // How the layers are put together. The table is the same either way, a
+    // frequency and an amplitude per layer; what differs is what a reading is
+    // worth once the layers above it are in hand.
+    enum class Synthesis {
+        // Each layer at its own amplitude, added. Every layer reads the map
+        // as it is and none of them knows what the others found.
+        FBM,
+        // The same sum read the other way up. The map creases along its own
+        // zero contour and stands at nothing there, so turning the sum over
+        // stands those creases up as summits and hangs the bulk of the map
+        // below them.
+        RIDGED_MULTIFRACTAL,
+    };
 
-    // The base layer is the last row of the table and the one the octaves ride
-    // on: what the body is shaped like, where they are what it wears. It is read
-    // by direction rather than through a lattice, so it lays down no tiles. Last,
-    // at k_octaveCount, so that an octave keeps the index it is read at; in every
-    // other way it is a layer like the rest and is summed like the rest.
-    static constexpr int k_levelCount{k_octaveCount + 1};
+    // Which of them the body is built with. Compiled rather than chosen at run
+    // time: the snippet unrolls its sum over the table, and the two sides have
+    // to be summing the same thing for the bounds to hold.
+    static constexpr Synthesis k_synthesis{Synthesis::RIDGED_MULTIFRACTAL};
+
+    // Layers the table holds, coarsest first. Public so a caller can check at
+    // compile time that the layers it asks for are there.
+    //
+    // The order is the synthesis's: a layer gated or warped by the ones above it
+    // has to meet them first, and every sum past FBM works that way. Reading the
+    // table in the order it is written is what keeps that free of a remapping
+    // each new sum would have to get right.
+    static constexpr int k_levelCount{4};
+
+    // The layer the rest ride on: what the body is shaped like, where they are
+    // what it wears. First, being the largest, and read by direction rather than
+    // through a lattice, so it lays down no tiles and carries no frequency. In
+    // every other way a layer like the rest, and summed like the rest.
+    static constexpr int k_baseLevel{0};
+
+    // The rest, each laid down through a lattice sized to its own tile. The one
+    // named here is the coarsest, and the frame every finer lattice is scaled
+    // from.
+    static constexpr int k_firstLatticeLevel{k_baseLevel + 1};
 
     // What the caller read, per layer, before anything gave it a size. The
     // snippet's TerrainLevels. A layer the caller did not reach is left at zero,
@@ -51,12 +80,15 @@ public:
         glm::dvec3 m_gradient{0.0};       // metres per metre, in the body's frame
     };
 
-    // reliefMetres is the floor to ceiling height of the terrain the octaves
-    // carry, baseReliefMetres the same for the layer beneath them.
+    // reliefMetres is the floor to ceiling height of the terrain the lattice
+    // layers carry, baseReliefMetres the same for the layer beneath them.
     TerrainDisplacement(double reliefMetres, double baseReliefMetres);
 
-    // Every layer at its own relief, summed. Fewer layers gathered is a coarser
-    // surface and not a different one: the same sum with the fine end at zero.
+    // Every layer at its own relief, put together by k_synthesis. Fewer layers
+    // gathered is a coarser surface and not a different one: the layers left out
+    // are the fine end, a layer at zero sits on the map's floor and is worth
+    // nothing, and a gate it shuts holds the rest of that fine end at nothing
+    // too.
     Displacement displacement(const Levels& levels) const;
 
     // What a layer's whole range comes to in metres, which is what its reading is
@@ -65,10 +97,23 @@ public:
     double levelRelief(int level) const;
 
     // How much oftener than the field it was built at a layer's map is laid down.
-    // The caller sizes its lattice and picks its mip levels off this.
-    double octaveFrequency(int octave) const;
+    // The caller sizes its lattice and picks its mip levels off this. Zero at
+    // k_baseLevel, which is read by direction and lays down no tiles.
+    double levelFrequency(int level) const;
 
 private:
+    // Each layer at its own relief, added. Nothing a layer reads depends on what
+    // any other found, so the sum is linear and the gradient is the same sum of
+    // the same reliefs.
+    Displacement fbm(const Levels& levels) const;
+
+    // Each layer at its own relief, subtracted rather than added. The map creases
+    // along its own zero contour and stands at nothing there: summed as it lies
+    // those creases are the valley floors, and taken the other way up they are
+    // the summits. Negation is linear, so the gradient is turned over with the
+    // height and stays the derivative of what is returned.
+    Displacement ridgedMultifractal(const Levels& levels) const;
+
     double m_relief{0.0};
     double m_baseRelief{0.0};
 };

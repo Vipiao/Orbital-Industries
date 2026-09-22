@@ -1,37 +1,41 @@
 // TerrainDisplacement.cpp
 #include "TerrainDisplacement.h"
 #include <cassert>
+#include <iterator>
 
 namespace {
 
 // The same map laid down at several scales and added up: frequency multiplier
-// and amplitude as a fraction of the relief, with the base layer last. The steps
-// between rows are what the constructor checks; they come to each layer having
-// four times the rise over run of the one above.
+// and amplitude as a fraction of the relief, coarsest first, with the base layer
+// leading. The steps between rows are what the constructor checks; frequency
+// rises by what amplitude falls by, which leaves every layer the same rise over
+// run as the one above it.
 //
-// The root of frequency rather than frequency itself: the reciprocal would give
-// every layer the same slope, where real ground has gentle big landforms and
-// steep small ones. Three steps reach thirty-one degrees, the angle loose ground
-// gives way at, past which roughening buys nothing.
+// Stepping them together is what makes the table self-similar: no scale is
+// steeper than another, so the shape a layer contributes is the shape the whole
+// sum has, only smaller. A frequency stepping faster than amplitude would give
+// the fine end the steep ground instead, which is how real landforms sit but not
+// how a multifractal is built.
 //
 // Amplitude is not a slope. A tile does not rise by its own range across its own
-// width -- the map carries eight layers of its own, averaging nearly three times
-// that -- so rise over run is amplitude over tile times what the map does.
-// Measured, as averages: 49.8 km at 658 m is two degrees, 3.11 km at 165 m eight
-// and a half, 194 m at 41.1 m thirty-one. The map's worst texel runs three times
-// its mean, putting the steepest ground near sixty-six, and that is the figure
-// the quadtree's ranges answer for.
-//
-// Steps this close cost span at the fine end, leaving the finest feature hundreds
-// of metres; a fourth layer would buy it back. The cell counts the octaves come
-// to -- 64, 1024, 16384, stepping by sixteen as the frequencies do -- leave room
-// for one.
+// width -- the map carries octaves of its own, and what they come to across a
+// tile is a factor in its own right -- so rise over run is amplitude over tile
+// times what the map does. The folded map averages 4.26 and its worst texel runs
+// 10.5, which puts all three near thirteen degrees on average and twenty-nine at
+// the steepest: 49.8 km at 2632 m, 12.4 km at 658 m, 3.11 km at 165 m.
 //
 // The frequency need not be a power of two: what has to land exactly is the cell
 // count the lattice comes to, which PlanetSurface rounds and asserts is whole.
-const glm::dvec2 k_levels[TerrainDisplacement::k_levelCount]{
-    glm::dvec2{0.0256, 1.0}, glm::dvec2{0.4096, 1.0 / 4.0},
-    glm::dvec2{6.5536, 1.0 / 16.0}, glm::dvec2{0.0, 1.0}};
+const glm::dvec2 k_levels[]{glm::dvec2{0.0, 1.0}, glm::dvec2{0.0256, 1.0},
+                            glm::dvec2{0.1024, 1.0 / 4.0},
+                            glm::dvec2{0.4096, 1.0 / 16.0}};
+
+// Sized by the rows written rather than by the count, so a row added or dropped
+// here without the count following is a compile error. Sized by the count, too
+// few rows would leave the rest zeroed and reach the constructor's asserts as a
+// broken ladder, and too many would not fit.
+static_assert(std::size(k_levels) == TerrainDisplacement::k_levelCount,
+              "The table's rows and the count the levels are read by must agree");
 
 }  // namespace
 
@@ -42,37 +46,61 @@ TerrainDisplacement::TerrainDisplacement(double reliefMetres, double baseReliefM
 
     // Both steps are exact in binary, so these hold to the bit and an edit that
     // breaks the progression is caught here rather than read off the surface.
-    for (int octave{1}; octave < k_octaveCount; ++octave) {
-        assert(k_levels[octave].x == 16.0 * k_levels[octave - 1].x &&
-               "Sixteen to a step in frequency");
-        assert(k_levels[octave].y == k_levels[octave - 1].y / 4.0 &&
+    for (int level{k_firstLatticeLevel + 1}; level < k_levelCount; ++level) {
+        assert(k_levels[level].x == 4.0 * k_levels[level - 1].x &&
+               "Four to a step in frequency");
+        assert(k_levels[level].y == k_levels[level - 1].y / 4.0 &&
                "Four to a step in amplitude");
     }
 
     // Read by direction rather than through a lattice, so it lays down no tiles,
     // and its amplitude is the whole of its own relief.
-    assert(k_levels[k_octaveCount].x == 0.0 && k_levels[k_octaveCount].y == 1.0 &&
+    assert(k_levels[k_baseLevel].x == 0.0 && k_levels[k_baseLevel].y == 1.0 &&
            "The base layer's row carries no tiling and its whole relief");
 }
 
-double TerrainDisplacement::octaveFrequency(int octave) const {
-    assert(octave >= 0 && octave < k_octaveCount && "No such octave in the table");
-    return k_levels[octave].x;
+double TerrainDisplacement::levelFrequency(int level) const {
+    assert(level >= 0 && level < k_levelCount && "No such level in the table");
+    return k_levels[level].x;
 }
 
 double TerrainDisplacement::levelRelief(int level) const {
     assert(level >= 0 && level < k_levelCount && "No such level in the table");
-    const double relief{level == k_octaveCount ? m_baseRelief : m_relief};
+    const double relief{level == k_baseLevel ? m_baseRelief : m_relief};
     return relief * k_levels[level].y;
 }
 
 TerrainDisplacement::Displacement TerrainDisplacement::displacement(
     const Levels& levels) const {
+    switch (k_synthesis) {
+        case Synthesis::FBM:
+            return fbm(levels);
+        case Synthesis::RIDGED_MULTIFRACTAL:
+            return ridgedMultifractal(levels);
+    }
+
+    assert(false && "No such synthesis");
+    return Displacement{};
+}
+
+TerrainDisplacement::Displacement TerrainDisplacement::fbm(const Levels& levels) const {
     Displacement displacement{};
     for (int level{0}; level < k_levelCount; ++level) {
         const double relief{levelRelief(level)};
         displacement.m_height += relief * levels.m_height[level];
         displacement.m_gradient += relief * levels.m_gradient[level];
+    }
+
+    return displacement;
+}
+
+TerrainDisplacement::Displacement TerrainDisplacement::ridgedMultifractal(
+    const Levels& levels) const {
+    Displacement displacement{};
+    for (int level{0}; level < k_levelCount; ++level) {
+        const double relief{levelRelief(level)};
+        displacement.m_height -= relief * levels.m_height[level];
+        displacement.m_gradient -= relief * levels.m_gradient[level];
     }
 
     return displacement;

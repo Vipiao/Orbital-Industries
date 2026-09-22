@@ -24,12 +24,16 @@
 // uniforms: a frequency settles a lattice cell count that has to land on a whole
 // number, and the counts size the arrays and unroll the loops below.
 //
-//    int   k_octaveCount   layers laid down through a lattice
-//    int   k_levelCount    those, plus the base layer, which is not
+//    int   k_levelCount    layers, coarsest first
+//    int   k_baseLevel     the one read by direction, which leads
+//    int   k_firstLatticeLevel  the coarsest of the rest, which are read through
+//                               a lattice
+//    int   k_synthesis     which of the sums below the body is built with, named
+//                          by the k_synthesis... constants beside it
 //    float k_levelReliefMetres[k_levelCount]  metres each layer stands, floor
 //                                             to ceiling
-//    float k_octaveFrequency[k_octaveCount]   how much oftener than the field an
-//                                             octave's map is laid down
+//    float k_levelFrequency[k_levelCount]     how much oftener than the field a
+//                                             layer's map is laid down
 
 // What the caller read, per layer, before anything gave it a size. A layer the
 // caller did not reach is left at zero, which is what lets the sum below run the
@@ -55,13 +59,14 @@ struct TerrainMaterial {
 // half of a slope -- the amplitude beside it says how far a layer rises, this
 // says across what -- so the two sit in one table, and the ladder asserts they
 // step together.
-float octaveFrequency(int octave) {
-   return k_octaveFrequency[octave];
+float levelFrequency(int level) {
+   return k_levelFrequency[level];
 }
 
-// Every layer at its own relief, summed. Fewer layers gathered is a coarser
-// surface and not a different one: the same sum with the fine end at zero.
-TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
+// Each layer at its own relief, added. Nothing a layer reads depends on what any
+// other found, so the sum is linear and the gradient is the same sum of the same
+// reliefs.
+TerrainDisplacement fbm(TerrainLevels levels) {
    TerrainDisplacement displacement;
    displacement.height = 0.0;
    displacement.gradient = vec3(0.0);
@@ -75,13 +80,64 @@ TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
    return displacement;
 }
 
-// Metres of height between one colour band and the next. A contour interval: the
-// surface is banded by how high it stands, so relief too gentle to see in the
-// shading still reads as a pattern of stripes.
+// Each layer at its own relief, subtracted rather than added. The map creases
+// along its own zero contour, one crease per octave of its own, and stands at
+// nothing there: summed as it lies those creases are the valley floors, and
+// taken the other way up they are the summits, with the body hanging under them
+// rather than standing on them.
 //
+// Negation is linear, so the gradient is turned over with the height and stays
+// the derivative of what is returned.
+TerrainDisplacement ridgedMultifractal(TerrainLevels levels) {
+   TerrainDisplacement displacement;
+   displacement.height = 0.0;
+   displacement.gradient = vec3(0.0);
+
+   for (int level = 0; level < k_levelCount; ++level) {
+      float relief = k_levelReliefMetres[level];
+      displacement.height -= relief * levels.height[level];
+      displacement.gradient -= relief * levels.gradient[level];
+   }
+
+   return displacement;
+}
+
+// Every layer at its own relief, put together by k_synthesis. Fewer layers
+// gathered is a coarser surface and not a different one: the layers left out are
+// the fine end, a layer at zero sits on the map's floor and is worth nothing,
+// and a gate it shuts holds the rest of that fine end at nothing too.
+TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
+   if (k_synthesis == k_synthesisRidgedMultifractal) {
+      return ridgedMultifractal(levels);
+   }
+
+   return fbm(levels);
+}
+
+// Where one ground cover gives way to the next, in metres of surface height, and
+// how much height the change is spread over so the two meet as a shore rather
+// than as a line.
+//
+// The sum is turned over, so nothing stands above zero and the high ground is
+// what sits nearest it: the surface runs from about -13.5 km, the base layer
+// carrying 10 km of that and the three octaves the rest. These two sit either
+// side of where the ground spends most of its time, a little over -6 km.
+const float k_sandCeilingMetres = -7000.0;
+const float k_snowFloorMetres = -6000.0;
+const float k_coverBlendMetres = 20.0;
+
+// Where the ground has given up holding anything and is bare rock. Placed off
+// what the octaves actually reach -- a little over half a rise per run at the
+// steepest -- so the flanks turn to rock while the floors between them do not.
+const float k_rockSlopeFrom = 0.20;
+const float k_rockSlopeTo = 0.45;
+
 // A stand-in for a material, and the whole of what this surface has to say about
 // its own colour for now.
-const float k_colourBandMetres = 500.0;
+const vec3 k_sandColour = vec3(0.8, 0.8, 0.45);
+const vec3 k_grassColour = vec3(0.5, 0.7, 0.20);
+const vec3 k_rockColour = vec3(0.4, 0.5, 0.5);
+const vec3 k_snowColour = vec3(0.90, 0.92, 0.95);
 
 // Roughness by slope: flats hold the fine material that settles out of everything
 // standing above them and scatter in every direction, while ground steep enough to
@@ -101,11 +157,25 @@ const float k_roughnessSlopeTo = 1.20;
 // holding once the part of the gradient that only moves the point has come off.
 // Neither of these knows the body is a sphere, and neither needs to.
 TerrainMaterial terrainMaterial(float heightMetres, float slope) {
-   const float k_turn = 6.283185307179586;
-
    TerrainMaterial material;
-   material.colour =
-      vec3(0.5 + 0.5 * sin(heightMetres * (k_turn / k_colourBandMetres)));
+
+   // What grows on the ground, by how high it stands: grass until the air gets
+   // too thin for it, snow above that.
+   vec3 cover = mix(k_grassColour, k_snowColour,
+                    smoothstep(k_snowFloorMetres - k_coverBlendMetres,
+                               k_snowFloorMetres + k_coverBlendMetres, heightMetres));
+
+   // Ground steep enough sheds whatever settles on it and is left as the rock
+   // beneath, which is why the flanks read bare and the floors do not.
+   vec3 ground = mix(cover, k_rockColour,
+                     smoothstep(k_rockSlopeFrom, k_rockSlopeTo, slope));
+
+   // Sand along the bottom, where the water will stand.
+   material.colour = mix(k_sandColour, ground,
+                         smoothstep(k_sandCeilingMetres - k_coverBlendMetres,
+                                    k_sandCeilingMetres + k_coverBlendMetres,
+                                    heightMetres));
+
    material.roughness =
       mix(k_flatRoughness, k_steepRoughness,
           smoothstep(k_roughnessSlopeFrom, k_roughnessSlopeTo, slope));

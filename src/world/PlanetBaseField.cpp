@@ -82,16 +82,18 @@ double PlanetBaseField::sample(const glm::dvec3& direction, glm::dvec3& slope) c
     }
 
     // Perlin straddles zero and the map that holds this is unsigned, so the sum
-    // is folded onto [0, 1]: the layer rises off the sphere rather than cutting
-    // into it, exactly as the tileable map does.
-    const double fold{0.5 / total};
+    // is shifted and scaled onto [0, 1]: the layer rises off the sphere rather
+    // than cutting into it. An affine move of the whole range, which leaves the
+    // field's shape alone -- nothing here creases it the way the tileable map's
+    // octave shaping does.
+    const double shift{0.5 / total};
 
     // Only what runs across the sphere. A step along the direction itself leaves
     // the point the field was read at exactly where it was, so it moves the
     // surface without turning it.
-    slope = (gradient - direction * glm::dot(direction, gradient)) * fold;
+    slope = (gradient - direction * glm::dot(direction, gradient)) * shift;
 
-    return glm::clamp(0.5 + value * fold, 0.0, 1.0);
+    return glm::clamp(0.5 + value * shift, 0.0, 1.0);
 }
 
 void PlanetBaseField::bakeElevationFace(int face, std::vector<std::uint16_t>& elevation) const {

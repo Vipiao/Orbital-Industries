@@ -17,6 +17,7 @@
 #include "src/world/PlanetBaseDump.h"
 #include "src/world/PlanetSurface.h"
 #include "src/world/PlanetSurfaceGlsl.h"
+#include "src/world/TerrainMapDump.h"
 #include "math/TileableNoiseMap.h"
 #include "debug/DebugRenderer.h"
 #include "debug/DebugGlobals.h"
@@ -119,11 +120,16 @@ static void buildTestWorld(GameBase* gameBase) {
     const double planetRadius{6371000.0};
     const double planetTileSpanMetres{12742000.0};
     const double planetTilesPerSpan{10000.0};
-    const double planetReliefMetres{658.0};
+    const double planetReliefMetres{2632.0};
     // The layer beneath the octaves. Nothing like their rise over run, and
-    // deliberately: it is hundreds of times wider than octave zero and only tens
-    // of times taller, so it is far the gentlest slope on the body and the
+    // deliberately: it is hundreds of times wider than octave zero and only a
+    // few times taller, so it is far the gentlest slope on the body and the
     // quadtree's ranges, which answer for the steepest, never see it.
+    //
+    // At zero the body carries none of it and the lattice layers stand on a
+    // plain sphere, which is the only way to see what one of them does on its
+    // own: at this height the layer is the shape of the body and the octaves
+    // read as texture on it.
     const double planetBaseReliefMetres{10000.0};
 
     // The noise both sides read, generated once. The map is dimensionless -- the
@@ -135,6 +141,11 @@ static void buildTestWorld(GameBase* gameBase) {
     terrainConfig.m_octaveCount = 8;
     terrainConfig.m_baseFrequency = 2;
     terrainConfig.m_gain = 0.45;
+    // Creased per octave rather than per map, which is where the ridges come
+    // from: the terrain reads this the other way up, so every octave's crease is
+    // a summit at its own scale, and the count above is how many scales of ridge
+    // the map carries. The base layer's field is left unfolded.
+    terrainConfig.m_octaveShape = TileableNoiseMapConfig::OctaveShape::FOLDED;
     terrainConfig.m_seed = 20260811;
 
     // The layer under all of them, which the snippet reads by direction off a
@@ -168,6 +179,14 @@ static void buildTestWorld(GameBase* gameBase) {
 
     const std::vector<uint16_t> noiseBake{planetSurface->bakeElevation()};
     const std::vector<float> gradientBake{planetSurface->bakeGradient()};
+
+    // Beside the binary, refreshed every run: the map is generated at startup
+    // from the config above, so an image of it is only ever worth looking at if
+    // it came from the run being looked at. Not worth failing over.
+    if (!TerrainMapDump::writeMaps(".", planetSurface->mapResolution(), noiseBake,
+                                   gradientBake)) {
+        std::cerr << "Could not write the terrain map images\n";
+    }
 
     TextureSpec mapSpec{};
     mapSpec.m_width = planetSurface->mapResolution();

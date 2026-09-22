@@ -22,10 +22,10 @@
  * what closes the seams between patches. The figures are not written twice:
  * planetSurfaceGlsl hands the snippet the ones held here.
  *
- * The shading octaves are the exception, and need not agree with anything: they
+ * The shading levels are the exception, and need not agree with anything: they
  * tilt a normal without moving a vertex, and nothing measures a normal.
  *
- * The snippet reads each octave at the mip level its samples resolve; this reads
+ * The snippet reads each layer at the mip its samples resolve; this reads
  * full detail throughout. That is the safe side rather than a drift to fix: a mip
  * averages what full detail holds, so the bounds go on containing the geometry.
  * They agree where it matters anyway, since the snippet coarsens only as its
@@ -52,7 +52,7 @@
 class PlanetSurface {
 public:
     // radiusMetres is the sphere the crude solid projects onto, reliefMetres the
-    // floor to ceiling height of the terrain the octaves carry, and
+    // floor to ceiling height of the terrain the lattice layers carry, and
     // baseReliefMetres the same for the layer beneath them. The base field is
     // dimensionless, so its height is named here rather than in the config that
     // generates it.
@@ -90,7 +90,7 @@ public:
     std::vector<float> bakeGradient() const { return m_noise.bakeGradient(); }
     int mapResolution() const { return m_noise.config().m_resolution; }
 
-    // The layer under the octaves, exported rather than wrapped: baking it and
+    // The layer under the rest, exported rather than wrapped: baking it and
     // reading it back are somebody else's business, and this only reads it.
     const PlanetBaseField& baseField() const { return m_baseField; }
 
@@ -99,10 +99,10 @@ public:
     // displacement's to say.
     const TerrainDisplacement& displacement() const { return m_displacement; }
 
-    // Lattice points a cell is bounded by, and so lookups an octave costs.
+    // Lattice points a cell is bounded by, and so lookups a level costs.
     static constexpr int k_latticeCorners{4};
 
-    // Tiles of an octave's own layer that one lattice cell spans, so the lattice
+    // Tiles of a level's own layer that one lattice cell spans, so the lattice
     // takes its size from the layer it carries and a frequency changed in the
     // table carries the lattice with it. Few enough that the map never repeats
     // visibly within one cell, many enough that the cells do not become the
@@ -110,12 +110,13 @@ public:
     // runs as the reciprocal of a cell.
     static constexpr double k_cellTiles{2.0};
 
-    // Octaves the drawn geometry carries, and so the surface the bounds are
-    // measured on.
-    static constexpr int k_positionOctaves{3};
-    static_assert(k_positionOctaves > 0 &&
-                      k_positionOctaves <= TerrainDisplacement::k_octaveCount,
-                  "The geometry cannot carry octaves the table does not hold");
+    // Levels the drawn geometry carries, and so the surface the bounds are
+    // measured on. A count taken from the top of the table, the base layer among
+    // them: what is left out is the fine end.
+    static constexpr int k_positionLevels{4};
+    static_assert(k_positionLevels > TerrainDisplacement::k_baseLevel &&
+                      k_positionLevels <= TerrainDisplacement::k_levelCount,
+                  "The geometry cannot carry levels the table does not hold");
 
 private:
     // One lattice point's plane, as the point being shaded stands in it. The
@@ -128,27 +129,27 @@ private:
     };
 
     // The cube face a point stands on, and where across it, found once and read
-    // by every octave. The snippet's LatticeFrame.
+    // by every level. The snippet's LatticeFrame.
     struct LatticeFrame {
         int m_major{0};                // the axis the face stands out along,
         int m_uAxis{0};                // and the two cut across it
         int m_vAxis{0};
         double m_coordU{0.0};          // where the point falls across the face, in
-        double m_coordV{0.0};          // cells of the coarsest octave
+        double m_coordV{0.0};          // cells of the coarsest lattice level
         double m_faceSign{1.0};        // which of the pair of faces it is
-        double m_metresPerCell{0.0};   // at that same octave
+        double m_metresPerCell{0.0};   // at that same level
     };
 
-    // Tiles of an octave's own layer to the metre, its map being laid down that
+    // Tiles of a level's own layer to the metre, its map being laid down that
     // much more often than the field it was built at. Mirrors
-    // octaveTilesPerMetre.
-    double octaveTilesPerMetre(int octave) const;
+    // levelTilesPerMetre.
+    double levelTilesPerMetre(int level) const;
 
     // Cells across one half of a cube face, for the layer named. Mirrors
-    // octaveCells; cellsExactly is what it rounds, kept apart so the constructor
+    // levelCells; cellsExactly is what it rounds, kept apart so the constructor
     // can check that the rounding had nothing to do.
-    int octaveCells(int octave) const;
-    double cellsExactly(int octave) const;
+    int levelCells(int level) const;
+    double cellsExactly(int level) const;
 
     // The frame the point stands in. Mirrors latticeFrameOf, and takes the crude
     // point for the same reason: the cell a point falls in is a ratio of two of
@@ -158,7 +159,7 @@ private:
     // The four lattice points the shading point stands between, each with the
     // plane its share of the terrain is read through. Mirrors latticePlanes.
     std::array<LatticePlane, k_latticeCorners> latticePlanes(
-        const LatticeFrame& frame, int octave) const;
+        const LatticeFrame& frame, int level) const;
 
     // Bilinear over the wrapped field, at the texel centres GL samples between,
     // so a lookup here lands where the snippet's lookup does.
@@ -166,25 +167,25 @@ private:
 
     // One plane's reading, in the map's own unit height, and its slope in unit
     // height per metre. What they come to in metres is TerrainDisplacement's,
-    // which has one weighted sum per octave to scale rather than four.
+    // which has one weighted sum per level to scale rather than four.
     double sampleElevation(const glm::dvec2& tileCoord) const;
     glm::dvec2 sampleSlope(const glm::dvec2& tileCoord, double tilesPerMetre) const;
 
-    // One octave's four planes blended into one reading, and into one slope in
+    // One level's four planes blended into one reading, and into one slope in
     // the body's frame. Mirrors blendHeight and blendSlope.
     double blendHeight(const std::array<LatticePlane, k_latticeCorners>& planes) const;
     glm::dvec3 blendSlope(const std::array<LatticePlane, k_latticeCorners>& planes,
                           double tilesPerMetre) const;
 
-    // Every octave's four planes read into one level apiece, and the base level
-    // read by direction, all of it in the map's own unit height. Mirrors
+    // Every lattice level's four planes read into one level apiece, and the base
+    // level read by direction, all of it in the map's own unit height. Mirrors
     // gatherHeightLevels and gatherLevels: the first reads height alone, which
     // is what placing a point needs, and the second reads height and slope off
     // one lattice, where asking for them apart would build every plane twice.
     TerrainDisplacement::Levels gatherHeightLevels(const glm::dvec3& crudePoint,
-                                                   int octaveCount) const;
+                                                   int levelCount) const;
     TerrainDisplacement::Levels gatherLevels(const glm::dvec3& crudePoint,
-                                             int octaveCount) const;
+                                             int levelCount) const;
 
     double m_radius{1.0};
     double m_tileSpan{1.0};

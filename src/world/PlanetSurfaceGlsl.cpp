@@ -36,7 +36,6 @@ std::string glslFloat(double value) {
 std::string planetSurfaceGlsl(const PlanetSurface& surface) {
     const TerrainDisplacement& displacement{surface.displacement()};
     const int levelCount{TerrainDisplacement::k_levelCount};
-    const int octaveCount{TerrainDisplacement::k_octaveCount};
 
     std::ostringstream glsl{};
     glsl << "// Written by planetSurfaceGlsl.\n"
@@ -48,14 +47,25 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface) {
          << ";\n"
          << "const float k_tilesPerSpan = " << glslFloat(surface.tilesPerSpan()) << ";\n\n"
          << "// The lattice: points a cell is bounded by, tiles of its own layer a cell\n"
-         << "// spans, and octaves the drawn geometry carries.\n"
+         << "// spans, and levels the drawn geometry carries.\n"
          << "const int k_latticeCorners = " << PlanetSurface::k_latticeCorners << ";\n"
          << "const float k_cellTiles = " << glslFloat(PlanetSurface::k_cellTiles) << ";\n"
-         << "const int k_positionOctaves = " << PlanetSurface::k_positionOctaves << ";\n\n"
-         << "// k_levelCount layers, of which the first k_octaveCount are laid down\n"
-         << "// through a lattice and the last is the base layer, which is not.\n"
-         << "const int k_octaveCount = " << octaveCount << ";\n"
-         << "const int k_levelCount = " << levelCount << ";\n\n"
+         << "const int k_positionLevels = " << PlanetSurface::k_positionLevels << ";\n\n"
+         << "// k_levelCount layers, coarsest first. k_baseLevel leads and is read by\n"
+         << "// direction; the rest, from k_firstLatticeLevel on, are laid down through\n"
+         << "// a lattice sized to their own tile.\n"
+         << "const int k_levelCount = " << levelCount << ";\n"
+         << "const int k_baseLevel = " << TerrainDisplacement::k_baseLevel << ";\n"
+         << "const int k_firstLatticeLevel = "
+         << TerrainDisplacement::k_firstLatticeLevel << ";\n\n"
+         << "// How the layers are put together.\n"
+         << "const int k_synthesisFbm = "
+         << static_cast<int>(TerrainDisplacement::Synthesis::FBM) << ";\n"
+         << "const int k_synthesisRidgedMultifractal = "
+         << static_cast<int>(TerrainDisplacement::Synthesis::RIDGED_MULTIFRACTAL)
+         << ";\n"
+         << "const int k_synthesis = "
+         << static_cast<int>(TerrainDisplacement::k_synthesis) << ";\n\n"
          << "// Metres each layer stands between its floor and its ceiling. The map is\n"
          << "// unsigned, so this is also the highest it reaches.\n"
          << "const float k_levelReliefMetres[k_levelCount] = float[k_levelCount](";
@@ -66,13 +76,13 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface) {
     }
 
     glsl << ");\n\n"
-         << "// How much oftener than the field it was built at an octave's map is laid\n"
-         << "// down.\n"
-         << "const float k_octaveFrequency[k_octaveCount] = float[k_octaveCount](";
+         << "// How much oftener than the field it was built at a layer's map is laid\n"
+         << "// down. Zero at k_baseLevel, which lays down no tiles.\n"
+         << "const float k_levelFrequency[k_levelCount] = float[k_levelCount](";
 
-    for (int octave{0}; octave < octaveCount; ++octave) {
-        glsl << (octave == 0 ? "\n   " : ",\n   ")
-             << glslFloat(displacement.octaveFrequency(octave));
+    for (int level{0}; level < levelCount; ++level) {
+        glsl << (level == 0 ? "\n   " : ",\n   ")
+             << glslFloat(displacement.levelFrequency(level));
     }
     glsl << ");\n";
 
