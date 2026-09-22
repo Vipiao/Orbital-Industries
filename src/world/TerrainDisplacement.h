@@ -38,12 +38,24 @@ public:
         // stands those creases up as summits and hangs the bulk of the map
         // below them.
         RIDGED_MULTIFRACTAL,
+        // The same sum as it lies, with one exponent applied after it. The map
+        // stands at nothing along its own zero contour, so the sum's floor is
+        // that crease network; an exponent above one presses the ground down
+        // onto it and leaves only the high ground standing, as mountains on a
+        // plain rather than as a surface that rolls everywhere.
+        TURBULENCE_POWER,
     };
 
     // Which of them the body is built with. Compiled rather than chosen at run
     // time: the snippet unrolls its sum over the table, and the two sides have
     // to be summing the same thing for the bounds to hold.
-    static constexpr Synthesis k_synthesis{Synthesis::RIDGED_MULTIFRACTAL};
+    static constexpr Synthesis k_synthesis{Synthesis::TURBULENCE_POWER};
+
+    // The exponent TURBULENCE_POWER carries. At one the sum is left as it lies
+    // and this is FBM again; above one the ground is pressed onto the sum's own
+    // floor and the high ground is left standing alone on it, below one that
+    // floor is lifted and the high ground flattens against a ceiling.
+    static constexpr double k_turbulenceExponent{4.0};
 
     // Layers the table holds, coarsest first. Public so a caller can check at
     // compile time that the layers it asks for are there.
@@ -113,6 +125,20 @@ private:
     // the summits. Negation is linear, so the gradient is turned over with the
     // height and stays the derivative of what is returned.
     Displacement ridgedMultifractal(const Levels& levels) const;
+
+    // The lattice layers' sum read as a fraction of the relief they carry
+    // between them, taken to k_turbulenceExponent, given that relief back and
+    // added to the base layer. The base layer is left out of the exponent: that
+    // layer is the shape of the body and the rest are what it wears, so only
+    // what they come to between them is bent.
+    //
+    // The sum stands as it lies rather than turned over. What the exponent
+    // leaves is a floor with the high ground standing on it, and the body has
+    // to be under that floor rather than hanging from the peaks.
+    //
+    // The exponent is differentiated with the height, so the gradient returned
+    // is still the derivative of what is returned.
+    Displacement turbulencePower(const Levels& levels) const;
 
     double m_relief{0.0};
     double m_baseRelief{0.0};

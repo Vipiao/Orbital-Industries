@@ -30,6 +30,7 @@
 //                               a lattice
 //    int   k_synthesis     which of the sums below the body is built with, named
 //                          by the k_synthesis... constants beside it
+//    float k_turbulenceExponent  the exponent turbulencePower carries
 //    float k_levelReliefMetres[k_levelCount]  metres each layer stands, floor
 //                                             to ceiling
 //    float k_levelFrequency[k_levelCount]     how much oftener than the field a
@@ -102,6 +103,59 @@ TerrainDisplacement ridgedMultifractal(TerrainLevels levels) {
    return displacement;
 }
 
+// The same sum as it lies, with one exponent applied after it. A rise that never
+// turns back cannot reorder altitudes, so the sum's own floor stays its floor and
+// only the profile above it moves. The map stands at nothing along its own zero
+// contour, so that floor is a crease network: above one the ground is pressed
+// down onto it and the high ground is left standing alone on a plain, below one
+// the floor is lifted and the high ground flattens against a ceiling.
+//
+// The base layer is left out of the exponent. That layer is the shape of the body
+// and the rest are what it wears, so only what they come to between them is bent.
+//
+// The exponent is differentiated with the height, so the gradient returned is
+// still the derivative of what is returned.
+TerrainDisplacement turbulencePower(TerrainLevels levels) {
+   float latticeRelief = 0.0;
+   float latticeSum = 0.0;
+   vec3 latticeGradient = vec3(0.0);
+
+   for (int level = k_firstLatticeLevel; level < k_levelCount; ++level) {
+      float relief = k_levelReliefMetres[level];
+      latticeRelief += relief;
+      latticeSum += relief * levels.height[level];
+      latticeGradient += relief * levels.gradient[level];
+   }
+
+   // The sum as a fraction of the whole it could have come to, so the exponent
+   // remaps that fraction onto itself and the layers still stand their own relief
+   // between them and no more. Lattice layers at no relief carry nothing to take
+   // a fraction of.
+   //
+   // The magnitude of it, because the map is unsigned but a level's reading is
+   // not: the lattice blend holds its contrast flat with weights that sum past one
+   // and takes the overshoot back off against the field's mean, so a reading below
+   // that mean lands below zero, where pow is undefined. Folding it costs a crease
+   // along the level the mean sits at, at the few centimetres of ground that reach
+   // under it.
+   float carried = latticeRelief > 0.0 ? abs(latticeSum / latticeRelief) : 0.0;
+
+   // The chain rule on relief times carried to the exponent: the exponent comes
+   // down, and the relief cancels against the one the fraction was taken over. The
+   // fold's own turn is left out, at the same few centimetres.
+   float slopeFactor = k_turbulenceExponent * pow(carried, k_turbulenceExponent - 1.0);
+
+   float baseRelief = k_levelReliefMetres[k_baseLevel];
+
+   TerrainDisplacement displacement;
+   displacement.height = baseRelief * levels.height[k_baseLevel] +
+                         latticeRelief * pow(carried, k_turbulenceExponent);
+   displacement.gradient =
+      baseRelief * levels.gradient[k_baseLevel] + slopeFactor * latticeGradient;
+
+   return displacement;
+}
+
 // Every layer at its own relief, put together by k_synthesis. Fewer layers
 // gathered is a coarser surface and not a different one: the layers left out are
 // the fine end, a layer at zero sits on the map's floor and is worth nothing,
@@ -109,6 +163,9 @@ TerrainDisplacement ridgedMultifractal(TerrainLevels levels) {
 TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
    if (k_synthesis == k_synthesisRidgedMultifractal) {
       return ridgedMultifractal(levels);
+   }
+   if (k_synthesis == k_synthesisTurbulencePower) {
+      return turbulencePower(levels);
    }
 
    return fbm(levels);
@@ -118,12 +175,12 @@ TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
 // how much height the change is spread over so the two meet as a shore rather
 // than as a line.
 //
-// The sum is turned over, so nothing stands above zero and the high ground is
-// what sits nearest it: the surface runs from about -13.5 km, the base layer
-// carrying 10 km of that and the three octaves the rest. These two sit either
-// side of where the ground spends most of its time, a little over -6 km.
-const float k_sandCeilingMetres = -7000.0;
-const float k_snowFloorMetres = -6000.0;
+// The sum stands off the sphere, so the surface runs from zero to about 13.5 km,
+// the base layer carrying 10 km of that and the three octaves the rest. These two
+// sit either side of where the ground spends most of its time, a little under
+// 7 km, which leaves the shore well below it and the snow line just above.
+const float k_sandCeilingMetres = 6500.0;
+const float k_snowFloorMetres = 7500.0;
 const float k_coverBlendMetres = 20.0;
 
 // Where the ground has given up holding anything and is bare rock. Placed off

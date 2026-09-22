@@ -1,6 +1,7 @@
 // TerrainDisplacement.cpp
 #include "TerrainDisplacement.h"
 #include <cassert>
+#include <cmath>
 #include <iterator>
 
 namespace {
@@ -77,6 +78,8 @@ TerrainDisplacement::Displacement TerrainDisplacement::displacement(
             return fbm(levels);
         case Synthesis::RIDGED_MULTIFRACTAL:
             return ridgedMultifractal(levels);
+        case Synthesis::TURBULENCE_POWER:
+            return turbulencePower(levels);
     }
 
     assert(false && "No such synthesis");
@@ -102,6 +105,49 @@ TerrainDisplacement::Displacement TerrainDisplacement::ridgedMultifractal(
         displacement.m_height -= relief * levels.m_height[level];
         displacement.m_gradient -= relief * levels.m_gradient[level];
     }
+
+    return displacement;
+}
+
+TerrainDisplacement::Displacement TerrainDisplacement::turbulencePower(
+    const Levels& levels) const {
+    double latticeRelief{0.0};
+    double latticeSum{0.0};
+    glm::dvec3 latticeGradient{0.0};
+    for (int level{k_firstLatticeLevel}; level < k_levelCount; ++level) {
+        const double relief{levelRelief(level)};
+        latticeRelief += relief;
+        latticeSum += relief * levels.m_height[level];
+        latticeGradient += relief * levels.m_gradient[level];
+    }
+
+    // The sum as a fraction of the whole it could have come to, so the exponent
+    // remaps that fraction onto itself and the layers still stand their own
+    // relief between them and no more. Lattice layers at no relief carry nothing
+    // to take a fraction of.
+    //
+    // The magnitude of it, because the map is unsigned but a level's reading is
+    // not: the lattice blend holds its contrast flat with weights that sum past
+    // one and takes the overshoot back off against the field's mean, so a
+    // reading below that mean lands below zero, where pow is undefined. Folding
+    // it costs a crease along the level the mean sits at, at the few centimetres
+    // of ground that reach under it.
+    const double carried{latticeRelief > 0.0 ? std::abs(latticeSum / latticeRelief)
+                                             : 0.0};
+
+    // The chain rule on relief times carried to the exponent: the exponent comes
+    // down, and the relief cancels against the one the fraction was taken over.
+    // The fold's own turn is left out, at the same few centimetres.
+    const double slopeFactor{k_turbulenceExponent *
+                             std::pow(carried, k_turbulenceExponent - 1.0)};
+
+    const double baseRelief{levelRelief(k_baseLevel)};
+
+    Displacement displacement{};
+    displacement.m_height = baseRelief * levels.m_height[k_baseLevel] +
+                            latticeRelief * std::pow(carried, k_turbulenceExponent);
+    displacement.m_gradient =
+        baseRelief * levels.m_gradient[k_baseLevel] + slopeFactor * latticeGradient;
 
     return displacement;
 }

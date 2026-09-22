@@ -64,8 +64,13 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface) {
          << "const int k_synthesisRidgedMultifractal = "
          << static_cast<int>(TerrainDisplacement::Synthesis::RIDGED_MULTIFRACTAL)
          << ";\n"
+         << "const int k_synthesisTurbulencePower = "
+         << static_cast<int>(TerrainDisplacement::Synthesis::TURBULENCE_POWER)
+         << ";\n"
          << "const int k_synthesis = "
-         << static_cast<int>(TerrainDisplacement::k_synthesis) << ";\n\n"
+         << static_cast<int>(TerrainDisplacement::k_synthesis) << ";\n"
+         << "const float k_turbulenceExponent = "
+         << glslFloat(TerrainDisplacement::k_turbulenceExponent) << ";\n\n"
          << "// Metres each layer stands between its floor and its ceiling. The map is\n"
          << "// unsigned, so this is also the highest it reaches.\n"
          << "const float k_levelReliefMetres[k_levelCount] = float[k_levelCount](";
