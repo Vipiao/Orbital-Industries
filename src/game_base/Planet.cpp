@@ -6,14 +6,18 @@
 #include "src/world/PlanetSurface.h"
 #include "graphics/GraphicsEngine.h"
 #include "graphics/SSBOManager.h"
+#include <cassert>
 #include <stdexcept>
 
-Planet::Planet(PhysicsEngine* physics, GraphicsEngine* graphics, const PlanetType& type,
-               double massKg)
-    : m_physics{physics}, m_graphics{graphics}, m_surface{type.getSurface()} {
+Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
+               const PlanetType& type, double massKg)
+    : m_uniqueId{uniqueId}, m_physics{physics}, m_graphics{graphics},
+      m_surface{type.getSurface()} {
     if (!m_physics || !m_graphics) {
         throw std::runtime_error("Planet: physics and graphics must be non-null");
     }
+    // Zero mass would give zero inertia, which the integrator inverts
+    assert(massKg > 0.0 && "planet mass must be positive");
 
     // A solid sphere of uniform density
     const double radius{m_surface->radius()};
@@ -38,6 +42,10 @@ Planet::~Planet() {
     }
 }
 
+double Planet::getApproximateRadius() const {
+    return m_surface->maxRadius();
+}
+
 void Planet::updateGraphics(const glm::dvec3& cameraPos) {
     std::shared_ptr<RigidBody> rigidBody{m_rigidBody.lock()};
     if (!rigidBody) {
@@ -54,7 +62,7 @@ void Planet::updateGraphics(const glm::dvec3& cameraPos) {
         rigidBody->getAngularVelocityWorld(),
         rigidBody->getCenterOfMassLocal(),
         m_physics->getCurrentPhysicsTimeStep(),
-        m_surface->maxRadius());
+        getApproximateRadius());
 }
 
 size_t Planet::computeHash() const {

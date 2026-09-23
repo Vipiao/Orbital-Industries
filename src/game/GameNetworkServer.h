@@ -53,9 +53,9 @@ private:
     void sendStructural(INetworkTransport::ConnectionId connection,
                         const std::vector<StructuralCommand>& commands);
     // The state snapshot addressed to one connection — the characters plus the
-    // grids this connection's scheduler picks this tick, paced by how much each
-    // grid affects that client's view. Mutates the connection's sync state, so it
-    // is built once per connection per tick.
+    // grids and planets this connection's scheduler picks this tick, paced by how
+    // much each body affects that client's view. Mutates the connection's sync
+    // state, so it is built once per connection per tick.
     std::vector<std::byte> buildConnectionSnapshot(INetworkTransport::ConnectionId connection,
                                                    std::uint64_t tick);
 
@@ -88,16 +88,18 @@ private:
     std::map<INetworkTransport::ConnectionId,
              std::vector<std::pair<std::uint64_t, std::uint64_t>>> m_pendingManifests{};
 
-    // Per-connection grid position-sync scheduler. Each grid carries the velocity
-    // last sent to this client (so its coasting error reads as a frame independent
+    // Per-connection position-sync scheduler. Each body carries the velocity last
+    // sent to this client (so its coasting error reads as a frame independent
     // velocity difference — never an absolute speed), a peak-held envelope of that
-    // error for the lost-packet hedge, and its next scheduled resend tick. A grid
-    // absent from a connection's map has not been tracked yet.
-    struct GridSyncState {
+    // error for the lost-packet hedge, and its next scheduled resend tick. Grids and
+    // planets number their ids separately, so each has its own map.
+    struct BodySyncState {
         glm::dvec3 m_lastSentVelocity{0.0, 0.0, 0.0};
         double m_disturbanceEnvelope{0.0};
         std::uint64_t m_nextSendTick{0};
     };
     std::map<INetworkTransport::ConnectionId,
-             std::map<std::uint64_t, GridSyncState>> m_gridSync{};
+             std::map<std::uint64_t, BodySyncState>> m_gridSync{};
+    std::map<INetworkTransport::ConnectionId,
+             std::map<std::uint64_t, BodySyncState>> m_planetSync{};
 };

@@ -8,6 +8,8 @@
 #include "../game_base/Grid.h"
 #include "../game_base/GridSubsystem.h"
 #include "../game_base/Mode.h"
+#include "../game_base/Planet.h"
+#include "../game_base/PlanetSubsystem.h"
 #include "utils/ByteStream.h"
 
 #include <algorithm>
@@ -33,6 +35,11 @@ void GameNetworkBase::broadcast(std::span<const std::byte> data, bool reliable) 
 std::weak_ptr<RigidBody> GameNetworkBase::findGridBody(std::uint64_t id) const {
     std::shared_ptr<Grid> grid{m_gameBase->getGridSubsystem()->getGridById(id).lock()};
     return grid ? grid->getRigidBody() : std::weak_ptr<RigidBody>{};
+}
+
+std::weak_ptr<RigidBody> GameNetworkBase::findPlanetBody(std::uint64_t id) const {
+    std::shared_ptr<Planet> planet{m_gameBase->m_planetSubsystem->getPlanetById(id).lock()};
+    return planet ? planet->getRigidBody() : std::weak_ptr<RigidBody>{};
 }
 
 std::weak_ptr<RigidBody> GameNetworkBase::findCharacterBody(std::int32_t id) const {

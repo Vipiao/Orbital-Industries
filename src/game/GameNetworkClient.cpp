@@ -330,12 +330,22 @@ void GameNetworkClient::applyStateSnapshot(const std::vector<std::byte>& data) {
                   << " nudge=" << alignment.m_scheduleNudgeTicks << std::endl;
     }
 
-    // Grids are not predicted yet, so always applied directly on the client.
+    // Grids and planets are not predicted yet, so always applied directly on the client.
     for (const StateSnapshot::GridEntry& entry : snapshot.m_grids) {
         if (!entry.m_state.isValid()) {
             continue;
         }
         std::weak_ptr<RigidBody> bodyWeak{findGridBody(entry.m_id)};
+        if (std::shared_ptr<RigidBody> body{bodyWeak.lock()}) {
+            shiftedInTime(entry.m_state, drift, *body)
+                .apply(bodyWeak, *m_gameBase->m_physicsEngine);
+        }
+    }
+    for (const StateSnapshot::PlanetEntry& entry : snapshot.m_planets) {
+        if (!entry.m_state.isValid()) {
+            continue;
+        }
+        std::weak_ptr<RigidBody> bodyWeak{findPlanetBody(entry.m_id)};
         if (std::shared_ptr<RigidBody> body{bodyWeak.lock()}) {
             shiftedInTime(entry.m_state, drift, *body)
                 .apply(bodyWeak, *m_gameBase->m_physicsEngine);

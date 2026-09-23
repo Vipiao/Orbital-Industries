@@ -26,8 +26,18 @@ std::weak_ptr<Planet> PlanetSubsystem::createPlanet(std::weak_ptr<const PlanetTy
     if (!lockedType) {
         throw std::runtime_error("PlanetSubsystem::createPlanet: type has expired");
     }
-    m_planets.push_back(std::make_shared<Planet>(m_physics, m_graphics, *lockedType, massKg));
+    m_planets.push_back(std::make_shared<Planet>(m_nextPlanetId++, m_physics, m_graphics,
+                                                 *lockedType, massKg));
     return m_planets.back();
+}
+
+std::weak_ptr<Planet> PlanetSubsystem::getPlanetById(uint64_t id) const {
+    for (const std::shared_ptr<Planet>& planet : m_planets) {
+        if (planet->getUniqueId() == id) {
+            return planet;
+        }
+    }
+    return {};
 }
 
 void PlanetSubsystem::stepUpdateGraphicsAll(const glm::dvec3& cameraPos) {

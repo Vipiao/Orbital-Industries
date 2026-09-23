@@ -9,6 +9,8 @@
 #include "../game_base/Grid.h"
 #include "../game_base/GridSerializer.h"
 #include "../game_base/GridSubsystem.h"
+#include "../game_base/Planet.h"
+#include "../game_base/PlanetSubsystem.h"
 #include "../game_base/RigidBodyState.h"
 #include "../physics/PhysicsUnits.h"
 #include "../physics/RigidBody.h"
@@ -26,45 +28,47 @@ namespace {
 // comfortably exceed a round trip plus one manifest.
 const double k_recentEditWindowTicks{PhysicsUnits::seconds(3.0)};
 
-// Grid position-sync scheduler (per connection). A grid comes due when its stale
-// copy on the client would have drifted k_syncAngularTolerance off where the viewer
-// sees it, so the snapshot spends its byte budget where the error is visible.
-const std::size_t k_gridSnapshotBudgetBytes{6000};
+// Grid and planet position-sync scheduler (per connection). A body comes due when its
+// stale copy on the client would have drifted k_syncAngularTolerance off where the
+// viewer sees it, so the snapshot spends its byte budget where the error is visible.
+const std::size_t k_bodySnapshotBudgetBytes{6000};
 const double k_syncAngularTolerance{0.0087};  // rad, half a degree of apparent drift
-// The keyframe interval: the deadline for a grid the client is coasting perfectly,
+// The keyframe interval: the deadline for a body the client is coasting perfectly,
 // which heals a lost update and bounds worst-case staleness. A snapshot is built
 // once per tick, so one tick is the shortest deadline that means anything.
 const double k_keyframeIntervalTicks{PhysicsUnits::seconds(2.0)};
 const double k_minIntervalTicks{1.0};
 // Peak-held envelope decay per tick, derived from a half-life in seconds (several
-// round trips) so a grid that just slowed stays urgent long enough that a lost
+// round trips) so a body that just slowed stays urgent long enough that a lost
 // "slowed down" update is resent before the client's stale high velocity carries
 // it far — and so the real-time half-life stays fixed if the tick rate changes.
 const double k_syncEnvelopeHalfLifeTicks{PhysicsUnits::seconds(0.5)};
 const double k_syncEnvelopeDecay{std::pow(0.5, 1.0 / k_syncEnvelopeHalfLifeTicks)};
-// A grid entry is id + RigidBodyState; used to stop filling before the byte budget.
-const std::size_t k_gridEntryBytes{sizeof(std::uint64_t) + 13 * sizeof(double)};
+// An entry is id + RigidBodyState; used to stop filling before the byte budget.
+const std::size_t k_bodyEntryBytes{sizeof(std::uint64_t) + 13 * sizeof(double)};
 
-// Ticks until the viewer would see the client's coasting copy of the grid drift
+// Ticks until the viewer would see the client's coasting copy of the body drift
 // k_syncAngularTolerance off the truth. envelope is the coasting-error rate in metres
 // per tick, so envelope·T is the drift by the deadline and tolerance·range is what the
-// range absorbs; solving those equal at the range the grid will have *then* prices
+// range absorbs; solving those equal at the range the body will have *then* prices
 // approach exactly rather than by a tuned weight, and for straight line relative
 // motion closes to  T = range / (closing + sqrt(referenceSpeed² − transverse²)).
-// A rate at or below zero means the grid recedes faster than the closing range
+// A rate at or below zero means the body recedes faster than the closing range
 // tightens the budget, so it never comes due on drift alone and waits for its keyframe.
 // Flooring the root does the same for a transverse sweep quicker than referenceSpeed,
 // settling for the arrival time — early rather than late, and rare at that speed.
-double resendDeadline(const Grid& grid, const RigidBody& body, const glm::dvec3& viewerPos,
-                      const glm::dvec3& viewerVel, double envelope) {
-    // Measured to the centre of mass, not the body origin: the origin is the lattice
-    // anchor and can sit well outside a grid that has been built out or cut down. The
-    // near surface is what betrays a position error, so the radius comes back off.
+double resendDeadline(double approximateRadius, const RigidBody& body,
+                      const glm::dvec3& viewerPos, const glm::dvec3& viewerVel,
+                      double envelope) {
+    assert(approximateRadius >= 0.0);
+    // Measured to the centre of mass, not the body origin, which for a grid is the
+    // lattice anchor and can sit well outside it. The near surface is what betrays a
+    // position error, so the radius comes back off.
     glm::dvec3 toViewer{viewerPos - body.getWorldCenterOfMass()};
     double centreRange{glm::length(toViewer)};
-    double range{centreRange - grid.getApproximateRadius()};
+    double range{centreRange - approximateRadius};
     if (range <= 0.0) {
-        return 0.0;  // the viewer is within the grid, where any drift is its widest
+        return 0.0;  // the viewer is within the body, where any drift is its widest
     }
     glm::dvec3 lineOfSight{toViewer / centreRange};
     glm::dvec3 relative{body.m_velocity - viewerVel};
@@ -197,6 +201,7 @@ void GameNetworkServer::onDisconnected(INetworkTransport::ConnectionId connectio
     endControlOf(connection);
     m_pendingManifests.erase(connection);
     m_gridSync.erase(connection);
+    m_planetSync.erase(connection);
 }
 
 int GameNetworkServer::acquireCharacter(
@@ -440,55 +445,84 @@ std::vector<std::byte> GameNetworkServer::buildConnectionSnapshot(
         }
     }
 
-    // Deadline every grid, retire sync state for grids that no longer exist, and
-    // collect the ones due to send.
-    std::map<std::uint64_t, GridSyncState>& sync{m_gridSync[connection]};
+    // Deadline every grid and planet, retire sync state for bodies that no longer
+    // exist, and collect the ones due to send.
+    std::map<std::uint64_t, BodySyncState>& gridSync{m_gridSync[connection]};
+    std::map<std::uint64_t, BodySyncState>& planetSync{m_planetSync[connection]};
     struct Candidate {
+        bool m_isPlanet{false};
         std::uint64_t m_id{0};
         double m_deadline{0.0};
         RigidBodyState m_state{};
     };
     std::vector<Candidate> due{};
-    std::vector<std::uint64_t> living{};
-    for (const std::shared_ptr<Grid>& grid : m_gameBase->getGridSubsystem()->getGrids()) {
-        std::shared_ptr<RigidBody> body{grid->getRigidBody().lock()};
-        if (!body) {
-            continue;
-        }
-        living.push_back(grid->uniqueId);
-        GridSyncState& state{sync[grid->uniqueId]};
-
-        double errorRate{glm::length(body->m_velocity - state.m_lastSentVelocity)};
+    auto consider = [&](std::map<std::uint64_t, BodySyncState>& sync, bool isPlanet,
+                        std::uint64_t id, const RigidBody& body, double approximateRadius) {
+        BodySyncState& state{sync[id]};
+        double errorRate{glm::length(body.m_velocity - state.m_lastSentVelocity)};
         state.m_disturbanceEnvelope =
             std::max(errorRate, state.m_disturbanceEnvelope * k_syncEnvelopeDecay);
         if (tick < state.m_nextSendTick) {
-            continue;
+            return;
         }
-        due.push_back({grid->uniqueId,
-                       resendDeadline(*grid, *body, refPos, refVel, state.m_disturbanceEnvelope),
-                       RigidBodyState::capture(*body)});
-    }
-    std::erase_if(sync, [&living](const auto& entry) {
-        return std::find(living.begin(), living.end(), entry.first) == living.end();
-    });
+        due.push_back({isPlanet, id,
+                       resendDeadline(approximateRadius, body, refPos, refVel,
+                                      state.m_disturbanceEnvelope),
+                       RigidBodyState::capture(body)});
+    };
+    auto retire = [](std::map<std::uint64_t, BodySyncState>& sync,
+                     const std::vector<std::uint64_t>& living) {
+        std::erase_if(sync, [&living](const auto& entry) {
+            return std::find(living.begin(), living.end(), entry.first) == living.end();
+        });
+    };
 
-    // Soonest deadline first; grid id breaks ties so the order is reproducible. The
-    // sort reads the raw deadline, not the clamped one, so grids pinned to the floor
-    // still order among themselves instead of being handed out by id. Fill the
-    // snapshot until the byte budget is spent, then reschedule what was sent.
+    std::vector<std::uint64_t> livingGrids{};
+    for (const std::shared_ptr<Grid>& grid : m_gameBase->getGridSubsystem()->getGrids()) {
+        if (std::shared_ptr<RigidBody> body{grid->getRigidBody().lock()}) {
+            livingGrids.push_back(grid->uniqueId);
+            consider(gridSync, false, grid->uniqueId, *body, grid->getApproximateRadius());
+        }
+    }
+    retire(gridSync, livingGrids);
+
+    std::vector<std::uint64_t> livingPlanets{};
+    for (const std::shared_ptr<Planet>& planet :
+         m_gameBase->m_planetSubsystem->getPlanets()) {
+        if (std::shared_ptr<RigidBody> body{planet->getRigidBody().lock()}) {
+            livingPlanets.push_back(planet->getUniqueId());
+            consider(planetSync, true, planet->getUniqueId(), *body,
+                     planet->getApproximateRadius());
+        }
+    }
+    retire(planetSync, livingPlanets);
+
+    // Soonest raw deadline first, so bodies pinned to the floor still order among
+    // themselves; kind then id break ties reproducibly. Fill the snapshot until the
+    // byte budget is spent, then reschedule what was sent.
     std::sort(due.begin(), due.end(), [](const Candidate& a, const Candidate& b) {
-        return a.m_deadline != b.m_deadline ? a.m_deadline < b.m_deadline : a.m_id < b.m_id;
+        if (a.m_deadline != b.m_deadline) {
+            return a.m_deadline < b.m_deadline;
+        }
+        if (a.m_isPlanet != b.m_isPlanet) {
+            return b.m_isPlanet;
+        }
+        return a.m_id < b.m_id;
     });
-    std::size_t budget{k_gridSnapshotBudgetBytes};
+    std::size_t budget{k_bodySnapshotBudgetBytes};
     for (const Candidate& candidate : due) {
-        if (budget < k_gridEntryBytes) {
+        if (budget < k_bodyEntryBytes) {
             break;
         }
-        budget -= k_gridEntryBytes;
-        snapshot.m_grids.push_back({candidate.m_id, candidate.m_state});
+        budget -= k_bodyEntryBytes;
+        if (candidate.m_isPlanet) {
+            snapshot.m_planets.push_back({candidate.m_id, candidate.m_state});
+        } else {
+            snapshot.m_grids.push_back({candidate.m_id, candidate.m_state});
+        }
         double interval{std::clamp(candidate.m_deadline, k_minIntervalTicks,
                                    k_keyframeIntervalTicks)};
-        GridSyncState& state{sync[candidate.m_id]};
+        BodySyncState& state{(candidate.m_isPlanet ? planetSync : gridSync)[candidate.m_id]};
         state.m_lastSentVelocity = candidate.m_state.m_velocity;
         state.m_nextSendTick = tick + static_cast<std::uint64_t>(interval);
     }

@@ -1,5 +1,5 @@
-// StateSnapshot.h — one tick's authoritative world state as a value: every grid and
-// character body, plus each character's input and docking status (levels riding the
+// StateSnapshot.h — one tick's authoritative world state as a value: every grid, planet
+// and character body, plus each character's input and docking status (levels riding the
 // unreliable channel; a lost snapshot is superseded by the next tick's). Pure data
 // with serialization; building it from the world and applying it are the caller's.
 #pragma once
@@ -16,6 +16,10 @@ struct StateSnapshot {
         std::uint64_t m_id{0};
         RigidBodyState m_state{};
     };
+    struct PlanetEntry {
+        std::uint64_t m_id{0};
+        RigidBodyState m_state{};
+    };
     struct CharacterEntry {
         std::int32_t m_id{0};
         RigidBodyState m_state{};
@@ -25,6 +29,7 @@ struct StateSnapshot {
 
     std::uint64_t m_tick{0};
     std::vector<GridEntry> m_grids{};
+    std::vector<PlanetEntry> m_planets{};
     std::vector<CharacterEntry> m_characters{};
 
     void serialize(ByteWriter& writer) const;

@@ -7,6 +7,11 @@ void StateSnapshot::serialize(ByteWriter& writer) const {
         writer.write(grid.m_id);
         grid.m_state.serialize(writer);
     }
+    writer.write(static_cast<std::uint32_t>(m_planets.size()));
+    for (const PlanetEntry& planet : m_planets) {
+        writer.write(planet.m_id);
+        planet.m_state.serialize(writer);
+    }
     writer.write(static_cast<std::uint32_t>(m_characters.size()));
     for (const CharacterEntry& character : m_characters) {
         writer.write(character.m_id);
@@ -29,6 +34,17 @@ bool StateSnapshot::deserialize(ByteReader& reader) {
             return false;
         }
         m_grids.push_back(grid);
+    }
+    std::uint32_t planetCount{0};
+    if (!reader.read(planetCount)) {
+        return false;
+    }
+    for (std::uint32_t ii = 0; ii < planetCount; ii++) {
+        PlanetEntry planet{};
+        if (!reader.read(planet.m_id) || !planet.m_state.deserialize(reader)) {
+            return false;
+        }
+        m_planets.push_back(planet);
     }
     std::uint32_t characterCount{0};
     if (!reader.read(characterCount)) {

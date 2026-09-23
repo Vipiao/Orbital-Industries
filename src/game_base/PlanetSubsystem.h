@@ -3,6 +3,7 @@
 
 #include "utils/IHashable.h"
 #include <glm/glm.hpp>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -27,6 +28,9 @@ public:
     std::weak_ptr<const PlanetType> createPlanetType(const PlanetTypeConfig& config);
     std::weak_ptr<Planet> createPlanet(std::weak_ptr<const PlanetType> type, double massKg);
 
+    const std::vector<std::shared_ptr<Planet>>& getPlanets() const { return m_planets; }
+    std::weak_ptr<Planet> getPlanetById(uint64_t id) const;
+
     // Once per physics step, after integration
     void stepUpdateGraphicsAll(const glm::dvec3& cameraPos);
 
@@ -40,6 +44,7 @@ private:
     // Declared before m_planets so every type outlives the planets wearing it
     std::vector<std::shared_ptr<const PlanetType>> m_planetTypes;
 
-    // In creation order, which is the same on every peer
+    // In creation order, which is the same on every peer, so ids match
     std::vector<std::shared_ptr<Planet>> m_planets;
+    uint64_t m_nextPlanetId{0};
 };

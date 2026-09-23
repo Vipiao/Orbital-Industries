@@ -142,6 +142,7 @@ protected:
 
     // Wire-format helpers shared by both roles.
     std::weak_ptr<RigidBody> findGridBody(std::uint64_t id) const;
+    std::weak_ptr<RigidBody> findPlanetBody(std::uint64_t id) const;
     std::weak_ptr<RigidBody> findCharacterBody(std::int32_t id) const;
     // Reverse of findGridBody: which grid owns this body, or k_noLockTargetGridId
     // when none (e.g. unlocked, or a body that isn't a grid's).
