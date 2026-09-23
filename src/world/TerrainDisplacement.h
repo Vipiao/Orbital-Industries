@@ -64,7 +64,7 @@ public:
     // has to meet them first, and every sum past FBM works that way. Reading the
     // table in the order it is written is what keeps that free of a remapping
     // each new sum would have to get right.
-    static constexpr int k_levelCount{4};
+    static constexpr int k_levelCount{5};
 
     // The layer the rest ride on: what the body is shaped like, where they are
     // what it wears. First, being the largest, and read by direction rather than

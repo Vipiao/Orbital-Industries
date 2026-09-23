@@ -175,10 +175,10 @@ TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
 // how much height the change is spread over so the two meet as a shore rather
 // than as a line.
 //
-// The sum stands off the sphere, so the surface runs from zero to about 13.5 km,
-// the base layer carrying 10 km of that and the three octaves the rest. These two
-// sit either side of where the ground spends most of its time, a little under
-// 7 km, which leaves the shore well below it and the snow line just above.
+// The sum stands off the sphere rather than either side of it, so these are
+// heights above the sphere and not above any sea. The two sit either side of
+// where the ground spends most of its time, which leaves the shore below it and
+// the snow line above.
 const float k_sandCeilingMetres = 6500.0;
 const float k_snowFloorMetres = 7500.0;
 const float k_coverBlendMetres = 20.0;

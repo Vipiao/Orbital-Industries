@@ -108,15 +108,20 @@ public:
     // visibly within one cell, many enough that the cells do not become the
     // pattern themselves. Cutting finer costs a normal: the term the blend drops
     // runs as the reciprocal of a cell.
-    static constexpr double k_cellTiles{2.0};
+    static constexpr double k_cellTiles{1.0};
 
     // Levels the drawn geometry carries, and so the surface the bounds are
-    // measured on. A count taken from the top of the table, the base layer among
-    // them: what is left out is the fine end.
-    static constexpr int k_positionLevels{4};
-    static_assert(k_positionLevels > TerrainDisplacement::k_baseLevel &&
-                      k_positionLevels <= TerrainDisplacement::k_levelCount,
-                  "The geometry cannot carry levels the table does not hold");
+    // measured on. Taken from the table: a level in the normal but not in the
+    // vertices reads as light that does not match the ground.
+    static constexpr int k_positionLevels{TerrainDisplacement::k_levelCount};
+
+    // Levels the normal carries. Free to differ from the geometry's, a pixel
+    // resolving finer than a quad: a layer past the geometry tilts a normal
+    // without moving a vertex, and nothing measures a normal.
+    static constexpr int k_shadingLevels{TerrainDisplacement::k_levelCount};
+    static_assert(k_shadingLevels > TerrainDisplacement::k_baseLevel &&
+                      k_shadingLevels <= TerrainDisplacement::k_levelCount,
+                  "The shading cannot carry levels the table does not hold");
 
 private:
     // One lattice point's plane, as the point being shaded stands in it. The

@@ -29,15 +29,6 @@ std::uint32_t latticeHash(const glm::ivec3& point) {
     return h;
 }
 
-// Levels the normal read here carries. Its own, needing to agree with nothing:
-// the snippet's shading levels tilt a normal without moving a vertex, and
-// nothing measures a normal.
-constexpr int k_shadingLevels{4};
-
-static_assert(k_shadingLevels > TerrainDisplacement::k_baseLevel &&
-                  k_shadingLevels <= TerrainDisplacement::k_levelCount,
-              "The shading cannot carry levels the table does not hold");
-
 // Whether a figure survives the narrowing to float the surface is drawn in, so
 // both sides read one number rather than two that differ in the last place.
 bool exactInFloat(double value) {

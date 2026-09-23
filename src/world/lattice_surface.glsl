@@ -80,6 +80,8 @@
 //    int   k_latticeCorners    lattice points a cell is bounded by
 //    float k_cellTiles         tiles of a level's own layer one cell spans
 //    int   k_positionLevels    levels the drawn geometry carries
+//    int   k_shadingLevels     levels the normal carries, free to differ from
+//                              the geometry's
 //
 // terrain_displacement.glsl lists the rest, being what reads them.
 
@@ -98,18 +100,6 @@ uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
 // of disagreement into a different answer.
 uniform samplerCube u_baseElevationMap;  // R16 unorm, spanning exactly [0, 1]
 uniform samplerCube u_baseGradientMap;   // RGB16F, slope per unit of direction
-
-// Levels the shading carries, and free to run past the geometry: both read the
-// same table and each stops where its own sampling does, a pixel resolving
-// finer than a quad. A layer past the geometry would arrive as relief in the
-// normal that the vertices never carry, and since it tilts a normal without
-// moving one, nothing that measures the surface has to answer for it.
-//
-// Level with the geometry here, the table holding nothing further to reach for.
-//
-// It costs four lookups per layer wherever one is still above the map's top,
-// which the gradient path skips it below.
-const int k_shadingLevels = 4;
 
 // One lattice point's plane, as the point being shaded stands in it.
 struct LatticePlane {
