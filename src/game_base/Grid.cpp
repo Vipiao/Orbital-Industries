@@ -715,10 +715,10 @@ void Grid::updateGraphics(const glm::dvec3& cameraPos) {
     
     glm::dvec3 angVelAxis = rigidBody->getAngularVelocityWorld();
     double angVelMagnitude = glm::length(angVelAxis);
-    if (angVelMagnitude > 0.00001) {
+    if (angVelMagnitude > 0.0) {
         angVelAxis = angVelAxis / angVelMagnitude;
     } else {
-        // If angular velocity is effectively zero, use a safe default axis
+        // No spin: use a safe default axis
         angVelAxis = glm::dvec3(0.0, 0.0, 1.0);
         angVelMagnitude = 0.0;
     }

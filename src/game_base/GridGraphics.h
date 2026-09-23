@@ -7,6 +7,7 @@
 #include "graphics/AssimpLoader.h"
 #include "StructuralBlock.h"
 #include "BlockGraphics.h"
+#include "MeshTransformPublisher.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -107,19 +108,8 @@ private:
     // Track pending jobs for cleanup
     std::vector<std::weak_ptr<Job>> m_pendingJobs;
     
-    // GPU state tracking for optimization
-    mutable glm::dvec3 m_lastSentPosition{0.0};
-    mutable glm::dquat m_lastSentOrientation{1.0, 0.0, 0.0, 0.0};
-    glm::dvec3 m_lastSentVelocity{0.0};
-    glm::dquat m_lastSentAngularVelocityQuat{1.0, 0.0, 0.0, 0.0};
-    uint64_t m_nextUpdateTimeStep{0};
-    mutable uint64_t m_lastCheckedTimeStep{0};
-    
-    // Update thresholds
-    static constexpr double POSITION_THRESHOLD = 0.0008;
-    static constexpr double ORIENTATION_THRESHOLD_BASE = 0.0004;
-    static constexpr uint64_t TIME_THRESHOLD = 256;
-    
+    MeshTransformPublisher m_transformPublisher;
+
     void loadTextures();
     
     // Job-based graphics operations
@@ -128,11 +118,4 @@ private:
 
     // Helper to track job handles
     void trackJob(std::weak_ptr<Job> jobHandle);
-    
-    bool shouldUpdateGPU(
-        const glm::dvec3& cameraPos,
-        const glm::dvec3& gridPosition,
-        const glm::dquat& gridOrientation,
-        uint64_t currentTimeStep,
-        double approximateRadius) const;
 };

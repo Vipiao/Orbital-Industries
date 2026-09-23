@@ -23,8 +23,12 @@ class JobManager;
 class Job;
 class GridSubsystem;
 class CharacterSubsystem;
+class PlanetSubsystem;
 class CockpitDockingCoordinator;
 class Grid;
+class Planet;
+class PlanetType;
+struct PlanetTypeConfig;
 class TimeHandler;
 class DebugRenderer;
 class Digibot;
@@ -51,6 +55,8 @@ public:
     bool modifyCell(uint64_t gridId, const glm::ivec3& coord, int cornerIndex,
                     const glm::ivec3& direction);
     std::weak_ptr<Digibot> createDigibot();
+    std::weak_ptr<const PlanetType> createPlanetType(const PlanetTypeConfig& config);
+    std::weak_ptr<Planet> createPlanet(std::weak_ptr<const PlanetType> type, double massKg);
 
     // Resumable frame advance. Call in a loop until FrameDone; the other
     // statuses yield to the caller at a control point, exactly once each per
@@ -99,6 +105,7 @@ public:
     std::unique_ptr<JobManager> m_jobManager;
     std::unique_ptr<GridSubsystem> m_gridSubsystem;
     std::unique_ptr<CharacterSubsystem> m_characterSubsystem;
+    std::unique_ptr<PlanetSubsystem> m_planetSubsystem;
     // Cockpit docking is world physics: it runs every step regardless of mode
     std::unique_ptr<CockpitDockingCoordinator> m_cockpitDockingCoordinator;
     TimeHandler* m_timeHandler;

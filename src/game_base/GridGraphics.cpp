@@ -37,10 +37,6 @@ GridGraphics::GridGraphics(GraphicsEngine* graphics, JobManager* jobManager,
 
     // Load textures
     loadTextures();
-    
-    // Initialize next update time to 0 to force initial update
-    m_nextUpdateTimeStep = 0;
-    m_lastCheckedTimeStep = 0;
 }
 
 GridGraphics::~GridGraphics() {
@@ -234,67 +230,6 @@ void GridGraphics::trackJob(std::weak_ptr<Job> jobHandle) {
     m_pendingJobs.push_back(jobHandle);
 }
 
-bool GridGraphics::shouldUpdateGPU(
-    const glm::dvec3& cameraPos,
-    const glm::dvec3& gridPosition,
-    const glm::dquat& gridOrientation,
-    uint64_t currentTimeStep,
-    double approximateRadius) const {
-    
-    // Check if time step has incremented since last check
-    if (currentTimeStep > m_lastCheckedTimeStep) {
-        // Advance our cached state by the number of time steps that have passed
-        uint64_t stepsDelta = currentTimeStep - m_lastCheckedTimeStep;
-        
-        // Update cached position with velocity
-        m_lastSentPosition += m_lastSentVelocity * static_cast<double>(stepsDelta);
-        
-        // Update cached orientation with angular velocity quaternion
-        for (uint64_t i = 0; i < stepsDelta; ++i) {
-            m_lastSentOrientation = m_lastSentAngularVelocityQuat * m_lastSentOrientation;
-        }
-        m_lastSentOrientation = glm::normalize(m_lastSentOrientation);
-        
-        m_lastCheckedTimeStep = currentTimeStep;
-    }
-    
-    // Check if it's time for a scheduled update
-    if (currentTimeStep >= m_nextUpdateTimeStep) {
-        return true;
-    }
-
-    // Calculate distance-based scaling factor
-    double distanceToCamera = glm::length(cameraPos - gridPosition);
-    double meshRadius = approximateRadius;
-    double effectiveDistance = std::max(distanceToCamera - meshRadius, 0.1); // Prevent division by very small numbers
-    double scalingFactor = std::max(effectiveDistance, 1.0); // Cap scaling factor at 1.0
-    
-    // Check position difference (now using interpolated cached position)
-    double positionDiff = glm::length(gridPosition - m_lastSentPosition);
-    double adaptivePositionThreshold = POSITION_THRESHOLD * scalingFactor;
-    if (positionDiff > adaptivePositionThreshold) {
-        return true;
-    }
-    
-    // Check orientation difference using radius-based threshold (now using interpolated cached orientation)
-    double orientationDot = glm::abs(glm::dot(gridOrientation, m_lastSentOrientation));
-    // Clamp to handle numerical precision issues
-    orientationDot = glm::clamp(orientationDot, 0.0, 1.0);
-    double halfAngleDiff = glm::acos(orientationDot);
-    double angleDiff = 2.0 * halfAngleDiff;
-    
-    // Calculate radius-based orientation threshold
-    double radius = approximateRadius;
-    double orientationThreshold = ORIENTATION_THRESHOLD_BASE / radius * scalingFactor;
-    
-    if (angleDiff > orientationThreshold) {
-        return true;
-    }
-    
-    // No significant change detected
-    return false;
-}
-
 void GridGraphics::updateGraphics(
     const glm::dvec3& cameraPos,
     const glm::dvec3& gridPosition,
@@ -304,56 +239,7 @@ void GridGraphics::updateGraphics(
     const glm::dvec3& gridCenter,
     uint64_t currentTimeStep,
     double approximateRadius) {
-    
-    if (m_ssboIndex < 0) {
-        return;
-    }
-
-    // Only update GPU if there's a significant change
-    if (!shouldUpdateGPU(cameraPos, gridPosition, gridOrientation, currentTimeStep, approximateRadius)) {
-        return;
-    } else {
-        //std::cout << "Updated graphics for " << m_graphicsCells.size() << " cells" << std::endl;
-    }
-    
-    glm::dvec3 angVelAxis = gridAngularVelocity;
-    double angVelMagnitude = glm::length(angVelAxis);
-    if (angVelMagnitude > 0.00001) {
-        angVelAxis = angVelAxis / angVelMagnitude;
-    } else {
-        // If angular velocity is effectively zero, use a safe default axis
-        angVelAxis = glm::dvec3(0.0, 0.0, 1.0);
-        angVelMagnitude = 0.0;
-    }
-    
-    m_graphics->updateMeshTransform(
-        m_ssboIndex,
-        gridPosition - gridCenter,
-        gridVelocity,
-        gridOrientation,
-        angVelAxis,
-        angVelMagnitude,
-        gridCenter,
-        glm::dvec3(1.0, 1.0, 1.0),      // Default scale
-        currentTimeStep,
-        0.0                             // Grid blocks non-emissive by default
-    );
-
-    // Update tracking variables with current grid state
-    m_lastSentPosition = gridPosition;
-    m_lastSentOrientation = gridOrientation;
-    m_lastSentVelocity = gridVelocity;
-    
-    // Convert angular velocity to quaternion for one time step
-    if (angVelMagnitude > 0.00001) {
-        m_lastSentAngularVelocityQuat = glm::angleAxis(angVelMagnitude, angVelAxis);
-    } else {
-        m_lastSentAngularVelocityQuat = glm::dquat(1.0, 0.0, 0.0, 0.0); // Identity quaternion (no rotation)
-    }
-    
-    // Update the last checked time step to current
-    m_lastCheckedTimeStep = currentTimeStep;
-    
-    // Schedule next mandatory update
-    m_nextUpdateTimeStep = currentTimeStep + TIME_THRESHOLD;
+    m_transformPublisher.publish(m_graphics, m_ssboIndex, cameraPos, gridPosition,
+                                 gridOrientation, gridVelocity, gridAngularVelocity,
+                                 gridCenter, currentTimeStep, approximateRadius);
 }

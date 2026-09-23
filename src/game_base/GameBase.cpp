@@ -7,6 +7,7 @@
 #include "utils/HashFunctions.h"
 #include "Grid.h"
 #include "GridSubsystem.h"
+#include "PlanetSubsystem.h"
 #include "cockpit/CockpitDockingCoordinator.h"
 #include "thruster/ThrusterControl.h"
 #include "reaction_wheel/ReactionWheelControl.h"
@@ -99,6 +100,11 @@ GameBase::GameBase(
         JobPriorities::GRID_CELL_CLASSIFICATION
     );
 
+    m_planetSubsystem = std::make_unique<PlanetSubsystem>(
+        m_physicsEngine.get(),
+        m_graphicsEngine.get()
+    );
+
     // Create cockpit docking coordinator (world-level, mode-independent)
     m_cockpitDockingCoordinator = std::make_unique<CockpitDockingCoordinator>();
 
@@ -135,6 +141,15 @@ std::weak_ptr<Grid> GameBase::createGrid(const glm::dvec3& position, const glm::
 
 std::weak_ptr<Digibot> GameBase::createDigibot() {
     return m_characterSubsystem->createDigibot();
+}
+
+std::weak_ptr<const PlanetType> GameBase::createPlanetType(const PlanetTypeConfig& config) {
+    return m_planetSubsystem->createPlanetType(config);
+}
+
+std::weak_ptr<Planet> GameBase::createPlanet(std::weak_ptr<const PlanetType> type,
+                                             double massKg) {
+    return m_planetSubsystem->createPlanet(type, massKg);
 }
 
 void GameBase::removeGrid(std::weak_ptr<Grid> gridWeak) {
@@ -488,6 +503,7 @@ GameBase::StepResult GameBase::updatePhysics(
             // interpolates toward it.
             m_gridSubsystem->stepUpdateGraphicsAll(m_graphicsEngine->getCamPos());
             m_characterSubsystem->stepUpdateGraphicsAll();
+            m_planetSubsystem->stepUpdateGraphicsAll(m_graphicsEngine->getCamPos());
 
             // Clear the in-progress flag and reset for the next step.
             m_physicsUpdateInProgress = false;
@@ -505,6 +521,7 @@ size_t GameBase::computeHash() const {
     hash = Hash::combineHashes(hash, std::hash<uint64_t>{}(m_physicsEngine->getCurrentPhysicsTimeStep()));
     
     hash = Hash::combineHashes(hash, m_gridSubsystem->computeHash());
+    hash = Hash::combineHashes(hash, m_planetSubsystem->computeHash());
     
     return hash;
 }
