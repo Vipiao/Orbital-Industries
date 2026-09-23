@@ -202,8 +202,8 @@ TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
 // heights above the sphere and not above any sea. The two sit either side of
 // where the ground spends most of its time, which leaves the shore below it and
 // the snow line above.
-const float k_sandCeilingMetres = 6500.0;
-const float k_snowFloorMetres = 7500.0;
+const float k_sandCeilingMetres = 4800.0;
+const float k_snowFloorMetres = 6000.0;
 const float k_coverBlendMetres = 20.0;
 
 // Where the ground has given up holding anything and is bare rock. Placed off

@@ -49,7 +49,7 @@ public:
     // Which of them the body is built with. Compiled rather than chosen at run
     // time: the snippet unrolls its sum over the table, and the two sides have
     // to be summing the same thing for the bounds to hold.
-    static constexpr Synthesis k_synthesis{Synthesis::TURBULENCE_POWER};
+    static constexpr Synthesis k_synthesis{Synthesis::RIDGED_MULTIFRACTAL};
 
     // The exponent TURBULENCE_POWER carries. At one the sum is left as it lies
     // and this is FBM again; above one the ground is pressed onto the sum's own

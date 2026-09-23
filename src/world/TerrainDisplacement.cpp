@@ -31,9 +31,9 @@ constexpr double k_coarsestFrequency{0.0256};
 
 const glm::dvec2 k_levels[]{glm::dvec2{0.0, 1.0},
                             glm::dvec2{k_coarsestFrequency * 1.0, 1.0},
-                            glm::dvec2{k_coarsestFrequency * 8.0, 1.0 / 8.0},
+                            glm::dvec2{k_coarsestFrequency * 4.0, 1.0 / 4.0},
                             glm::dvec2{k_coarsestFrequency * 64.0, 1.0 / 64.0},
-                            glm::dvec2{k_coarsestFrequency * 512.0, 1.0 / 512.0}};
+                            glm::dvec2{k_coarsestFrequency * 1024.0, 1.0 / 1024.0}};
 
 // Sized by the rows written rather than by the count, so a row added or dropped
 // here without the count following is a compile error. Sized by the count, too
