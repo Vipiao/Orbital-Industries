@@ -104,7 +104,7 @@ static void buildTestWorld(GameBase* gameBase) {
     // SSAO works from the depth buffer, which holds the coarse displaced
     // triangles, rather than the per-pixel normals the surface is shaded with.
     // Where the two disagree it darkens facets.
-    graphicsEngine->setSsaoEnabled(false);
+    graphicsEngine->setSsaoEnabled(true);
 
     // Triangles per selected patch, shared by every CDLOD body.
     graphicsEngine->setCdlodPatchQuads(24);
