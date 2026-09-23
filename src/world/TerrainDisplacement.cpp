@@ -92,37 +92,62 @@ TerrainDisplacement::Displacement TerrainDisplacement::displacement(
     return Displacement{};
 }
 
-TerrainDisplacement::Displacement TerrainDisplacement::fbm(const Levels& levels) const {
+double TerrainDisplacement::latticeRelief() const {
+    double relief{0.0};
+    for (int level{k_firstLatticeLevel}; level < k_levelCount; ++level) {
+        relief += levelRelief(level);
+    }
+
+    return relief;
+}
+
+TerrainDisplacement::Displacement TerrainDisplacement::baseDisplacement(
+    const Levels& levels) const {
+    const double relief{levelRelief(k_baseLevel)};
+
     Displacement displacement{};
-    for (int level{0}; level < k_levelCount; ++level) {
+    displacement.m_height = relief * levels.m_height[k_baseLevel];
+    displacement.m_gradient = relief * levels.m_gradient[k_baseLevel];
+
+    return displacement;
+}
+
+TerrainDisplacement::Displacement TerrainDisplacement::fbm(const Levels& levels) const {
+    Displacement displacement{baseDisplacement(levels)};
+    for (int level{k_firstLatticeLevel}; level < k_levelCount; ++level) {
         const double relief{levelRelief(level)};
         displacement.m_height += relief * levels.m_height[level];
         displacement.m_gradient += relief * levels.m_gradient[level];
     }
+
+    // The offset moves the sum without bending it, so the gradient is untouched.
+    displacement.m_height -= k_fbmMedian * latticeRelief();
 
     return displacement;
 }
 
 TerrainDisplacement::Displacement TerrainDisplacement::ridgedMultifractal(
     const Levels& levels) const {
-    Displacement displacement{};
-    for (int level{0}; level < k_levelCount; ++level) {
+    Displacement displacement{baseDisplacement(levels)};
+    for (int level{k_firstLatticeLevel}; level < k_levelCount; ++level) {
         const double relief{levelRelief(level)};
         displacement.m_height -= relief * levels.m_height[level];
         displacement.m_gradient -= relief * levels.m_gradient[level];
     }
+
+    displacement.m_height -= k_ridgedMultifractalMedian * latticeRelief();
 
     return displacement;
 }
 
 TerrainDisplacement::Displacement TerrainDisplacement::turbulencePower(
     const Levels& levels) const {
-    double latticeRelief{0.0};
+    const double carriedRelief{latticeRelief()};
+
     double latticeSum{0.0};
     glm::dvec3 latticeGradient{0.0};
     for (int level{k_firstLatticeLevel}; level < k_levelCount; ++level) {
         const double relief{levelRelief(level)};
-        latticeRelief += relief;
         latticeSum += relief * levels.m_height[level];
         latticeGradient += relief * levels.m_gradient[level];
     }
@@ -138,7 +163,7 @@ TerrainDisplacement::Displacement TerrainDisplacement::turbulencePower(
     // reading below that mean lands below zero, where pow is undefined. Folding
     // it costs a crease along the level the mean sits at, at the few centimetres
     // of ground that reach under it.
-    const double carried{latticeRelief > 0.0 ? std::abs(latticeSum / latticeRelief)
+    const double carried{carriedRelief > 0.0 ? std::abs(latticeSum / carriedRelief)
                                              : 0.0};
 
     // The chain rule on relief times carried to the exponent: the exponent comes
@@ -147,13 +172,11 @@ TerrainDisplacement::Displacement TerrainDisplacement::turbulencePower(
     const double slopeFactor{k_turbulenceExponent *
                              std::pow(carried, k_turbulenceExponent - 1.0)};
 
-    const double baseRelief{levelRelief(k_baseLevel)};
-
-    Displacement displacement{};
-    displacement.m_height = baseRelief * levels.m_height[k_baseLevel] +
-                            latticeRelief * std::pow(carried, k_turbulenceExponent);
-    displacement.m_gradient =
-        baseRelief * levels.m_gradient[k_baseLevel] + slopeFactor * latticeGradient;
+    Displacement displacement{baseDisplacement(levels)};
+    displacement.m_height +=
+        carriedRelief *
+        (std::pow(carried, k_turbulenceExponent) - k_turbulencePowerMedian);
+    displacement.m_gradient += slopeFactor * latticeGradient;
 
     return displacement;
 }

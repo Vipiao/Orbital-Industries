@@ -57,6 +57,16 @@ public:
     // floor is lifted and the high ground flattens against a ceiling.
     static constexpr double k_turbulenceExponent{4.0};
 
+    // Where the middle of each sum falls, as a fraction of the relief the lattice
+    // layers carry between them: the median over ten thousand points spread
+    // evenly across the sphere, rounded. Each sum takes its own off what it
+    // returns, so the ground sits at one height whichever is chosen. The median
+    // rather than the mean, which the peaks have a hand in. A sum edited is a
+    // median measured again.
+    static constexpr double k_fbmMedian{0.38};
+    static constexpr double k_ridgedMultifractalMedian{-0.38};
+    static constexpr double k_turbulencePowerMedian{0.02};
+
     // Layers the table holds, coarsest first. Public so a caller can check at
     // compile time that the layers it asks for are there.
     //
@@ -114,23 +124,30 @@ public:
     double levelFrequency(int level) const;
 
 private:
-    // Each layer at its own relief, added. Nothing a layer reads depends on what
-    // any other found, so the sum is linear and the gradient is the same sum of
-    // the same reliefs.
+    // The relief the lattice layers carry between them, the base layer being no
+    // part of it: what a sum below has to spend, and what its median is of.
+    double latticeRelief() const;
+
+    // The base layer at its own relief, which every sum below starts from and
+    // none of them bends: that layer is the shape of the body and the lattice
+    // layers are what it wears.
+    Displacement baseDisplacement(const Levels& levels) const;
+
+    // The lattice layers each at their own relief, added onto the base layer.
+    // Nothing a layer reads depends on what any other found, so the sum is
+    // linear and the gradient is the same sum of the same reliefs.
     Displacement fbm(const Levels& levels) const;
 
-    // Each layer at its own relief, subtracted rather than added. The map creases
-    // along its own zero contour and stands at nothing there: summed as it lies
-    // those creases are the valley floors, and taken the other way up they are
-    // the summits. Negation is linear, so the gradient is turned over with the
+    // The same lattice sum subtracted rather than added. The map creases along
+    // its own zero contour and stands at nothing there: summed as it lies those
+    // creases are the valley floors, and taken the other way up they are the
+    // summits. Negation is linear, so the gradient is turned over with the
     // height and stays the derivative of what is returned.
     Displacement ridgedMultifractal(const Levels& levels) const;
 
     // The lattice layers' sum read as a fraction of the relief they carry
     // between them, taken to k_turbulenceExponent, given that relief back and
-    // added to the base layer. The base layer is left out of the exponent: that
-    // layer is the shape of the body and the rest are what it wears, so only
-    // what they come to between them is bent.
+    // added to the base layer.
     //
     // The sum stands as it lies rather than turned over. What the exponent
     // leaves is a floor with the high ground standing on it, and the body has

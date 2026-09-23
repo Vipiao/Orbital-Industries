@@ -31,6 +31,10 @@
 //    int   k_synthesis     which of the sums below the body is built with, named
 //                          by the k_synthesis... constants beside it
 //    float k_turbulenceExponent  the exponent turbulencePower carries
+//    float k_fbmMedian, k_ridgedMultifractalMedian, k_turbulencePowerMedian
+//                          where the middle of each sum falls, as a fraction of
+//                          the lattice relief, which each takes off what it
+//                          returns so they all stand at one height
 //    float k_levelReliefMetres[k_levelCount]  metres each layer stands, floor
 //                                             to ceiling
 //    float k_levelFrequency[k_levelCount]     how much oftener than the field a
@@ -64,41 +68,66 @@ float levelFrequency(int level) {
    return k_levelFrequency[level];
 }
 
-// Each layer at its own relief, added. Nothing a layer reads depends on what any
-// other found, so the sum is linear and the gradient is the same sum of the same
-// reliefs.
-TerrainDisplacement fbm(TerrainLevels levels) {
-   TerrainDisplacement displacement;
-   displacement.height = 0.0;
-   displacement.gradient = vec3(0.0);
+// The relief the lattice layers carry between them, the base layer being no part
+// of it: what a sum below has to spend, and what its median is of.
+float latticeRelief() {
+   float relief = 0.0;
+   for (int level = k_firstLatticeLevel; level < k_levelCount; ++level) {
+      relief += k_levelReliefMetres[level];
+   }
 
-   for (int level = 0; level < k_levelCount; ++level) {
+   return relief;
+}
+
+// The base layer at its own relief, which every sum below starts from and none of
+// them bends: that layer is the shape of the body and the lattice layers are what
+// it wears.
+TerrainDisplacement baseDisplacement(TerrainLevels levels) {
+   float relief = k_levelReliefMetres[k_baseLevel];
+
+   TerrainDisplacement displacement;
+   displacement.height = relief * levels.height[k_baseLevel];
+   displacement.gradient = relief * levels.gradient[k_baseLevel];
+
+   return displacement;
+}
+
+// The lattice layers each at their own relief, added onto the base layer. Nothing
+// a layer reads depends on what any other found, so the sum is linear and the
+// gradient is the same sum of the same reliefs.
+TerrainDisplacement fbm(TerrainLevels levels) {
+   TerrainDisplacement displacement = baseDisplacement(levels);
+
+   for (int level = k_firstLatticeLevel; level < k_levelCount; ++level) {
       float relief = k_levelReliefMetres[level];
       displacement.height += relief * levels.height[level];
       displacement.gradient += relief * levels.gradient[level];
    }
 
+   // The offset moves the sum without bending it, so the gradient is untouched.
+   displacement.height -= k_fbmMedian * latticeRelief();
+
    return displacement;
 }
 
-// Each layer at its own relief, subtracted rather than added. The map creases
-// along its own zero contour, one crease per octave of its own, and stands at
-// nothing there: summed as it lies those creases are the valley floors, and
-// taken the other way up they are the summits, with the body hanging under them
-// rather than standing on them.
+// The same lattice sum subtracted rather than added. The map creases along its
+// own zero contour, one crease per octave of its own, and stands at nothing
+// there: summed as it lies those creases are the valley floors, and taken the
+// other way up they are the summits, with the ground hanging under them rather
+// than standing on them.
 //
 // Negation is linear, so the gradient is turned over with the height and stays
 // the derivative of what is returned.
 TerrainDisplacement ridgedMultifractal(TerrainLevels levels) {
-   TerrainDisplacement displacement;
-   displacement.height = 0.0;
-   displacement.gradient = vec3(0.0);
+   TerrainDisplacement displacement = baseDisplacement(levels);
 
-   for (int level = 0; level < k_levelCount; ++level) {
+   for (int level = k_firstLatticeLevel; level < k_levelCount; ++level) {
       float relief = k_levelReliefMetres[level];
       displacement.height -= relief * levels.height[level];
       displacement.gradient -= relief * levels.gradient[level];
    }
+
+   displacement.height -= k_ridgedMultifractalMedian * latticeRelief();
 
    return displacement;
 }
@@ -110,19 +139,16 @@ TerrainDisplacement ridgedMultifractal(TerrainLevels levels) {
 // down onto it and the high ground is left standing alone on a plain, below one
 // the floor is lifted and the high ground flattens against a ceiling.
 //
-// The base layer is left out of the exponent. That layer is the shape of the body
-// and the rest are what it wears, so only what they come to between them is bent.
-//
 // The exponent is differentiated with the height, so the gradient returned is
 // still the derivative of what is returned.
 TerrainDisplacement turbulencePower(TerrainLevels levels) {
-   float latticeRelief = 0.0;
+   float carriedRelief = latticeRelief();
+
    float latticeSum = 0.0;
    vec3 latticeGradient = vec3(0.0);
 
    for (int level = k_firstLatticeLevel; level < k_levelCount; ++level) {
       float relief = k_levelReliefMetres[level];
-      latticeRelief += relief;
       latticeSum += relief * levels.height[level];
       latticeGradient += relief * levels.gradient[level];
    }
@@ -138,20 +164,17 @@ TerrainDisplacement turbulencePower(TerrainLevels levels) {
    // that mean lands below zero, where pow is undefined. Folding it costs a crease
    // along the level the mean sits at, at the few centimetres of ground that reach
    // under it.
-   float carried = latticeRelief > 0.0 ? abs(latticeSum / latticeRelief) : 0.0;
+   float carried = carriedRelief > 0.0 ? abs(latticeSum / carriedRelief) : 0.0;
 
    // The chain rule on relief times carried to the exponent: the exponent comes
    // down, and the relief cancels against the one the fraction was taken over. The
    // fold's own turn is left out, at the same few centimetres.
    float slopeFactor = k_turbulenceExponent * pow(carried, k_turbulenceExponent - 1.0);
 
-   float baseRelief = k_levelReliefMetres[k_baseLevel];
-
-   TerrainDisplacement displacement;
-   displacement.height = baseRelief * levels.height[k_baseLevel] +
-                         latticeRelief * pow(carried, k_turbulenceExponent);
-   displacement.gradient =
-      baseRelief * levels.gradient[k_baseLevel] + slopeFactor * latticeGradient;
+   TerrainDisplacement displacement = baseDisplacement(levels);
+   displacement.height +=
+      carriedRelief * (pow(carried, k_turbulenceExponent) - k_turbulencePowerMedian);
+   displacement.gradient += slopeFactor * latticeGradient;
 
    return displacement;
 }
