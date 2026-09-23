@@ -20,13 +20,20 @@ namespace {
 // tile is a factor in its own right -- so rise over run is amplitude over tile
 // times what the map does.
 //
-// The frequency need not be a power of two: what has to land exactly is the cell
-// count the lattice comes to, which PlanetSurface rounds and asserts is whole.
+// How often the coarsest lattice layer is laid down, which the rest are written
+// as multiples of: the multiplier is how much oftener than it a layer comes, and
+// the amplitude is one over that same number, so the ladder rule is on the page
+// rather than only in the assert below. The scale itself need not be a power of
+// two -- what has to land exactly is the cell count the lattice comes to, which
+// PlanetSurface rounds and asserts is whole -- but the multipliers must be, and
+// the assert there checks it.
+constexpr double k_coarsestFrequency{0.0256};
+
 const glm::dvec2 k_levels[]{glm::dvec2{0.0, 1.0},
-                            glm::dvec2{0.0256, 1.0},
-                            glm::dvec2{0.1024, 1.0 / 4.0},
-                            glm::dvec2{0.4096, 1.0 / 16.0},
-                            glm::dvec2{1.6384, 1.0 / 64.0}};
+                            glm::dvec2{k_coarsestFrequency * 1.0, 1.0},
+                            glm::dvec2{k_coarsestFrequency * 8.0, 1.0 / 8.0},
+                            glm::dvec2{k_coarsestFrequency * 64.0, 1.0 / 64.0},
+                            glm::dvec2{k_coarsestFrequency * 512.0, 1.0 / 512.0}};
 
 // Sized by the rows written rather than by the count, so a row added or dropped
 // here without the count following is a compile error. Sized by the count, too
