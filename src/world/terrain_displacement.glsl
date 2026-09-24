@@ -214,10 +214,10 @@ const float k_rockSlopeTo = 0.45;
 
 // A stand-in for a material, and the whole of what this surface has to say about
 // its own colour for now.
-const vec3 k_sandColour = vec3(0.8, 0.8, 0.45);
-const vec3 k_grassColour = vec3(0.5, 0.7, 0.20);
-const vec3 k_rockColour = vec3(0.4, 0.5, 0.5);
-const vec3 k_snowColour = vec3(0.90, 0.92, 0.95);
+const vec3 k_sandColour  = vec3(0.84, 0.84, 0.47);
+const vec3 k_grassColour = vec3(0.53, 0.74, 0.21);
+const vec3 k_rockColour  = vec3(0.42, 0.53, 0.53);
+const vec3 k_snowColour  = vec3(0.95, 0.97, 1.0000);
 
 // Roughness by slope: flats hold the fine material that settles out of everything
 // standing above them and scatter in every direction, while ground steep enough to
