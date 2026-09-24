@@ -1,6 +1,7 @@
 // Planet.cpp
 #include "Planet.h"
 #include "PlanetType.h"
+#include "PlanetWaterGraphics.h"
 #include "../physics/PhysicsEngine.h"
 #include "../physics/RigidBody.h"
 #include "src/world/PlanetSurface.h"
@@ -10,7 +11,7 @@
 #include <stdexcept>
 
 Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
-               const PlanetType& type, double massKg)
+               const PlanetType& type, std::weak_ptr<Geometry> waterShell, double massKg)
     : m_uniqueId{uniqueId}, m_physics{physics}, m_graphics{graphics},
       m_surface{type.getSurface()} {
     if (!m_physics || !m_graphics) {
@@ -28,12 +29,18 @@ Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphi
 
     m_ssboIndex = m_graphics->m_ssboManager->allocateIndex();
     m_cdlodInstance = type.createCdlodInstance(m_ssboIndex);
+    if (type.getWater()) {
+        m_water = std::make_unique<PlanetWaterGraphics>(
+            m_graphics, waterShell, m_ssboIndex, radius, *type.getWater());
+    }
 
     // Use a default distant camera position for the initial update
     updateGraphics(glm::dvec3{0.0, 0.0, 100.0});
 }
 
 Planet::~Planet() {
+    // Both drawables go before the SSBO slot they are drawn through
+    m_water.reset();
     m_graphics->removeCdlodInstance(m_cdlodInstance);
     m_graphics->m_ssboManager->deallocateIndex(m_ssboIndex);
 

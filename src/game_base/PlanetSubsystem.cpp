@@ -3,6 +3,7 @@
 #include "Planet.h"
 #include "PlanetType.h"
 #include "utils/HashFunctions.h"
+#include "graphics/GraphicsEngine.h"
 #include <stdexcept>
 
 PlanetSubsystem::PlanetSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics)
@@ -10,9 +11,19 @@ PlanetSubsystem::PlanetSubsystem(PhysicsEngine* physics, GraphicsEngine* graphic
     if (!m_physics || !m_graphics) {
         throw std::runtime_error("PlanetSubsystem: All dependencies must be non-null");
     }
+
+    // A coarse icosphere, since the shader rather than the mesh shapes the water
+    const size_t waterMaterial{
+        m_graphics->createRayVolumeMaterial("../media/planet/water_body.glsl")};
+    m_waterShell = m_graphics->createRayVolumeGeometry(
+        "../media/blender/02_sphere.obj", waterMaterial);
 }
 
-PlanetSubsystem::~PlanetSubsystem() = default;
+PlanetSubsystem::~PlanetSubsystem() {
+    // The planets' water instances go before the shell they are drawn on
+    m_planets.clear();
+    m_graphics->releaseRayVolumeGeometry(m_waterShell);
+}
 
 std::weak_ptr<const PlanetType> PlanetSubsystem::createPlanetType(
     const PlanetTypeConfig& config) {
@@ -27,7 +38,7 @@ std::weak_ptr<Planet> PlanetSubsystem::createPlanet(std::weak_ptr<const PlanetTy
         throw std::runtime_error("PlanetSubsystem::createPlanet: type has expired");
     }
     m_planets.push_back(std::make_shared<Planet>(m_nextPlanetId++, m_physics, m_graphics,
-                                                 *lockedType, massKg));
+                                                 *lockedType, m_waterShell, massKg));
     return m_planets.back();
 }
 

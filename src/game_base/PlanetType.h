@@ -1,7 +1,9 @@
 // PlanetType.h
 #pragma once
 
+#include "PlanetWaterConfig.h"
 #include <memory>
+#include <optional>
 
 class GraphicsEngine;
 class PlanetSurface;
@@ -26,6 +28,7 @@ public:
     PlanetType& operator=(const PlanetType&) = delete;
 
     const std::shared_ptr<const PlanetSurface>& getSurface() const { return m_surface; }
+    const std::optional<PlanetWaterConfig>& getWater() const { return m_water; }
 
     // An instance of this shape drawn through the given SSBO slot. The caller
     // removes it through the graphics engine.
@@ -34,6 +37,7 @@ public:
 private:
     GraphicsEngine* m_graphics;
     std::shared_ptr<const PlanetSurface> m_surface;
+    std::optional<PlanetWaterConfig> m_water;
     std::weak_ptr<CdlodSurface> m_cdlodSurface;
     // Where any patch of this shape can render, the same for every instance
     std::shared_ptr<const ICdlodPatchBounds> m_bounds;

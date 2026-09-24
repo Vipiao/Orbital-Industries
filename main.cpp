@@ -124,6 +124,14 @@ static void buildTestWorld(GameBase* gameBase) {
     // shading at all. The snippet's colour bands are what it is read through.
     planetTypeConfig.m_base = PlanetBaseLayerConfig{};
 
+    // Sea level halfway up the base layer's height. Light is down to about a third
+    // after 50 metres of water.
+    PlanetWaterConfig waterConfig{};
+    waterConfig.m_seaLevelMetres = 5000.0;
+    waterConfig.m_absorptionPerMetre = 0.02;
+    waterConfig.m_color = glm::dvec3{0.02, 0.08, 0.15};
+    planetTypeConfig.m_water = waterConfig;
+
     // Generates the maps, once for every planet of this shape
     const std::weak_ptr<const PlanetType> planetType{
         gameBase->createPlanetType(planetTypeConfig)};

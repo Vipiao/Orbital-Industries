@@ -12,6 +12,8 @@ class GraphicsEngine;
 class RigidBody;
 class PlanetSurface;
 class PlanetType;
+class PlanetWaterGraphics;
+class Geometry;
 struct CdlodInstance;
 
 /**
@@ -22,8 +24,9 @@ struct CdlodInstance;
  */
 class Planet : public IHashable {
 public:
+    // waterShell is used only when the type has water
     Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
-           const PlanetType& type, double massKg);
+           const PlanetType& type, std::weak_ptr<Geometry> waterShell, double massKg);
     ~Planet();
 
     Planet(const Planet&) = delete;
@@ -49,5 +52,7 @@ private:
     std::weak_ptr<RigidBody> m_rigidBody;
     int m_ssboIndex{-1};
     std::weak_ptr<CdlodInstance> m_cdlodInstance;
+    // Null for a dry planet
+    std::unique_ptr<PlanetWaterGraphics> m_water;
     MeshTransformPublisher m_transformPublisher;
 };

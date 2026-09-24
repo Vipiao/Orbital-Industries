@@ -41,7 +41,7 @@ static PlanetBaseMaps loadOrBakeBaseMaps(const std::filesystem::path& cachePath,
 }
 
 PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
-    : m_graphics{graphics} {
+    : m_graphics{graphics}, m_water{config.m_water} {
     if (!m_graphics) {
         throw std::runtime_error("PlanetType: graphics must be non-null");
     }

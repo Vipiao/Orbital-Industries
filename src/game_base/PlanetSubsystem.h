@@ -11,6 +11,7 @@ class PhysicsEngine;
 class GraphicsEngine;
 class Planet;
 class PlanetType;
+class Geometry;
 struct PlanetTypeConfig;
 
 /**
@@ -40,6 +41,9 @@ public:
 private:
     PhysicsEngine* m_physics;
     GraphicsEngine* m_graphics;
+
+    // Shell with the water shader, shared by every planet's water
+    std::weak_ptr<Geometry> m_waterShell;
 
     // Declared before m_planets so every type outlives the planets wearing it
     std::vector<std::shared_ptr<const PlanetType>> m_planetTypes;
