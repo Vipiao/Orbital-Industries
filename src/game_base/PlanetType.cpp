@@ -57,8 +57,12 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     // The snippet is read each time this is asked, so a shader reload picks it up
     // as edited. The figures are taken once: they are fixed at startup, and a
     // reload is for the GLSL rather than for the shape of the body.
+    //
+    // The shore is the waterline; a dry planet puts it below all ground, so it
+    // has no sand.
+    const double shoreMetres{m_water ? m_water->m_seaLevelMetres : -m_surface->radius()};
     m_cdlodSurface = m_graphics->createCdlodSurface(
-        [shape = planetSurfaceGlsl(*m_surface)] {
+        [shape = planetSurfaceGlsl(*m_surface, shoreMetres)] {
             return shape
                  + ShaderProgram::loadTextFileFromPath(
                        "../src/world/lattice_surface.glsl");

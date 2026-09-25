@@ -33,13 +33,15 @@ std::string glslFloat(double value) {
 
 }  // namespace
 
-std::string planetSurfaceGlsl(const PlanetSurface& surface) {
+std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres) {
     const TerrainDisplacement& displacement{surface.displacement()};
     const int levelCount{TerrainDisplacement::k_levelCount};
 
     std::ostringstream glsl{};
     glsl << "// Written by planetSurfaceGlsl.\n"
-         << "const float k_radiusMetres = " << glslFloat(surface.radius()) << ";\n\n"
+         << "const float k_radiusMetres = " << glslFloat(surface.radius()) << ";\n"
+         << "// Height above the sphere the sand is laid along.\n"
+         << "const float k_shoreMetres = " << glslFloat(shoreMetres) << ";\n\n"
          << "// One repeat of the map, as the two whole numbers its width is the ratio\n"
          << "// of: the width itself is not exact in a float, and a plane coordinate\n"
          << "// stands thousands of tiles out.\n"

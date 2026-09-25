@@ -194,15 +194,12 @@ TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
    return fbm(levels);
 }
 
-// Where one ground cover gives way to the next, in metres of surface height, and
-// how much height the change is spread over so the two meet as a shore rather
-// than as a line.
+// Where one ground cover gives way to the next, and the height the change is
+// blended over.
 //
-// The sum stands off the sphere rather than either side of it, so these are
-// heights above the sphere and not above any sea. The two sit either side of
-// where the ground spends most of its time, which leaves the shore below it and
-// the snow line above.
-const float k_sandCeilingMetres = 4800.0;
+// Sand covers the sea floor and a strip of beach above it. The snow line depends
+// on the air rather than the sea, so it is measured from the sphere.
+const float k_beachRiseMetres = 10.0;
 const float k_snowFloorMetres = 6000.0;
 const float k_coverBlendMetres = 20.0;
 
@@ -219,17 +216,10 @@ const vec3 k_grassColour = vec3(0.53, 0.74, 0.21);
 const vec3 k_rockColour  = vec3(0.42, 0.53, 0.53);
 const vec3 k_snowColour  = vec3(0.95, 0.97, 1.0000);
 
-// Roughness by slope: flats hold the fine material that settles out of everything
-// standing above them and scatter in every direction, while ground steep enough to
-// shed it is left as the rock beneath, which carries a highlight.
-//
-// The ramp is placed off the ladder's own measurements -- mean rise over run is
-// 0.60 and the steepest ground reaches 2.27 -- so it spans the middle of the range
-// and keeps the far end for ground that is truly bare.
+// Roughness by slope, on the rock's ramp: flat ground holds fine material that
+// scatters light, while the bare rock on steep ground carries a highlight.
 const float k_flatRoughness = 0.85;
 const float k_steepRoughness = 0.45;
-const float k_roughnessSlopeFrom = 0.25;
-const float k_roughnessSlopeTo = 1.20;
 
 // What the ground is made of, from how high it stands and how steeply it leans.
 //
@@ -247,18 +237,16 @@ TerrainMaterial terrainMaterial(float heightMetres, float slope) {
 
    // Ground steep enough sheds whatever settles on it and is left as the rock
    // beneath, which is why the flanks read bare and the floors do not.
-   vec3 ground = mix(cover, k_rockColour,
-                     smoothstep(k_rockSlopeFrom, k_rockSlopeTo, slope));
+   float bare = smoothstep(k_rockSlopeFrom, k_rockSlopeTo, slope);
+   vec3 ground = mix(cover, k_rockColour, bare);
 
-   // Sand along the bottom, where the water will stand.
+   // Sand under the water and along its edge
+   float sandCeiling = k_shoreMetres + k_beachRiseMetres;
    material.colour = mix(k_sandColour, ground,
-                         smoothstep(k_sandCeilingMetres - k_coverBlendMetres,
-                                    k_sandCeilingMetres + k_coverBlendMetres,
-                                    heightMetres));
+                         smoothstep(sandCeiling - k_coverBlendMetres,
+                                    sandCeiling + k_coverBlendMetres, heightMetres));
 
-   material.roughness =
-      mix(k_flatRoughness, k_steepRoughness,
-          smoothstep(k_roughnessSlopeFrom, k_roughnessSlopeTo, slope));
+   material.roughness = mix(k_flatRoughness, k_steepRoughness, bare);
 
    return material;
 }

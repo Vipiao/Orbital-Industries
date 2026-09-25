@@ -19,5 +19,8 @@
  * The one thing here that knows GLSL exists. PlanetSurface holds the numbers and
  * knows nothing of shaders; this reads it through the same accessors anything
  * else would, and only says how to spell what it answers.
+ *
+ * shoreMetres is the height above the sphere the sand is laid along; a value
+ * below all ground gives no sand.
  */
-std::string planetSurfaceGlsl(const PlanetSurface& surface);
+std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres);
