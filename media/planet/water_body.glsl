@@ -2,7 +2,9 @@
 //
 // A planet's water: a sea-level sphere absorbing light by the distance the view
 // ray travels through it before the opaque scene. No surface shading yet.
-// value.x is the absorption per metre, value.y the sea-level radius.
+// value.xyz is the absorption per metre in each channel, value.w the sea-level
+// radius. color.rgb is the water seen too deep to see through, lit by the full
+// ambient light, and dims with the scene's ambient light.
 //
 // A float resolves only half a metre at a planet's radius, so the intersection
 // is written around the camera's height above the water, taken from the wide
@@ -14,12 +16,12 @@ RayVolumeResult rayVolumeShade(
    vec3 centerViewPos, mat3 viewBasis)
 {
    RayVolumeResult res;
-   res.color = color.rgb;
+   res.color = vec3(0.0);
    res.alpha = 0.0;
    res.weightDepth = 1.0;
 
-   float absorption = value.x;
-   float radius = value.y;
+   vec3 absorption = value.xyz;
+   float radius = value.w;
 
    // Camera height above sea level, negative under water. hi - radius is exact
    // (Sterbenz) at any height where it matters; precise keeps lo from being
@@ -67,8 +69,17 @@ RayVolumeResult rayVolumeShade(
       return res;
    }
 
-   // Beer-Lambert: what survives the path is exp(-absorption * path)
-   res.alpha = 1.0 - exp(-absorption * path);
+   // Beer-Lambert: what survives the path is exp(-absorption * path), in each
+   // channel apart
+   vec3 transmitted = exp(-absorption * path);
+   vec3 target = mix(color.rgb * u_ambientScale, opaqueColor, transmitted);
+
+   // The blend takes one alpha for all three channels: the channel that loses
+   // the most sets it, and the colour hands the others back the extra share of
+   // the scene behind that they keep. Exact for a single layer.
+   float least = min(transmitted.r, min(transmitted.g, transmitted.b));
+   res.alpha = 1.0 - least;
+   res.color = (target - opaqueColor * least) / max(res.alpha, 1e-6);
    res.weightDepth = entry * max(-rayDir.z, 1e-4);
    return res;
 }

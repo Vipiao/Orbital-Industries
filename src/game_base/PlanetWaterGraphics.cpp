@@ -14,24 +14,25 @@ constexpr double k_shellMargin{1.02};
 
 PlanetWaterGraphics::PlanetWaterGraphics(GraphicsEngine* graphics,
                                          std::weak_ptr<Geometry> shellGeometry,
-                                         int ssboIndex, double planetRadiusMetres,
+                                         int ssboIndex, double seaLevelRadius,
                                          const PlanetWaterConfig& config)
     : m_graphics{graphics}, m_geometry{shellGeometry} {
     if (!m_graphics) {
         throw std::runtime_error{"PlanetWaterGraphics: GraphicsEngine cannot be null"};
     }
-    assert(config.m_absorptionPerMetre > 0.0 && "water must absorb to be seen");
+    assert(glm::all(glm::greaterThan(config.m_absorptionPerMetre, glm::dvec3{0.0})) &&
+           "water must absorb in every channel to be seen");
 
-    const double seaLevelRadius{planetRadiusMetres + config.m_seaLevelMetres};
     assert(seaLevelRadius > 0.0);
     // The shader reads it as a float; exact, it matches what CPU code expects
     assert(static_cast<double>(static_cast<float>(seaLevelRadius)) == seaLevelRadius &&
            "sea-level radius must be exact in a float");
 
-    // state.x is the absorption, state.y the sea-level radius; neither changes
+    // state.xyz is the absorption per channel and state.w the sea-level radius;
+    // neither changes
     m_instance = m_graphics->addRayVolumeInstance(
         m_geometry, ssboIndex, glm::dvec4{config.m_color, 1.0},
-        glm::dvec4{config.m_absorptionPerMetre, seaLevelRadius, 0.0, 0.0});
+        glm::dvec4{config.m_absorptionPerMetre, seaLevelRadius});
 
     std::shared_ptr<Instance> instance{m_instance.lock()};
     std::shared_ptr<Geometry> geometry{m_geometry.lock()};

@@ -504,6 +504,7 @@ GameBase::StepResult GameBase::updatePhysics(
             m_gridSubsystem->stepUpdateGraphicsAll(m_graphicsEngine->getCamPos());
             m_characterSubsystem->stepUpdateGraphicsAll();
             m_planetSubsystem->stepUpdateGraphicsAll(m_graphicsEngine->getCamPos());
+            m_planetSubsystem->stepUpdateLighting(m_graphicsEngine->getCamPos());
 
             // Clear the in-progress flag and reset for the next step.
             m_physicsUpdateInProgress = false;

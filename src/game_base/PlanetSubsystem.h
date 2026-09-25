@@ -34,6 +34,9 @@ public:
 
     // Once per physics step, after integration
     void stepUpdateGraphicsAll(const glm::dvec3& cameraPos);
+    // Dims the scene's light by how deep under water the camera is, the whole
+    // scene at once
+    void stepUpdateLighting(const glm::dvec3& cameraPos);
 
     // IHashable interface
     virtual size_t computeHash() const override;

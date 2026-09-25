@@ -4,6 +4,7 @@
 #include "PlanetType.h"
 #include "utils/HashFunctions.h"
 #include "graphics/GraphicsEngine.h"
+#include <algorithm>
 #include <stdexcept>
 
 PlanetSubsystem::PlanetSubsystem(PhysicsEngine* physics, GraphicsEngine* graphics)
@@ -55,6 +56,18 @@ void PlanetSubsystem::stepUpdateGraphicsAll(const glm::dvec3& cameraPos) {
     for (const std::shared_ptr<Planet>& planet : m_planets) {
         planet->updateGraphics(cameraPos);
     }
+}
+
+void PlanetSubsystem::stepUpdateLighting(const glm::dvec3& cameraPos) {
+    // The camera is under one sea at most, and the others leave the light whole
+    LightIntensity light{};
+    for (const std::shared_ptr<Planet>& planet : m_planets) {
+        const LightIntensity underWater{planet->lightUnderWater(cameraPos)};
+        light.m_ambient = std::min(light.m_ambient, underWater.m_ambient);
+        light.m_direct = std::min(light.m_direct, underWater.m_direct);
+    }
+
+    m_graphics->setLightIntensity(light);
 }
 
 size_t PlanetSubsystem::computeHash() const {

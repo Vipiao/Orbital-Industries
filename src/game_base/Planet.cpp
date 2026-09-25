@@ -8,12 +8,13 @@
 #include "graphics/GraphicsEngine.h"
 #include "graphics/SSBOManager.h"
 #include <cassert>
+#include <cmath>
 #include <stdexcept>
 
 Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
                const PlanetType& type, std::weak_ptr<Geometry> waterShell, double massKg)
     : m_uniqueId{uniqueId}, m_physics{physics}, m_graphics{graphics},
-      m_surface{type.getSurface()} {
+      m_surface{type.getSurface()}, m_waterConfig{type.getWater()} {
     if (!m_physics || !m_graphics) {
         throw std::runtime_error("Planet: physics and graphics must be non-null");
     }
@@ -29,9 +30,11 @@ Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphi
 
     m_ssboIndex = m_graphics->m_ssboManager->allocateIndex();
     m_cdlodInstance = type.createCdlodInstance(m_ssboIndex);
-    if (type.getWater()) {
+    if (m_waterConfig) {
+        assert(m_waterConfig->m_directFalloffMetres > 0.0 &&
+               m_waterConfig->m_ambientFalloffMetres > 0.0);
         m_water = std::make_unique<PlanetWaterGraphics>(
-            m_graphics, waterShell, m_ssboIndex, radius, *type.getWater());
+            m_graphics, waterShell, m_ssboIndex, seaLevelRadius(), *m_waterConfig);
     }
 
     // Use a default distant camera position for the initial update
@@ -53,6 +56,11 @@ double Planet::getApproximateRadius() const {
     return m_surface->maxRadius();
 }
 
+double Planet::seaLevelRadius() const {
+    assert(m_waterConfig);
+    return m_surface->radius() + m_waterConfig->m_seaLevelMetres;
+}
+
 void Planet::updateGraphics(const glm::dvec3& cameraPos) {
     std::shared_ptr<RigidBody> rigidBody{m_rigidBody.lock()};
     if (!rigidBody) {
@@ -70,6 +78,21 @@ void Planet::updateGraphics(const glm::dvec3& cameraPos) {
         rigidBody->getCenterOfMassLocal(),
         m_physics->getCurrentPhysicsTimeStep(),
         getApproximateRadius());
+}
+
+LightIntensity Planet::lightUnderWater(const glm::dvec3& worldPos) const {
+    std::shared_ptr<RigidBody> rigidBody{m_rigidBody.lock()};
+    if (!m_waterConfig || !rigidBody) {
+        return LightIntensity{};
+    }
+
+    // The sea is a sphere about the body's origin, so its orientation is moot
+    const double depth{seaLevelRadius() - glm::length(worldPos - rigidBody->getPosition())};
+    if (depth <= 0.0) {
+        return LightIntensity{};
+    }
+    return LightIntensity{std::exp(-depth / m_waterConfig->m_ambientFalloffMetres),
+                          std::exp(-depth / m_waterConfig->m_directFalloffMetres)};
 }
 
 size_t Planet::computeHash() const {

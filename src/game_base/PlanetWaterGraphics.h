@@ -13,7 +13,7 @@ struct PlanetWaterConfig;
 class PlanetWaterGraphics {
 public:
     PlanetWaterGraphics(GraphicsEngine* graphics, std::weak_ptr<Geometry> shellGeometry,
-                        int ssboIndex, double planetRadiusMetres,
+                        int ssboIndex, double seaLevelRadius,
                         const PlanetWaterConfig& config);
     ~PlanetWaterGraphics();
 

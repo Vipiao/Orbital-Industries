@@ -124,12 +124,18 @@ static void buildTestWorld(GameBase* gameBase) {
     // shading at all. The snippet's colour bands are what it is read through.
     planetTypeConfig.m_base = PlanetBaseLayerConfig{};
 
-    // Sea level halfway up the base layer's height. Light is down to about a third
-    // after 50 metres of water.
+    // Sea level halfway up the base layer's height. The water is as clear as the
+    // clearest natural water: red is gone within about 10 metres, green within 50,
+    // and blue carries past 100, for a sighting range of about 75 metres. Deep, it
+    // is blue with a little green, what little it scatters back being mostly blue.
     PlanetWaterConfig waterConfig{};
     waterConfig.m_seaLevelMetres = 5000.0;
-    waterConfig.m_absorptionPerMetre = 0.02;
-    waterConfig.m_color = glm::dvec3{0.02, 0.08, 0.15};
+    waterConfig.m_absorptionPerMetre = glm::dvec3{0.35, 0.065, 0.025};
+    waterConfig.m_color = glm::dvec3{0.005, 0.05, 0.16};
+    // With the camera under water the sun is mostly gone by 60 metres down, and
+    // the ambient light by 1200
+    waterConfig.m_directFalloffMetres = 20.0;
+    waterConfig.m_ambientFalloffMetres = 400.0;
     planetTypeConfig.m_water = waterConfig;
 
     // Generates the maps, once for every planet of this shape
