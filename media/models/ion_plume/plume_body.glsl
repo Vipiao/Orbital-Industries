@@ -5,7 +5,7 @@
 // Shadertoy prototype:
 //   - the camera/ray come from the engine (view space), so no camera is built;
 //   - the cylinder axis is reconstructed from the instance orientation
-//     (viewBasis maps local -> view) and origin (centerViewPos);
+//     (rayVolumeSpaceToView maps local -> view) and origin (centerViewPos);
 //   - the march is clamped by the opaque scene depth as well as the cylinder
 //     exit, so the plume fades into geometry behind it.
 // The cylinder inscribes the 1x2x1 proxy: axis along local +Y at (0.5, *, 0.5),
@@ -83,7 +83,8 @@ float density(vec3 point, vec3 axisBase, vec3 axisDir)
     vec3  toPoint      = point - axisBase;
     float axialDist    = dot(toPoint, axisDir);
     float radialDist   = length(toPoint - axialDist * axisDir);  // distance to axis
-    float radialParam = radialDist / radiusProfile(axialDist, vec2(0.0, 0.65), vec2(0.5, 0.4), vec2(2.0, 1.0));
+    float radialParam = radialDist /
+        radiusProfile(axialDist, vec2(0.0, 0.65), vec2(0.5, 0.4), vec2(2.0, 1.0));
     //float ring = sin(radialParam * PI*4.0 - 1.57)+1.;                 // rings; tune the 16
     float density = 0.5-radialParam;
     // Fade toward end.
@@ -114,9 +115,10 @@ float opticalDepth(vec3 rayOrigin, vec3 rayDir, vec3 axisBase, vec3 axisDir,
 }
 
 RayVolumeResult rayVolumeShade(
-   vec3 viewPos, vec3 rayDir, float backDepth, float sceneDepth,
+   vec3 rayDir, float exitDistance, float sceneDistance,
    vec3 opaqueColor, vec4 value, vec4 color, vec2 uv,
-   vec3 centerViewPos, mat3 viewBasis)
+   vec3 centerViewPos, Df centerDistance,
+   mat3 rayVolumeSpaceToView, Df3 cameraLocalPosition)
 {
    RayVolumeResult res;
    res.color = vec3(0.0);
@@ -135,19 +137,17 @@ RayVolumeResult rayVolumeShade(
    const float radius = 0.5;
    const float height = 2.0;
 
-   vec3 axisBase  = centerViewPos + viewBasis * axisBaseLocal;
-   vec3 axisDir   = normalize(viewBasis * axisDirLocal);
+   vec3 axisBase  = centerViewPos + rayVolumeSpaceToView * axisBaseLocal;
+   vec3 axisDir   = normalize(rayVolumeSpaceToView * axisDirLocal);
    vec3 rayOrigin = vec3(0.0);
 
    vec2 hit = cylinderHit(rayOrigin, rayDir, axisBase, axisDir, radius, height);
    if (hit.y <= hit.x) return res;   // ray misses the cylinder
 
    // Limit the chord by the far opaque surface as well as the cylinder exit, so
-   // the plume is occluded by geometry behind it (converting scene depth, which
-   // is measured along -z, into a ray parameter t).
-   float tScene = sceneDepth / max(-rayDir.z, 1e-4);
+   // the plume is occluded by geometry behind it.
    float tEnter = max(hit.x, 0.0);
-   float tExit  = min(hit.y, tScene);
+   float tExit  = min(hit.y, sceneDistance);
    if (tExit <= tEnter) return res;
 
    float depth = opticalDepth(rayOrigin, rayDir, axisBase, axisDir, tEnter, tExit);
@@ -156,8 +156,9 @@ RayVolumeResult rayVolumeShade(
    // transparency fade): the dense core fades last, the fringes first.
    depth *= thrust;
 
-   depth *= (sin(mod(physicsTime(), 2. * PI) + frameTime()) + 
-      sin(mod(physicsTime() * 0.77, 2. * PI) + frameTime() * 0.77)) * 0.125 + 0.75;
+   depth *= (sin(mod(wrappedPhysicsTicks(), 2. * PI) + wrappedPhysicsTime()) +
+      sin(mod(wrappedPhysicsTicks() * 0.77, 2. * PI) + wrappedPhysicsTime() * 0.77))
+      * 0.125 + 0.75;
 
    res.color       = color.rgb + opaqueColor;
    res.alpha       = 1.0 - exp(-depth);
