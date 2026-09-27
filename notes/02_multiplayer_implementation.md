@@ -1,6 +1,6 @@
 # Multiplayer — As Implemented
 
-The design that actually runs: Version Beta (multiplayer_design.md §5) plus the
+The design that actually runs: Version Beta (00_multiplayer_design.md §5) plus the
 extensions below. That doc holds the Alpha/Beta analysis and the reasoning for
 server authority and "consistently in the past"; this one records what was built
 and the logic that is not obvious from the code alone.
@@ -126,7 +126,7 @@ world's bodies integrate on every step, and a frozen anchor would miss the
 timeline by `speed × staleness` (meters, at speed) and fight the controller.
 Inside the deadzone a weak pull bleeds drift while moving;
 a large error engages the strong band with hysteresis. See
-multiplayer_design.md §5 for why anchor-at-server-time keeps the whole world
+00_multiplayer_design.md §5 for why anchor-at-server-time keeps the whole world
 mutually consistent.
 
 ## 8. Not built yet (and where it hooks in)
@@ -140,4 +140,4 @@ mutually consistent.
   "what a client should hold" just stops being "everything".
 - **Structure-hash caching**: dirty flag on Grid, invalidated where structural
   edits already schedule analysis; hashing is microseconds today.
-- **Alpha upgrade** (client-side lead/extrapolation): multiplayer_design.md §4.
+- **Alpha upgrade** (client-side lead/extrapolation): 00_multiplayer_design.md §4.

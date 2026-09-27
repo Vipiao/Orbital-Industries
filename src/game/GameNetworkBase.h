@@ -2,10 +2,10 @@
 // connection tracking, the reliable-message dispatch loop, character-control
 // arbitration's shared skeleton, and wire-format helpers both roles need.
 //
-// The implemented design is documented in notes/multiplayer_implementation.md
-// (rationale: notes/multiplayer_design.md).
+// The implemented design is documented in notes/02_multiplayer_implementation.md
+// (rationale: notes/00_multiplayer_design.md).
 //
-// The server is the single authority (Beta, see notes/multiplayer_design.md §5). It
+// The server is the single authority (Beta, see notes/00_multiplayer_design.md §5). It
 // simulates the whole world and broadcasts a state snapshot every tick. Authority
 // never moves; only who supplies the character's *input* does:
 //   - Client in control mode: it drives the character, predicts it locally, and

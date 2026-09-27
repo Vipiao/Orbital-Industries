@@ -1,6 +1,6 @@
 # Beta Implementation Plan
 
-Companion to `multiplayer_design.md` §5. This is the concrete build plan for Beta:
+Companion to `00_multiplayer_design.md` §5. This is the concrete build plan for Beta:
 server simulates everything and applies client inputs on arrival; the client applies
 server state directly to everything except its own player, which it predicts locally
 and pulls toward the server anchor with an exponential position+velocity blend.

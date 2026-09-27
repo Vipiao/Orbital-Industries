@@ -12,7 +12,7 @@
 namespace {
 
 // Strong-band time constant, in ticks: how fast a large error eases onto the anchor
-// the instant the band engages. See notes/multiplayer_design.md §5.
+// the instant the band engages. See notes/00_multiplayer_design.md §5.
 constexpr double s_strongTauTicks{PhysicsUnits::seconds(0.5)};
 
 // Strong-band half-life, in ticks: while the band stays engaged the effective tau
@@ -87,7 +87,7 @@ void PlayerPrediction::correct(const std::weak_ptr<RigidBody>& bodyWeak,
     }
 
     // Ease onto the anchor; it rides the same timeline as the applied world, so the
-    // pull keeps the world mutually consistent (multiplayer_design.md §5).
+    // pull keeps the world mutually consistent (00_multiplayer_design.md §5).
     double blend{1.0 - std::exp(-1.0 / tau)};
 
     body->setPosition(body->getPosition() +

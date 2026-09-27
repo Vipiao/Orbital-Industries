@@ -1,5 +1,5 @@
 // TickTimelineFilter.h — keeps a client's tick phase aligned with the server's
-// (notes/multiplayer_implementation.md §6). Peers' tick clocks are never phase
+// (notes/02_multiplayer_implementation.md §6). Peers' tick clocks are never phase
 // locked, so the accumulated offset drifts. Rather than shifting object positions
 // to hide that drift (which is only common-mode when every object is refreshed the
 // same tick), this reports a small nudge to *when the next physics step runs*, so

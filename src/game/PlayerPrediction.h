@@ -13,7 +13,7 @@
 //
 // The anchor is owned by the caller (GameNetworkClient), which time-aligns it with the
 // rest of the applied world and advances it along the world's timeline between
-// snapshots (notes/multiplayer_implementation.md §6-7). This class is only the
+// snapshots (notes/02_multiplayer_implementation.md §6-7). This class is only the
 // correction policy: it compares and pulls, nothing else.
 #pragma once
 
