@@ -157,7 +157,7 @@ static void buildTestWorld(GameBase* gameBase) {
 
         // Radians per physics step
         planetBody->setAngularVelocityBody(
-            glm::normalize(glm::dvec3{0.2, 1.0, 0.35}) * 0.00000001*100.);
+            glm::normalize(glm::dvec3{0.2, 1.0, 0.35}) * 0.00000001);
         //planetBody->setOrientation(
         //    glm::angleAxis(glm::radians(90.0), glm::dvec3{1.0, 0.0, 0.0}));
     }
