@@ -24,7 +24,7 @@ public:
     void setMaxRollRate(double maxRate) { m_maxRollRate = maxRate; }
 
 private:
-    double m_thrustStrength{PhysicsUnits::metersPerSecondSquared(16.384)};
+    double m_thrustStrength{PhysicsUnits::metersPerSecondSquared(16.384 * 5.)};
     double m_angularAccelerationMax{PhysicsUnits::radiansPerSecondSquared(65.536)};
     double m_maxRollRate{PhysicsUnits::radiansPerSecond(2.048)};
     double m_translationLockStrength{PhysicsUnits::perSecond(64.0)};

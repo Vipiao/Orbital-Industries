@@ -18,6 +18,25 @@ const float k_waterIor = 1.33;
 const float k_waterF0 = 0.02;
 // Spreads the sun's glint on a calm sea to about the sun's own width
 const float k_surfaceRoughness = 0.1;
+// Water shallower than this shows foam, fading out toward it
+const float k_foamDepth = 0.125;
+// The share of the surface the foam covers at the waterline
+const float k_foamCover = 0.25;
+// Foam's grey from below, lit only by what it scatters through
+const float k_foamFromBelow = 0.25;
+// Foam's albedo from above, lit like the ground
+const float k_foamAlbedo = 0.9;
+// How far in depth the swell moves the foam's edge, at the swell's rms
+const float k_foamSwell = 0.04;
+// The rise per metre assumed of a shore, to tell what depth one pixel spans
+const float k_shoreSlope = 0.1;
+// Surf lines: the depth between two, the depth they reach out to, and their
+// share of the foam's cover
+const float k_surfSpacing = 0.1;
+const float k_surfReach = 0.4;
+const float k_surfCover = 0.6;
+// Surf lines arriving per time wrap, two every second
+const uint k_surfCyclesPerWrap = 32768u;
 
 // Deep-water swell, summed as slopes. Each wave makes a whole number of cycles
 // per time wrap, so the sea runs on across the wrap without a jump; the counts
@@ -76,6 +95,8 @@ vec3 faceCamera(vec3 normal, vec3 toCamera) {
 struct SeaSurface {
    vec3 normal;   // view space, on the side of the up given
    float roughness;
+   float swell;       // the waves' crests summed alike, rms 1 where all are present
+   float footprint;   // metres of water one pixel spans
 };
 
 // The waves where the ray meets the water at distance t, around the calm normal
@@ -93,6 +114,7 @@ SeaSurface seaSurface(vec3 up, vec3 rayDir, float t, mat3 rayVolumeSpaceToView,
    float footprint = pixelAngle * t / max(abs(dot(rayDir, up)), 0.05);
 
    vec3 slope = vec3(0.0);
+   float swell = 0.0;
    float lostVariance = 0.0;
    for (int i = 0; i < k_waveCount; ++i) {
       float heading = k_waveHeading[i];
@@ -108,6 +130,7 @@ SeaSurface seaSurface(vec3 up, vec3 rayDir, float t, mat3 rayVolumeSpaceToView,
 
       float present = smoothstep(2.0, 4.0, wavelength / footprint);
       slope += present * k_waveSlope * cos(2.0 * k_pi * cycles) * direction;
+      swell += present * sin(2.0 * k_pi * cycles);
       lostVariance += (1.0 - present * present) * 0.5 * k_waveSlope * k_waveSlope;
    }
    // Only the part along the surface tilts it
@@ -117,7 +140,32 @@ SeaSurface seaSurface(vec3 up, vec3 rayDir, float t, mat3 rayVolumeSpaceToView,
    sea.normal = rayVolumeSpaceToView * normalize(upLocal - slope);
    // roughness^4 is the mean square slope of the lobe, so the lost slope adds there
    sea.roughness = pow(pow(k_surfaceRoughness, 4.0) + lostVariance, 0.25);
+   sea.swell = swell / sqrt(0.5 * float(k_waveCount));
+   sea.footprint = footprint;
    return sea;
+}
+
+// How much of the surface is foam where the water is depth deep; from below,
+// where the ground beyond stands depth above it
+float foamCover(float depth, SeaSurface sea) {
+   // The swell lifts and lowers the edge, so it wanders with the waves
+   depth += k_foamSwell * sea.swell;
+
+   // What one pixel spans in depth. A band thinner than that would flicker, so it
+   // is spread over the pixel and thinned in the same proportion.
+   float pixelDepth = sea.footprint * k_shoreSlope;
+   float width = max(k_foamDepth, pixelDepth);
+   float edge = k_foamDepth / width * (1.0 - smoothstep(0.0, width, depth));
+
+   // Surf lines running in toward the shore, each sharp on its shoreward side
+   // and trailing off behind; they fade out with depth, and with distance before
+   // a pixel spans one
+   float phase = fract(depth / k_surfSpacing + waveTimeCycles(k_surfCyclesPerWrap));
+   float line = smoothstep(0.0, 0.05, phase) * (1.0 - smoothstep(0.05, 0.4, phase));
+   float surf = k_surfCover * line * (1.0 - smoothstep(0.0, k_surfReach, depth))
+              * (1.0 - smoothstep(0.25, 0.5, pixelDepth / k_surfSpacing));
+
+   return k_foamCover * max(edge, surf);
 }
 
 RayVolumeResult rayVolumeShade(
@@ -196,9 +244,9 @@ RayVolumeResult rayVolumeShade(
    if (height > 0.0) {
       // From above, the surface at entry mirrors the sky and lets the rest in
       vec3 toCamera = -rayDir;
+      vec3 surfaceUp = normalize(rayDir * entry - centerViewPos);
       SeaSurface sea = seaSurface(
-         normalize(rayDir * entry - centerViewPos), rayDir, entry, rayVolumeSpaceToView,
-         cameraLocalPosition);
+         surfaceUp, rayDir, entry, rayVolumeSpaceToView, cameraLocalPosition);
       vec3 normal = faceCamera(sea.normal, toCamera);
       float mirrored = reflectance(dot(normal, toCamera));
       vec3 halfway = normalize(toLight + toCamera);
@@ -211,12 +259,22 @@ RayVolumeResult rayVolumeShade(
       vec3 below = mix(waterColor, opaqueColor, transmitted);
       target = mix(below, u_skyColor, mirrored) + glint;
       kept = (1.0 - mirrored) * leastTransmitted;
+
+      // Foam where the water over the ground is shallow, covering the ground
+      // under it. The depth is the path's drop, the shore being near flat on the
+      // planet's scale.
+      float depth = path * -dot(rayDir, surfaceUp);
+      float foam = foamCover(depth, sea);
+      float foamLight =
+         k_ambient * u_ambientScale + max(dot(surfaceUp, toLight), 0.0) * u_directScale;
+      target = mix(target, vec3(k_foamAlbedo * foamLight), foam);
+      kept *= 1.0 - foam;
    } else if (mu > 0.0 && exit < sceneDistance) {
       // From below, the surface at exit, its normal facing the camera. Past the
       // critical angle refract returns zero and the surface reflects everything.
+      vec3 surfaceUp = normalize(rayDir * exit - centerViewPos);
       SeaSurface sea = seaSurface(
-         normalize(rayDir * exit - centerViewPos), rayDir, exit, rayVolumeSpaceToView,
-         cameraLocalPosition);
+         surfaceUp, rayDir, exit, rayVolumeSpaceToView, cameraLocalPosition);
       vec3 normal = faceCamera(-sea.normal, -rayDir);
       vec3 refracted = refract(rayDir, normal, k_waterIor);
       float mirrored = 1.0;
@@ -229,8 +287,16 @@ RayVolumeResult rayVolumeShade(
       }
       // What the surface mirrors from below is deep water
       vec3 surface = mix(above, waterColor, mirrored);
+
+      // Foam where the ground beyond stands little above the water, the rise of
+      // the ray out mirroring the depth taken from above. It hides the view out
+      // and shows the light it scatters down.
+      float rise = (sceneDistance - exit) * dot(rayDir, surfaceUp);
+      float foam = foamCover(rise, sea);
+      surface = mix(surface, vec3(k_foamFromBelow), foam);
+
       target = mix(waterColor, surface, transmitted);
-      kept = (1.0 - mirrored) * leastTransmitted;
+      kept = (1.0 - mirrored) * (1.0 - foam) * leastTransmitted;
    } else {
       target = mix(waterColor, opaqueColor, transmitted);
       kept = leastTransmitted;
