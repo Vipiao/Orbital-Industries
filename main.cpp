@@ -157,7 +157,9 @@ static void buildTestWorld(GameBase* gameBase) {
 
         // Radians per physics step
         planetBody->setAngularVelocityBody(
-            glm::normalize(glm::dvec3{0.2, 1.0, 0.35}) * 0.00000001);
+            glm::normalize(glm::dvec3{0.2, 1.0, 0.35}) * 0.00000001*100.);
+        //planetBody->setOrientation(
+        //    glm::angleAxis(glm::radians(90.0), glm::dvec3{1.0, 0.0, 0.0}));
     }
 }
 
@@ -179,7 +181,7 @@ static constexpr SessionMode s_sessionMode{SessionMode::RECORD};
 // worth keeping, so no edit of the switch above can overwrite a session that
 // already is. Two roles recording at once want two scratch folders, every stream
 // but the network journal being per role.
-static const std::filesystem::path s_playbackDir{"../recordings/004_digibot_leg_offset"};
+static const std::filesystem::path s_playbackDir{"../recordings/006_packing_benchmark"};
 static const std::filesystem::path s_recordDir{"../recordings/999_scratch"};
 
 int main() {

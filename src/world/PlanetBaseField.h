@@ -90,8 +90,8 @@ public:
     // Both maps, one pass each, six faces at a time.
     PlanetBaseMaps bake() const;
 
-    int elevationResolution() const { return m_config.m_elevationResolution; }
-    int slopeResolution() const { return m_config.m_slopeResolution; }
+    int getElevationResolution() const { return m_config.m_elevationResolution; }
+    int getSlopeResolution() const { return m_config.m_slopeResolution; }
 
 private:
     // One face of each map, written in place. Split out because the faces are

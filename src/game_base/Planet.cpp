@@ -22,7 +22,7 @@ Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphi
     assert(massKg > 0.0 && "planet mass must be positive");
 
     // A solid sphere of uniform density
-    const double radius{m_surface->radius()};
+    const double radius{m_surface->getRadius()};
     const double momentOfInertia{0.4 * massKg * radius * radius};
     m_rigidBody = m_physics->addRigidBody(
         glm::dvec3{0.0}, glm::dquat{1.0, 0.0, 0.0, 0.0}, massKg,
@@ -58,7 +58,7 @@ double Planet::getApproximateRadius() const {
 
 double Planet::seaLevelRadius() const {
     assert(m_waterConfig);
-    return m_surface->radius() + m_waterConfig->m_seaLevelMetres;
+    return m_surface->getRadius() + m_waterConfig->m_seaLevelMetres;
 }
 
 void Planet::updateGraphics(const glm::dvec3& cameraPos) {

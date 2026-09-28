@@ -34,20 +34,23 @@ std::string glslFloat(double value) {
 }  // namespace
 
 std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres) {
-    const TerrainDisplacement& displacement{surface.displacement()};
+    const TerrainDisplacement& displacement{surface.getDisplacement()};
     const int levelCount{TerrainDisplacement::k_levelCount};
 
     std::ostringstream glsl{};
     glsl << "// Written by planetSurfaceGlsl.\n"
-         << "const float k_radiusMetres = " << glslFloat(surface.radius()) << ";\n"
+         << "const float k_radiusMetres = " << glslFloat(surface.getRadius()) << ";\n"
          << "// Height above the sphere the sand is laid along.\n"
          << "const float k_shoreMetres = " << glslFloat(shoreMetres) << ";\n\n"
          << "// One repeat of the map, as the two whole numbers its width is the ratio\n"
          << "// of: the width itself is not exact in a float, and a plane coordinate\n"
          << "// stands thousands of tiles out.\n"
-         << "const float k_tileSpanMetres = " << glslFloat(surface.tileSpanMetres())
+         << "const float k_tileSpanMetres = " << glslFloat(surface.getTileSpanMetres())
          << ";\n"
-         << "const float k_tilesPerSpan = " << glslFloat(surface.tilesPerSpan()) << ";\n\n"
+         << "const float k_tilesPerSpan = " << glslFloat(surface.getTilesPerSpan()) << ";\n"
+         << "// What the packed slope spans either way, per unit of tile.\n"
+         << "const float k_gradientScale = " << glslFloat(surface.getGradientScale())
+         << ";\n\n"
          << "// The lattice: points a cell is bounded by, tiles of its own layer a cell\n"
          << "// spans, and levels the geometry and the shading each carry.\n"
          << "const int k_latticeCorners = " << PlanetSurface::k_latticeCorners << ";\n"

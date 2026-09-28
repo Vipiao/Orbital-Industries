@@ -29,7 +29,7 @@ public:
     
     // Character selection
     void setPilotableCharacter(std::weak_ptr<Digibot> character);
-    std::weak_ptr<Digibot> getPilotableCharacter() const;
+    std::weak_ptr<Digibot> getPilotableCharacter() const { return m_pilotableCharacter; }
     
     // Enable/disable
     void enable();

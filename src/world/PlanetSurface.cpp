@@ -85,7 +85,7 @@ PlanetSurface::PlanetSurface(double radiusMetres, double tileSpanMetres,
 
     // mapTopLevel reads the field's mean off a 1x1 top, which a chain only
     // reaches from a power of two.
-    const int resolution{m_noise.config().m_resolution};
+    const int resolution{m_noise.getConfig().m_resolution};
     assert(resolution > 0 && (resolution & (resolution - 1)) == 0 &&
            "The map needs a power of two side to mip down to a single texel");
 
@@ -107,6 +107,37 @@ PlanetSurface::PlanetSurface(double radiusMetres, double tileSpanMetres,
     m_fieldMean = total / (static_cast<double>(resolution) * resolution);
     assert(m_fieldMean >= 0.0 && m_fieldMean <= 1.0 &&
            "The map spans [0, 1], and so does the mean of it");
+
+    // The steepest component, rounded up to a power of two: the packed slope
+    // spends its range on this map however gentle or sharp it is, at a cost of
+    // at most one of its sixteen bits.
+    double steepest{0.0};
+    for (int y{0}; y < resolution; ++y) {
+        for (int x{0}; x < resolution; ++x) {
+            const glm::dvec2 slope{glm::abs(m_noise.gradient(x, y))};
+            steepest = glm::max(steepest, glm::max(slope.x, slope.y));
+        }
+    }
+    assert(steepest > 0.0 && "A map with no slope anywhere leaves nothing to scale by");
+    m_gradientScale = glm::exp2(glm::ceil(glm::log2(steepest)));
+}
+
+std::vector<uint16_t> PlanetSurface::bakeMap() const {
+    const std::vector<uint16_t> elevation{m_noise.bake()};
+    const int resolution{getMapResolution()};
+
+    std::vector<uint16_t> texels(elevation.size() * 4, 0);
+    for (int y{0}; y < resolution; ++y) {
+        for (int x{0}; x < resolution; ++x) {
+            const size_t texel{static_cast<size_t>(y) * resolution + x};
+            const glm::dvec2 unit{m_noise.gradient(x, y) / (2.0 * m_gradientScale) + 0.5};
+
+            texels[texel * 4] = elevation[texel];
+            texels[texel * 4 + 1] = static_cast<uint16_t>(glm::round(unit.x * 65535.0));
+            texels[texel * 4 + 2] = static_cast<uint16_t>(glm::round(unit.y * 65535.0));
+        }
+    }
+    return texels;
 }
 
 double PlanetSurface::levelTilesPerMetre(int level) const {
@@ -283,7 +314,7 @@ PlanetSurface::latticePlanes(const LatticeFrame& frame, int level) const {
 glm::dvec2 PlanetSurface::texelCoord(const glm::dvec2& tileCoord) const {
     // GL samples a texture at texel centres, which sit half a texel in from the
     // coordinate the uv names, so the half texel comes off before interpolating.
-    const double resolution{static_cast<double>(m_noise.config().m_resolution)};
+    const double resolution{static_cast<double>(m_noise.getConfig().m_resolution)};
 
     // Reduced to its tile first, as the sampler's own wrap is: the texel index
     // whole tiles out runs past what an int holds.

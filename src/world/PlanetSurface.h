@@ -76,11 +76,11 @@ public:
 
     // The sphere the crude solid projects onto, before any terrain: the size of
     // the solid a caller builds to subdivide.
-    double radius() const { return m_radius; }
+    double getRadius() const { return m_radius; }
     // The tile, as the two whole numbers its width is the ratio of, so a caller
     // that has to divide by it can divide the same way this does.
-    double tileSpanMetres() const { return m_tileSpan; }
-    double tilesPerSpan() const { return m_tilesPerSpan; }
+    double getTileSpanMetres() const { return m_tileSpan; }
+    double getTilesPerSpan() const { return m_tilesPerSpan; }
     // The highest the surface can reach from the body's centre, since the map is
     // unsigned and the terrain rises off the sphere rather than straddling it.
     double maxRadius() const;
@@ -88,16 +88,23 @@ public:
     // The maps the snippet samples, off the field read above.
     std::vector<uint16_t> bakeElevation() const { return m_noise.bake(); }
     std::vector<float> bakeGradient() const { return m_noise.bakeGradient(); }
-    int mapResolution() const { return m_noise.config().m_resolution; }
+    // Both in one RGBA16 texel, so a plane reads its height and its slope in one
+    // lookup: the height in R as bakeElevation has it, the slope in G and B
+    // mapped from plus and minus getGradientScale onto [0, 1], A unused.
+    std::vector<uint16_t> bakeMap() const;
+    // What the packed slope spans either way. A power of two, so the snippet's
+    // float decodes by exactly what this encoded by.
+    double getGradientScale() const { return m_gradientScale; }
+    int getMapResolution() const { return m_noise.getConfig().m_resolution; }
 
     // The layer under the rest, exported rather than wrapped: baking it and
     // reading it back are somebody else's business, and this only reads it.
-    const PlanetBaseField& baseField() const { return m_baseField; }
+    const PlanetBaseField& getBaseField() const { return m_baseField; }
 
     // How tall the layers stand and how often each is laid down, exported rather
     // than wrapped: this reads the maps, and what a reading is worth is the
     // displacement's to say.
-    const TerrainDisplacement& displacement() const { return m_displacement; }
+    const TerrainDisplacement& getDisplacement() const { return m_displacement; }
 
     // Lattice points a cell is bounded by, and so lookups a level costs.
     static constexpr int k_latticeCorners{4};
@@ -198,6 +205,7 @@ private:
     // In unit height, as the snippet's fieldMean is: the map's own mean, which
     // the blend leans on because its weights sum to more than one.
     double m_fieldMean{0.0};
+    double m_gradientScale{1.0};
     TileableNoiseMap m_noise;
     PlanetBaseField m_baseField;
     TerrainDisplacement m_displacement;

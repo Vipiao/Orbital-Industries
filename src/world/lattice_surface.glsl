@@ -85,8 +85,10 @@
 //
 // terrain_displacement.glsl lists the rest, being what reads them.
 
-uniform sampler2D u_noiseMap;     // R16 unorm, one tile, spanning exactly [0, 1]
-uniform sampler2D u_gradientMap;  // RG16F, gradient per unit of tile, same tile
+// RGBA16 unorm, one tile. R is the height, spanning exactly [0, 1]; G and B the
+// gradient per unit of tile, mapped from plus and minus k_gradientScale onto
+// [0, 1]. One texel, so a plane reads both in one lookup.
+uniform sampler2D u_terrainMap;
 
 // The base layer: what the body is shaped like at its own size, under everything
 // the lattice layers lay on it. Read by direction rather than through the lattice,
@@ -261,8 +263,8 @@ void latticePlanes(LatticeFrame frame, int level,
    // between crisp corners. The sum factors, a weight being one fraction's share
    // times the other's.
    //
-   // It costs weights that no longer sum to one. blendSlope does not care;
-   // blendHeight does, and answers for it.
+   // It costs weights that no longer sum to one. The slope does not care; the
+   // height does, and blendHeight answers for it.
    float restore = inversesqrt(dot(alongU, alongU) * dot(alongV, alongV));
 
    float tilesPerMetre = levelTilesPerMetre(level);
@@ -338,7 +340,7 @@ void latticePlanes(LatticeFrame frame, int level,
 // The mip is given rather than derived: this is read from stages that have no
 // derivatives, and the caller knows how far apart its samples stand.
 float sampleElevation(vec2 tileCoord, float mip) {
-   return textureLod(u_noiseMap, tileCoord, mip).r;
+   return textureLod(u_terrainMap, tileCoord, mip).r;
 }
 
 // Mips sharper than the spacing each lookup is taken. At zero a texel matches
@@ -359,7 +361,7 @@ const float k_detailSharpening = 0.0;
 // one resolution.
 float levelMip(float sampleSpacing, float frequency) {
    float texelSpan = k_tileSpanMetres
-      / (k_tilesPerSpan * frequency * float(textureSize(u_noiseMap, 0).x));
+      / (k_tilesPerSpan * frequency * float(textureSize(u_terrainMap, 0).x));
 
    return max(0.0, log2(sampleSpacing / texelSpan) - k_detailSharpening);
 }
@@ -367,7 +369,7 @@ float levelMip(float sampleSpacing, float frequency) {
 // The mip at which a lookup covers the whole tile, so that what comes back is
 // the field's mean however the coordinate moves.
 float mapTopMip() {
-   return log2(float(textureSize(u_noiseMap, 0).x));
+   return log2(float(textureSize(u_terrainMap, 0).x));
 }
 
 // The mip at which one texel of a base map covers the spacing given. A cube
@@ -408,19 +410,21 @@ vec3 baseGradient(vec3 direction, float sampleSpacing) {
       * (1.0 / k_radiusMetres);
 }
 
-// Slope of one plane's reading, expressed in that plane's own two axes, in unit
-// height per metre: the map holds it per unit of tile, matching the field it was
-// differenced from, and the tiles to the metre are what carry it onto the
-// ground. Unit height as sampleElevation's is, so the two take the same scaling
-// and the one stays the derivative of the other.
+// One plane's reading and its slope, out of the one texel both are kept in. The
+// reading is in unit height as sampleElevation's; the slope is in the plane's own
+// two axes, in unit height per metre: the map holds it per unit of tile,
+// matching the field it was differenced from, and the tiles to the metre are
+// what carry it onto the ground. The same unit height, so the two take the same
+// scaling and the one stays the derivative of the other.
 //
 // The mip is given rather than derived, as sampleElevation's is. Each plane's
 // coordinate jumps to the next lattice point at every cell boundary, so
 // differencing one across a pixel quad would read that jump as an infinite slope
 // and pick the coarsest mip along a line through every cell.
-vec2 sampleSlope(vec2 tileCoord, float tilesPerMetre, float mip) {
-   vec2 perTile = textureLod(u_gradientMap, tileCoord, mip).rg;
-   return perTile * tilesPerMetre;
+vec3 sampleElevationAndSlope(vec2 tileCoord, float tilesPerMetre, float mip) {
+   vec3 texel = textureLod(u_terrainMap, tileCoord, mip).rgb;
+   vec2 perTile = (texel.gb * 2.0 - 1.0) * k_gradientScale;
+   return vec3(texel.r, perTile * tilesPerMetre);
 }
 
 // One level's four planes blended into one reading.
@@ -441,7 +445,8 @@ float blendHeight(LatticePlane planes[k_latticeCorners], float mip,
    return reading + fieldMean * (1.0 - covered);
 }
 
-// The same four, blended into one slope in the body's frame.
+// The same four blended into a reading as blendHeight's, and into one slope in
+// the body's frame, off one lookup a plane.
 //
 // Each plane returns a slope in its own two axes, which those axes carry back
 // into that frame. Blending the four as vectors is exact in a way blending
@@ -451,16 +456,23 @@ float blendHeight(LatticePlane planes[k_latticeCorners], float mip,
 // proportional to the difference between the planes' readings, which the blend
 // already softens. No mean to answer for either, the mean slope of a field that
 // wraps being zero.
-vec3 blendSlope(LatticePlane planes[k_latticeCorners], float mip,
-                float tilesPerMetre) {
-   vec3 reading = vec3(0.0);
+float blendHeightAndSlope(LatticePlane planes[k_latticeCorners], float mip,
+                          float fieldMean, float tilesPerMetre, out vec3 slope) {
+   float reading = 0.0;
+   float covered = 0.0;
+   slope = vec3(0.0);
    for (int corner = 0; corner < k_latticeCorners; ++corner) {
-      vec2 slope = sampleSlope(planes[corner].tileCoord, tilesPerMetre, mip);
-      reading += planes[corner].weight
-         * (slope.x * planes[corner].tangent + slope.y * planes[corner].bitangent);
+      vec3 sampled =
+         sampleElevationAndSlope(planes[corner].tileCoord, tilesPerMetre, mip);
+      float weight = planes[corner].weight;
+
+      reading += weight * sampled.x;
+      covered += weight;
+      slope += weight
+         * (sampled.y * planes[corner].tangent + sampled.z * planes[corner].bitangent);
    }
 
-   return reading;
+   return reading + fieldMean * (1.0 - covered);
 }
 
 // Nothing read yet. A layer the caller does not reach is left at zero rather
@@ -500,7 +512,7 @@ TerrainLevels gatherHeightLevels(Df3 crudePoint, int levelCount,
    levels.height[k_baseLevel] =
       baseElevation(normalize(df3ToVec(crudePoint)), sampleSpacing);
 
-   float fieldMean = textureLod(u_noiseMap, vec2(0.5), mapTopMip()).r;
+   float fieldMean = textureLod(u_terrainMap, vec2(0.5), mapTopMip()).r;
    LatticeFrame frame = latticeFrameOf(crudePoint);
 
    for (int level = k_firstLatticeLevel; level < levelCount; ++level) {
@@ -515,8 +527,8 @@ TerrainLevels gatherHeightLevels(Df3 crudePoint, int levelCount,
 }
 
 // Height and slope together: what the fragment stage asks for, which shades a
-// point and reads its height for the colour bands. One lattice serves both,
-// where asking for them apart would build every plane twice.
+// point and reads its height for the colour bands. One lattice and one lookup a
+// plane serve both, where asking for them apart would build every plane twice.
 TerrainLevels gatherLevels(Df3 crudePoint, int levelCount, float sampleSpacing) {
    TerrainLevels levels = emptyLevels();
 
@@ -524,25 +536,16 @@ TerrainLevels gatherLevels(Df3 crudePoint, int levelCount, float sampleSpacing) 
    levels.height[k_baseLevel] = baseElevation(direction, sampleSpacing);
    levels.gradient[k_baseLevel] = baseGradient(direction, sampleSpacing);
 
-   float topMip = mapTopMip();
-   float fieldMean = textureLod(u_noiseMap, vec2(0.5), topMip).r;
+   float fieldMean = textureLod(u_terrainMap, vec2(0.5), mapTopMip()).r;
    LatticeFrame frame = latticeFrameOf(crudePoint);
 
    for (int level = k_firstLatticeLevel; level < levelCount; ++level) {
       LatticePlane planes[k_latticeCorners];
       latticePlanes(frame, level, planes);
-      float mip = levelMip(sampleSpacing, levelFrequency(level));
 
-      levels.height[level] = blendHeight(planes, mip, fieldMean);
-
-      // Past the top the map returns the tile's mean, whose slope is zero: the
-      // layer has nothing left to tilt a normal with, so its four slope lookups
-      // are skipped rather than summed to nothing. The height has no such exit, a
-      // mean height being a real offset.
-      if (mip < topMip) {
-         levels.gradient[level] =
-            blendSlope(planes, mip, levelTilesPerMetre(level));
-      }
+      levels.height[level] = blendHeightAndSlope(
+         planes, levelMip(sampleSpacing, levelFrequency(level)), fieldMean,
+         levelTilesPerMetre(level), levels.gradient[level]);
    }
 
    return levels;

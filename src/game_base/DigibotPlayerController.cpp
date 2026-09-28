@@ -40,10 +40,6 @@ void DigibotPlayerController::setPilotableCharacter(std::weak_ptr<Digibot> chara
     applyHeadVisibility();
 }
 
-std::weak_ptr<Digibot> DigibotPlayerController::getPilotableCharacter() const {
-    return m_pilotableCharacter;
-}
-
 void DigibotPlayerController::enable() {
     if (m_enabled) {
         return;

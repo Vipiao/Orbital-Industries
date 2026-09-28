@@ -60,7 +60,7 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     //
     // The shore is the waterline; a dry planet puts it below all ground, so it
     // has no sand.
-    const double shoreMetres{m_water ? m_water->m_seaLevelMetres : -m_surface->radius()};
+    const double shoreMetres{m_water ? m_water->m_seaLevelMetres : -m_surface->getRadius()};
     m_cdlodSurface = m_graphics->createCdlodSurface(
         [shape = planetSurfaceGlsl(*m_surface, shoreMetres)] {
             return shape
@@ -74,40 +74,37 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     // Beside the binary, refreshed every run: the map is generated at startup
     // from the config, so an image of it is only ever worth looking at if it
     // came from the run being looked at. Not worth failing over.
-    if (!TerrainMapDump::writeMaps(".", m_surface->mapResolution(), noiseBake,
+    if (!TerrainMapDump::writeMaps(".", m_surface->getMapResolution(), noiseBake,
                                    gradientBake)) {
         std::cerr << "Could not write the terrain map images\n";
     }
 
     TextureSpec mapSpec{};
-    mapSpec.m_width = m_surface->mapResolution();
-    mapSpec.m_height = m_surface->mapResolution();
+    mapSpec.m_width = m_surface->getMapResolution();
+    mapSpec.m_height = m_surface->getMapResolution();
     // The fragment stage samples both maps once per pixel, so a body small on
     // screen would otherwise stride whole texels between neighbouring pixels:
     // aliased normals, and a working set too large for the texture cache. The
     // vertex stage takes level 0 regardless and is unaffected.
     mapSpec.m_generateMipmaps = true;
-    mapSpec.m_format = TextureFormat::R16;
-    mapSpec.m_pixels = noiseBake.data();
-    m_graphics->setCdlodSurfaceTexture(m_cdlodSurface, "u_noiseMap", mapSpec);
-
-    mapSpec.m_format = TextureFormat::RG16F;
-    mapSpec.m_pixels = gradientBake.data();
-    m_graphics->setCdlodSurfaceTexture(m_cdlodSurface, "u_gradientMap", mapSpec);
+    const std::vector<uint16_t> mapBake{m_surface->bakeMap()};
+    mapSpec.m_format = TextureFormat::RGBA16;
+    mapSpec.m_pixels = mapBake.data();
+    m_graphics->setCdlodSurfaceTexture(m_cdlodSurface, "u_terrainMap", mapSpec);
 
     // The base layer's pair, kept beside the binary between runs: the bake costs
     // seconds, and tuning the octaves never touches the config that drives it. A
     // file written for a different config, or cut short mid-write, reads as a
     // miss and is baked over.
     const PlanetBaseMaps baseMaps{
-        loadOrBakeBaseMaps("planet_base.cache", config.m_base, m_surface->baseField())};
+        loadOrBakeBaseMaps("planet_base.cache", config.m_base, m_surface->getBaseField())};
 
     CubeTextureSpec baseSpec{};
     // Read from orbit as well as from the ground, where a whole face of these
     // maps falls inside a pixel.
     baseSpec.m_generateMipmaps = true;
 
-    baseSpec.m_size = m_surface->baseField().elevationResolution();
+    baseSpec.m_size = m_surface->getBaseField().getElevationResolution();
     baseSpec.m_format = TextureFormat::R16;
     for (int face{0}; face < PlanetBaseMaps::k_faceCount; ++face) {
         baseSpec.m_faces[face] = baseMaps.m_elevation[face].data();
@@ -116,7 +113,7 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
 
     // Smaller than the elevation, the filter's own coarseness being what sizes
     // that one and a slope having no such pressure.
-    baseSpec.m_size = m_surface->baseField().slopeResolution();
+    baseSpec.m_size = m_surface->getBaseField().getSlopeResolution();
     baseSpec.m_format = TextureFormat::RGB16F;
     for (int face{0}; face < PlanetBaseMaps::k_faceCount; ++face) {
         baseSpec.m_faces[face] = baseMaps.m_slope[face].data();
@@ -133,6 +130,6 @@ PlanetType::~PlanetType() {
 
 std::weak_ptr<CdlodInstance> PlanetType::createCdlodInstance(int ssboIndex) const {
     return m_graphics->createCdlodInstance(
-        ssboIndex, CdlodConfig{}, CdlodCubeFaces::cubeRootFrames(m_surface->radius()),
+        ssboIndex, CdlodConfig{}, CdlodCubeFaces::cubeRootFrames(m_surface->getRadius()),
         m_bounds, m_cdlodSurface);
 }
