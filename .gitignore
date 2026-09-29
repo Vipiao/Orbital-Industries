@@ -52,6 +52,7 @@ CMakeUserPresets.json
 # Local Claude config (kept out of git)
 CLAUDE.md
 .claude/
+/notes/handoff.md
 
 # Generated artifacts (kept local)
 dependency_graph_generator/cpp_dependencies.graphml
