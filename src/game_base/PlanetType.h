@@ -29,6 +29,7 @@ public:
 
     const std::shared_ptr<const PlanetSurface>& getSurface() const { return m_surface; }
     const std::optional<PlanetWaterConfig>& getWater() const { return m_water; }
+    std::weak_ptr<CdlodSurface> getCdlodSurface() const { return m_cdlodSurface; }
 
     // An instance of this shape drawn through the given SSBO slot. The caller
     // removes it through the graphics engine.

@@ -18,6 +18,7 @@ class PlanetType;
 class PlanetWaterGraphics;
 class Geometry;
 struct CdlodInstance;
+struct CdlodSurface;
 
 /**
  * @brief A planet in the world: a rigid body wearing a PlanetType's surface
@@ -54,6 +55,13 @@ public:
 private:
     // Distance from the centre to sea level; only for a planet with water
     double seaLevelRadius() const;
+    // Metres below sea level, negative above it; only for a planet with water
+    double depthUnderWater(const RigidBody& rigidBody, const glm::dvec3& worldPos) const;
+
+    // The two halves of updateGraphics: where the body is drawn, and how its
+    // water looks from the camera
+    void publishTransform(const RigidBody& rigidBody, const glm::dvec3& cameraPos);
+    void updateWaterView(const RigidBody& rigidBody, const glm::dvec3& cameraPos);
 
     const uint64_t m_uniqueId;
     PhysicsEngine* m_physics;
@@ -62,6 +70,8 @@ private:
     std::weak_ptr<RigidBody> m_rigidBody;
     int m_ssboIndex{-1};
     std::weak_ptr<CdlodInstance> m_cdlodInstance;
+    // Shared with every planet of the same type
+    std::weak_ptr<CdlodSurface> m_cdlodSurface;
     // Both empty for a dry planet
     std::optional<PlanetWaterConfig> m_waterConfig;
     std::unique_ptr<PlanetWaterGraphics> m_water;

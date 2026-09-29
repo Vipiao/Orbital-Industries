@@ -14,7 +14,8 @@
 Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphics,
                const PlanetType& type, std::weak_ptr<Geometry> waterShell, double massKg)
     : m_uniqueId{uniqueId}, m_physics{physics}, m_graphics{graphics},
-      m_surface{type.getSurface()}, m_waterConfig{type.getWater()} {
+      m_surface{type.getSurface()}, m_cdlodSurface{type.getCdlodSurface()},
+      m_waterConfig{type.getWater()} {
     if (!m_physics || !m_graphics) {
         throw std::runtime_error("Planet: physics and graphics must be non-null");
     }
@@ -37,8 +38,12 @@ Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphi
             m_graphics, waterShell, m_ssboIndex, seaLevelRadius(), *m_waterConfig);
     }
 
-    // Use a default distant camera position for the initial update
-    updateGraphics(glm::dvec3{0.0, 0.0, 100.0});
+    // Use a default distant camera position for the initial transform. The water
+    // is left to learn the camera's side from the first real frame, so a stand-in
+    // camera cannot read as a crossing.
+    if (std::shared_ptr<RigidBody> rigidBody{m_rigidBody.lock()}) {
+        publishTransform(*rigidBody, glm::dvec3{0.0, 0.0, 100.0});
+    }
 }
 
 Planet::~Planet() {
@@ -67,17 +72,38 @@ void Planet::updateGraphics(const glm::dvec3& cameraPos) {
         return;
     }
 
+    publishTransform(*rigidBody, cameraPos);
+    if (m_waterConfig) {
+        updateWaterView(*rigidBody, cameraPos);
+    }
+}
+
+void Planet::publishTransform(const RigidBody& rigidBody, const glm::dvec3& cameraPos) {
     m_transformPublisher.publish(
         m_graphics,
         m_ssboIndex,
         cameraPos,
-        rigidBody->getWorldCenterOfMass(),
-        rigidBody->getOrientation(),
-        rigidBody->m_velocity,
-        rigidBody->getAngularVelocityWorld(),
-        rigidBody->getCenterOfMassLocal(),
+        rigidBody.getWorldCenterOfMass(),
+        rigidBody.getOrientation(),
+        rigidBody.m_velocity,
+        rigidBody.getAngularVelocityWorld(),
+        rigidBody.getCenterOfMassLocal(),
         m_physics->getCurrentPhysicsTimeStep(),
         getApproximateRadius());
+}
+
+void Planet::updateWaterView(const RigidBody& rigidBody, const glm::dvec3& cameraPos) {
+    const bool cameraUnderWater{depthUnderWater(rigidBody, cameraPos) > 0.0};
+
+    // The sea floor's wobble stands in for looking down through the surface
+    m_graphics->setCdlodSurfaceUniform(m_cdlodSurface, "u_underwaterWarp",
+                                       cameraUnderWater ? 0.0f : 1.0f);
+    m_water->updateSplash(cameraUnderWater, m_physics->getCurrentPhysicsTimeStep());
+}
+
+double Planet::depthUnderWater(const RigidBody& rigidBody, const glm::dvec3& worldPos) const {
+    // The sea is a sphere about the body's origin, so its orientation is moot
+    return seaLevelRadius() - glm::length(worldPos - rigidBody.getPosition());
 }
 
 LightIntensity Planet::lightUnderWater(const glm::dvec3& worldPos) const {
@@ -86,8 +112,7 @@ LightIntensity Planet::lightUnderWater(const glm::dvec3& worldPos) const {
         return LightIntensity{};
     }
 
-    // The sea is a sphere about the body's origin, so its orientation is moot
-    const double depth{seaLevelRadius() - glm::length(worldPos - rigidBody->getPosition())};
+    const double depth{depthUnderWater(*rigidBody, worldPos)};
     if (depth <= 0.0) {
         return LightIntensity{};
     }

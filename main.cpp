@@ -18,6 +18,7 @@
 #include "debug/DebugGlobals.h"
 #include "graphics/GraphicsEngine.h"
 #include <glm/glm.hpp>
+#include <algorithm>
 #include <cassert>
 #include <filesystem>
 #include <iostream>
@@ -148,12 +149,17 @@ static void buildTestWorld(GameBase* gameBase) {
     std::shared_ptr<Planet> planet{gameBase->createPlanet(planetType, planetMassKg).lock()};
     std::shared_ptr<RigidBody> planetBody{planet ? planet->getRigidBody().lock() : nullptr};
     if (planetBody) {
-        // Gap between the platform and the highest the terrain can reach.
-        const double platformClearanceMetres{200.0};
+        // Gap between the platform and the ground or sea directly beneath it.
+        const double platformClearanceMetres{800.0};
 
-        // Centred so the terrain's ceiling sits just above the platform.
-        planetBody->setPosition(
-            glm::dvec3{0.0, planet->getSurface().maxRadius() + platformClearanceMetres, 0.0});
+        // The platform stands at the origin, on the body's -y side
+        const PlanetSurface& surface{planet->getSurface()};
+        const double groundRadius{
+            glm::length(surface.surfacePoint(glm::dvec3{0.0, -surface.getRadius(), 0.0}))};
+        const double seaRadius{surface.getRadius() + waterConfig.m_seaLevelMetres};
+
+        planetBody->setPosition(glm::dvec3{
+            0.0, std::max(groundRadius, seaRadius) + platformClearanceMetres, 0.0});
 
         // Radians per physics step
         planetBody->setAngularVelocityBody(

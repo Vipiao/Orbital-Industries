@@ -2,8 +2,9 @@
 //
 // A planet's water: a sea-level sphere that absorbs light along the view ray,
 // under a surface that reflects by Fresnel from either side. value.xyz is the
-// absorption per metre in each channel, value.w the sea-level radius, and
-// color.rgb the deep-water colour at full ambient light.
+// absorption per metre in each channel, value.w the sea-level radius,
+// color.rgb the deep-water colour at full ambient light, and color.w the tick
+// the camera last crossed the surface at (see the splash below).
 //
 // Waves tilt the surface without raising it, so the sphere intersection stands.
 // The surface does not refract yet; from below it still turns to a mirror past
@@ -83,6 +84,15 @@ float waveTimeCycles(uint cyclesPerWrap) {
    uint whole = (u_time * cyclesPerWrap) & (k_timeWrapTicks - 1u);
    float cycles = float(whole) + u_timeRemainder * float(cyclesPerWrap);
    return fract(cycles / float(k_timeWrapTicks));
+}
+
+// Camera height above sea level, negative under water. hi - radius is exact
+// (Sterbenz) at any height where it matters; precise keeps lo from being folded
+// into radius first.
+float cameraHeight(Df centerDistance, float radius) {
+   precise float aboveHi = centerDistance.hi - radius;
+   precise float height = aboveHi + centerDistance.lo;
+   return height;
 }
 
 // A tilted normal can turn from the camera at grazing angles; it is leaned back
@@ -168,7 +178,93 @@ float foamCover(float depth, SeaSurface sea) {
    return k_foamCover * max(edge, surf);
 }
 
-RayVolumeResult rayVolumeShade(
+// Water over the lens for a moment after the camera crosses the surface. Patches
+// of noise stand above a threshold that rises until none are left, and each
+// bends the view across its slope; the water is then shaded along the bent ray
+// against the scene that ray sees. color.w holds the physics tick the crossing
+// happened at, modulo the time wrap, or is negative before the first.
+const float k_splashSeconds = 0.6;
+// Foam filling the patches right after the crossing, gone after this long. White
+// and half see-through coming out of the water, black going in.
+const float k_splashFoamSeconds = 0.2;
+const vec3 k_splashFoamColor = vec3(0.85, 0.9, 0.95);
+const float k_splashFoamOpacity = 0.5;
+const vec3 k_splashDiveColor = vec3(0.0);
+// The threshold at the crossing; it rises to 1 over k_splashSeconds
+const float k_splashStartThreshold = 0.25;
+// Noise cells per screen height
+const float k_splashScale = 7.5;
+// How far a patch's slope shifts the view, in screen heights
+const float k_splashBend = 0.05;
+
+float splashHash(vec2 p) {
+   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+// Smooth value noise in [0, 1]
+float valueNoise(vec2 p) {
+   vec2 i = floor(p);
+   vec2 f = fract(p);
+   vec2 u = f * f * (3.0 - 2.0 * f);
+   return mix(mix(splashHash(i), splashHash(i + vec2(1.0, 0.0)), u.x),
+              mix(splashHash(i + vec2(0.0, 1.0)), splashHash(i + vec2(1.0)), u.x), u.y);
+}
+
+// How far the water stands above the threshold, in screen-height noise units
+float splashHeight(vec2 p, float threshold) {
+   float n = 0.65 * valueNoise(p) + 0.35 * valueNoise(2.1 * p + 5.0);
+   return max(n - threshold, 0.0);
+}
+
+// Seconds since the camera last crossed the surface, or past the splash if never
+float secondsSinceCrossing(float crossingTick) {
+   if (crossingTick < 0.0) {
+      return k_splashSeconds;
+   }
+   uint elapsed = (u_time - uint(crossingTick)) & (k_timeWrapTicks - 1u);
+   return (float(elapsed) + u_timeRemainder) / k_ticksPerSecond;
+}
+
+float splashThreshold(float t) {
+   return mix(k_splashStartThreshold, 1.0, t / k_splashSeconds);
+}
+
+// Where a fragment falls in the noise
+vec2 splashNoisePoint(vec2 fragCoord) {
+   return fragCoord / u_screenSize.y * k_splashScale;
+}
+
+// Pixels the splash shifts the view by at a fragment, t seconds after crossing
+vec2 splashOffset(vec2 fragCoord, float t) {
+   float threshold = splashThreshold(t);
+   vec2 p = splashNoisePoint(fragCoord);
+   float e = 0.02;
+   vec2 slope = vec2(splashHeight(p + vec2(e, 0.0), threshold)
+                        - splashHeight(p - vec2(e, 0.0), threshold),
+                     splashHeight(p + vec2(0.0, e), threshold)
+                        - splashHeight(p - vec2(0.0, e), threshold)) / (2.0 * e);
+
+   return slope * (k_splashBend * u_screenSize.y);
+}
+
+// Share of a fragment the foam covers, t seconds after crossing
+float splashFoam(vec2 fragCoord, float t) {
+   float fade = 1.0 - t / k_splashFoamSeconds;
+   if (fade <= 0.0) {
+      return 0.0;
+   }
+   float height = splashHeight(splashNoisePoint(fragCoord), splashThreshold(t));
+   return fade * fade * smoothstep(0.0, 0.1, height);
+}
+
+// The view ray through a point on the screen, in view space
+vec3 viewRayThrough(vec2 fragCoord) {
+   vec2 ndc = fragCoord / u_screenSize * 2.0 - 1.0;
+   vec4 viewH = u_inverseProjection * vec4(ndc, 0.5, 1.0);
+   return normalize(viewH.xyz / viewH.w);
+}
+
+RayVolumeResult waterShade(
    vec3 rayDir, float exitDistance, float sceneDistance,
    vec3 opaqueColor, vec4 value, vec4 color, vec2 uv,
    vec3 centerViewPos, Df centerDistance,
@@ -184,11 +280,7 @@ RayVolumeResult rayVolumeShade(
 
    // ---- Where the ray enters and leaves the water sphere (entry, exit) ----
 
-   // Camera height above sea level, negative under water. hi - radius is exact
-   // (Sterbenz) at any height where it matters; precise keeps lo from being
-   // folded into radius first.
-   precise float aboveHi = centerDistance.hi - radius;
-   precise float height = aboveHi + centerDistance.lo;
+   float height = cameraHeight(centerDistance, radius);
    float centreDist = centerDistance.hi; // Rounding is fine.
 
    // Cosine between the ray and the local up, and the matching sine
@@ -309,5 +401,44 @@ RayVolumeResult rayVolumeShade(
    res.alpha = 1.0 - kept;
    res.color = (target - opaqueColor * kept) / max(res.alpha, 1e-6);
    res.weightDepth = entry * max(-rayDir.z, 1e-4);
+   return res;
+}
+
+RayVolumeResult rayVolumeShade(
+   vec3 rayDir, float exitDistance, float sceneDistance,
+   vec3 opaqueColor, vec4 value, vec4 color, vec2 uv,
+   vec3 centerViewPos, Df centerDistance,
+   mat3 rayVolumeSpaceToView, Df3 cameraLocalPosition,
+   sampler2D sceneDepthMap, sampler2D opaqueColorMap)
+{
+   float t = secondsSinceCrossing(color.w);
+   if (t >= k_splashSeconds) {
+      return waterShade(
+         rayDir, exitDistance, sceneDistance, opaqueColor, value, color, uv,
+         centerViewPos, centerDistance, rayVolumeSpaceToView, cameraLocalPosition);
+   }
+
+   // The pixel the splash bends this one's view onto, and the scene along it
+   vec2 bent = gl_FragCoord.xy + splashOffset(gl_FragCoord.xy, t);
+   ivec2 pixel = clamp(ivec2(bent), ivec2(0), ivec2(u_screenSize) - 1);
+   vec3 bentRay = viewRayThrough(vec2(pixel) + 0.5);
+   float bentScene = viewDepthAt(sceneDepthMap, pixel) / max(-bentRay.z, 1e-4);
+   vec3 bentOpaque = texelFetch(opaqueColorMap, pixel, 0).rgb;
+
+   RayVolumeResult res = waterShade(
+      bentRay, exitDistance, bentScene, bentOpaque, value, color, uv,
+      centerViewPos, centerDistance, rayVolumeSpaceToView, cameraLocalPosition);
+
+   // The water over the scene the bent ray sees, covering this pixel's own
+   res.color = mix(bentOpaque, res.color, res.alpha);
+   res.alpha = 1.0;
+
+   // Foam over it, lit like the foam on the sea, or black after a dive
+   bool dove = cameraHeight(centerDistance, value.w) < 0.0;
+   vec3 foamColor = dove
+      ? k_splashDiveColor
+      : k_splashFoamColor * min(k_ambient * u_ambientScale + u_directScale, 1.0);
+   float foam = splashFoam(gl_FragCoord.xy, t) * (dove ? 1.0 : k_splashFoamOpacity);
+   res.color = mix(res.color, foamColor, foam);
    return res;
 }

@@ -551,6 +551,48 @@ TerrainLevels gatherLevels(Df3 crudePoint, int levelCount, float sampleSpacing) 
    return levels;
 }
 
+// u_time, u_timeRemainder and k_timeWrapTicks are in scope from the engine's
+// shared_shaders/frame_time.glsl, which cdlod_patch.glsl includes.
+//
+// Scales the underwater warp: one with the camera above the sea, zero below it,
+// where the surface the warp stands in for is out of view
+uniform float u_underwaterWarp;
+
+// Ground under water wobbles as if seen through moving water. No refraction: each
+// vertex is pushed along a sinusoid, further the deeper it lies, so the sea floor
+// looks alive without a screen-space pass. Visual only; the CPU twin leaves it out.
+//
+// Cycles per metre of the pattern along each body axis. A power of two, so a
+// point's high part times it is exact in a float and its fraction keeps full
+// precision at the body's radius.
+const float k_warpCyclesPerMetre = 0.25;
+// Cycles the phase advances per metre of depth
+const float k_warpCyclesPerDepth = 0.1;
+// Metres of warp per metre of depth, and the depth past which it stops growing
+const float k_warpPerDepth = 0.04;
+const float k_warpDepthCap = 3.0;
+// Whole cycles per time wrap, so the pattern runs across the wrap without a jump;
+// about half a cycle a second
+const uint k_warpCyclesPerWrap = 8192u;
+
+// The offset for a point depth metres under water, in the body's frame
+vec3 underwaterWarp(Df3 point, float depth) {
+   vec3 spatial = fract(point.hi * k_warpCyclesPerMetre) + point.lo * k_warpCyclesPerMetre;
+
+   uint whole = (u_time * k_warpCyclesPerWrap) & (k_timeWrapTicks - 1u);
+   float timeCycles = fract(
+      (float(whole) + u_timeRemainder * float(k_warpCyclesPerWrap))
+      / float(k_timeWrapTicks));
+
+   // Each component driven by the other two axes, so it varies across the ground
+   // rather than along its own direction only
+   vec3 cycles = timeCycles + spatial.yzx + spatial.zxy + depth * k_warpCyclesPerDepth
+               + vec3(0.0, 1.0 / 3.0, 2.0 / 3.0);
+
+   return sin(6.2831853 * cycles)
+        * (min(depth, k_warpDepthCap) * k_warpPerDepth * u_underwaterWarp);
+}
+
 // Where a crude point is drawn: the sphere, raised along its outward direction.
 // A scalar height rather than a free displacement, so the normal below can be
 // its gradient rather than a second opinion about the same surface.
@@ -572,7 +614,14 @@ Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
    Df reach =
       dfAdd(dfFromFloat(k_radiusMetres), dfFromFloat(displacement.height));
 
-   return df3Scale(df3Normalize(crudePoint), reach);
+   Df3 point = df3Scale(df3Normalize(crudePoint), reach);
+
+   float depth = k_shoreMetres - displacement.height;
+   if (depth > 0.0 && u_underwaterWarp > 0.0) {
+      point = df3AddVec(point, underwaterWarp(point, depth));
+   }
+
+   return point;
 }
 
 // How the surface faces, what colour it is drawn in, and how tight a highlight
