@@ -576,13 +576,15 @@ const float k_warpDepthCap = 3.0;
 // about half a cycle a second
 const uint k_warpCyclesPerWrap = 8192u;
 
-// The offset for a point depth metres under water, in the body's frame
-vec3 underwaterWarp(Df3 point, float depth) {
+// The offset for a point depth metres under water, in the body's frame, strength
+// of the way to the full warp at the time the engine's clock gives
+vec3 underwaterWarp(Df3 point, float depth, float strength, uint time,
+                    float timeRemainder) {
    vec3 spatial = fract(point.hi * k_warpCyclesPerMetre) + point.lo * k_warpCyclesPerMetre;
 
-   uint whole = (u_time * k_warpCyclesPerWrap) & (k_timeWrapTicks - 1u);
+   uint whole = (time * k_warpCyclesPerWrap) & (k_timeWrapTicks - 1u);
    float timeCycles = fract(
-      (float(whole) + u_timeRemainder * float(k_warpCyclesPerWrap))
+      (float(whole) + timeRemainder * float(k_warpCyclesPerWrap))
       / float(k_timeWrapTicks));
 
    // Each component driven by the other two axes, so it varies across the ground
@@ -591,7 +593,7 @@ vec3 underwaterWarp(Df3 point, float depth) {
                + vec3(0.0, 1.0 / 3.0, 2.0 / 3.0);
 
    return sin(6.2831853 * cycles)
-        * (min(depth, k_warpDepthCap) * k_warpPerDepth * u_underwaterWarp);
+        * (min(depth, k_warpDepthCap) * k_warpPerDepth * strength);
 }
 
 // Where a crude point is drawn: the sphere, raised along its outward direction.
@@ -612,14 +614,19 @@ Df3 cdlodSurfacePoint(Df3 crudePoint, float sampleSpacing) {
    TerrainDisplacement displacement = terrainDisplacement(
       gatherHeightLevels(crudePoint, k_positionLevels, sampleSpacing));
 
-   Df reach =
-      dfAdd(dfFromFloat(k_radiusMetres), dfFromFloat(displacement.height));
+   // The far sea is drawn flat, so the floor under it rises to the shore
+   float depth = k_shoreMetres - displacement.height;
+   float flatness = depth > 0.0 ? farWaterFlatness(farWaterCameraHeight(u_farWaterCamera))
+                                : 0.0;
+   float height = mix(displacement.height, k_shoreMetres, flatness);
+
+   Df reach = dfAdd(dfFromFloat(k_radiusMetres), dfFromFloat(height));
 
    Df3 point = df3Scale(df3Normalize(crudePoint), reach);
 
-   float depth = k_shoreMetres - displacement.height;
-   if (depth > 0.0 && u_underwaterWarp > 0.0) {
-      point = df3AddVec(point, underwaterWarp(point, depth));
+   float warp = u_underwaterWarp * (1.0 - flatness);
+   if (depth > 0.0 && warp > 0.0) {
+      point = df3AddVec(point, underwaterWarp(point, depth, warp, u_time, u_timeRemainder));
    }
 
    return point;
@@ -676,10 +683,10 @@ CdlodSurfaceShading cdlodSurfaceShading(Df3 crudePoint, vec3 crudeDerivX,
    shading.emissive = 0.0;
 
    float depth = k_shoreMetres - displacement.height;
-   float farWater = farWaterShare();
+   float farWater = farWaterShare(farWaterCameraHeight(u_farWaterCamera));
    if (depth > 0.0 && farWater > 0.0) {
       shadeFarWater(shading, sphereNormal, sphereNormal * (k_radiusMetres + k_shoreMetres),
-                    depth, farWater);
+                    depth, farWater, u_farWaterCamera, u_farWaterToLight, u_farWaterSky);
    }
 
    return shading;

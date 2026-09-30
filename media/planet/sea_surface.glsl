@@ -17,9 +17,9 @@ const float k_waveSlope = 0.06;
 // Camera heights above sea level. The far sea fades in between the first two and
 // the near sea out between the last two, so what shows through the near sea as it
 // fades is always the whole far sea.
-const float k_farSeaFrom = 3000.0;
-const float k_farSeaWhole = 4500.0;
-const float k_nearSeaGone = 6000.0;
+const float k_farSeaFrom = 2000.0;
+const float k_farSeaWhole = 3500.0;
+const float k_nearSeaGone = 5000.0;
 
 // The roughness of a sea whose waves have lostVariance of their mean square slope
 // to being too narrow to draw. roughness^4 is the mean square slope of the lobe,
