@@ -52,11 +52,18 @@ const float k_waveHeading[k_waveCount] =
 // Peak slope of each wave; eight together make an rms slope of 0.12, a moderate
 // breeze
 const float k_waveSlope = 0.06;
-// The wind in the planet's frame, and the axis the headings turn toward. Waves
-// fade out toward the two ends of the wind axis, so it is kept off the platform,
-// which stands on -y.
-const vec3 k_windAxis = vec3(1.0, 0.0, 0.0);
-const vec3 k_windCross = vec3(0.0, 0.0, 1.0);
+// The sea is three sets of the same waves, each running in the plane across one
+// axis of the planet's frame and weighted by how near up lies to that axis, so
+// every set is seen near face on. Each plane's wind, and the axis the headings
+// turn toward; the xz plane's covers the platform, which stands on -y.
+const vec3 k_windAxes[3] = vec3[](vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0),
+                                  vec3(1.0, 0.0, 0.0));
+const vec3 k_windCrosses[3] = vec3[](vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, 1.0),
+                                     vec3(0.0, 1.0, 0.0));
+// A plane's set shows only where up's component along its axis passes this. The
+// largest component of a unit vector is at least 1/sqrt(3), so some set always
+// shows.
+const float k_planeThreshold = 0.5;
 // Mirrors PhysicsUnits::s_tickRateHz
 const float k_ticksPerSecond = 64.0;
 const float k_gravity = 9.81;
@@ -123,25 +130,42 @@ SeaSurface seaSurface(vec3 up, vec3 rayDir, float t, mat3 rayVolumeSpaceToView,
    float pixelAngle = 2.0 * u_inverseProjection[1][1] / u_screenSize.y;
    float footprint = pixelAngle * t / max(abs(dot(rayDir, up)), 0.05);
 
+   // The sets are unrelated, so weights of unit length keep the rms slope and
+   // swell of one set wherever they blend
+   vec3 weights = max(abs(upLocal) - k_planeThreshold, 0.0);
+   weights /= length(weights);
+
    vec3 slope = vec3(0.0);
    float swell = 0.0;
    float lostVariance = 0.0;
    for (int i = 0; i < k_waveCount; ++i) {
-      float heading = k_waveHeading[i];
-      vec3 direction = cos(heading) * k_windAxis + sin(heading) * k_windCross;
       float wavelength = waveLength(k_waveCyclesPerWrap[i]);
-      vec3 cyclesPerMetre = direction / wavelength;
-
-      // The camera's share is planet sized, so it is taken wide and only its
-      // fraction kept; the offset from the camera is near enough for a float
-      float cycles =
-         dfFractToFloat(df3Dot(df3FromVec(cyclesPerMetre), cameraLocalPosition))
-         + dot(cyclesPerMetre, offset) - waveTimeCycles(k_waveCyclesPerWrap[i]);
-
       float present = smoothstep(2.0, 4.0, wavelength / footprint);
-      slope += present * k_waveSlope * cos(2.0 * k_pi * cycles) * direction;
-      swell += present * sin(2.0 * k_pi * cycles);
       lostVariance += (1.0 - present * present) * 0.5 * k_waveSlope * k_waveSlope;
+      if (present <= 0.0) {
+         continue;
+      }
+      float heading = k_waveHeading[i];
+      float timeCycles = waveTimeCycles(k_waveCyclesPerWrap[i]);
+
+      for (int plane = 0; plane < 3; ++plane) {
+         if (weights[plane] <= 0.0) {
+            continue;
+         }
+         vec3 direction =
+            cos(heading) * k_windAxes[plane] + sin(heading) * k_windCrosses[plane];
+         vec3 cyclesPerMetre = direction / wavelength;
+
+         // The camera's share is planet sized, so it is taken wide and only its
+         // fraction kept; the offset from the camera is near enough for a float
+         float cycles =
+            dfFractToFloat(df3Dot(df3FromVec(cyclesPerMetre), cameraLocalPosition))
+            + dot(cyclesPerMetre, offset) - timeCycles;
+
+         float amount = weights[plane] * present;
+         slope += amount * k_waveSlope * cos(2.0 * k_pi * cycles) * direction;
+         swell += amount * sin(2.0 * k_pi * cycles);
+      }
    }
    // Only the part along the surface tilts it
    slope -= dot(slope, upLocal) * upLocal;
