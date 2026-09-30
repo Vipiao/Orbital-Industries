@@ -21,6 +21,10 @@
  * else would, and only says how to spell what it answers.
  *
  * shoreMetres is the height above the sphere the sand is laid along; a value
- * below all ground gives no sand.
+ * below all ground gives no sand. waterAbsorptionPerMetre and waterColor are the
+ * sea's below it, for far_water.glsl; bodyTint is what the renderer multiplies the
+ * surface's colour by.
  */
-std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres);
+std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres,
+                              const glm::dvec3& waterAbsorptionPerMetre,
+                              const glm::dvec3& waterColor, const glm::dvec3& bodyTint);

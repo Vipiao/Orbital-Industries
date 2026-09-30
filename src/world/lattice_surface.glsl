@@ -66,6 +66,7 @@
 // src/graphics/shared_shaders/dekker_arithmetic.glsl -- this file is spliced
 // into a stage that has included it, so there is nothing to include here.
 #include "terrain_displacement.glsl"
+#include "far_water.glsl"
 
 // In scope already, written ahead of this file by planetSurfaceGlsl in
 // src/world/PlanetSurfaceGlsl.cpp, off the PlanetSurface the quadtree's bounds
@@ -672,6 +673,14 @@ CdlodSurfaceShading cdlodSurfaceShading(Df3 crudePoint, vec3 crudeDerivX,
    shading.normal = normalize(sphereNormal - acrossSphere);
    shading.colour = material.colour;
    shading.roughness = material.roughness;
+   shading.emissive = 0.0;
+
+   float depth = k_shoreMetres - displacement.height;
+   float farWater = farWaterShare();
+   if (depth > 0.0 && farWater > 0.0) {
+      shadeFarWater(shading, sphereNormal, sphereNormal * (k_radiusMetres + k_shoreMetres),
+                    depth, farWater);
+   }
 
    return shading;
 }

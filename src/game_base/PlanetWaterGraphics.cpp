@@ -20,9 +20,11 @@ constexpr uint64_t k_splashStampTicks{k_timeWrapTicks / 2};
 
 PlanetWaterGraphics::PlanetWaterGraphics(GraphicsEngine* graphics,
                                          std::weak_ptr<Geometry> shellGeometry,
+                                         std::weak_ptr<CdlodSurface> cdlodSurface,
                                          int ssboIndex, double seaLevelRadius,
                                          const PlanetWaterConfig& config)
-    : m_graphics{graphics}, m_geometry{shellGeometry} {
+    : m_graphics{graphics}, m_geometry{shellGeometry}, m_cdlodSurface{cdlodSurface},
+      m_seaLevelRadius{seaLevelRadius} {
     if (!m_graphics) {
         throw std::runtime_error{"PlanetWaterGraphics: GraphicsEngine cannot be null"};
     }
@@ -51,6 +53,29 @@ PlanetWaterGraphics::PlanetWaterGraphics(GraphicsEngine* graphics,
     instance->m_localOrientation = glm::dquat{1.0, 0.0, 0.0, 0.0};
     instance->m_localScale = glm::dvec3{seaLevelRadius * k_shellMargin};
     geometry->updateInstanceInBuffer(instance.get());
+}
+
+void PlanetWaterGraphics::updateView(const glm::dvec3& cameraLocal,
+                                     const glm::dquat& bodyOrientation,
+                                     uint64_t physicsTick) {
+    const bool cameraUnderWater{glm::length(cameraLocal) < m_seaLevelRadius};
+
+    // The sea floor's wobble stands in for looking down through the surface
+    m_graphics->setCdlodSurfaceUniform(m_cdlodSurface, "u_underwaterWarp",
+                                       cameraUnderWater ? 0.0f : 1.0f);
+
+    // What src/world/far_water.glsl shades the far sea by, and fades it in by
+    const glm::dvec3 toLight{
+        glm::conjugate(bodyOrientation) * -glm::normalize(m_graphics->getLightDirection())};
+    m_graphics->setCdlodSurfaceUniform(m_cdlodSurface, "u_farWaterCamera",
+                                       glm::vec3{cameraLocal});
+    m_graphics->setCdlodSurfaceUniform(m_cdlodSurface, "u_farWaterToLight",
+                                       glm::vec3{toLight});
+    m_graphics->setCdlodSurfaceUniform(
+        m_cdlodSurface, "u_farWaterSky",
+        glm::vec3{m_graphics->getGraphicsEngineBase()->m_skyColor});
+
+    updateSplash(cameraUnderWater, physicsTick);
 }
 
 void PlanetWaterGraphics::updateSplash(bool cameraUnderWater, uint64_t physicsTick) {

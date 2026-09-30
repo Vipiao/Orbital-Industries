@@ -3,7 +3,7 @@
 // A planet's water: a sea-level sphere that absorbs light along the view ray,
 // under a surface that reflects by Fresnel from either side. value.xyz is the
 // absorption per metre in each channel, value.w the sea-level radius,
-// color.rgb the deep-water colour at full ambient light, and color.w the tick
+// color.rgb the deep water's albedo, lit like the ground, and color.w the tick
 // the camera last crossed the surface at (see the splash below).
 //
 // Waves tilt the surface without raising it, so the sphere intersection stands.
@@ -14,11 +14,9 @@
 // is written around the camera's height above the water, and the waves around
 // the camera's position in the planet's frame.
 
+#include "sea_surface.glsl"
+
 const float k_waterIor = 1.33;
-// Reflectance head-on, ((n - 1) / (n + 1))^2
-const float k_waterF0 = 0.02;
-// Spreads the sun's glint on a calm sea to about the sun's own width
-const float k_surfaceRoughness = 0.1;
 // Water shallower than this shows foam, fading out toward it
 const float k_foamDepth = 0.125;
 // The share of the surface the foam covers at the waterline
@@ -43,15 +41,11 @@ const uint k_surfCyclesPerWrap = 32768u;
 // per time wrap, so the sea runs on across the wrap without a jump; the counts
 // are picked so the wavelengths step by the golden ratio from 100 m to 3.4 m,
 // which keeps the sum from ever lining up again.
-const int k_waveCount = 8;
 const uint k_waveCyclesPerWrap[k_waveCount] =
    uint[](2047u, 2604u, 3312u, 4214u, 5360u, 6818u, 8672u, 11031u);
 // Each wave's heading off the wind in radians, alternating sides out to 35 degrees
 const float k_waveHeading[k_waveCount] =
    float[](0.0, 0.44, -0.52, 0.21, -0.31, 0.61, -0.14, 0.35);
-// Peak slope of each wave; eight together make an rms slope of 0.12, a moderate
-// breeze
-const float k_waveSlope = 0.06;
 // The sea is three sets of the same waves, each running in the plane across one
 // axis of the planet's frame and weighted by how near up lies to that axis, so
 // every set is seen near face on. Each plane's wind, and the axis the headings
@@ -67,16 +61,6 @@ const float k_planeThreshold = 0.5;
 // Mirrors PhysicsUnits::s_tickRateHz
 const float k_ticksPerSecond = 64.0;
 const float k_gravity = 9.81;
-
-// The normalized Blinn-Phong lobe of phong_lighting.glsl
-float sunLobe(float cosHalf, float roughness) {
-   float exponent = blinnExponent(roughness);
-   return (exponent + 8.0) / (8.0 * k_pi) * pow(max(cosHalf, 0.0), exponent);
-}
-
-float reflectance(float cosTheta) {
-   return fresnelSchlick(vec3(k_waterF0), cosTheta).r;
-}
 
 // Deep-water dispersion, g T^2 / 2 pi, for the period the cycle count sets
 float waveLength(uint cyclesPerWrap) {
@@ -172,8 +156,7 @@ SeaSurface seaSurface(vec3 up, vec3 rayDir, float t, mat3 rayVolumeSpaceToView,
 
    SeaSurface sea;
    sea.normal = rayVolumeSpaceToView * normalize(upLocal - slope);
-   // roughness^4 is the mean square slope of the lobe, so the lost slope adds there
-   sea.roughness = pow(pow(k_surfaceRoughness, 4.0) + lostVariance, 0.25);
+   sea.roughness = seaRoughness(lostVariance);
    sea.swell = swell / sqrt(0.5 * float(k_waveCount));
    sea.footprint = footprint;
    return sea;
@@ -305,6 +288,10 @@ RayVolumeResult waterShade(
    // ---- Where the ray enters and leaves the water sphere (entry, exit) ----
 
    float height = cameraHeight(centerDistance, radius);
+   float farWater = smoothstep(k_farSeaWhole, k_nearSeaGone, height);
+   if (farWater >= 1.0) {
+      return res;
+   }
    float centreDist = centerDistance.hi; // Rounding is fine.
 
    // Cosine between the ray and the local up, and the matching sine
@@ -348,8 +335,12 @@ RayVolumeResult waterShade(
    // channel apart
    vec3 transmitted = exp(-absorption * path);
    float leastTransmitted = min(transmitted.r, min(transmitted.g, transmitted.b));
-   vec3 waterColor = color.rgb * u_ambientScale;
    vec3 toLight = -normalize(u_lightDir);
+
+   // Lit as flat ground where the ray enters
+   vec3 entryUp = normalize(rayDir * entry - centerViewPos);
+   float light = seaLight(entryUp, toLight, u_ambientScale, u_directScale);
+   vec3 waterColor = color.rgb * light;
 
    // ---- The surface seen from above, from below, or not at all ----
 
@@ -364,16 +355,10 @@ RayVolumeResult waterShade(
       SeaSurface sea = seaSurface(
          surfaceUp, rayDir, entry, rayVolumeSpaceToView, cameraLocalPosition);
       vec3 normal = faceCamera(sea.normal, toCamera);
-      float mirrored = reflectance(dot(normal, toCamera));
-      vec3 halfway = normalize(toLight + toCamera);
-      // The sun's peak runs to hundreds, enough to overflow the fp16 blend
-      // targets, so both of its terms are capped at white, which the display
-      // clips to anyway
-      vec3 glint = min(fresnelSchlick(vec3(k_waterF0), dot(halfway, toCamera)) *
-         sunLobe(dot(normal, halfway), sea.roughness) * max(dot(normal, toLight), 0.0) *
-         u_directScale, vec3(1.0));
       vec3 below = mix(waterColor, opaqueColor, transmitted);
-      target = mix(below, u_skyColor, mirrored) + glint;
+      float mirrored;
+      target = seaFromAbove(below, normal, toCamera, toLight, sea.roughness, u_skyColor,
+                            u_directScale, mirrored);
       kept = (1.0 - mirrored) * leastTransmitted;
 
       // Foam where the water over the ground is shallow, covering the ground
@@ -381,9 +366,7 @@ RayVolumeResult waterShade(
       // planet's scale.
       float depth = path * -dot(rayDir, surfaceUp);
       float foam = foamCover(depth, sea);
-      float foamLight =
-         k_ambient * u_ambientScale + max(dot(surfaceUp, toLight), 0.0) * u_directScale;
-      target = mix(target, vec3(k_foamAlbedo * foamLight), foam);
+      target = mix(target, vec3(k_foamAlbedo * light), foam);
       kept *= 1.0 - foam;
    } else if (mu > 0.0 && exit < sceneDistance) {
       // From below, the surface at exit, its normal facing the camera. Past the
@@ -424,6 +407,7 @@ RayVolumeResult waterShade(
    // the colour gives each channel back its extra share. Exact for a single layer.
    res.alpha = 1.0 - kept;
    res.color = (target - opaqueColor * kept) / max(res.alpha, 1e-6);
+   res.alpha *= 1.0 - farWater;
    res.weightDepth = entry * max(-rayDir.z, 1e-4);
    return res;
 }

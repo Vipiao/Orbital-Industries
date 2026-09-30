@@ -58,10 +58,8 @@ private:
     // Metres below sea level, negative above it; only for a planet with water
     double depthUnderWater(const RigidBody& rigidBody, const glm::dvec3& worldPos) const;
 
-    // The two halves of updateGraphics: where the body is drawn, and how its
-    // water looks from the camera
+    // Where the body is drawn
     void publishTransform(const RigidBody& rigidBody, const glm::dvec3& cameraPos);
-    void updateWaterView(const RigidBody& rigidBody, const glm::dvec3& cameraPos);
 
     const uint64_t m_uniqueId;
     PhysicsEngine* m_physics;

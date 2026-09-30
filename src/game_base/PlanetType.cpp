@@ -16,6 +16,10 @@
 #include <stdexcept>
 #include <vector>
 
+// How every planet's surface is drawn; its base colour is also the tint the far
+// sea's colour is written against
+static const CdlodConfig k_cdlodConfig{};
+
 // The maps a config was baked at, read back when the cache holds that same config
 // and baked afresh when it does not. A fresh bake is written back, and the faces
 // written out as images alongside it, a bake being the only occasion they change.
@@ -61,8 +65,12 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     // The shore is the waterline; a dry planet puts it below all ground, so it
     // has no sand.
     const double shoreMetres{m_water ? m_water->m_seaLevelMetres : -m_surface->getRadius()};
+    const glm::dvec3 waterAbsorption{m_water ? m_water->m_absorptionPerMetre : glm::dvec3{}};
+    const glm::dvec3 waterColor{m_water ? m_water->m_color : glm::dvec3{}};
+    const glm::dvec3 bodyTint{k_cdlodConfig.m_baseColor};
     m_cdlodSurface = m_graphics->createCdlodSurface(
-        [shape = planetSurfaceGlsl(*m_surface, shoreMetres)] {
+        [shape = planetSurfaceGlsl(*m_surface, shoreMetres, waterAbsorption, waterColor,
+                                   bodyTint)] {
             return shape
                  + ShaderProgram::loadTextFileFromPath(
                        "../src/world/lattice_surface.glsl");
@@ -130,6 +138,6 @@ PlanetType::~PlanetType() {
 
 std::weak_ptr<CdlodInstance> PlanetType::createCdlodInstance(int ssboIndex) const {
     return m_graphics->createCdlodInstance(
-        ssboIndex, CdlodConfig{}, CdlodCubeFaces::cubeRootFrames(m_surface->getRadius()),
+        ssboIndex, k_cdlodConfig, CdlodCubeFaces::cubeRootFrames(m_surface->getRadius()),
         m_bounds, m_cdlodSurface);
 }

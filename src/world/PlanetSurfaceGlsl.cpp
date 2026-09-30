@@ -31,9 +31,16 @@ std::string glslFloat(double value) {
     return text;
 }
 
+std::string glslVec3(const glm::dvec3& value) {
+    return "vec3(" + glslFloat(value.x) + ", " + glslFloat(value.y) + ", " +
+           glslFloat(value.z) + ")";
+}
+
 }  // namespace
 
-std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres) {
+std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres,
+                              const glm::dvec3& waterAbsorptionPerMetre,
+                              const glm::dvec3& waterColor, const glm::dvec3& bodyTint) {
     const TerrainDisplacement& displacement{surface.getDisplacement()};
     const int levelCount{TerrainDisplacement::k_levelCount};
 
@@ -41,7 +48,13 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres) 
     glsl << "// Written by planetSurfaceGlsl.\n"
          << "const float k_radiusMetres = " << glslFloat(surface.getRadius()) << ";\n"
          << "// Height above the sphere the sand is laid along.\n"
-         << "const float k_shoreMetres = " << glslFloat(shoreMetres) << ";\n\n"
+         << "const float k_shoreMetres = " << glslFloat(shoreMetres) << ";\n"
+         << "// The water below the shore, as the sea is drawn from far above.\n"
+         << "const vec3 k_waterAbsorptionPerMetre = " << glslVec3(waterAbsorptionPerMetre)
+         << ";\n"
+         << "const vec3 k_waterColor = " << glslVec3(waterColor) << ";\n"
+         << "// What the renderer multiplies the surface's colour by.\n"
+         << "const vec3 k_bodyTint = " << glslVec3(bodyTint) << ";\n\n"
          << "// One repeat of the map, as the two whole numbers its width is the ratio\n"
          << "// of: the width itself is not exact in a float, and a plane coordinate\n"
          << "// stands thousands of tiles out.\n"

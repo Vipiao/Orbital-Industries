@@ -35,7 +35,8 @@ Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphi
         assert(m_waterConfig->m_directFalloffMetres > 0.0 &&
                m_waterConfig->m_ambientFalloffMetres > 0.0);
         m_water = std::make_unique<PlanetWaterGraphics>(
-            m_graphics, waterShell, m_ssboIndex, seaLevelRadius(), *m_waterConfig);
+            m_graphics, waterShell, m_cdlodSurface, m_ssboIndex, seaLevelRadius(),
+            *m_waterConfig);
     }
 
     // Use a default distant camera position for the initial transform. The water
@@ -73,8 +74,11 @@ void Planet::updateGraphics(const glm::dvec3& cameraPos) {
     }
 
     publishTransform(*rigidBody, cameraPos);
-    if (m_waterConfig) {
-        updateWaterView(*rigidBody, cameraPos);
+    if (m_water) {
+        const glm::dquat orientation{rigidBody->getOrientation()};
+        const glm::dvec3 cameraLocal{
+            glm::conjugate(orientation) * (cameraPos - rigidBody->getPosition())};
+        m_water->updateView(cameraLocal, orientation, m_physics->getCurrentPhysicsTimeStep());
     }
 }
 
@@ -90,15 +94,6 @@ void Planet::publishTransform(const RigidBody& rigidBody, const glm::dvec3& came
         rigidBody.getCenterOfMassLocal(),
         m_physics->getCurrentPhysicsTimeStep(),
         getApproximateRadius());
-}
-
-void Planet::updateWaterView(const RigidBody& rigidBody, const glm::dvec3& cameraPos) {
-    const bool cameraUnderWater{depthUnderWater(rigidBody, cameraPos) > 0.0};
-
-    // The sea floor's wobble stands in for looking down through the surface
-    m_graphics->setCdlodSurfaceUniform(m_cdlodSurface, "u_underwaterWarp",
-                                       cameraUnderWater ? 0.0f : 1.0f);
-    m_water->updateSplash(cameraUnderWater, m_physics->getCurrentPhysicsTimeStep());
 }
 
 double Planet::depthUnderWater(const RigidBody& rigidBody, const glm::dvec3& worldPos) const {
