@@ -30,15 +30,23 @@
 //                               a lattice
 //    int   k_synthesis     which of the sums below the body is built with, named
 //                          by the k_synthesis... constants beside it
-//    float k_turbulenceExponent  the exponent turbulencePower carries
-//    float k_fbmMedian, k_ridgedMultifractalMedian, k_turbulencePowerMedian
-//                          where the middle of each sum falls, as a fraction of
-//                          the lattice relief, which each takes off what it
-//                          returns so they all stand at one height
 //    float k_levelReliefMetres[k_levelCount]  metres each layer stands, floor
 //                                             to ceiling
 //    float k_levelFrequency[k_levelCount]     how much oftener than the field a
 //                                             layer's map is laid down
+//
+// And what each sum carries of its own, named after it. A median is where the
+// middle of the sum falls, as a fraction of the relief it sums, which it takes
+// off what it returns so they all stand at one height.
+//
+//    float k_fbmMedian
+//    float k_ridgedMultifractalMedian
+//    float k_turbulencePowerExponent, k_turbulencePowerMedian
+//    int   k_dunesLevel          the layer read through the sine
+//    float k_dunesFrequency      what multiplies that layer's reading in it
+//    float k_dunesCrestRounding  how far the crest is rounded off
+//    float k_dunesRidgeScale     relief scale for the ridged layers above it
+//    float k_dunesMedian         of the ridged layers' relief
 
 // What the caller read, per layer, before anything gave it a size. A layer the
 // caller did not reach is left at zero, which is what lets the sum below run the
@@ -169,12 +177,45 @@ TerrainDisplacement turbulencePower(TerrainLevels levels) {
    // The chain rule on relief times carried to the exponent: the exponent comes
    // down, and the relief cancels against the one the fraction was taken over. The
    // fold's own turn is left out, at the same few centimetres.
-   float slopeFactor = k_turbulenceExponent * pow(carried, k_turbulenceExponent - 1.0);
+   float slopeFactor =
+      k_turbulencePowerExponent * pow(carried, k_turbulencePowerExponent - 1.0);
 
    TerrainDisplacement displacement = baseDisplacement(levels);
    displacement.height +=
-      carriedRelief * (pow(carried, k_turbulenceExponent) - k_turbulencePowerMedian);
+      carriedRelief *
+      (pow(carried, k_turbulencePowerExponent) - k_turbulencePowerMedian);
    displacement.gradient += slopeFactor * latticeGradient;
+
+   return displacement;
+}
+
+// The ridged sum above k_dunesLevel, plus that layer as
+// relief / f * (1 - sqrt(sin(f * reading)^2 + rounding)), differentiated with
+// the height. The sine's crests follow the layer's contours, so they run in
+// trains. Nothing finer is summed.
+TerrainDisplacement dunes(TerrainLevels levels) {
+   TerrainDisplacement displacement = baseDisplacement(levels);
+
+   float carriedRelief = 0.0;
+   for (int level = k_firstLatticeLevel; level < k_dunesLevel; ++level) {
+      float relief = k_dunesRidgeScale * k_levelReliefMetres[level];
+      displacement.height -= relief * levels.height[level];
+      displacement.gradient -= relief * levels.gradient[level];
+      carriedRelief += relief;
+   }
+
+   displacement.height -= k_dunesMedian * carriedRelief;
+
+   // The fold is the sine's magnitude with the crease rounded off. The chain
+   // rule: the frequency cancels against the one the relief was divided by.
+   float relief = k_levelReliefMetres[k_dunesLevel];
+   float phase = k_dunesFrequency * levels.height[k_dunesLevel];
+   float wave = sin(phase);
+   float fold = sqrt(wave * wave + k_dunesCrestRounding);
+   float slopeFactor = -wave / fold * cos(phase);
+
+   displacement.height += relief / k_dunesFrequency * (1.0 - fold);
+   displacement.gradient += relief * slopeFactor * levels.gradient[k_dunesLevel];
 
    return displacement;
 }
@@ -189,6 +230,9 @@ TerrainDisplacement terrainDisplacement(TerrainLevels levels) {
    }
    if (k_synthesis == k_synthesisTurbulencePower) {
       return turbulencePower(levels);
+   }
+   if (k_synthesis == k_synthesisDunes) {
+      return dunes(levels);
    }
 
    return fbm(levels);
@@ -221,12 +265,9 @@ const vec3 k_snowColour  = vec3(0.95, 0.97, 1.0000);
 const float k_flatRoughness = 0.85;
 const float k_steepRoughness = 0.45;
 
-// What the ground is made of, from how high it stands and how steeply it leans.
-//
-// Slope is rise over run across the surface, which is what the caller is left
-// holding once the part of the gradient that only moves the point has come off.
-// Neither of these knows the body is a sphere, and neither needs to.
-TerrainMaterial terrainMaterial(float heightMetres, float slope) {
+// Grass, rock, snow and a sandy shore, from how high the ground stands and how
+// steeply it leans. What every sum without a material of its own wears.
+TerrainMaterial coverMaterial(float heightMetres, float slope) {
    TerrainMaterial material;
 
    // What grows on the ground, by how high it stands: grass until the air gets
@@ -249,4 +290,27 @@ TerrainMaterial terrainMaterial(float heightMetres, float slope) {
    material.roughness = mix(k_flatRoughness, k_steepRoughness, bare);
 
    return material;
+}
+
+// Sand at every height. Handed the readings like the sum beside it, for when
+// crest and trough are told apart.
+TerrainMaterial dunesMaterial(TerrainLevels levels, float heightMetres, float slope) {
+   TerrainMaterial material;
+   material.colour = k_sandColour;
+   material.roughness = k_flatRoughness;
+
+   return material;
+}
+
+// What the ground is made of, by the sum it was built with.
+//
+// Slope is rise over run across the surface, which is what the caller is left
+// holding once the part of the gradient that only moves the point has come off.
+// Neither of these knows the body is a sphere, and neither needs to.
+TerrainMaterial terrainMaterial(TerrainLevels levels, float heightMetres, float slope) {
+   if (k_synthesis == k_synthesisDunes) {
+      return dunesMaterial(levels, heightMetres, slope);
+   }
+
+   return coverMaterial(heightMetres, slope);
 }

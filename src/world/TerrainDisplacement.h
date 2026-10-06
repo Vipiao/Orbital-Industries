@@ -44,28 +44,62 @@ public:
         // onto it and leaves only the high ground standing, as mountains on a
         // plain rather than as a surface that rolls everywhere.
         TURBULENCE_POWER,
+        // Ridged down to k_dunes.m_level, which is read through a folded sine so its
+        // crests run in trains. Nothing finer is summed.
+        DUNES,
     };
 
     // Which of them the body is built with. Compiled rather than chosen at run
     // time: the snippet unrolls its sum over the table, and the two sides have
     // to be summing the same thing for the bounds to hold.
-    static constexpr Synthesis k_synthesis{Synthesis::RIDGED_MULTIFRACTAL};
+    static constexpr Synthesis k_synthesis{Synthesis::DUNES};
 
-    // The exponent TURBULENCE_POWER carries. At one the sum is left as it lies
-    // and this is FBM again; above one the ground is pressed onto the sum's own
-    // floor and the high ground is left standing alone on it, below one that
-    // floor is lifted and the high ground flattens against a ceiling.
-    static constexpr double k_turbulenceExponent{4.0};
+    // What each synthesis carries besides the table, one group apiece.
+    //
+    // m_median is where the middle of its sum falls, as a fraction of the relief
+    // the lattice layers carry between them: the median over ten thousand points
+    // spread evenly across the sphere, rounded. Each sum takes its own off what
+    // it returns, so the ground sits at one height whichever is chosen. The
+    // median rather than the mean, which the peaks have a hand in. A sum edited
+    // is a median measured again.
+    struct FbmConfig {
+        double m_median;
+    };
 
-    // Where the middle of each sum falls, as a fraction of the relief the lattice
-    // layers carry between them: the median over ten thousand points spread
-    // evenly across the sphere, rounded. Each sum takes its own off what it
-    // returns, so the ground sits at one height whichever is chosen. The median
-    // rather than the mean, which the peaks have a hand in. A sum edited is a
-    // median measured again.
-    static constexpr double k_fbmMedian{0.38};
-    static constexpr double k_ridgedMultifractalMedian{-0.38};
-    static constexpr double k_turbulencePowerMedian{0.02};
+    struct RidgedMultifractalConfig {
+        double m_median;
+    };
+
+    struct TurbulencePowerConfig {
+        // At one the sum is left as it lies and this is FBM again; above one the
+        // ground is pressed onto the sum's own floor and the high ground is left
+        // standing alone on it, below one that floor is lifted and the high
+        // ground flattens against a ceiling.
+        double m_exponent;
+        double m_median;
+    };
+
+    struct DunesConfig {
+        // The layer read through the sine. Coarser ones are summed ridged, finer
+        // ones are left out.
+        int m_level;
+        // What that layer's reading is multiplied by inside the sine. Its relief
+        // is divided by the same, which keeps its slope what it was.
+        double m_frequency;
+        // Added to the sine squared before the root that folds it. More is a
+        // rounder crest; none would be a hard crease, and a slope of nothing
+        // over nothing along it.
+        double m_crestRounding;
+        // Relief scale for the ridged layers above the dune layer.
+        double m_ridgeScale;
+        // Ridged's, borrowed until measured. Of the ridged layers' relief.
+        double m_median;
+    };
+
+    static constexpr FbmConfig k_fbm{.m_median = 0.38};
+    static constexpr RidgedMultifractalConfig k_ridgedMultifractal{.m_median = -0.38};
+    static constexpr TurbulencePowerConfig k_turbulencePower{.m_exponent = 4.0,
+                                                             .m_median = 0.02};
 
     // Layers the table holds, coarsest first. Public so a caller can check at
     // compile time that the layers it asks for are there.
@@ -86,6 +120,13 @@ public:
     // named here is the coarsest, and the frame every finer lattice is scaled
     // from.
     static constexpr int k_firstLatticeLevel{k_baseLevel + 1};
+
+    // Down here because its level is counted off the table.
+    static constexpr DunesConfig k_dunes{.m_level = k_levelCount - 2,
+                                         .m_frequency = 6.283185307179586,
+                                         .m_crestRounding = 0.01,
+                                         .m_ridgeScale = 0.25,
+                                         .m_median = -0.38};
 
     // What the caller read, per layer, before anything gave it a size. The
     // snippet's TerrainLevels. A layer the caller did not reach is left at zero,
@@ -146,7 +187,7 @@ private:
     Displacement ridgedMultifractal(const Levels& levels) const;
 
     // The lattice layers' sum read as a fraction of the relief they carry
-    // between them, taken to k_turbulenceExponent, given that relief back and
+    // between them, taken to its exponent, given that relief back and
     // added to the base layer.
     //
     // The sum stands as it lies rather than turned over. What the exponent
@@ -156,6 +197,11 @@ private:
     // The exponent is differentiated with the height, so the gradient returned
     // is still the derivative of what is returned.
     Displacement turbulencePower(const Levels& levels) const;
+
+    // The ridged sum above k_dunes.m_level, plus that layer as
+    // relief / f * (1 - sqrt(sin(f * reading)^2 + rounding)), differentiated
+    // with the height.
+    Displacement dunes(const Levels& levels) const;
 
     double m_relief{0.0};
     double m_baseRelief{0.0};

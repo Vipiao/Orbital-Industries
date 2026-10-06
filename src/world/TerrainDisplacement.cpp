@@ -86,6 +86,8 @@ TerrainDisplacement::Displacement TerrainDisplacement::displacement(
             return ridgedMultifractal(levels);
         case Synthesis::TURBULENCE_POWER:
             return turbulencePower(levels);
+        case Synthesis::DUNES:
+            return dunes(levels);
     }
 
     assert(false && "No such synthesis");
@@ -121,7 +123,7 @@ TerrainDisplacement::Displacement TerrainDisplacement::fbm(const Levels& levels)
     }
 
     // The offset moves the sum without bending it, so the gradient is untouched.
-    displacement.m_height -= k_fbmMedian * latticeRelief();
+    displacement.m_height -= k_fbm.m_median * latticeRelief();
 
     return displacement;
 }
@@ -135,7 +137,7 @@ TerrainDisplacement::Displacement TerrainDisplacement::ridgedMultifractal(
         displacement.m_gradient -= relief * levels.m_gradient[level];
     }
 
-    displacement.m_height -= k_ridgedMultifractalMedian * latticeRelief();
+    displacement.m_height -= k_ridgedMultifractal.m_median * latticeRelief();
 
     return displacement;
 }
@@ -169,14 +171,41 @@ TerrainDisplacement::Displacement TerrainDisplacement::turbulencePower(
     // The chain rule on relief times carried to the exponent: the exponent comes
     // down, and the relief cancels against the one the fraction was taken over.
     // The fold's own turn is left out, at the same few centimetres.
-    const double slopeFactor{k_turbulenceExponent *
-                             std::pow(carried, k_turbulenceExponent - 1.0)};
+    const double exponent{k_turbulencePower.m_exponent};
+    const double slopeFactor{exponent * std::pow(carried, exponent - 1.0)};
 
     Displacement displacement{baseDisplacement(levels)};
     displacement.m_height +=
-        carriedRelief *
-        (std::pow(carried, k_turbulenceExponent) - k_turbulencePowerMedian);
+        carriedRelief * (std::pow(carried, exponent) - k_turbulencePower.m_median);
     displacement.m_gradient += slopeFactor * latticeGradient;
+
+    return displacement;
+}
+
+TerrainDisplacement::Displacement TerrainDisplacement::dunes(const Levels& levels) const {
+    Displacement displacement{baseDisplacement(levels)};
+
+    double carriedRelief{0.0};
+    for (int level{k_firstLatticeLevel}; level < k_dunes.m_level; ++level) {
+        const double relief{k_dunes.m_ridgeScale * levelRelief(level)};
+        displacement.m_height -= relief * levels.m_height[level];
+        displacement.m_gradient -= relief * levels.m_gradient[level];
+        carriedRelief += relief;
+    }
+
+    displacement.m_height -= k_dunes.m_median * carriedRelief;
+
+    // The fold is the sine's magnitude with the crease rounded off. The chain
+    // rule: the frequency cancels against the one the relief was divided by.
+    const double relief{levelRelief(k_dunes.m_level)};
+    const double phase{k_dunes.m_frequency * levels.m_height[k_dunes.m_level]};
+    const double wave{std::sin(phase)};
+    const double fold{std::sqrt(wave * wave + k_dunes.m_crestRounding)};
+    const double slopeFactor{-wave / fold * std::cos(phase)};
+
+    displacement.m_height += relief / k_dunes.m_frequency * (1.0 - fold);
+    displacement.m_gradient +=
+        relief * slopeFactor * levels.m_gradient[k_dunes.m_level];
 
     return displacement;
 }

@@ -667,14 +667,14 @@ CdlodSurfaceShading cdlodSurfaceShading(Df3 crudePoint, vec3 crudeDerivX,
    // rather than its width, which is the side that would alias.
    float sampleSpacing = max(length(metreDerivX), length(metreDerivY));
 
-   TerrainDisplacement displacement =
-      terrainDisplacement(gatherLevels(crudePoint, k_shadingLevels, sampleSpacing));
+   TerrainLevels levels = gatherLevels(crudePoint, k_shadingLevels, sampleSpacing);
+   TerrainDisplacement displacement = terrainDisplacement(levels);
    vec3 acrossSphere = displacement.gradient
       - sphereNormal * dot(sphereNormal, displacement.gradient);
 
    // Rise over run, which the tangential gradient already is.
    TerrainMaterial material =
-      terrainMaterial(displacement.height, length(acrossSphere));
+      terrainMaterial(levels, displacement.height, length(acrossSphere));
 
    CdlodSurfaceShading shading;
    shading.normal = normalize(sphereNormal - acrossSphere);
