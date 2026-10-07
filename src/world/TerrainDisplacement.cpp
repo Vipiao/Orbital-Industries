@@ -185,27 +185,30 @@ TerrainDisplacement::Displacement TerrainDisplacement::turbulencePower(
 TerrainDisplacement::Displacement TerrainDisplacement::dunes(const Levels& levels) const {
     Displacement displacement{baseDisplacement(levels)};
 
-    double carriedRelief{0.0};
-    for (int level{k_firstLatticeLevel}; level < k_dunes.m_level; ++level) {
-        const double relief{k_dunes.m_ridgeScale * levelRelief(level)};
-        displacement.m_height -= relief * levels.m_height[level];
-        displacement.m_gradient -= relief * levels.m_gradient[level];
-        carriedRelief += relief;
+    double ridgedRelief{0.0};
+    for (int level{k_firstLatticeLevel}; level < k_levelCount; ++level) {
+        const double relief{k_dunes.m_scale[level] * levelRelief(level)};
+        const double frequency{k_dunes.m_frequency[level]};
+
+        if (frequency == 0.0) {
+            displacement.m_height -= relief * levels.m_height[level];
+            displacement.m_gradient -= relief * levels.m_gradient[level];
+            ridgedRelief += relief;
+            continue;
+        }
+
+        // The fold is the sine's magnitude with the crease rounded off. The chain
+        // rule: the frequency cancels against the one the relief was divided by.
+        const double phase{frequency * levels.m_height[level]};
+        const double wave{std::sin(phase)};
+        const double fold{std::sqrt(wave * wave + k_dunes.m_crestRounding)};
+        const double slopeFactor{-wave / fold * std::cos(phase)};
+
+        displacement.m_height += relief / frequency * (1.0 - fold);
+        displacement.m_gradient += relief * slopeFactor * levels.m_gradient[level];
     }
 
-    displacement.m_height -= k_dunes.m_median * carriedRelief;
-
-    // The fold is the sine's magnitude with the crease rounded off. The chain
-    // rule: the frequency cancels against the one the relief was divided by.
-    const double relief{levelRelief(k_dunes.m_level)};
-    const double phase{k_dunes.m_frequency * levels.m_height[k_dunes.m_level]};
-    const double wave{std::sin(phase)};
-    const double fold{std::sqrt(wave * wave + k_dunes.m_crestRounding)};
-    const double slopeFactor{-wave / fold * std::cos(phase)};
-
-    displacement.m_height += relief / k_dunes.m_frequency * (1.0 - fold);
-    displacement.m_gradient +=
-        relief * slopeFactor * levels.m_gradient[k_dunes.m_level];
+    displacement.m_height -= k_dunes.m_median * ridgedRelief;
 
     return displacement;
 }

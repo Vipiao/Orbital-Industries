@@ -36,6 +36,18 @@ std::string glslVec3(const glm::dvec3& value) {
            glslFloat(value.z) + ")";
 }
 
+// One figure per layer, as a constant array.
+std::string glslLevelArray(
+    const std::string& name,
+    const std::array<double, TerrainDisplacement::k_levelCount>& values) {
+    std::string text{"const float " + name + "[k_levelCount] = float[k_levelCount]("};
+    for (std::size_t level{0}; level < values.size(); ++level) {
+        text += (level == 0 ? "" : ", ") + glslFloat(values[level]);
+    }
+
+    return text + ");\n";
+}
+
 }  // namespace
 
 std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres,
@@ -102,13 +114,10 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres,
          << glslFloat(TerrainDisplacement::k_turbulencePower.m_exponent) << ";\n"
          << "const float k_turbulencePowerMedian = "
          << glslFloat(TerrainDisplacement::k_turbulencePower.m_median) << ";\n\n"
-         << "const int k_dunesLevel = " << TerrainDisplacement::k_dunes.m_level << ";\n"
-         << "const float k_dunesFrequency = "
-         << glslFloat(TerrainDisplacement::k_dunes.m_frequency) << ";\n"
+         << glslLevelArray("k_dunesScale", TerrainDisplacement::k_dunes.m_scale)
+         << glslLevelArray("k_dunesFrequency", TerrainDisplacement::k_dunes.m_frequency)
          << "const float k_dunesCrestRounding = "
          << glslFloat(TerrainDisplacement::k_dunes.m_crestRounding) << ";\n"
-         << "const float k_dunesRidgeScale = "
-         << glslFloat(TerrainDisplacement::k_dunes.m_ridgeScale) << ";\n"
          << "const float k_dunesMedian = "
          << glslFloat(TerrainDisplacement::k_dunes.m_median) << ";\n\n"
          << "// Metres each layer stands between its floor and its ceiling. The map is\n"

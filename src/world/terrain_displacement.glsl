@@ -42,10 +42,10 @@
 //    float k_fbmMedian
 //    float k_ridgedMultifractalMedian
 //    float k_turbulencePowerExponent, k_turbulencePowerMedian
-//    int   k_dunesLevel          the layer read through the sine
-//    float k_dunesFrequency      what multiplies that layer's reading in it
+//    float k_dunesScale[k_levelCount]      relief scale per layer
+//    float k_dunesFrequency[k_levelCount]  what multiplies a layer's reading in
+//                                          the sine; zero sums it ridged
 //    float k_dunesCrestRounding  how far the crest is rounded off
-//    float k_dunesRidgeScale     relief scale for the ridged layers above it
 //    float k_dunesMedian         of the ridged layers' relief
 
 // What the caller read, per layer, before anything gave it a size. A layer the
@@ -189,33 +189,37 @@ TerrainDisplacement turbulencePower(TerrainLevels levels) {
    return displacement;
 }
 
-// The ridged sum above k_dunesLevel, plus that layer as
+// Each layer ridged, or where it has a frequency f, as
 // relief / f * (1 - sqrt(sin(f * reading)^2 + rounding)), differentiated with
 // the height. The sine's crests follow the layer's contours, so they run in
-// trains. Nothing finer is summed.
+// trains.
 TerrainDisplacement dunes(TerrainLevels levels) {
    TerrainDisplacement displacement = baseDisplacement(levels);
 
-   float carriedRelief = 0.0;
-   for (int level = k_firstLatticeLevel; level < k_dunesLevel; ++level) {
-      float relief = k_dunesRidgeScale * k_levelReliefMetres[level];
-      displacement.height -= relief * levels.height[level];
-      displacement.gradient -= relief * levels.gradient[level];
-      carriedRelief += relief;
+   float ridgedRelief = 0.0;
+   for (int level = k_firstLatticeLevel; level < k_levelCount; ++level) {
+      float relief = k_dunesScale[level] * k_levelReliefMetres[level];
+      float frequency = k_dunesFrequency[level];
+
+      if (frequency == 0.0) {
+         displacement.height -= relief * levels.height[level];
+         displacement.gradient -= relief * levels.gradient[level];
+         ridgedRelief += relief;
+         continue;
+      }
+
+      // The fold is the sine's magnitude with the crease rounded off. The chain
+      // rule: the frequency cancels against the one the relief was divided by.
+      float phase = frequency * levels.height[level];
+      float wave = sin(phase);
+      float fold = sqrt(wave * wave + k_dunesCrestRounding);
+      float slopeFactor = -wave / fold * cos(phase);
+
+      displacement.height += relief / frequency * (1.0 - fold);
+      displacement.gradient += relief * slopeFactor * levels.gradient[level];
    }
 
-   displacement.height -= k_dunesMedian * carriedRelief;
-
-   // The fold is the sine's magnitude with the crease rounded off. The chain
-   // rule: the frequency cancels against the one the relief was divided by.
-   float relief = k_levelReliefMetres[k_dunesLevel];
-   float phase = k_dunesFrequency * levels.height[k_dunesLevel];
-   float wave = sin(phase);
-   float fold = sqrt(wave * wave + k_dunesCrestRounding);
-   float slopeFactor = -wave / fold * cos(phase);
-
-   displacement.height += relief / k_dunesFrequency * (1.0 - fold);
-   displacement.gradient += relief * slopeFactor * levels.gradient[k_dunesLevel];
+   displacement.height -= k_dunesMedian * ridgedRelief;
 
    return displacement;
 }

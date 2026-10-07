@@ -44,8 +44,8 @@ public:
         // onto it and leaves only the high ground standing, as mountains on a
         // plain rather than as a surface that rolls everywhere.
         TURBULENCE_POWER,
-        // Ridged down to k_dunes.m_level, which is read through a folded sine so its
-        // crests run in trains. Nothing finer is summed.
+        // Each layer either ridged or read through a folded sine, so its crests
+        // run in trains. k_dunes says which, per layer.
         DUNES,
     };
 
@@ -79,23 +79,6 @@ public:
         double m_median;
     };
 
-    struct DunesConfig {
-        // The layer read through the sine. Coarser ones are summed ridged, finer
-        // ones are left out.
-        int m_level;
-        // What that layer's reading is multiplied by inside the sine. Its relief
-        // is divided by the same, which keeps its slope what it was.
-        double m_frequency;
-        // Added to the sine squared before the root that folds it. More is a
-        // rounder crest; none would be a hard crease, and a slope of nothing
-        // over nothing along it.
-        double m_crestRounding;
-        // Relief scale for the ridged layers above the dune layer.
-        double m_ridgeScale;
-        // Ridged's, borrowed until measured. Of the ridged layers' relief.
-        double m_median;
-    };
-
     static constexpr FbmConfig k_fbm{.m_median = 0.38};
     static constexpr RidgedMultifractalConfig k_ridgedMultifractal{.m_median = -0.38};
     static constexpr TurbulencePowerConfig k_turbulencePower{.m_exponent = 4.0,
@@ -121,12 +104,26 @@ public:
     // from.
     static constexpr int k_firstLatticeLevel{k_baseLevel + 1};
 
-    // Down here because its level is counted off the table.
-    static constexpr DunesConfig k_dunes{.m_level = k_levelCount - 2,
-                                         .m_frequency = 6.283185307179586,
-                                         .m_crestRounding = 0.01,
-                                         .m_ridgeScale = 0.25,
-                                         .m_median = -0.38};
+    // Down here because its rows are counted off the table. The base layer's
+    // entries are not read.
+    struct DunesConfig {
+        // Relief scale per layer. Nothing leaves the layer out.
+        std::array<double, k_levelCount> m_scale;
+        // What a layer's reading is multiplied by inside the sine, its relief
+        // being divided by the same. Nothing sums the layer ridged instead.
+        std::array<double, k_levelCount> m_frequency;
+        // Added to the sine squared before the root that folds it. More is a
+        // rounder crest; must be above nothing.
+        double m_crestRounding;
+        // Ridged's, borrowed until measured. Of the ridged layers' relief.
+        double m_median;
+    };
+
+    static constexpr DunesConfig k_dunes{
+        .m_scale = {1.0, 0.25, 0.5, 1.0, 0.0},
+        .m_frequency = {0.0, 0.0, 6.283185307179586, 5.026548245743669, 0.0},
+        .m_crestRounding = 0.000625,
+        .m_median = -0.38};
 
     // What the caller read, per layer, before anything gave it a size. The
     // snippet's TerrainLevels. A layer the caller did not reach is left at zero,
@@ -198,7 +195,7 @@ private:
     // is still the derivative of what is returned.
     Displacement turbulencePower(const Levels& levels) const;
 
-    // The ridged sum above k_dunes.m_level, plus that layer as
+    // Each layer ridged, or where k_dunes gives it a frequency f, as
     // relief / f * (1 - sqrt(sin(f * reading)^2 + rounding)), differentiated
     // with the height.
     Displacement dunes(const Levels& levels) const;
