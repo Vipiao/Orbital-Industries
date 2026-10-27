@@ -187,7 +187,7 @@ static constexpr SessionMode s_sessionMode{SessionMode::RECORD};
 // worth keeping, so no edit of the switch above can overwrite a session that
 // already is. Two roles recording at once want two scratch folders, every stream
 // but the network journal being per role.
-static const std::filesystem::path s_playbackDir{"../recordings/006_packing_benchmark"};
+static const std::filesystem::path s_playbackDir{"../recordings/007_forest_benchmark"};
 static const std::filesystem::path s_recordDir{"../recordings/999_scratch"};
 
 int main() {
@@ -265,7 +265,7 @@ int main() {
         // Each role starts nearest a different character, so the two peers'
         // nearest-camera control requests resolve to different digibots.
         if (netConfig.m_role == NetworkStartupConfig::Role::Client) {
-            game.getGameBase()->m_graphicsEngine->getCamPos() = glm::dvec3{5.0, 0.0, 0.0};
+            game.getGameBase()->m_graphicsEngine->setCamPos(glm::dvec3{5.0, 0.0, 0.0});
         }
 
         // Testing convenience: park the window at a fixed spot (no-op on Wayland).

@@ -1,7 +1,7 @@
-// CdlodCubeFaces.cpp
-#include "CdlodCubeFaces.h"
+// CubeFaces.cpp
+#include "CubeFaces.h"
 
-const glm::dvec3 CdlodCubeFaces::k_faceOrigin[k_faceCount]{
+const glm::dvec3 CubeFaces::k_faceOrigin[k_faceCount]{
     { 1.0, -1.0, -1.0},  // +X
     {-1.0, -1.0, -1.0},  // -X
     {-1.0,  1.0, -1.0},  // +Y
@@ -9,21 +9,20 @@ const glm::dvec3 CdlodCubeFaces::k_faceOrigin[k_faceCount]{
     {-1.0, -1.0,  1.0},  // +Z
     {-1.0, -1.0, -1.0}   // -Z
 };
-const glm::dvec3 CdlodCubeFaces::k_faceUAxis[k_faceCount]{
+const glm::dvec3 CubeFaces::k_faceUAxis[k_faceCount]{
     {0.0, 2.0, 0.0}, {0.0, 0.0, 2.0}, {0.0, 0.0, 2.0},
     {2.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {0.0, 2.0, 0.0}
 };
-const glm::dvec3 CdlodCubeFaces::k_faceVAxis[k_faceCount]{
+const glm::dvec3 CubeFaces::k_faceVAxis[k_faceCount]{
     {0.0, 0.0, 2.0}, {0.0, 2.0, 0.0}, {2.0, 0.0, 0.0},
     {0.0, 0.0, 2.0}, {0.0, 2.0, 0.0}, {2.0, 0.0, 0.0}
 };
 
-std::vector<CdlodPatchFrame> CdlodCubeFaces::cubeRootFrames(double halfExtent) {
+std::vector<CdlodPatchFrame> CubeFaces::cubeRootFrames(double halfExtent) {
     std::vector<CdlodPatchFrame> frames{};
     frames.reserve(k_faceCount);
 
-    // A frame's axes are half-edges measured from the patch centre, so a face
-    // spanning its full basis has axes of half of it, and sits at the midpoint.
+    // A frame's axes are half-edges from the patch centre
     for (int faceIndex{0}; faceIndex < k_faceCount; ++faceIndex) {
         const glm::dvec3 uAxis{k_faceUAxis[faceIndex] * 0.5 * halfExtent};
         const glm::dvec3 vAxis{k_faceVAxis[faceIndex] * 0.5 * halfExtent};

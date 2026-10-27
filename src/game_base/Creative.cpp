@@ -422,21 +422,20 @@ void Creative::processInputLogic() {
 
         m_digibotPlayerController->setPilotableCharacter(m_boundCharacter);
         m_digibotPlayerController->enable();
-        m_digibotPlayerController->update(
-            controller,
-            m_gameBase->m_graphicsEngine->getCamPos(),
-            m_gameBase->m_graphicsEngine->getCamOri(),
-            timeRemainder
-        );
+        glm::dvec3 camPos{m_gameBase->m_graphicsEngine->getCamPos()};
+        glm::dquat camOri{m_gameBase->m_graphicsEngine->getCamOri()};
+        m_digibotPlayerController->update(controller, camPos, camOri, timeRemainder);
+        m_gameBase->m_graphicsEngine->setCamPos(camPos);
+        m_gameBase->m_graphicsEngine->setCamOri(camOri);
     } else {
         // Free camera mode
         m_digibotPlayerController->disable();
-        
-        m_freeCameraController->update(
-            deltaTime, 
-            m_gameBase->m_graphicsEngine->getCamPos(),
-            m_gameBase->m_graphicsEngine->getCamOri()
-        );
+
+        glm::dvec3 camPos{m_gameBase->m_graphicsEngine->getCamPos()};
+        glm::dquat camOri{m_gameBase->m_graphicsEngine->getCamOri()};
+        m_freeCameraController->update(deltaTime, camPos, camOri);
+        m_gameBase->m_graphicsEngine->setCamPos(camPos);
+        m_gameBase->m_graphicsEngine->setCamOri(camOri);
     }
 
     // Toggle radial menu visibility with R key

@@ -52,7 +52,7 @@ public:
     // Which of them the body is built with. Compiled rather than chosen at run
     // time: the snippet unrolls its sum over the table, and the two sides have
     // to be summing the same thing for the bounds to hold.
-    static constexpr Synthesis k_synthesis{Synthesis::DUNES};
+    static constexpr Synthesis k_synthesis{Synthesis::RIDGED_MULTIFRACTAL};
 
     // What each synthesis carries besides the table, one group apiece.
     //

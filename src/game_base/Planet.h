@@ -16,6 +16,7 @@ class RigidBody;
 class PlanetSurface;
 class PlanetType;
 class PlanetWaterGraphics;
+class PlanetPropsGraphics;
 class Geometry;
 struct CdlodInstance;
 struct CdlodSurface;
@@ -73,5 +74,6 @@ private:
     // Both empty for a dry planet
     std::optional<PlanetWaterConfig> m_waterConfig;
     std::unique_ptr<PlanetWaterGraphics> m_water;
+    std::unique_ptr<PlanetPropsGraphics> m_props;
     MeshTransformPublisher m_transformPublisher;
 };

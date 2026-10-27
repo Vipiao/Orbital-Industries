@@ -1,7 +1,8 @@
 // PlanetType.cpp
 #include "PlanetType.h"
+#include "PlanetPropsGraphics.h"
 #include "PlanetTypeConfig.h"
-#include "src/world/CdlodCubeFaces.h"
+#include "src/world/CubeFaces.h"
 #include "src/world/CubeSphereBounds.h"
 #include "src/world/PlanetBaseCache.h"
 #include "src/world/PlanetBaseDump.h"
@@ -45,14 +46,15 @@ static PlanetBaseMaps loadOrBakeBaseMaps(const std::filesystem::path& cachePath,
 }
 
 PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
-    : m_graphics{graphics}, m_water{config.m_water} {
+    : m_graphics{graphics},
+      m_surface{std::make_shared<const PlanetSurface>(
+          config.m_radiusMetres, config.m_tileSpanMetres, config.m_tilesPerSpan,
+          config.m_reliefMetres, config.m_baseReliefMetres, config.m_terrain, config.m_base)},
+      m_water{config.m_water},
+      m_propPatchGrid{m_surface->getRadius(), PlanetPropsGraphics::k_patchMetres} {
     if (!m_graphics) {
         throw std::runtime_error("PlanetType: graphics must be non-null");
     }
-
-    m_surface = std::make_shared<const PlanetSurface>(
-        config.m_radiusMetres, config.m_tileSpanMetres, config.m_tilesPerSpan,
-        config.m_reliefMetres, config.m_baseReliefMetres, config.m_terrain, config.m_base);
 
     // The body's figures go in front of the shader that reads them, so they are
     // written once in C++ and compiled rather than sent per frame. The snippet
@@ -68,13 +70,13 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     const glm::dvec3 waterAbsorption{m_water ? m_water->m_absorptionPerMetre : glm::dvec3{}};
     const glm::dvec3 waterColor{m_water ? m_water->m_color : glm::dvec3{}};
     const glm::dvec3 bodyTint{k_cdlodConfig.m_baseColor};
+    const std::string surfaceFigures{planetSurfaceGlsl(*m_surface, shoreMetres)};
     m_cdlodSurface = m_graphics->createCdlodSurface(
-        [shape = planetSurfaceGlsl(*m_surface, shoreMetres, waterAbsorption, waterColor,
-                                   bodyTint)] {
-            return shape
-                 + ShaderProgram::loadTextFileFromPath(
-                       "../src/world/lattice_surface.glsl");
+        [figures = surfaceFigures + farWaterGlsl(waterAbsorption, waterColor, bodyTint)] {
+            return figures
+                 + ShaderProgram::loadTextFileFromPath("../src/world/cdlod_surface.glsl");
         });
+    m_propSet = PlanetPropsGraphics::createSet(m_graphics, m_propPatchGrid, surfaceFigures);
 
     const std::vector<uint16_t> noiseBake{m_surface->bakeElevation()};
     const std::vector<float> gradientBake{m_surface->bakeGradient()};
@@ -98,7 +100,7 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     const std::vector<uint16_t> mapBake{m_surface->bakeMap()};
     mapSpec.m_format = TextureFormat::RGBA16;
     mapSpec.m_pixels = mapBake.data();
-    m_graphics->setCdlodSurfaceTexture(m_cdlodSurface, "u_terrainMap", mapSpec);
+    shareGroundMap("u_terrainMap", m_graphics->createSharedTexture(mapSpec));
 
     // The base layer's pair, kept beside the binary between runs: the bake costs
     // seconds, and tuning the octaves never touches the config that drives it. A
@@ -117,7 +119,7 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     for (int face{0}; face < PlanetBaseMaps::k_faceCount; ++face) {
         baseSpec.m_faces[face] = baseMaps.m_elevation[face].data();
     }
-    m_graphics->setCdlodSurfaceCubeTexture(m_cdlodSurface, "u_baseElevationMap", baseSpec);
+    shareGroundMap("u_baseElevationMap", m_graphics->createSharedCubeTexture(baseSpec));
 
     // Smaller than the elevation, the filter's own coarseness being what sizes
     // that one and a slope having no such pressure.
@@ -126,18 +128,30 @@ PlanetType::PlanetType(GraphicsEngine* graphics, const PlanetTypeConfig& config)
     for (int face{0}; face < PlanetBaseMaps::k_faceCount; ++face) {
         baseSpec.m_faces[face] = baseMaps.m_slope[face].data();
     }
-    m_graphics->setCdlodSurfaceCubeTexture(m_cdlodSurface, "u_baseGradientMap", baseSpec);
+    shareGroundMap("u_baseGradientMap", m_graphics->createSharedCubeTexture(baseSpec));
 
     m_bounds = std::make_shared<const CubeSphereBounds>(m_surface);
 }
 
 PlanetType::~PlanetType() {
-    // The engine keeps the surface alive until its last instance is removed
+    // The engine keeps the surface alive until its last instance is removed; the
+    // set goes at once, with whatever planets' props are still on it
+    m_graphics->removeScatterSet(m_propSet);
     m_graphics->removeCdlodSurface(m_cdlodSurface);
+    for (const GroundMap& map : m_groundMaps) {
+        m_graphics->removeSharedTexture(map.m_texture);
+    }
+}
+
+void PlanetType::shareGroundMap(const std::string& samplerName,
+                                std::weak_ptr<Texture> texture) {
+    m_graphics->setCdlodSurfaceTexture(m_cdlodSurface, samplerName, texture);
+    m_graphics->setScatterSetTexture(m_propSet, samplerName, texture);
+    m_groundMaps.push_back(GroundMap{samplerName, std::move(texture)});
 }
 
 std::weak_ptr<CdlodInstance> PlanetType::createCdlodInstance(int ssboIndex) const {
     return m_graphics->createCdlodInstance(
-        ssboIndex, k_cdlodConfig, CdlodCubeFaces::cubeRootFrames(m_surface->getRadius()),
+        ssboIndex, k_cdlodConfig, CubeFaces::cubeRootFrames(m_surface->getRadius()),
         m_bounds, m_cdlodSurface);
 }

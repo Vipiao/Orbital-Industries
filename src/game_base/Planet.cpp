@@ -1,5 +1,6 @@
 // Planet.cpp
 #include "Planet.h"
+#include "PlanetPropsGraphics.h"
 #include "PlanetType.h"
 #include "PlanetWaterGraphics.h"
 #include "../physics/PhysicsEngine.h"
@@ -31,6 +32,8 @@ Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphi
 
     m_ssboIndex = m_graphics->m_ssboManager->allocateIndex();
     m_cdlodInstance = type.createCdlodInstance(m_ssboIndex);
+    m_props = std::make_unique<PlanetPropsGraphics>(
+        m_graphics, type.getPropSet(), type.getPropPatchGrid(), m_surface, m_ssboIndex);
     if (m_waterConfig) {
         assert(m_waterConfig->m_directFalloffMetres > 0.0 &&
                m_waterConfig->m_ambientFalloffMetres > 0.0);
@@ -48,8 +51,9 @@ Planet::Planet(uint64_t uniqueId, PhysicsEngine* physics, GraphicsEngine* graphi
 }
 
 Planet::~Planet() {
-    // Both drawables go before the SSBO slot they are drawn through
+    // The drawables go before the SSBO slot they are drawn through
     m_water.reset();
+    m_props.reset();
     m_graphics->removeCdlodInstance(m_cdlodInstance);
     m_graphics->m_ssboManager->deallocateIndex(m_ssboIndex);
 
@@ -74,10 +78,12 @@ void Planet::updateGraphics(const glm::dvec3& cameraPos) {
     }
 
     publishTransform(*rigidBody, cameraPos);
+
+    const glm::dquat orientation{rigidBody->getOrientation()};
+    const glm::dvec3 cameraLocal{
+        glm::conjugate(orientation) * (cameraPos - rigidBody->getPosition())};
+    m_props->updateView(cameraLocal);
     if (m_water) {
-        const glm::dquat orientation{rigidBody->getOrientation()};
-        const glm::dvec3 cameraLocal{
-            glm::conjugate(orientation) * (cameraPos - rigidBody->getPosition())};
         m_water->updateView(cameraLocal, orientation, m_physics->getCurrentPhysicsTimeStep());
     }
 }

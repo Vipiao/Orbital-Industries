@@ -269,29 +269,59 @@ const vec3 k_snowColour  = vec3(0.95, 0.97, 1.0000);
 const float k_flatRoughness = 0.85;
 const float k_steepRoughness = 0.45;
 
-// Grass, rock, snow and a sandy shore, from how high the ground stands and how
-// steeply it leans. What every sum without a material of its own wears.
-TerrainMaterial coverMaterial(float heightMetres, float slope) {
-   TerrainMaterial material;
+// Shares of the ground's cover, summing to one.
+struct TerrainCover {
+   float sand;
+   float grass;
+   float rock;
+   float snow;
+};
 
+// Ground steep enough sheds whatever settles on it and is left as the rock
+// beneath, which is why the flanks read bare and the floors do not.
+float bareShare(float slope) {
+   return smoothstep(k_rockSlopeFrom, k_rockSlopeTo, slope);
+}
+
+// Grass, rock, snow and a sandy shore, from how high the ground stands and how
+// steeply it leans. What every sum without a cover of its own wears.
+TerrainCover coverShares(float heightMetres, float slope) {
    // What grows on the ground, by how high it stands: grass until the air gets
    // too thin for it, snow above that.
-   vec3 cover = mix(k_grassColour, k_snowColour,
-                    smoothstep(k_snowFloorMetres - k_coverBlendMetres,
-                               k_snowFloorMetres + k_coverBlendMetres, heightMetres));
+   float snowy = smoothstep(k_snowFloorMetres - k_coverBlendMetres,
+                            k_snowFloorMetres + k_coverBlendMetres, heightMetres);
+   float bare = bareShare(slope);
 
-   // Ground steep enough sheds whatever settles on it and is left as the rock
-   // beneath, which is why the flanks read bare and the floors do not.
-   float bare = smoothstep(k_rockSlopeFrom, k_rockSlopeTo, slope);
-   vec3 ground = mix(cover, k_rockColour, bare);
-
-   // Sand under the water and along its edge
+   // Sand under the water and along its edge, over everything else
    float sandCeiling = k_shoreMetres + k_beachRiseMetres;
-   material.colour = mix(k_sandColour, ground,
-                         smoothstep(sandCeiling - k_coverBlendMetres,
-                                    sandCeiling + k_coverBlendMetres, heightMetres));
+   float land = smoothstep(sandCeiling - k_coverBlendMetres,
+                           sandCeiling + k_coverBlendMetres, heightMetres);
 
-   material.roughness = mix(k_flatRoughness, k_steepRoughness, bare);
+   TerrainCover cover;
+   cover.sand = 1.0 - land;
+   cover.rock = land * bare;
+   cover.grass = land * (1.0 - bare) * (1.0 - snowy);
+   cover.snow = land * (1.0 - bare) * snowy;
+
+   return cover;
+}
+
+// Dunes are all sand.
+TerrainCover terrainCover(float heightMetres, float slope) {
+   if (k_synthesis == k_synthesisDunes) {
+      return TerrainCover(1.0, 0.0, 0.0, 0.0);
+   }
+
+   return coverShares(heightMetres, slope);
+}
+
+TerrainMaterial coverMaterial(float heightMetres, float slope) {
+   TerrainCover cover = coverShares(heightMetres, slope);
+
+   TerrainMaterial material;
+   material.colour = cover.sand * k_sandColour + cover.grass * k_grassColour
+                   + cover.rock * k_rockColour + cover.snow * k_snowColour;
+   material.roughness = mix(k_flatRoughness, k_steepRoughness, bareShare(slope));
 
    return material;
 }

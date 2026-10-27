@@ -1,5 +1,6 @@
 // PlanetSurfaceGlsl.cpp
 #include "PlanetSurfaceGlsl.h"
+#include "CubeFaces.h"
 #include <array>
 #include <cassert>
 #include <charconv>
@@ -50,9 +51,7 @@ std::string glslLevelArray(
 
 }  // namespace
 
-std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres,
-                              const glm::dvec3& waterAbsorptionPerMetre,
-                              const glm::dvec3& waterColor, const glm::dvec3& bodyTint) {
+std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres) {
     const TerrainDisplacement& displacement{surface.getDisplacement()};
     const int levelCount{TerrainDisplacement::k_levelCount};
 
@@ -60,13 +59,7 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres,
     glsl << "// Written by planetSurfaceGlsl.\n"
          << "const float k_radiusMetres = " << glslFloat(surface.getRadius()) << ";\n"
          << "// Height above the sphere the sand is laid along.\n"
-         << "const float k_shoreMetres = " << glslFloat(shoreMetres) << ";\n"
-         << "// The water below the shore, as the sea is drawn from far above.\n"
-         << "const vec3 k_waterAbsorptionPerMetre = " << glslVec3(waterAbsorptionPerMetre)
-         << ";\n"
-         << "const vec3 k_waterColor = " << glslVec3(waterColor) << ";\n"
-         << "// What the renderer multiplies the surface's colour by.\n"
-         << "const vec3 k_bodyTint = " << glslVec3(bodyTint) << ";\n\n"
+         << "const float k_shoreMetres = " << glslFloat(shoreMetres) << ";\n\n"
          << "// One repeat of the map, as the two whole numbers its width is the ratio\n"
          << "// of: the width itself is not exact in a float, and a plane coordinate\n"
          << "// stands thousands of tiles out.\n"
@@ -141,4 +134,36 @@ std::string planetSurfaceGlsl(const PlanetSurface& surface, double shoreMetres,
     glsl << ");\n";
 
     return glsl.str();
+}
+
+std::string farWaterGlsl(const glm::dvec3& waterAbsorptionPerMetre,
+                         const glm::dvec3& waterColor, const glm::dvec3& bodyTint) {
+    return "// Written by farWaterGlsl.\n"
+           "// The water below the shore, as the sea is drawn from far above.\n"
+           "const vec3 k_waterAbsorptionPerMetre = " + glslVec3(waterAbsorptionPerMetre) +
+           ";\n"
+           "const vec3 k_waterColor = " + glslVec3(waterColor) + ";\n"
+           "// What the renderer multiplies the surface's colour by.\n"
+           "const vec3 k_bodyTint = " + glslVec3(bodyTint) + ";\n\n";
+}
+
+std::string propPatchGridGlsl(const PropPatchGrid& grid) {
+    std::string faceOrigin{};
+    std::string faceUAxis{};
+    std::string faceVAxis{};
+    for (int face{0}; face < CubeFaces::k_faceCount; ++face) {
+        const std::string separator{face == 0 ? "\n   " : ",\n   "};
+        faceOrigin += separator + glslVec3(CubeFaces::faceOrigin(face));
+        faceUAxis += separator + glslVec3(CubeFaces::faceUAxis(face));
+        faceVAxis += separator + glslVec3(CubeFaces::faceVAxis(face));
+    }
+
+    return "// Written by propPatchGridGlsl.\n"
+           "// Prop patches along each edge of a cube face.\n"
+           "const uint k_propPatchesPerEdge = " +
+           std::to_string(grid.getPatchesPerEdge()) + "u;\n"
+           "// The cube's faces, as CubeFaces holds them: a corner and two edges.\n"
+           "const vec3 k_faceOrigin[6] = vec3[6](" + faceOrigin + ");\n"
+           "const vec3 k_faceUAxis[6] = vec3[6](" + faceUAxis + ");\n"
+           "const vec3 k_faceVAxis[6] = vec3[6](" + faceVAxis + ");\n\n";
 }

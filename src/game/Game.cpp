@@ -43,9 +43,9 @@ Game::Game(TimeHandler* timeHandler, GraphicsEngineBase::Mode controlMode,
     m_mode = std::make_unique<Creative>(m_gameBase.get());
 
     // Set up initial camera position and orientation
-    m_gameBase->m_graphicsEngine->getCamPos() = glm::dvec3(0, 0, 0);
-    m_gameBase->m_graphicsEngine->getCamOri() =
-        glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0));
+    m_gameBase->m_graphicsEngine->setCamPos(glm::dvec3(0, 0, 0));
+    m_gameBase->m_graphicsEngine->setCamOri(
+        glm::angleAxis(glm::radians(0.0), glm::dvec3(1, 0, 0)));
     m_gameBase->m_graphicsEngine->getFieldOfView() = glm::radians(120.0);
     // Panini projection: 0 = standard rectilinear (off), 1 = max distortion.
     m_gameBase->m_graphicsEngine->getPaniniHorizontal() = 0.5;

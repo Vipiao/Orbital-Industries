@@ -66,12 +66,14 @@ public:
                   const TileableNoiseMapConfig& noiseConfig,
                   const PlanetBaseLayerConfig& baseConfig);
 
-    // Where a crude point is drawn. Mirrors cdlodSurfacePoint.
+    // Where the ground stands at a crude point: the height gatherHeightLevels
+    // reads, put in place by surfacePointAtHeight. cdlodSurfacePoint is this
+    // plus the far sea and the underwater warp, which only draw.
     glm::dvec3 surfacePoint(const glm::dvec3& crudePoint) const;
     // The unit normal there. Mirrors the normal cdlodSurfaceShading returns.
     glm::dvec3 surfaceNormal(const glm::dvec3& crudePoint) const;
     // The same point before any terrain, which costs no lookup: the projection
-    // the snippet's position path folds into cdlodSurfacePoint.
+    // the snippet's surfacePointAtHeight folds the height into.
     glm::dvec3 spherePointOf(const glm::dvec3& crudePoint) const;
 
     // The sphere the crude solid projects onto, before any terrain: the size of

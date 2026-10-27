@@ -11,8 +11,6 @@
 // The cylinder inscribes the 1x2x1 proxy: axis along local +Y at (0.5, *, 0.5),
 // radius 0.5, height 2.
 
-#define PI 3.1415926538
-
 // Local plume radius at axialDist, fitted so sqrt(a*x^2 + b*x + c) passes
 // through the three (axialDist, radius) control points p0, p1, p2.
 float radiusProfile(float axialDist, vec2 p0, vec2 p1, vec2 p2)
@@ -85,13 +83,13 @@ float density(vec3 point, vec3 axisBase, vec3 axisDir)
     float radialDist   = length(toPoint - axialDist * axisDir);  // distance to axis
     float radialParam = radialDist /
         radiusProfile(axialDist, vec2(0.0, 0.65), vec2(0.5, 0.4), vec2(2.0, 1.0));
-    //float ring = sin(radialParam * PI*4.0 - 1.57)+1.;                 // rings; tune the 16
+    //float ring = sin(radialParam * k_pi*4.0 - 1.57)+1.;                 // rings; tune the 16
     float density = 0.5-radialParam;
     // Fade toward end.
     density *= pow(2.-axialDist, 4.0);
     // Round the ring.
     float ff = 1.0;//sin(iTime)*0.5 + 0.5;
-    density *= sin(radialDist * 4. * PI - ff*PI/2.) + ff;
+    density *= sin(radialDist * 4. * k_pi - ff*k_pi/2.) + ff;
 
     //Soften.
     //density *= max(density, 0.);
@@ -157,8 +155,8 @@ RayVolumeResult rayVolumeShade(
    // transparency fade): the dense core fades last, the fringes first.
    depth *= thrust;
 
-   depth *= (sin(mod(wrappedPhysicsTicks(), 2. * PI) + wrappedPhysicsTime()) +
-      sin(mod(wrappedPhysicsTicks() * 0.77, 2. * PI) + wrappedPhysicsTime() * 0.77))
+   depth *= (sin(mod(wrappedPhysicsTicks(), k_twoPi) + wrappedPhysicsTime()) +
+      sin(mod(wrappedPhysicsTicks() * 0.77, k_twoPi) + wrappedPhysicsTime() * 0.77))
       * 0.125 + 0.75;
 
    res.color       = color.rgb + opaqueColor;
