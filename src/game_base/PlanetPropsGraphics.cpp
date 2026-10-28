@@ -30,14 +30,20 @@ std::weak_ptr<ScatterSet> PlanetPropsGraphics::createSet(GraphicsEngine* graphic
 }
 
 ScatterSetConfig PlanetPropsGraphics::setConfig(const PropPatchGrid& grid) {
-    // The colour texture's left half is the trunk, its right half the crown. The
-    // material texture makes it matte.
-    const std::string treeDir{"../media/models/tree/"};
+    // An ash from EZ-Tree, exported from Blender with the material names below
+    const std::string treeDir{"../media/models/ash_tree/"};
+    ScatterMaterial bark{};
+    bark.m_name = "branches.001";
+    bark.m_colorTexturePath = treeDir + "albedo.png";
+    bark.m_normalTexturePath = treeDir + "normal.png";
+    ScatterMaterial leaves{};
+    leaves.m_name = "leaves.001";
+    leaves.m_colorTexturePath = treeDir + "leaves.png";
+
     ScatterKind tree{};
-    tree.m_lods = {ScatterLod{treeDir + "tree_lod0.obj", 25.0},
-                   ScatterLod{treeDir + "tree_lod1.obj", 50.0}};
-    tree.m_colorTexturePath = treeDir + "tree_color.png";
-    tree.m_materialTexturePath = treeDir + "tree_material.png";
+    tree.m_lods = {ScatterLod{treeDir + "L0.obj", 25.0}, ScatterLod{treeDir + "L1.obj", 50.0},
+                   ScatterLod{treeDir + "L2.obj", 100.0}};
+    tree.m_materials = {bark, leaves};
 
     // Over the last 300 m trees shrink and sink into the ground by their height,
     // so the forest thins out instead of ending in a line

@@ -54,8 +54,8 @@ private:
     static_assert(k_candidatesPerSide <= 256, "candidate positions must stay below 2^24");
     static constexpr double k_searchStepMetres{16.0};
     static constexpr double k_rangeMarginMetres{16.0};
-    // tree_lod0.obj's height, standing on Z = 0
-    static constexpr double k_treeHeightMetres{10.0};
+    // ash_tree/L0.obj's height, standing on Z = 0
+    static constexpr double k_treeHeightMetres{27.7};
     static constexpr uint32_t k_patchesPerFrame{16};
     // Mixed into every draw, the same on every peer
     static constexpr uint32_t k_seed{1};

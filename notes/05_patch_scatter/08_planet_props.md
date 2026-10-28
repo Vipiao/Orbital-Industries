@@ -187,6 +187,35 @@ come later.
   reached at the band's end; the game sets it to (0, 0, −`k_treeHeightMetres`). Chosen
   over a vertex-stage hook for the game: one effect is data, a hook pays off only
   once there are several. `ScatterImpostorData` is 80 bytes.
+- 2026-10-28 — Multi-material kinds, for an EZ-Tree ash (Markus picked texture arrays
+  over an offline bake to one atlas). A kind has a list of `ScatterMaterial`s, matched
+  to the model's sub-meshes by material name; each texture role becomes a
+  `Texture2DArray` with a layer per material (`TextureStore::createArrayFromFiles`,
+  layers of one size, a missing texture filled so it decodes as none). The layer is a
+  per-vertex float at location 4 in a buffer of its own; `material_decode.glsl` samples
+  arrays under `MATERIAL_TEXTURE_ARRAYS`. UVs are the OBJ's own; no .mtl is needed, as
+  Assimp keeps the `usemtl` names without it. Scatter meshes cut at alpha 0.5 and
+  draw back faces with the normal flipped, the bake the same. The ash: 3 LODs (13.6k,
+  3.7k, 2.0k triangles, to 25, 50, 100 m), 27.7 m tall, files in
+  `media/models/ash_tree/`; the bark colour scaled to 1024² to match the leaves.
+- 2026-10-28 — The L0 → L1 pop: L1 and L2 held a loose edge (`l` in the OBJ), which
+  Assimp keeps as a 2-index face, shifting every later triangle's indices. `AssimpLoader`
+  now drops points and lines (`aiProcess_SortByPType`, `AI_CONFIG_PP_SBP_REMOVE`).
+  Impostors bake from the last LOD, the one they take over from. Leaf normals point
+  out from the crown's centre (written into the OBJs by script for now; the lasting
+  way is a Normal Edit modifier in Blender), and back faces keep their normal, so a
+  card is lit alike from both sides.
+- 2026-10-29 — The ash cost ~2 ms GPU over the old tree (7.04 vs 4.99 ms on
+  `007_forest_benchmark`): size, not triangles; ~1.4 ms of it impostors, whose quads
+  are 74% cut-out pixels that read all 8 textures before discarding. Benchmarked:
+  tight per-view quads (−0.03 ms, the crown fills ~80% of the square; dropped), view
+  culling (−0.10), a depth pre-pass (−0.54), impostor colour read before normals
+  (−0.34). Kept the last three (Markus): 6.30 ms, −10.5%. The cull pass drops items
+  whose sphere (`m_boundingRadius`, now holding the impostor quad) is outside the
+  view's side planes. Items are drawn depth-only first, alpha cut, then shaded with
+  depth `EQUAL` and early fragment tests; `invariant gl_Position` keeps the passes
+  alike. The cutoff is a uniform, `u_alphaCutoff` (1/255 by default, 0.5 for scatter
+  and its bake).
 
 ## The plan
 
