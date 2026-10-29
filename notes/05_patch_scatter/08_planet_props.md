@@ -230,6 +230,19 @@ come later.
   everything in one pass. Flat quads in one pass 6.60, everything in one 6.87, so the
   pre-pass still pays for the LOD meshes. Kept: front quads, impostors in one pass,
   6.95 ms (+0.45, +7%).
+- 2026-10-29 — Optimisation benchmark (Markus walking), against 6.95 ms. Patches
+  sorted near or far first: no change (meshes go in LOD order already, a coarse
+  sort). One atlas view instead of four: −0.64 ms everywhere, −0.49 past 200 m,
+  −0.22 past 400 m. No depth atlas read past 400 m: nothing. Depth in the normal
+  atlas's alpha instead of its own texture: −0.14. Per-pixel depth in all: 0.34.
+  Octagon instead of the quad: nothing. The crossfade in all: 0.12 (half the band
+  0.03; the dither discard alone ~0.1). Found while measuring: a LOD without a
+  crossfade band hid the next mesh entirely; `scatterHandover` now steps there.
+- 2026-10-29 — Kept from it (Markus): `ScatterImpostor::m_blendViewsMetres`, past
+  which only the nearest view is read; and depth in the normal atlas's alpha,
+  roughness not baked (impostors shade at `k_defaultRoughness`, which the ash has
+  everywhere anyway). At 200 m 6.38 ms (−0.56, −8%); the ash uses 400 m, where the
+  snap between views is less visible, 6.62 ms (−0.32, −5%).
 
 ## The plan
 

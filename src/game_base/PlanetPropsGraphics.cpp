@@ -53,6 +53,8 @@ ScatterSetConfig PlanetPropsGraphics::setConfig(const PropPatchGrid& grid) {
     impostor.m_maxDistance = 2000.0;
     impostor.m_fadeBandMetres = 300.0;
     impostor.m_fadeOffsetMetres = glm::dvec3{0.0, 0.0, -k_treeHeightMetres};
+    // Farther out a tree is too small to show the snap between views
+    impostor.m_blendViewsMetres = 400.0;
     // Views about 6 degrees apart; 192 px pictures in 224 = 7 * 32 px cells, clean
     // down to mip 5
     impostor.m_bake.m_viewsPerSide = 16;
