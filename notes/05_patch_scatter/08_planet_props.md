@@ -216,6 +216,20 @@ come later.
   depth `EQUAL` and early fragment tests; `invariant gl_Position` keeps the passes
   alike. The cutoff is a uniform, `u_alphaCutoff` (1/255 by default, 0.5 for scatter
   and its bake).
+- 2026-10-29 — LOD crossfade (Markus): `ScatterLod::m_crossfadeMetres`, the ash 2.5 /
+  5 / 10 m. In the band the cull pass draws the next mesh too, and both dither with
+  complementary halves of one screen noise (`shared_shaders/dither.glsl`, interleaved
+  gradient noise shifted per item). Stateless: each vertex shader works out its own
+  fade from distance; the LOD meshes find their mesh by `gl_DrawID`.
+- 2026-10-29 — Impostor depth per pixel, against crossing quads popping (Markus, then
+  slept). The bake writes a third atlas, R8: surface depth along the view, ±radius.
+  Benchmarked on `007_forest_benchmark` against 6.49 ms: quad at the centre and the
+  depth written in both passes 11.85 ms (every test late); quad moved along the rays
+  to the sphere's front with depth only pushed back (`depth_less`, keeps early
+  rejection) 7.61 ms with the pre-pass, 6.96 ms with impostors in one pass, 7.22 with
+  everything in one pass. Flat quads in one pass 6.60, everything in one 6.87, so the
+  pre-pass still pays for the LOD meshes. Kept: front quads, impostors in one pass,
+  6.95 ms (+0.45, +7%).
 
 ## The plan
 

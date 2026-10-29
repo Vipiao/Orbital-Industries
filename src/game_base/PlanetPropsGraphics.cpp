@@ -41,8 +41,10 @@ ScatterSetConfig PlanetPropsGraphics::setConfig(const PropPatchGrid& grid) {
     leaves.m_colorTexturePath = treeDir + "leaves.png";
 
     ScatterKind tree{};
-    tree.m_lods = {ScatterLod{treeDir + "L0.obj", 25.0}, ScatterLod{treeDir + "L1.obj", 50.0},
-                   ScatterLod{treeDir + "L2.obj", 100.0}};
+    // Each dithers into the next over the last tenth of its distance
+    tree.m_lods = {ScatterLod{treeDir + "L0.obj", 25.0, 2.5},
+                   ScatterLod{treeDir + "L1.obj", 50.0, 5.0},
+                   ScatterLod{treeDir + "L2.obj", 100.0, 10.0}};
     tree.m_materials = {bark, leaves};
 
     // Over the last 300 m trees shrink and sink into the ground by their height,
