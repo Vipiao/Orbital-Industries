@@ -36,9 +36,9 @@ come later.
   none of them is written twice.
 - **The ash.** EZ-Tree, 27.7 m tall, `media/models/ash_tree/`: bark and leaves as two
   materials (texture arrays, a layer per material, matched by `usemtl` name). L0/L1/L2
-  (13.6k, 3.7k, 2.0k triangles) to 25/50/100 m, each dithering into the next over its
-  last tenth. Leaf normals point out from the crown's centre (written by script; the
-  lasting way is a Normal Edit modifier in Blender).
+  (13.6k, 3.7k, 2.5k triangles) to 25/50/100 m, each dithering into the next over its
+  last tenth. Leaf normals point out from the crown's centre, as exported from Blender.
+  Its materials must be named `branches.001` and `leaves.001`.
 - **Impostors.** Baked at startup from the last LOD (`ImpostorBaker`): 16 × 16 views of
   224 px cells, colour, and normal with depth in alpha. Out to 2 km; the four nearest
   views blended to 400 m, the nearest alone beyond; per-pixel depth, the quad at the
@@ -48,8 +48,8 @@ come later.
 - **Shadows.** Patches carry a bounding sphere (`patchBounds`) and are grouped by caster
   tier like CDLOD's (`CasterTiers`); cascade k culls the first `m_tierEnds[k]` patches
   into its own draw list. The ash casts into 2 cascades (out to 64 m) with
-  `ScatterShadow{L3.obj, 100 m, 20 m fade}`: L2 with a sixth of its leaves, dithered out
-  over its last 20 m. Impostors never cast.
+  `ScatterShadow{LS.obj, 100 m, 20 m fade}`: few branches and 256 leaf cards, dithered
+  out over its last 20 m. Impostors never cast.
 
 ## Progress
 
@@ -77,6 +77,12 @@ come later.
   against 6.2), 150 m +0.31, 100 m +0.16 (7.0). Kept 100 m with a 20 m dither (Markus).
   Alpha-only depth read: no gain, the driver already drops unused reads.
 - 2026-10-30 — `s_planetSpins` in `main.cpp`, off; 007 and 008 replay with it on.
+- 2026-10-30 — Shadow mesh LS (Markus). Three crown-sized cards cost as L3's 146 (on
+  007 / 008 against no tree shadows: +1.20 / +0.14 ms against +1.18 / +0.15; branches
+  alone +0.10): the cost is the cards' rasterised area (1739 m² against 1879 a tree),
+  alpha-cut texels included, not their count. Kept LS with 256 leaf cards, 2318 m²:
+  +1.43 / +0.18 ms, as area predicts (~0.57 ms per 1000 m² on 007). The new L2 has more
+  branch triangles (215 to 724): +0.04 ms on 007.
 
 ## Shadow optimisations, pinned (Markus, 2026-10-30)
 
@@ -86,9 +92,9 @@ One at a time on top of the L3 shadow mesh, each benchmarked and looked at.
   blurs leaf shapes. Measure on L3 first.
 - **Cascade far-plane cull.** The shadow cull tests only side planes, so trees past the
   slab's far end are drawn and clipped. Likely under 0.1 ms.
-- **L4, leaves made for shadows.** Fewer overlapping fragments: a few large leaf-cluster
-  cards (L3 drew 64% of cascade 1's texels, the LODs 67–70%), or an opaque crown shell
-  (early depth works, blob shadows), maybe for cascade 1 only.
+- **Less leaf-card area in LS.** Cost goes with area: smaller cards, or cards cropped
+  closer to their leaves (`leaves.png` is 16% opaque). Or an opaque crown shell (early
+  depth works, blob shadows), maybe for cascade 1 only.
 - **Cascade 1 resolution or radius.** Fill grows with texel density squared; terrain
   shadows soften too.
 

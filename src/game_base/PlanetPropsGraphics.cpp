@@ -70,9 +70,9 @@ ScatterSetConfig PlanetPropsGraphics::setConfig(const PropPatchGrid& grid) {
     impostor.m_bake.m_viewPixels = 224;
     impostor.m_bake.m_borderPixels = 16;
     tree.m_impostor = impostor;
-    // L2 with a sixth of its leaves: in a fine shadow map leaf cards cost by area.
+    // Few branches and 256 leaf cards: in a fine shadow map leaf cards cost by area.
     // Short, as a low sun over a wooded ridge cost ~25 ms at 2 km.
-    tree.m_shadow = ScatterShadow{k_treeDir + "L3.obj", 100.0, 20.0};
+    tree.m_shadow = ScatterShadow{k_treeDir + "LS.obj", 100.0, 20.0};
 
     ScatterSetConfig config{};
     config.m_kinds = {tree};
