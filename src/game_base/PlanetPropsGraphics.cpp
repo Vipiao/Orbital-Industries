@@ -11,13 +11,24 @@
 #include <stdexcept>
 #include <vector>
 
+namespace {
+
+// An ash from EZ-Tree, exported from Blender with the material names setConfig
+// gives. Its L0.obj stands this tall on Z = 0.
+const std::string k_treeDir{"../media/models/ash_tree/"};
+constexpr double k_treeHeightMetres{27.7};
+
+}  // namespace
+
 std::weak_ptr<ScatterSet> PlanetPropsGraphics::createSet(GraphicsEngine* graphics,
                                                          const PropPatchGrid& grid,
                                                          const std::string& surfaceFigures) {
     // Figures written once, the snippet read again on every reload
-    const std::string figures{surfaceFigures + propPatchGridGlsl(grid) +
-                              "const uint k_propCandidatesPerSide = " +
-                              std::to_string(k_candidatesPerSide) + "u;\n\n"};
+    const std::string figures{
+        surfaceFigures + propPatchGridGlsl(grid) + "const uint k_propCandidatesPerSide = " +
+        std::to_string(k_candidatesPerSide) + "u;\n" +
+        "const float k_propMinScale = " + glslFloat(k_propMinScale) + ";\n" +
+        "const float k_propScaleSpan = " + glslFloat(k_propScaleSpan) + ";\n\n"};
     const std::weak_ptr<ScatterSet> set{graphics->createScatterSet(setConfig(grid), [figures] {
         return figures + ShaderProgram::loadTextFileFromPath("../src/world/planet_props.glsl");
     })};
@@ -30,21 +41,19 @@ std::weak_ptr<ScatterSet> PlanetPropsGraphics::createSet(GraphicsEngine* graphic
 }
 
 ScatterSetConfig PlanetPropsGraphics::setConfig(const PropPatchGrid& grid) {
-    // An ash from EZ-Tree, exported from Blender with the material names below
-    const std::string treeDir{"../media/models/ash_tree/"};
     ScatterMaterial bark{};
     bark.m_name = "branches.001";
-    bark.m_colorTexturePath = treeDir + "albedo.png";
-    bark.m_normalTexturePath = treeDir + "normal.png";
+    bark.m_colorTexturePath = k_treeDir + "albedo.png";
+    bark.m_normalTexturePath = k_treeDir + "normal.png";
     ScatterMaterial leaves{};
     leaves.m_name = "leaves.001";
-    leaves.m_colorTexturePath = treeDir + "leaves.png";
+    leaves.m_colorTexturePath = k_treeDir + "leaves.png";
 
     ScatterKind tree{};
     // Each dithers into the next over the last tenth of its distance
-    tree.m_lods = {ScatterLod{treeDir + "L0.obj", 25.0, 2.5},
-                   ScatterLod{treeDir + "L1.obj", 50.0, 5.0},
-                   ScatterLod{treeDir + "L2.obj", 100.0, 10.0}};
+    tree.m_lods = {ScatterLod{k_treeDir + "L0.obj", 25.0, 2.5},
+                   ScatterLod{k_treeDir + "L1.obj", 50.0, 5.0},
+                   ScatterLod{k_treeDir + "L2.obj", 100.0, 10.0}};
     tree.m_materials = {bark, leaves};
 
     // Over the last 300 m trees shrink and sink into the ground by their height,
@@ -61,11 +70,16 @@ ScatterSetConfig PlanetPropsGraphics::setConfig(const PropPatchGrid& grid) {
     impostor.m_bake.m_viewPixels = 224;
     impostor.m_bake.m_borderPixels = 16;
     tree.m_impostor = impostor;
+    // L2 with a sixth of its leaves: in a fine shadow map leaf cards cost by area.
+    // Short, as a low sun over a wooded ridge cost ~25 ms at 2 km.
+    tree.m_shadow = ScatterShadow{k_treeDir + "L3.obj", 100.0, 20.0};
 
     ScatterSetConfig config{};
     config.m_kinds = {tree};
     config.m_maxPatches = grid.maxPatchesWithin(keepReach(config.drawDistance()));
     config.m_itemsPerPatch = k_candidatesPerSide * k_candidatesPerSide;
+    // The near two, out to 64 m
+    config.m_shadowCascades = 2;
     return config;
 }
 
@@ -154,11 +168,33 @@ void PlanetPropsGraphics::addPending() {
 
         const PropPatchKey key{m_pendingPatches.back().second};
         m_pendingPatches.pop_back();
+        const auto [boundsCentre, boundsRadius] = patchBounds(key);
         m_livePatches.emplace(
             key, m_graphics->addScatterPatch(
-                     m_instance, m_grid.patchOrigin(key),
+                     m_instance, m_grid.patchOrigin(key), boundsCentre, boundsRadius,
                      glm::uvec4{key.m_face, key.m_column, key.m_row, k_seed}));
     }
+}
+
+std::pair<glm::dvec3, double> PlanetPropsGraphics::patchBounds(const PropPatchKey& key) const {
+    // Corners, then the middle
+    const glm::dvec2 samples[5]{{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}, {1.0, 1.0}, {0.5, 0.5}};
+    glm::dvec3 ground[5]{};
+    glm::dvec3 centre{0.0};
+    for (size_t sample{0}; sample < 5; ++sample) {
+        ground[sample] = m_surface->surfacePoint(
+            m_surface->getRadius() * m_grid.gridDirection(key.m_face,
+                                                          key.m_column + samples[sample].x,
+                                                          key.m_row + samples[sample].y));
+        centre += ground[sample] / 5.0;
+    }
+
+    double spread{0.0};
+    for (const glm::dvec3& point : ground) {
+        spread = std::max(spread, glm::length(point - centre));
+    }
+    return {centre,
+            1.5 * spread + (k_propMinScale + k_propScaleSpan) * k_treeHeightMetres};
 }
 
 void PlanetPropsGraphics::removeAll() {

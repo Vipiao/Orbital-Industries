@@ -54,8 +54,9 @@ private:
     static_assert(k_candidatesPerSide <= 256, "candidate positions must stay below 2^24");
     static constexpr double k_searchStepMetres{16.0};
     static constexpr double k_rangeMarginMetres{16.0};
-    // ash_tree/L0.obj's height, standing on Z = 0
-    static constexpr double k_treeHeightMetres{27.7};
+    // The snippet scales each prop by k_propMinScale plus up to k_propScaleSpan
+    static constexpr double k_propMinScale{0.7};
+    static constexpr double k_propScaleSpan{0.6};
     static constexpr uint32_t k_patchesPerFrame{16};
     // Mixed into every draw, the same on every peer
     static constexpr uint32_t k_seed{1};
@@ -70,6 +71,9 @@ private:
     void search(const glm::dvec3& direction, bool addable);
     void addPending();
     void removeAll();
+    // A sphere holding the patch's ground and trees, from the ground at its corners
+    // and middle; widened, since the ground between them may rise further
+    std::pair<glm::dvec3, double> patchBounds(const PropPatchKey& key) const;
 
     GraphicsEngine* m_graphics;
     PropPatchGrid m_grid;

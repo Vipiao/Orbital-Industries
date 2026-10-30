@@ -8,13 +8,12 @@
 // Every decision is made in integers, so a CPU twin can match it bit for bit;
 // floats enter only when the spot is put on the ground.
 //
-// Preceded by planetSurfaceGlsl, propPatchGridGlsl and k_propCandidatesPerSide.
+// Preceded by planetSurfaceGlsl, propPatchGridGlsl, k_propCandidatesPerSide,
+// k_propMinScale and k_propScaleSpan.
 #include "lattice_surface.glsl"
 
 // Candidates kept on all-grass ground, in 65536ths: six in ten
 const uint k_propKeep = 39322u;
-const float k_propMinScale = 0.7;
-const float k_propScaleSpan = 0.6;
 // Finer than any map texel, as PlanetSurface::surfacePoint reads them
 const float k_propSampleSpacing = 0.001;
 

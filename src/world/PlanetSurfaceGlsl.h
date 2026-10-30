@@ -45,3 +45,10 @@ std::string farWaterGlsl(const glm::dvec3& waterAbsorptionPerMetre,
  * snippet lays out the same grid PropPatchGrid does without a copy of either.
  */
 std::string propPatchGridGlsl(const PropPatchGrid& grid);
+
+/**
+ * @brief One number as a GLSL float literal, at the shortest spelling that reads
+ * back as the number itself, so the shader compiles the figure it was given
+ * rather than a rounding of it.
+ */
+std::string glslFloat(double value);

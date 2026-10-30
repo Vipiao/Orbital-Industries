@@ -6,11 +6,6 @@
 #include <charconv>
 #include <sstream>
 
-namespace {
-
-// One number as GLSL source, at the shortest spelling that reads back as the
-// number itself, so the shader compiles the figure it was given rather than a
-// rounding of it.
 std::string glslFloat(double value) {
     std::array<char, 32> buffer{};
     const std::to_chars_result printed{
@@ -31,6 +26,8 @@ std::string glslFloat(double value) {
 
     return text;
 }
+
+namespace {
 
 std::string glslVec3(const glm::dvec3& value) {
     return "vec3(" + glslFloat(value.x) + ", " + glslFloat(value.y) + ", " +

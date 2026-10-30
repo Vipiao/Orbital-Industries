@@ -31,6 +31,10 @@ int debug2 = 0;
 DebugRenderer* DebugGlobals::g_debugRenderer = nullptr;
 IHashable* DebugGlobals::g_gameBase = nullptr;
 
+// The planet's slow spin. A replay needs what its recording had: 007 and 008 were
+// captured spinning.
+static constexpr bool s_planetSpins{false};
+
 // Test fixture: the hardcoded demo world. This is content, not game machinery, so
 // it lives with the entry point. Server and client build the identical world in
 // the same order, so every object id matches deterministically and the network
@@ -64,9 +68,9 @@ static void buildTestWorld(GameBase* gameBase) {
         }
     }
 
-    // A planet parked off to the side, with no collider yet, given a slow spin so
-    // the vertex stage's frame interpolation is visible on it. Sized as a planet,
-    // which is what the surface and the LOD tree have to survive.
+    // A planet parked off to the side, with no collider yet, given a slow spin (when
+    // s_planetSpins) so the vertex stage's frame interpolation is visible on it.
+    // Sized as a planet, which is what the surface and the LOD tree have to survive.
     GraphicsEngine* graphicsEngine{gameBase->m_graphicsEngine.get()};
     // SSAO works from the depth buffer, which holds the coarse displaced
     // triangles, rather than the per-pixel normals the surface is shaded with.
@@ -162,8 +166,10 @@ static void buildTestWorld(GameBase* gameBase) {
             0.0, std::max(groundRadius, seaRadius) + platformClearanceMetres, 0.0});
 
         // Radians per physics step
-        planetBody->setAngularVelocityBody(
-            glm::normalize(glm::dvec3{0.2, 1.0, 0.35}) * 0.00000001);
+        if (s_planetSpins) {
+            planetBody->setAngularVelocityBody(
+                glm::normalize(glm::dvec3{0.2, 1.0, 0.35}) * 0.00000001);
+        }
         //planetBody->setOrientation(
         //    glm::angleAxis(glm::radians(90.0), glm::dvec3{1.0, 0.0, 0.0}));
     }
